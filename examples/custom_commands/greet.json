@@ -1,0 +1,22 @@
+{
+  "name": "greet",
+  "description": "A friendly greeting command with customizable messages",
+  "arguments": [
+    {
+      "name": "name",
+      "type": "string",
+      "description": "Name of the person to greet",
+      "required": false,
+      "default": "friend"
+    },
+    {
+      "name": "style",
+      "type": "string",
+      "description": "Greeting style",
+      "choices": ["formal", "casual", "enthusiastic"],
+      "required": false,
+      "default": "casual"
+    }
+  ],
+  "script": "greet.py"
+}
