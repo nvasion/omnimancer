@@ -1,0 +1,168 @@
+# GitLab CI for Omnimancer CLI (Python project)
+# Stages:
+# - version: export VERSION from scripts/version_manager.py to downstream jobs
+# - lint: run black/isort/flake8/mypy checks
+# - test: run pytest with coverage
+# - build: build sdist and wheel artifacts
+#
+# Notes:
+# - The bump_version job is manual and requires push permissions to the repo (PAT or CI Job Token configured).
+# - By default, no tags are pushed automatically, except in the manual bump job.
+# - If you want multi-Python testing, I can extend this to a matrix.
+
+image: python:3.11-slim
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+cache:
+  key:
+    files:
+      - pyproject.toml
+      - .bandit
+  paths:
+    - .cache/pip
+
+stages:
+  - version
+  - lint
+  - test
+  - build
+
+.default_setup:
+  before_script:
+    - python --version
+    - pip install --upgrade pip setuptools wheel
+    - pip install -e ".[dev]"
+
+version:
+  stage: version
+  extends: .default_setup
+  script:
+    - |
+      python - <<'PY' > version.env
+      from scripts.version_manager import get_current_version
+      v = get_current_version()
+      print(f"VERSION={v}")
+      PY
+    - echo "Resolved version:"
+    - cat version.env
+  artifacts:
+    reports:
+      dotenv: version.env
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+lint:
+  stage: lint
+  extends: .default_setup
+  needs: ["version"]
+  script:
+    - black --check .
+    - isort --check-only .
+    - flake8 omnimancer tests
+    - mypy omnimancer
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+test:
+  stage: test
+  extends: .default_setup
+  needs: ["version"]
+  script:
+    - pytest
+  artifacts:
+    paths:
+      - htmlcov
+      - .coverage
+    when: always
+    expire_in: 1 week
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build:
+  stage: build
+  extends: .default_setup
+  needs: ["version", "lint", "test"]
+  script:
+    - pip install build
+    - python -m build
+    - ls -l dist
+  artifacts:
+    paths:
+      - dist/*
+    expire_in: 2 weeks
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# Manual version bump helper:
+# - BUMP can be: major | minor | patch (default: patch)
+# - Requires a token with push permissions:
+#   - Preferred: set GIT_AUTH_TOKEN as a masked variable (PAT with repo write).
+#   - Or configure CI_JOB_TOKEN-based push if your project allows it.
+bump_version:
+  stage: version
+  image: python:3.11-slim
+  variables:
+    BUMP: "patch"
+  before_script:
+    - apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+    - python --version
+    - pip install --upgrade pip setuptools wheel
+    - pip install -e ".[dev]"
+    - git config user.name "ci-bot"
+    - git config user.email "ci-bot@example.com"
+    - |
+      if [ -n "$GIT_AUTH_TOKEN" ]; then
+        git remote set-url origin "https://${GIT_AUTH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      fi
+    - git fetch --tags
+    - git checkout "${CI_COMMIT_REF_NAME}"
+  script:
+    - |
+      python - <<'PY'
+      import os
+      from scripts.version_manager import (
+          get_current_version, bump_version, update_version,
+          generate_changelog, update_changelog_file
+      )
+      bump = os.environ.get("BUMP", "patch").lower()
+      curr = get_current_version()
+      new = bump_version(curr, bump)
+      update_version(new)
+      ch = generate_changelog(new)
+      update_changelog_file(ch)
+      print(f"Bumped {curr} -> {new}")
+      PY
+    - git add pyproject.toml CHANGELOG.md || true
+    - git commit -m "chore(release): bump version [skip ci]" || echo "No changes to commit"
+    - |
+      NEW_VERSION=$(python - <<'PY'
+      from scripts.version_manager import get_current_version
+      print(get_current_version())
+      PY
+      )
+      echo "New version: ${NEW_VERSION}"
+    - git tag "v${NEW_VERSION}" -f
+    - git push origin "${CI_COMMIT_REF_NAME}"
+    - git push origin "v${NEW_VERSION}" -f
+    - echo "VERSION=${NEW_VERSION}" > version.env
+  artifacts:
+    reports:
+      dotenv: version.env
+  rules:
+    - when: manual
+      allow_failure: true
+  only:
+    - main
