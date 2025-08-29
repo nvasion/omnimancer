@@ -154,7 +154,7 @@ bump_version:
       PY
       )
       echo "New version: ${NEW_VERSION}"
-    - git tag "v${NEW_VERSION}" -f
+    - git tag "v${NEW_VERSION}"
     - git push origin "${CI_COMMIT_REF_NAME}"
     - git push origin "v${NEW_VERSION}" -f
     - echo "VERSION=${NEW_VERSION}" > version.env
