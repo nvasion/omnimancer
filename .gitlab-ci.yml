@@ -21,7 +21,6 @@ cache:
   key:
     files:
       - pyproject.toml
-      - .bandit
   paths:
     - .cache/pip
 
