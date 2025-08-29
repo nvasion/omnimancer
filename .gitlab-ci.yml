@@ -167,11 +167,12 @@ manual_bump_version:
   stage: version
   extends: auto_bump_version
   rules:
-    - when: manual
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
       allow_failure: true
-  only:
-    - main
-    - develop
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+      allow_failure: true
 
 # ============================================================================
 # Code Quality Stage
@@ -205,11 +206,6 @@ lint:flake8:
   needs: ["extract_version"]
   script:
     - flake8 omnimancer tests --max-line-length=88 --extend-ignore=E203,W503
-  artifacts:
-    when: on_failure
-    reports:
-      codequality: flake8-report.json
-    expire_in: 1 week
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -290,7 +286,9 @@ test:integration:
 # Static Application Security Testing
 sast:
   stage: security
-  needs: []
+  image: python:3.11-slim
+  before_script:
+    - pip install --upgrade pip
   script:
     - pip install bandit safety
     - bandit -r omnimancer -f json -o bandit-report.json || true
@@ -300,8 +298,6 @@ sast:
     paths:
       - bandit-report.json
       - safety-report.json
-    reports:
-      sast: bandit-report.json
     expire_in: 1 month
   allow_failure: true
   rules:
@@ -312,7 +308,9 @@ sast:
 # Dependency Scanning
 dependency_scanning:
   stage: security
-  needs: []
+  image: python:3.11-slim
+  before_script:
+    - pip install --upgrade pip
   script:
     - pip install pip-audit
     - pip-audit --desc --format json > dependency-scan.json || true
@@ -329,7 +327,9 @@ dependency_scanning:
 # License Scanning
 license_scanning:
   stage: security
-  needs: []
+  image: python:3.11-slim
+  before_script:
+    - pip install --upgrade pip
   script:
     - pip install pip-licenses
     - pip-licenses --format=json --with-urls --with-description > licenses.json
@@ -450,7 +450,7 @@ deploy:gitlab_registry:
         dist/*
   environment:
     name: gitlab-registry
-    url: ${CI_PROJECT_URL}/-/packages
+    url: $CI_PROJECT_URL/-/packages
   rules:
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
     - if: '$CI_COMMIT_BRANCH == "main"'
@@ -504,7 +504,8 @@ pages:
   stage: deploy
   extends: .default_setup
   needs: 
-    - test:python
+    - job: test:python
+      artifacts: false
   script:
     - pip install sphinx sphinx-rtd-theme
     - cd docs || mkdir docs
@@ -550,8 +551,6 @@ performance:
   artifacts:
     paths:
       - benchmark.json
-    reports:
-      performance: benchmark.json
     expire_in: 1 week
   allow_failure: true
   rules:
