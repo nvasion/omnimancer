@@ -29,7 +29,7 @@ from .providers.base import BaseProvider
 
 __all__ = [
     "BaseProvider",
-    "ChatContext", 
+    "ChatContext",
     "ChatMessage",
     "ChatResponse",
     "Command",

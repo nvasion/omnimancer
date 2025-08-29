@@ -13,6 +13,7 @@ from datetime import datetime
 
 class OperationType(Enum):
     """Types of operations that can be performed by the agent."""
+
     FILE_READ = "file_read"
     FILE_WRITE = "file_write"
     FILE_DELETE = "file_delete"
@@ -27,6 +28,7 @@ class OperationType(Enum):
 @dataclass
 class Operation:
     """Represents an operation to be performed by the agent."""
+
     type: OperationType
     description: str
     data: Dict[str, Any]
@@ -34,7 +36,7 @@ class Operation:
     reversible: bool = False
     preview: Optional[str] = None
     created_at: Optional[datetime] = None
-    
+
     def __post_init__(self):
         if self.created_at is None:
             self.created_at = datetime.now()
@@ -43,6 +45,7 @@ class Operation:
 @dataclass
 class OperationResult:
     """Result of an operation execution."""
+
     success: bool
     data: Any = None
     error: Optional[str] = None
@@ -51,7 +54,7 @@ class OperationResult:
     operation: Optional[Operation] = None
     execution_time: Optional[float] = None
     created_at: Optional[datetime] = None
-    
+
     def __post_init__(self):
         if self.created_at is None:
             self.created_at = datetime.now()

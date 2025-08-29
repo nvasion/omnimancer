@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # Mapping of provider names to environment variable names
 ENV_VAR_MAPPING = {
     "claude": "ANTHROPIC_API_KEY",
-    "openai": "OPENAI_API_KEY", 
+    "openai": "OPENAI_API_KEY",
     "gemini": "GOOGLE_API_KEY",
     "perplexity": "PERPLEXITY_API_KEY",
     "xai": "XAI_API_KEY",
@@ -28,33 +28,35 @@ ENV_VAR_MAPPING = {
 def load_api_key_from_env(provider_name: str) -> Optional[str]:
     """
     Load API key from environment variable for a specific provider.
-    
+
     Args:
         provider_name: Name of the provider
-        
+
     Returns:
         API key from environment or None if not found
     """
     env_var = ENV_VAR_MAPPING.get(provider_name)
     if not env_var:
         return None
-    
+
     api_key = os.environ.get(env_var)
     if api_key:
-        logger.debug(f"Loaded API key for {provider_name} from environment variable {env_var}")
+        logger.debug(
+            f"Loaded API key for {provider_name} from environment variable {env_var}"
+        )
     return api_key
 
 
 def inject_env_api_keys(provider_configs: Dict) -> Dict:
     """
     Inject API keys from environment variables into provider configurations.
-    
+
     This function checks each provider configuration and if the API key is missing
     or is a placeholder, it attempts to load it from the environment.
-    
+
     Args:
         provider_configs: Dictionary of provider configurations
-        
+
     Returns:
         Updated provider configurations with environment API keys
     """
@@ -62,10 +64,14 @@ def inject_env_api_keys(provider_configs: Dict) -> Dict:
         # Skip if provider doesn't need API key
         if provider_name in ["ollama", "claude-code"]:
             continue
-            
+
         # Check if API key is missing or is a placeholder
-        current_key = getattr(config, 'api_key', None)
-        if not current_key or current_key.startswith("your-") or current_key.startswith("sk-your"):
+        current_key = getattr(config, "api_key", None)
+        if (
+            not current_key
+            or current_key.startswith("your-")
+            or current_key.startswith("sk-your")
+        ):
             # Try to load from environment
             env_key = load_api_key_from_env(provider_name)
             if env_key:
@@ -73,5 +79,5 @@ def inject_env_api_keys(provider_configs: Dict) -> Dict:
                 logger.info(f"Injected API key for {provider_name} from environment")
             else:
                 logger.debug(f"No environment API key found for {provider_name}")
-    
+
     return provider_configs

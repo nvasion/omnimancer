@@ -16,7 +16,7 @@ from .errors import (
 __all__ = [
     "OmnimancerError",
     "ConfigurationError",
-    "ProviderError", 
+    "ProviderError",
     "AuthenticationError",
     "RateLimitError",
 ]

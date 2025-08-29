@@ -11,11 +11,11 @@ from typing import Dict, List, Optional
 
 from ..core.models import ChatContext, ChatResponse, ModelInfo
 from ..utils.errors import (
-    ProviderError, 
-    AuthenticationError, 
+    ProviderError,
+    AuthenticationError,
     RateLimitError,
     NetworkError,
-    ModelNotFoundError
+    ModelNotFoundError,
 )
 from .base import BaseProvider
 
@@ -24,37 +24,36 @@ class ClaudeProvider(BaseProvider):
     """
     Claude AI provider implementation using Anthropic's API.
     """
-    
+
     BASE_URL = "https://api.anthropic.com/v1"
-    
+
     def __init__(self, api_key: str, model: str = "", **kwargs):
         """
         Initialize Claude provider.
-        
+
         Args:
             api_key: Anthropic API key
             model: Claude model to use (e.g., 'claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022')
             **kwargs: Additional configuration
         """
         super().__init__(api_key, model or "claude-sonnet-4-20250514", **kwargs)
-        self.max_tokens = kwargs.get('max_tokens') or 4096
-        self.temperature = kwargs.get('temperature') or 0.7
-        
-    
+        self.max_tokens = kwargs.get("max_tokens") or 4096
+        self.temperature = kwargs.get("temperature") or 0.7
+
     async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to Claude API.
-        
+
         Args:
             message: User message
             context: Conversation context
-            
+
         Returns:
             ChatResponse with Claude's reply
         """
         # Prepare messages for Claude API
         messages = self._prepare_messages(message, context)
-        
+
         # Try with SSL verification first, then fall back if needed
         for ssl_verify in [True, certifi.where(), False]:
             try:
@@ -64,20 +63,20 @@ class ClaudeProvider(BaseProvider):
                         headers={
                             "Content-Type": "application/json",
                             "x-api-key": self.api_key,
-                            "anthropic-version": "2023-06-01"
+                            "anthropic-version": "2023-06-01",
                         },
                         json={
                             "model": self.model,
                             "max_tokens": self.max_tokens,
                             "temperature": self.temperature,
-                            "messages": messages
+                            "messages": messages,
                         },
-                        timeout=30.0
+                        timeout=30.0,
                     )
-                
+
                 # If we get here, the request succeeded
                 return self._handle_response(response)
-                
+
             except httpx.ConnectError as e:
                 if "SSL" in str(e) or "certificate" in str(e):
                     # SSL error, try next verification method
@@ -93,20 +92,25 @@ class ClaudeProvider(BaseProvider):
                     raise NetworkError(f"Network error: {e}")
                 # SSL-related error, try next verification method
                 continue
-            except (AuthenticationError, RateLimitError, ModelNotFoundError, ProviderError) as e:
+            except (
+                AuthenticationError,
+                RateLimitError,
+                ModelNotFoundError,
+                ProviderError,
+            ) as e:
                 # Known provider errors, don't retry
                 raise
             except Exception as e:
                 # Unknown error, don't retry
                 raise ProviderError(f"Unexpected error: {e}")
-        
+
         # If we get here, all SSL methods failed
         raise NetworkError("Failed to establish SSL connection to Claude API")
-    
+
     async def validate_credentials(self) -> bool:
         """
         Validate Claude API credentials by making a test request.
-        
+
         Returns:
             True if credentials are valid
         """
@@ -120,16 +124,16 @@ class ClaudeProvider(BaseProvider):
                         headers={
                             "Content-Type": "application/json",
                             "x-api-key": self.api_key,
-                            "anthropic-version": "2023-06-01"
+                            "anthropic-version": "2023-06-01",
                         },
                         json={
                             "model": self.model,
                             "max_tokens": 10,
-                            "messages": [{"role": "user", "content": "Hi"}]
+                            "messages": [{"role": "user", "content": "Hi"}],
                         },
-                        timeout=10.0
+                        timeout=10.0,
                     )
-                
+
                 # If we get here, connection worked
                 # Check for specific status codes
                 if response.status_code == 200:
@@ -153,7 +157,7 @@ class ClaudeProvider(BaseProvider):
                 else:
                     # Other status codes - if we got a response, API key is probably valid
                     return True
-                
+
             except httpx.ConnectError as e:
                 last_error = e
                 if "SSL" in str(e) or "certificate" in str(e):
@@ -180,69 +184,65 @@ class ClaudeProvider(BaseProvider):
                     return False
                 # SSL-related error, continue to next method
                 continue
-        
+
         # If we get here, all SSL methods failed
         return False
-    
-    def _prepare_messages(self, message: str, context: ChatContext) -> List[Dict[str, str]]:
+
+    def _prepare_messages(
+        self, message: str, context: ChatContext
+    ) -> List[Dict[str, str]]:
         """
         Prepare messages for Claude API format.
-        
+
         Args:
             message: Current user message
             context: Conversation context
-            
+
         Returns:
             List of messages formatted for Claude API
         """
         messages = []
-        
+
         # Add context messages (excluding system messages for Claude)
         for msg in context.messages:
             if msg.role.value != "system":
-                messages.append({
-                    "role": msg.role.value,
-                    "content": msg.content
-                })
-        
+                messages.append({"role": msg.role.value, "content": msg.content})
+
         # Add current message
-        messages.append({
-            "role": "user",
-            "content": message
-        })
-        
+        messages.append({"role": "user", "content": message})
+
         return messages
-    
+
     def _handle_response(self, response: httpx.Response) -> ChatResponse:
         """
         Handle Claude API response.
-        
+
         Args:
             response: HTTP response from Claude API
-            
+
         Returns:
             ChatResponse object
-            
+
         Raises:
             Various provider errors based on response status
         """
         if response.status_code == 200:
             data = response.json()
             content = data.get("content", [])
-            
+
             if content and len(content) > 0:
                 text_content = content[0].get("text", "")
                 usage = data.get("usage", {})
-                
+
                 return ChatResponse(
                     content=text_content,
                     model_used=self.model,
                     tokens_used=usage.get("output_tokens", 0),
-                    timestamp=datetime.now()
+                    timestamp=datetime.now(),
                 )
             else:
                 raise ProviderError("Empty response from Claude API")
-                
+
         elif response.status_code == 401:
             raise AuthenticationError("Invalid Claude API key")
         elif response.status_code == 429:
@@ -255,9 +255,9 @@ class ClaudeProvider(BaseProvider):
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
             except:
                 error_msg = f"HTTP {response.status_code}"
-            
+
             raise ProviderError(f"Claude API error: {error_msg}")
-    
+
     def get_model_info(self) -> ModelInfo:
         """
         Get information about the current Claude model.
@@ -266,42 +266,45 @@ class ClaudeProvider(BaseProvider):
             "claude-sonnet-4-20250514": {
                 "description": "Claude Sonnet 4 - Latest and most capable model",
                 "max_tokens": 200000,
-                "cost_per_token": 0.000015
+                "cost_per_token": 0.000015,
             },
             "claude-opus-4-20250514": {
                 "description": "Claude Opus 4 - Most powerful model for complex tasks",
                 "max_tokens": 200000,
-                "cost_per_token": 0.000075
+                "cost_per_token": 0.000075,
             },
             "claude-3-5-sonnet-20241022": {
                 "description": "Claude 3.5 Sonnet - Enhanced reasoning and analysis",
                 "max_tokens": 200000,
-                "cost_per_token": 0.000015
+                "cost_per_token": 0.000015,
             },
             # Legacy models for backward compatibility
             "claude-3-sonnet-20240229": {
                 "description": "Claude 3 Sonnet - Balanced performance and speed",
                 "max_tokens": 200000,
-                "cost_per_token": 0.000015
+                "cost_per_token": 0.000015,
             },
             "claude-3-haiku-20240307": {
                 "description": "Claude 3 Haiku - Fast and efficient",
                 "max_tokens": 200000,
-                "cost_per_token": 0.00000025
+                "cost_per_token": 0.00000025,
             },
             "claude-3-opus-20240229": {
                 "description": "Claude 3 Opus - Most capable model",
                 "max_tokens": 200000,
-                "cost_per_token": 0.000075
-            }
+                "cost_per_token": 0.000075,
+            },
         }
-        
-        config = model_configs.get(self.model, {
-            "description": f"Claude model {self.model}",
-            "max_tokens": 200000,
-            "cost_per_token": 0.000015
-        })
-        
+
+        config = model_configs.get(
+            self.model,
+            {
+                "description": f"Claude model {self.model}",
+                "max_tokens": 200000,
+                "cost_per_token": 0.000015,
+            },
+        )
+
         return ModelInfo(
             name=self.model,
             provider="claude",
@@ -311,9 +314,9 @@ class ClaudeProvider(BaseProvider):
             available=True,
             supports_tools=True,
             supports_multimodal=True,
-            latest_version=self.model == "claude-sonnet-4-20250514"
+            latest_version=self.model == "claude-sonnet-4-20250514",
         )
-    
+
     def _get_static_models(self) -> List[ModelInfo]:
         """
         Get static list of available Claude models.
@@ -328,7 +331,7 @@ class ClaudeProvider(BaseProvider):
                 available=True,
                 supports_tools=True,
                 supports_multimodal=True,
-                latest_version=True
+                latest_version=True,
             ),
             ModelInfo(
                 name="claude-opus-4-20250514",
@@ -338,27 +341,27 @@ class ClaudeProvider(BaseProvider):
                 cost_per_token=0.000075,
                 available=True,
                 supports_tools=True,
-                supports_multimodal=True
+                supports_multimodal=True,
             ),
             ModelInfo(
                 name="claude-3-5-sonnet-20241022",
-                provider="claude", 
+                provider="claude",
                 description="Claude 3.5 Sonnet - Enhanced reasoning and analysis",
                 max_tokens=200000,
                 cost_per_token=0.000015,
                 available=True,
                 supports_tools=True,
-                supports_multimodal=True
-            )
+                supports_multimodal=True,
+            ),
         ]
-    
+
     async def fetch_live_models(self) -> List[ModelInfo]:
         """
         Fetch live model list from Anthropic API.
-        
+
         Note: Anthropic doesn't have a public models list endpoint,
         so we return an enhanced static list with current pricing.
-        
+
         Returns:
             List of ModelInfo objects for Claude models
         """
@@ -374,7 +377,7 @@ class ClaudeProvider(BaseProvider):
                 available=True,
                 supports_tools=True,
                 supports_multimodal=True,
-                latest_version=True
+                latest_version=True,
             ),
             ModelInfo(
                 name="claude-3-5-haiku-20241022",
@@ -384,7 +387,7 @@ class ClaudeProvider(BaseProvider):
                 cost_per_token=0.00000025,  # $0.25 per million input tokens
                 available=True,
                 supports_tools=True,
-                supports_multimodal=True
+                supports_multimodal=True,
             ),
             ModelInfo(
                 name="claude-3-opus-20240229",
@@ -394,7 +397,7 @@ class ClaudeProvider(BaseProvider):
                 cost_per_token=0.000015,  # $15 per million input tokens
                 available=True,
                 supports_tools=True,
-                supports_multimodal=True
+                supports_multimodal=True,
             ),
             ModelInfo(
                 name="claude-3-haiku-20240307",
@@ -404,23 +407,23 @@ class ClaudeProvider(BaseProvider):
                 cost_per_token=0.00000025,  # $0.25 per million input tokens
                 available=True,
                 supports_tools=True,
-                supports_multimodal=True
-            )
+                supports_multimodal=True,
+            ),
         ]
-    
+
     def supports_tools(self) -> bool:
         """
         Check if Claude provider supports tool calling.
-        
+
         Returns:
             True - Claude supports tool calling
         """
         return True
-    
+
     def supports_multimodal(self) -> bool:
         """
         Check if Claude provider supports multimodal inputs.
-        
+
         Returns:
             True - Claude supports images and other multimodal inputs
         """

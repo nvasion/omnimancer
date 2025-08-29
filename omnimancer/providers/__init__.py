@@ -16,7 +16,7 @@ from .factory import ProviderFactory
 __all__ = [
     "BaseProvider",
     "ClaudeProvider",
-    "OpenAIProvider", 
+    "OpenAIProvider",
     "GeminiProvider",
     "CohereProvider",
     "OllamaProvider",

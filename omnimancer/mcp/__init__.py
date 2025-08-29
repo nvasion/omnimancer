@@ -8,4 +8,4 @@ server connection management, tool discovery, and tool execution.
 from .client import MCPClient
 from .manager import MCPManager
 
-__all__ = ['MCPClient', 'MCPManager']
+__all__ = ["MCPClient", "MCPManager"]
