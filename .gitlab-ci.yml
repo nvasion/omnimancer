@@ -162,7 +162,6 @@ bump_version:
     reports:
       dotenv: version.env
   rules:
-    - when: manual
+    - if: $CI_COMMIT_REF_NAME == "main"
+      when: manual
       allow_failure: true
-  only:
-    - main
