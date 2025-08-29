@@ -121,7 +121,7 @@ bump_version:
     - pip install --upgrade pip setuptools wheel
     - pip install -e ".[dev]"
     - git config user.name "ci-bot"
-    - git config user.email "ci-bot@example.com"
+    - git config user.email "ci-bot@jite.ai"
     - |
       if [ -n "$GIT_AUTH_TOKEN" ]; then
         git remote set-url origin "https://${GIT_AUTH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
@@ -145,7 +145,7 @@ bump_version:
       print(f"Bumped {curr} -> {new}")
       PY
     - git add pyproject.toml CHANGELOG.md || true
-    - git commit -m "chore(release): bump version [skip ci]" || echo "No changes to commit"
+    - git commit -m "chore(release) bump version [skip ci]" || echo "No changes to commit"
     - |
       NEW_VERSION=$(python - <<'PY'
       from scripts.version_manager import get_current_version
