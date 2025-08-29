@@ -19,7 +19,9 @@ class MockProvider(BaseProvider):
     def __init__(self, api_key: str, model: str, **kwargs):
         super().__init__(api_key, model, **kwargs)
 
-    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
+    async def send_message(
+        self, message: str, context: ChatContext
+    ) -> ChatResponse:
         return ChatResponse(
             content="Mock response", model_used=self.model, tokens_used=10
         )

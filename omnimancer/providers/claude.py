@@ -36,11 +36,15 @@ class ClaudeProvider(BaseProvider):
             model: Claude model to use (e.g., 'claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022')
             **kwargs: Additional configuration
         """
-        super().__init__(api_key, model or "claude-sonnet-4-20250514", **kwargs)
+        super().__init__(
+            api_key, model or "claude-sonnet-4-20250514", **kwargs
+        )
         self.max_tokens = kwargs.get("max_tokens") or 4096
         self.temperature = kwargs.get("temperature") or 0.7
 
-    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
+    async def send_message(
+        self, message: str, context: ChatContext
+    ) -> ChatResponse:
         """
         Send a message to Claude API.
 
@@ -145,7 +149,9 @@ class ClaudeProvider(BaseProvider):
                     # Bad request - but API key might be valid, could be model issue
                     try:
                         error_data = response.json()
-                        error_type = error_data.get("error", {}).get("type", "")
+                        error_type = error_data.get("error", {}).get(
+                            "type", ""
+                        )
                         # If it's an authentication error, API key is invalid
                         if error_type == "authentication_error":
                             return False
@@ -206,7 +212,9 @@ class ClaudeProvider(BaseProvider):
         # Add context messages (excluding system messages for Claude)
         for msg in context.messages:
             if msg.role.value != "system":
-                messages.append({"role": msg.role.value, "content": msg.content})
+                messages.append(
+                    {"role": msg.role.value, "content": msg.content}
+                )
 
         # Add current message
         messages.append({"role": "user", "content": message})
@@ -252,7 +260,9 @@ class ClaudeProvider(BaseProvider):
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get("message", "Unknown error")
+                error_msg = error_data.get("error", {}).get(
+                    "message", "Unknown error"
+                )
             except:
                 error_msg = f"HTTP {response.status_code}"
 

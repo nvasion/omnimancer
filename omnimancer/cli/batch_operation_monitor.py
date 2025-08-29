@@ -197,10 +197,14 @@ class BatchOperationMonitor:
             if self.live_display:
                 self.live_display.stop()
 
-    async def _setup_progress_display(self, batch_request: BatchApprovalRequest):
+    async def _setup_progress_display(
+        self, batch_request: BatchApprovalRequest
+    ):
         """Setup live progress display."""
         self.progress_tracker = Progress(
-            TextColumn("[bold blue]Executing batch operations...", justify="right"),
+            TextColumn(
+                "[bold blue]Executing batch operations...", justify="right"
+            ),
             BarColumn(bar_width=None),
             "[progress.percentage]{task.percentage:>3.1f}%",
             "•",
@@ -222,7 +226,9 @@ class BatchOperationMonitor:
             Layout(name="details"),
         )
 
-        self.live_display = Live(layout, console=self.console, refresh_per_second=4)
+        self.live_display = Live(
+            layout, console=self.console, refresh_per_second=4
+        )
         self.live_display.start()
 
     async def _execute_operations(
@@ -235,12 +241,17 @@ class BatchOperationMonitor:
             # Skip if not approved
             if i not in approved_indices:
                 self._record_operation_result(
-                    i, operation, OperationStatus.SKIPPED, "Operation not approved"
+                    i,
+                    operation,
+                    OperationStatus.SKIPPED,
+                    "Operation not approved",
                 )
                 continue
 
             # Execute operation with retry logic
-            await self._execute_single_operation(i, operation, operation_executor)
+            await self._execute_single_operation(
+                i, operation, operation_executor
+            )
 
             # Update progress display
             if self.progress_tracker:
@@ -252,7 +263,10 @@ class BatchOperationMonitor:
                     self.live_display.layout["details"].update(details_content)
 
     async def _execute_single_operation(
-        self, operation_id: int, operation: Operation, operation_executor: callable
+        self,
+        operation_id: int,
+        operation: Operation,
+        operation_executor: callable,
     ):
         """Execute a single operation with retry logic."""
         result = OperationResult(
@@ -328,13 +342,19 @@ class BatchOperationMonitor:
             status=status,
             start_time=datetime.now(),
             end_time=datetime.now(),
-            error_message=message if status == OperationStatus.FAILED else None,
+            error_message=(
+                message if status == OperationStatus.FAILED else None
+            ),
         )
 
         self.operation_results[operation_id] = result
-        self._log_operation_event(operation_id, status.value.upper(), message or "")
+        self._log_operation_event(
+            operation_id, status.value.upper(), message or ""
+        )
 
-    def _log_operation_event(self, operation_id: int, event_type: str, message: str):
+    def _log_operation_event(
+        self, operation_id: int, event_type: str, message: str
+    ):
         """Log an operation event."""
         if self.current_summary:
             self.current_summary.execution_log.append(
@@ -356,7 +376,10 @@ class BatchOperationMonitor:
             status_counts[result.status] += 1
 
             # Collect recent events
-            if result.error_message and result.status == OperationStatus.FAILED:
+            if (
+                result.error_message
+                and result.status == OperationStatus.FAILED
+            ):
                 recent_events.append(
                     f"[red]Failed[/red]: {result.operation.type.value} - {result.error_message}"
                 )
@@ -392,7 +415,9 @@ class BatchOperationMonitor:
             else "[dim]No recent events[/dim]"
         )
 
-        content = f"{status_table}\n\n[bold]Recent Events:[/bold]\n{events_text}"
+        content = (
+            f"{status_table}\n\n[bold]Recent Events:[/bold]\n{events_text}"
+        )
 
         return Panel(
             content, title="[bold]Execution Status[/bold]", border_style="blue"
@@ -436,7 +461,9 @@ class BatchOperationMonitor:
         batch_id_short = self.current_summary.batch_id[:8]
 
         # Save JSON summary
-        json_path = self.results_directory / f"batch_{batch_id_short}_{timestamp}.json"
+        json_path = (
+            self.results_directory / f"batch_{batch_id_short}_{timestamp}.json"
+        )
         json_data = {
             "summary": {
                 "batch_id": self.current_summary.batch_id,
@@ -467,13 +494,19 @@ class BatchOperationMonitor:
                     "description": result.operation.description,
                     "status": result.status.value,
                     "start_time": (
-                        result.start_time.isoformat() if result.start_time else None
+                        result.start_time.isoformat()
+                        if result.start_time
+                        else None
                     ),
                     "end_time": (
-                        result.end_time.isoformat() if result.end_time else None
+                        result.end_time.isoformat()
+                        if result.end_time
+                        else None
                     ),
                     "duration_seconds": (
-                        result.duration.total_seconds() if result.duration else None
+                        result.duration.total_seconds()
+                        if result.duration
+                        else None
                     ),
                     "retry_count": result.retry_count,
                     "error_message": result.error_message,
@@ -507,27 +540,38 @@ class BatchOperationMonitor:
 
         summary_table.add_row("Batch ID:", summary.batch_id[:12] + "...")
         summary_table.add_row(
-            "Execution Time:", str(summary.duration) if summary.duration else "Unknown"
+            "Execution Time:",
+            str(summary.duration) if summary.duration else "Unknown",
         )
-        summary_table.add_row("Total Operations:", str(summary.total_operations))
+        summary_table.add_row(
+            "Total Operations:", str(summary.total_operations)
+        )
         summary_table.add_row(
             "Successful:", f"[green]{summary.successful_operations}[/green]"
         )
-        summary_table.add_row("Failed:", f"[red]{summary.failed_operations}[/red]")
-        summary_table.add_row("Skipped:", f"[dim]{summary.skipped_operations}[/dim]")
+        summary_table.add_row(
+            "Failed:", f"[red]{summary.failed_operations}[/red]"
+        )
+        summary_table.add_row(
+            "Skipped:", f"[dim]{summary.skipped_operations}[/dim]"
+        )
         summary_table.add_row(
             "Retried:", f"[yellow]{summary.retried_operations}[/yellow]"
         )
         summary_table.add_row(
             "Success Rate:", f"[green]{summary.success_rate:.1f}%[/green]"
         )
-        summary_table.add_row("Result:", self._format_batch_result(summary.result))
+        summary_table.add_row(
+            "Result:", self._format_batch_result(summary.result)
+        )
 
         summary_panel = Panel(
             summary_table,
             title="[bold]Batch Execution Summary[/bold]",
             border_style=(
-                "green" if summary.result == BatchOperationResult.SUCCESS else "red"
+                "green"
+                if summary.result == BatchOperationResult.SUCCESS
+                else "red"
             ),
         )
 
@@ -535,9 +579,13 @@ class BatchOperationMonitor:
 
         # Error details if any
         if summary.error_summary:
-            error_text = "\n".join([f"• {error}" for error in summary.error_summary])
+            error_text = "\n".join(
+                [f"• {error}" for error in summary.error_summary]
+            )
             error_panel = Panel(
-                error_text, title="[bold red]Errors[/bold red]", border_style="red"
+                error_text,
+                title="[bold red]Errors[/bold red]",
+                border_style="red",
             )
             self.console.print(error_panel)
 
@@ -560,9 +608,13 @@ class BatchOperationMonitor:
         ):
             status_display = self._format_operation_status(result.status)
             duration_display = (
-                f"{result.duration.total_seconds():.1f}s" if result.duration else "N/A"
+                f"{result.duration.total_seconds():.1f}s"
+                if result.duration
+                else "N/A"
             )
-            retry_display = str(result.retry_count) if result.retry_count > 0 else "-"
+            retry_display = (
+                str(result.retry_count) if result.retry_count > 0 else "-"
+            )
             error_display = (
                 result.error_message[:40] + "..."
                 if result.error_message and len(result.error_message) > 40
@@ -632,7 +684,9 @@ class BatchOperationMonitor:
         if not output_path:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             batch_id_short = self.current_summary.batch_id[:8]
-            filename = f"batch_results_{batch_id_short}_{timestamp}.{format_type}"
+            filename = (
+                f"batch_results_{batch_id_short}_{timestamp}.{format_type}"
+            )
             output_path = Path.cwd() / filename
 
         try:
@@ -675,7 +729,9 @@ class BatchOperationMonitor:
                     "type": result.operation.type.value,
                     "status": result.status.value,
                     "description": result.operation.description,
-                    "duration": str(result.duration) if result.duration else None,
+                    "duration": (
+                        str(result.duration) if result.duration else None
+                    ),
                     "retry_count": result.retry_count,
                     "error": result.error_message,
                 }
@@ -716,7 +772,11 @@ class BatchOperationMonitor:
                         result.operation.type.value,
                         result.operation.description or "",
                         result.status.value,
-                        result.duration.total_seconds() if result.duration else "",
+                        (
+                            result.duration.total_seconds()
+                            if result.duration
+                            else ""
+                        ),
                         result.retry_count,
                         result.error_message or "",
                     ]

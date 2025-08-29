@@ -41,9 +41,13 @@ class TestUnifiedFileContentDisplay:
         operation_context = {"interactive": True}
 
         with patch.object(
-            self.display.unified_approval_ui, "prompt_for_file_modification_approval"
+            self.display.unified_approval_ui,
+            "prompt_for_file_modification_approval",
         ) as mock_review:
-            mock_review.return_value = {"approved": True, "modified_content": None}
+            mock_review.return_value = {
+                "approved": True,
+                "modified_content": None,
+            }
 
             result = await self.display.display_file_creation(
                 file_path, content, operation_context
@@ -98,7 +102,9 @@ class TestUnifiedFileContentDisplay:
         with patch.object(
             self.display.diff_renderer, "render_unified_diff"
         ) as mock_diff:
-            mock_diff.return_value = "--- a/test/file.py\n+++ b/test/file.py\n..."
+            mock_diff.return_value = (
+                "--- a/test/file.py\n+++ b/test/file.py\n..."
+            )
 
             with patch.object(
                 self.display.unified_approval_ui,
@@ -153,10 +159,26 @@ class TestUnifiedFileContentDisplay:
     def test_display_batch_operations(self):
         """Test batch operations display."""
         operations = [
-            {"type": "create", "file_path": "/test/file1.py", "risk_level": "low"},
-            {"type": "modify", "file_path": "/test/file2.py", "risk_level": "medium"},
-            {"type": "delete", "file_path": "/test/file3.py", "risk_level": "high"},
-            {"type": "create", "file_path": "/test/file4.py", "risk_level": "low"},
+            {
+                "type": "create",
+                "file_path": "/test/file1.py",
+                "risk_level": "low",
+            },
+            {
+                "type": "modify",
+                "file_path": "/test/file2.py",
+                "risk_level": "medium",
+            },
+            {
+                "type": "delete",
+                "file_path": "/test/file3.py",
+                "risk_level": "high",
+            },
+            {
+                "type": "create",
+                "file_path": "/test/file4.py",
+                "risk_level": "low",
+            },
         ]
 
         result = self.display.display_batch_operations(operations)
@@ -171,7 +193,11 @@ class TestUnifiedFileContentDisplay:
     def test_display_batch_operations_large_batch(self):
         """Test batch operations display with many operations."""
         operations = [
-            {"type": "create", "file_path": f"/test/file{i}.py", "risk_level": "low"}
+            {
+                "type": "create",
+                "file_path": f"/test/file{i}.py",
+                "risk_level": "low",
+            }
             for i in range(20)
         ]
 
@@ -274,7 +300,8 @@ class TestUnifiedFileContentDisplay:
         operation_context = {"interactive": True}
 
         with patch.object(
-            self.display.unified_approval_ui, "prompt_for_file_modification_approval"
+            self.display.unified_approval_ui,
+            "prompt_for_file_modification_approval",
         ) as mock_review:
             mock_review.side_effect = Exception("Test error")
 

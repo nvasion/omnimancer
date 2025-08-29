@@ -15,7 +15,10 @@ from omnimancer.core.agent.file_modification_workflow import (
     WorkflowState,
     WorkflowResult,
 )
-from omnimancer.core.agent.proposed_changes_integration import ChangeSet, ProposedChange
+from omnimancer.core.agent.proposed_changes_integration import (
+    ChangeSet,
+    ProposedChange,
+)
 from omnimancer.core.agent.approval_manager import ChangeType
 from omnimancer.core.security.approval_workflow import RiskLevel
 
@@ -75,7 +78,10 @@ class TestFileModificationWorkflow:
             with patch.object(
                 self.workflow, "_handle_change_approval"
             ) as mock_approval:
-                mock_approval.return_value = {"approved": True, "all_changes": True}
+                mock_approval.return_value = {
+                    "approved": True,
+                    "all_changes": True,
+                }
 
                 # Create a mock that actually updates the workflow context
                 async def mock_apply_changes(
@@ -84,19 +90,28 @@ class TestFileModificationWorkflow:
                     # Simulate updating the workflow context like the real method does
                     applied_files = ["/test/file0.py", "/test/file1.py"]
                     workflow_context.applied_changes.extend(applied_files)
-                    return {"success": True, "applied": applied_files, "failed": []}
+                    return {
+                        "success": True,
+                        "applied": applied_files,
+                        "failed": [],
+                    }
 
                 with patch.object(
                     self.workflow,
                     "_apply_approved_changes",
                     side_effect=mock_apply_changes,
                 ):
-                    result = await self.workflow.execute_file_modification_workflow(
-                        "test-op"
+                    result = (
+                        await self.workflow.execute_file_modification_workflow(
+                            "test-op"
+                        )
                     )
 
                     assert result.operation_id == "test-op"
-                    assert result.final_result == WorkflowResult.APPROVED_AND_APPLIED
+                    assert (
+                        result.final_result
+                        == WorkflowResult.APPROVED_AND_APPLIED
+                    )
                     assert result.current_state == WorkflowState.COMPLETED
                     assert len(result.applied_changes) == 2
 
@@ -115,8 +130,10 @@ class TestFileModificationWorkflow:
             ) as mock_approval:
                 mock_approval.return_value = {"approved": False}
 
-                result = await self.workflow.execute_file_modification_workflow(
-                    "test-op-denied"
+                result = (
+                    await self.workflow.execute_file_modification_workflow(
+                        "test-op-denied"
+                    )
                 )
 
                 assert result.final_result == WorkflowResult.DENIED
@@ -145,7 +162,9 @@ class TestFileModificationWorkflow:
     @pytest.mark.asyncio
     async def test_execute_single_file_workflow_create(self):
         """Test single file creation workflow."""
-        self.file_system_manager.create_file = AsyncMock(return_value={"success": True})
+        self.file_system_manager.create_file = AsyncMock(
+            return_value={"success": True}
+        )
         self.file_system_manager._original_write_file = AsyncMock(
             return_value={"success": True}
         )
@@ -167,7 +186,9 @@ class TestFileModificationWorkflow:
     @pytest.mark.asyncio
     async def test_execute_single_file_workflow_modify(self):
         """Test single file modification workflow."""
-        self.file_system_manager.modify_file = AsyncMock(return_value={"success": True})
+        self.file_system_manager.modify_file = AsyncMock(
+            return_value={"success": True}
+        )
         self.file_system_manager._original_write_file = AsyncMock(
             return_value={"success": True}
         )
@@ -192,7 +213,9 @@ class TestFileModificationWorkflow:
     @pytest.mark.asyncio
     async def test_execute_single_file_workflow_delete(self):
         """Test single file deletion workflow."""
-        self.file_system_manager.delete_file = AsyncMock(return_value={"success": True})
+        self.file_system_manager.delete_file = AsyncMock(
+            return_value={"success": True}
+        )
 
         with patch.object(
             self.workflow.unified_display, "display_file_deletion"
@@ -200,7 +223,9 @@ class TestFileModificationWorkflow:
             mock_display.return_value = {"approved": True}
 
             result = await self.workflow.execute_single_file_workflow(
-                "/test/file_to_delete.py", "delete", current_content="content to delete"
+                "/test/file_to_delete.py",
+                "delete",
+                current_content="content to delete",
             )
 
             assert result.final_result == WorkflowResult.APPROVED_AND_APPLIED
@@ -226,7 +251,9 @@ class TestFileModificationWorkflow:
     async def test_handle_change_approval_batch_interface(self):
         """Test change approval with batch interface."""
         change_set = self.create_test_change_set(5)  # Exceeds batch threshold
-        workflow_context = WorkflowContext(operation_id="test", operation_type="test")
+        workflow_context = WorkflowContext(
+            operation_id="test", operation_type="test"
+        )
 
         with patch.object(
             self.workflow.changes_integration, "display_proposed_changes"
@@ -244,27 +271,36 @@ class TestFileModificationWorkflow:
     async def test_handle_change_approval_individual(self):
         """Test individual change approval."""
         change_set = self.create_test_change_set(2)  # Below batch threshold
-        workflow_context = WorkflowContext(operation_id="test", operation_type="test")
+        workflow_context = WorkflowContext(
+            operation_id="test", operation_type="test"
+        )
 
         with patch.object(
             self.workflow.changes_integration, "display_proposed_changes"
         ) as mock_display:
             # Mock approval for first change, denial for second
-            mock_display.side_effect = [{"approved": True}, {"approved": False}]
+            mock_display.side_effect = [
+                {"approved": True},
+                {"approved": False},
+            ]
 
             result = await self.workflow._handle_change_approval(
                 workflow_context, change_set
             )
 
             assert result["approved"] is True
-            assert result["selected_changes"] == [0]  # Only first change approved
+            assert result["selected_changes"] == [
+                0
+            ]  # Only first change approved
             assert len(workflow_context.user_decisions) == 2
 
     @pytest.mark.asyncio
     async def test_apply_approved_changes_success(self):
         """Test successful application of approved changes."""
         change_set = self.create_test_change_set(2)
-        workflow_context = WorkflowContext(operation_id="test", operation_type="test")
+        workflow_context = WorkflowContext(
+            operation_id="test", operation_type="test"
+        )
         approval_result = {"approved": True, "selected_changes": [0, 1]}
 
         with patch.object(
@@ -277,7 +313,9 @@ class TestFileModificationWorkflow:
             }
 
             # Mock Progress to avoid Rich console issues
-            with patch("omnimancer.core.agent.file_modification_workflow.Progress"):
+            with patch(
+                "omnimancer.core.agent.file_modification_workflow.Progress"
+            ):
                 result = await self.workflow._apply_approved_changes(
                     workflow_context, change_set, approval_result
                 )
@@ -290,7 +328,9 @@ class TestFileModificationWorkflow:
     async def test_apply_approved_changes_partial_failure(self):
         """Test partial failure when applying changes."""
         change_set = self.create_test_change_set(2)
-        workflow_context = WorkflowContext(operation_id="test", operation_type="test")
+        workflow_context = WorkflowContext(
+            operation_id="test", operation_type="test"
+        )
         approval_result = {"approved": True, "selected_changes": [0, 1]}
 
         with patch.object(
@@ -303,7 +343,9 @@ class TestFileModificationWorkflow:
             }
 
             # Mock Progress to avoid Rich console issues
-            with patch("omnimancer.core.agent.file_modification_workflow.Progress"):
+            with patch(
+                "omnimancer.core.agent.file_modification_workflow.Progress"
+            ):
                 result = await self.workflow._apply_approved_changes(
                     workflow_context, change_set, approval_result
                 )
@@ -345,14 +387,19 @@ class TestFileModificationWorkflow:
         )
         self.workflow.active_workflows["cancel-test"] = workflow_context
 
-        with patch.object(self.workflow, "_finalize_workflow") as mock_finalize:
+        with patch.object(
+            self.workflow, "_finalize_workflow"
+        ) as mock_finalize:
             success = await self.workflow.cancel_workflow(
                 "cancel-test", "User requested"
             )
 
             assert success is True
             assert workflow_context.final_result == WorkflowResult.CANCELLED
-            assert workflow_context.metadata["cancellation_reason"] == "User requested"
+            assert (
+                workflow_context.metadata["cancellation_reason"]
+                == "User requested"
+            )
             mock_finalize.assert_called_once()
 
     @pytest.mark.asyncio
@@ -375,7 +422,9 @@ class TestFileModificationWorkflow:
             workflow_context, WorkflowState.DISPLAYING_CHANGES
         )
 
-        assert workflow_context.current_state == WorkflowState.DISPLAYING_CHANGES
+        assert (
+            workflow_context.current_state == WorkflowState.DISPLAYING_CHANGES
+        )
         assert len(workflow_context.state_history) == 1
         assert (
             workflow_context.state_history[0]["from_state"]
@@ -462,10 +511,14 @@ class TestFileModificationWorkflow:
             with patch.object(
                 self.workflow, "_handle_change_approval"
             ) as mock_approval:
-                mock_approval.side_effect = asyncio.TimeoutError("Timeout occurred")
+                mock_approval.side_effect = asyncio.TimeoutError(
+                    "Timeout occurred"
+                )
 
-                result = await self.workflow.execute_file_modification_workflow(
-                    "timeout-test"
+                result = (
+                    await self.workflow.execute_file_modification_workflow(
+                        "timeout-test"
+                    )
                 )
 
                 assert result.final_result == WorkflowResult.TIMEOUT

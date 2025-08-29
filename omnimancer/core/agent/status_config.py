@@ -66,7 +66,9 @@ class StatusConfigManager:
                         value = StatusDisplayLevel(value)
                     except ValueError:
                         continue
-                elif key == "update_frequency" and isinstance(value, (str, float)):
+                elif key == "update_frequency" and isinstance(
+                    value, (str, float)
+                ):
                     try:
                         if isinstance(value, str):
                             value = StatusUpdateFrequency(value)
@@ -117,7 +119,8 @@ class StatusConfigManager:
                 config[key] = value.value
             elif isinstance(value, set):
                 config[key] = [
-                    item.value if isinstance(item, Enum) else item for item in value
+                    item.value if isinstance(item, Enum) else item
+                    for item in value
                 ]
             elif isinstance(value, Path):
                 config[key] = str(value)
@@ -130,7 +133,9 @@ class StatusConfigManager:
         self.config.display_level = level
         self.save_config()
 
-    def update_update_frequency(self, frequency: StatusUpdateFrequency) -> None:
+    def update_update_frequency(
+        self, frequency: StatusUpdateFrequency
+    ) -> None:
         """Update update frequency."""
         self.config.update_frequency = frequency
         self.save_config()
@@ -223,12 +228,15 @@ def load_config_from_env() -> StatusDisplayConfig:
 
     if os.getenv("omnimancer_STATUS_AUTO_START"):
         config.auto_start_display = (
-            os.getenv("omnimancer_STATUS_AUTO_START", "false").lower() == "true"
+            os.getenv("omnimancer_STATUS_AUTO_START", "false").lower()
+            == "true"
         )
 
     if os.getenv("omnimancer_STATUS_MAX_OPS"):
         try:
-            config.max_visible_operations = int(os.getenv("omnimancer_STATUS_MAX_OPS"))
+            config.max_visible_operations = int(
+                os.getenv("omnimancer_STATUS_MAX_OPS")
+            )
         except ValueError:
             pass
 

@@ -149,7 +149,9 @@ class AgentOperation:
         if percentage >= 100.0 and self.status == OperationStatus.RUNNING:
             self.complete()
 
-    def complete(self, result_metadata: Optional[Dict[str, Any]] = None) -> None:
+    def complete(
+        self, result_metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Mark operation as completed."""
         self.status = OperationStatus.COMPLETED
         self.end_time = datetime.now()
@@ -158,7 +160,9 @@ class AgentOperation:
             self.metadata.update(result_metadata)
 
     def fail(
-        self, error_details: str, error_metadata: Optional[Dict[str, Any]] = None
+        self,
+        error_details: str,
+        error_metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Mark operation as failed."""
         self.status = OperationStatus.FAILED
@@ -320,7 +324,9 @@ class StatusDisplayConfig:
                     break
 
         # Ensure reasonable limits
-        self.max_visible_operations = max(1, min(50, self.max_visible_operations))
+        self.max_visible_operations = max(
+            1, min(50, self.max_visible_operations)
+        )
         self.max_visible_events = max(1, min(100, self.max_visible_events))
         self.throttle_rate = max(1, min(100, self.throttle_rate))
 
@@ -371,7 +377,9 @@ class EventListener:
 class StatusStreamListener:
     """Base class for status stream listeners."""
 
-    def __init__(self, listener_id: str, event_types: Optional[Set[EventType]] = None):
+    def __init__(
+        self, listener_id: str, event_types: Optional[Set[EventType]] = None
+    ):
         """
         Initialize status stream listener.
 
@@ -392,7 +400,10 @@ class StatusStreamListener:
         Args:
             stream_event: The status stream event to handle
         """
-        if not self.active or stream_event.event.event_type not in self.event_types:
+        if (
+            not self.active
+            or stream_event.event.event_type not in self.event_types
+        ):
             return
 
         try:
@@ -404,7 +415,9 @@ class StatusStreamListener:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.error(f"Error processing event in listener {self.listener_id}: {e}")
+            logger.error(
+                f"Error processing event in listener {self.listener_id}: {e}"
+            )
 
     async def _process_event(self, stream_event: StatusStreamEvent) -> None:
         """Process the event. Override in subclasses."""

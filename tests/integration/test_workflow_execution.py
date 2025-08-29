@@ -73,7 +73,9 @@ The workspace has been analyzed and documented successfully.[/FILE_WRITE]
 
 The workspace analysis is now complete. I've created a summary file with the key findings. Task completed."""
 
-            elif "analyze" in message.lower() and "workspace" in message.lower():
+            elif (
+                "analyze" in message.lower() and "workspace" in message.lower()
+            ):
                 response.content = """I'll analyze the workspace structure.
                 
 [COMMAND_EXEC] ls -la [/COMMAND_EXEC]
@@ -266,7 +268,9 @@ Let me also check if there are any Python files and their content.
 
             return response
 
-        cli.engine.send_message = AsyncMock(side_effect=command_focused_responses)
+        cli.engine.send_message = AsyncMock(
+            side_effect=command_focused_responses
+        )
 
         executed_commands = []
 
@@ -296,9 +300,13 @@ Let me also check if there are any Python files and their content.
             return content
 
         with patch.object(
-            cli, "_parse_and_execute_operations", side_effect=mock_command_execution
+            cli,
+            "_parse_and_execute_operations",
+            side_effect=mock_command_execution,
         ):
-            command = Command.create_chat_message("check git status and list all files")
+            command = Command.create_chat_message(
+                "check git status and list all files"
+            )
 
             await cli._handle_chat_message(command)
 
@@ -340,7 +348,9 @@ Let me also check if there are any Python files and their content.
 
             return response
 
-        cli.engine.send_message = AsyncMock(side_effect=error_inducing_responses)
+        cli.engine.send_message = AsyncMock(
+            side_effect=error_inducing_responses
+        )
 
         error_count = 0
 
@@ -371,7 +381,9 @@ Let me also check if there are any Python files and their content.
             return content
 
         with patch.object(
-            cli, "_parse_and_execute_operations", side_effect=mock_error_prone_execution
+            cli,
+            "_parse_and_execute_operations",
+            side_effect=mock_error_prone_execution,
         ):
             command = Command.create_chat_message(
                 "try operations that might cause errors"

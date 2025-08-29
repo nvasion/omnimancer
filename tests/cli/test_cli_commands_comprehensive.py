@@ -18,9 +18,19 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from io import StringIO
 
 from omnimancer.cli.interface import CommandLineInterface
-from omnimancer.cli.commands import Command, CommandType, SlashCommand, parse_command
+from omnimancer.cli.commands import (
+    Command,
+    CommandType,
+    SlashCommand,
+    parse_command,
+)
 from omnimancer.core.config_manager import ConfigManager
-from omnimancer.core.models import Config, ProviderConfig, ChatMessage, MessageRole
+from omnimancer.core.models import (
+    Config,
+    ProviderConfig,
+    ChatMessage,
+    MessageRole,
+)
 from omnimancer.core.engine import CoreEngine
 
 

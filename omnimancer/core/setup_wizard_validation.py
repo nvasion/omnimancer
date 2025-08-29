@@ -66,14 +66,18 @@ class SetupWizardValidation:
             console=self.console,
         ) as progress:
             # Step 1: Validate API key format
-            task = progress.add_task("Validating API key format...", total=None)
+            task = progress.add_task(
+                "Validating API key format...", total=None
+            )
 
             if not self._validate_api_key_format(
                 provider_name, provider_config.api_key
             ):
                 progress.update(task, description="❌ Invalid API key format!")
                 await asyncio.sleep(0.5)
-                self.console.print("[red]❌ API key format validation failed![/red]")
+                self.console.print(
+                    "[red]❌ API key format validation failed![/red]"
+                )
                 self.ui.show_troubleshooting_guidance(
                     provider_name, "Invalid API key format"
                 )
@@ -95,11 +99,15 @@ class SetupWizardValidation:
                 is_valid = await self._validate_provider_credentials(provider)
 
                 if is_valid:
-                    progress.update(task, description="✅ API connection successful!")
+                    progress.update(
+                        task, description="✅ API connection successful!"
+                    )
                     await asyncio.sleep(0.5)
 
                     # Step 3: Test model availability
-                    progress.update(task, description="Checking model availability...")
+                    progress.update(
+                        task, description="Checking model availability..."
+                    )
 
                     # Special handling for Bedrock to test model access
                     if provider_name == "bedrock" and hasattr(
@@ -108,14 +116,18 @@ class SetupWizardValidation:
                         model_test = await provider.validate_model_access()
 
                         if model_test["success"]:
-                            progress.update(task, description="✅ Model accessible!")
+                            progress.update(
+                                task, description="✅ Model accessible!"
+                            )
                             await asyncio.sleep(0.5)
                             self.console.print(
                                 "[green]✅ All configuration tests passed![/green]"
                             )
                             return True
                         else:
-                            progress.update(task, description="⚠️  Model access issue!")
+                            progress.update(
+                                task, description="⚠️  Model access issue!"
+                            )
                             await asyncio.sleep(0.5)
 
                             # Show detailed model access warning
@@ -141,7 +153,8 @@ class SetupWizardValidation:
                             )
 
                             return Confirm.ask(
-                                "Continue with this configuration?", default=True
+                                "Continue with this configuration?",
+                                default=True,
                             )
                     else:
                         # Standard model availability check for other providers
@@ -150,7 +163,9 @@ class SetupWizardValidation:
                         )
 
                         if model_available:
-                            progress.update(task, description="✅ Model available!")
+                            progress.update(
+                                task, description="✅ Model available!"
+                            )
                             await asyncio.sleep(0.5)
                             self.console.print(
                                 "[green]✅ All configuration tests passed![/green]"
@@ -158,27 +173,38 @@ class SetupWizardValidation:
                             return True
                         else:
                             progress.update(
-                                task, description="⚠️  Model may not be available!"
+                                task,
+                                description="⚠️  Model may not be available!",
                             )
                             await asyncio.sleep(0.5)
                             self.console.print(
                                 "[yellow]⚠️  Model availability could not be confirmed[/yellow]"
                             )
-                            return Confirm.ask("Continue with this configuration?")
+                            return Confirm.ask(
+                                "Continue with this configuration?"
+                            )
                 else:
-                    progress.update(task, description="❌ API authentication failed!")
+                    progress.update(
+                        task, description="❌ API authentication failed!"
+                    )
                     await asyncio.sleep(0.5)
-                    self.console.print("[red]❌ API authentication failed![/red]")
+                    self.console.print(
+                        "[red]❌ API authentication failed![/red]"
+                    )
                     self.ui.show_troubleshooting_guidance(
                         provider_name, "Authentication failed"
                     )
-                    return Confirm.ask("Continue with this configuration anyway?")
+                    return Confirm.ask(
+                        "Continue with this configuration anyway?"
+                    )
 
             except Exception as e:
                 progress.update(task, description="❌ Connection test failed!")
                 await asyncio.sleep(0.5)
 
-                self.console.print(f"[red]❌ Configuration test failed: {e}[/red]")
+                self.console.print(
+                    f"[red]❌ Configuration test failed: {e}[/red]"
+                )
 
                 # Provide troubleshooting guidance
                 self.ui.show_troubleshooting_guidance(provider_name, str(e))
@@ -223,11 +249,18 @@ class SetupWizardValidation:
         elif provider_name == "xai":
             return api_key.startswith("xai-") and len(api_key) > 20
         elif provider_name == "bedrock":
-            return api_key.startswith("ABSKQmVkcm9ja0FQSUtleS1") and len(api_key) > 50
+            return (
+                api_key.startswith("ABSKQmVkcm9ja0FQSUtleS1")
+                and len(api_key) > 50
+            )
         elif provider_name == "mistral":
-            return len(api_key) > 20  # Mistral keys don't have consistent prefix
+            return (
+                len(api_key) > 20
+            )  # Mistral keys don't have consistent prefix
         elif provider_name == "cohere":
-            return len(api_key) > 20  # Cohere keys don't have consistent prefix
+            return (
+                len(api_key) > 20
+            )  # Cohere keys don't have consistent prefix
 
         return len(api_key) > 10  # Generic validation
 
@@ -259,7 +292,9 @@ class SetupWizardValidation:
             # Log the error but don't raise it
             return False
 
-    async def _check_model_availability(self, provider, model_name: str) -> bool:
+    async def _check_model_availability(
+        self, provider, model_name: str
+    ) -> bool:
         """
         Check if a specific model is available for the provider.
 
@@ -336,10 +371,16 @@ class SetupWizardValidation:
                     provider_name, provider_config.model_dump(mode="json")
                 )
 
-                credentials_valid = await self._validate_provider_credentials(provider)
+                credentials_valid = await self._validate_provider_credentials(
+                    provider
+                )
                 if not credentials_valid:
-                    result["errors"].append("API credentials validation failed")
-                    result["suggestions"].append("Verify API key and account status")
+                    result["errors"].append(
+                        "API credentials validation failed"
+                    )
+                    result["suggestions"].append(
+                        "Verify API key and account status"
+                    )
                 else:
                     # Check model availability
                     model_available = await self._check_model_availability(
@@ -354,7 +395,9 @@ class SetupWizardValidation:
                         )
 
             except Exception as e:
-                result["errors"].append(f"Provider initialization failed: {str(e)}")
+                result["errors"].append(
+                    f"Provider initialization failed: {str(e)}"
+                )
                 result["suggestions"].append(
                     "Check provider configuration and network connectivity"
                 )
@@ -363,6 +406,8 @@ class SetupWizardValidation:
             result["valid"] = len(result["errors"]) == 0
 
         except Exception as e:
-            result["errors"].append(f"Configuration validation failed: {str(e)}")
+            result["errors"].append(
+                f"Configuration validation failed: {str(e)}"
+            )
 
         return result

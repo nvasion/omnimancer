@@ -23,7 +23,11 @@ from omnimancer.utils.errors import (
     AuthenticationError,
     RateLimitError,
 )
-from tests.conftest import MockProviderFactory, create_chat_response, create_model_info
+from tests.conftest import (
+    MockProviderFactory,
+    create_chat_response,
+    create_model_info,
+)
 
 
 @pytest.mark.integration
@@ -43,13 +47,18 @@ class TestProviderSwitching:
             "claude", "claude-3-sonnet", "Claude response"
         )
 
-        mock_engine.providers = {"openai": openai_provider, "claude": claude_provider}
+        mock_engine.providers = {
+            "openai": openai_provider,
+            "claude": claude_provider,
+        }
         mock_engine.current_provider = openai_provider
 
         # Mock the actual switch_model method
         async def mock_switch_model(provider_name, model_name=None):
             if provider_name in mock_engine.providers:
-                mock_engine.current_provider = mock_engine.providers[provider_name]
+                mock_engine.current_provider = mock_engine.providers[
+                    provider_name
+                ]
                 return True
             return False
 
@@ -76,7 +85,9 @@ class TestProviderSwitching:
         # Mock switch_model to raise ConfigurationError for unknown providers
         async def mock_switch_model(provider_name, model_name=None):
             if provider_name not in mock_engine.providers:
-                raise ConfigurationError(f"Provider '{provider_name}' is not available")
+                raise ConfigurationError(
+                    f"Provider '{provider_name}' is not available"
+                )
             return True
 
         mock_engine.switch_model = mock_switch_model
@@ -95,20 +106,30 @@ class TestProviderSwitching:
         openai_provider = MagicMock()
         claude_provider = MagicMock()
 
-        mock_engine.providers = {"openai": openai_provider, "claude": claude_provider}
+        mock_engine.providers = {
+            "openai": openai_provider,
+            "claude": claude_provider,
+        }
         mock_engine.current_provider = openai_provider
-        mock_engine.chat_manager.get_current_context.return_value = sample_chat_context
+        mock_engine.chat_manager.get_current_context.return_value = (
+            sample_chat_context
+        )
 
         # Mock switch_model to preserve context
         async def mock_switch_model(provider_name, model_name=None):
             if provider_name in mock_engine.providers:
                 old_context = mock_engine.chat_manager.get_current_context()
-                mock_engine.current_provider = mock_engine.providers[provider_name]
+                mock_engine.current_provider = mock_engine.providers[
+                    provider_name
+                ]
                 mock_engine.chat_manager.set_current_model(
                     mock_engine.current_provider.model
                 )
                 # Context should be preserved
-                assert mock_engine.chat_manager.get_current_context() == old_context
+                assert (
+                    mock_engine.chat_manager.get_current_context()
+                    == old_context
+                )
                 return True
             return False
 
@@ -152,7 +173,9 @@ class TestProviderSwitching:
                     openai_provider.model = model_name
                     return True
                 else:
-                    raise ConfigurationError(f"Model '{model_name}' not available")
+                    raise ConfigurationError(
+                        f"Model '{model_name}' not available"
+                    )
             return False
 
         mock_engine.switch_model = mock_switch_model
@@ -203,11 +226,13 @@ class TestProviderErrorHandling:
         assert "Authentication failed" in response.error
 
     @pytest.mark.asyncio
-    async def test_rate_limiting_error(self, mock_engine, mock_provider_factory):
+    async def test_rate_limiting_error(
+        self, mock_engine, mock_provider_factory
+    ):
         """Test handling of rate limiting errors."""
         # Create rate-limited provider
-        rate_limited_provider = mock_provider_factory.create_rate_limited_provider(
-            "openai"
+        rate_limited_provider = (
+            mock_provider_factory.create_rate_limited_provider("openai")
         )
 
         mock_engine.providers = {"openai": rate_limited_provider}
@@ -225,7 +250,9 @@ class TestProviderErrorHandling:
         assert "Rate limit" in response.error
 
     @pytest.mark.asyncio
-    async def test_network_timeout_error(self, mock_engine, mock_provider_factory):
+    async def test_network_timeout_error(
+        self, mock_engine, mock_provider_factory
+    ):
         """Test handling of network timeout errors."""
         # Create provider that times out
         timeout_provider = mock_provider_factory.create_failing_provider(
@@ -241,7 +268,9 @@ class TestProviderErrorHandling:
         # Mock send_message to handle exceptions
         async def mock_send_message(message):
             try:
-                return await mock_engine.current_provider.send_message(message, [])
+                return await mock_engine.current_provider.send_message(
+                    message, []
+                )
             except Exception as e:
                 return create_chat_response(content="", error=str(e))
 
@@ -265,13 +294,18 @@ class TestProviderErrorHandling:
             "openai", "gpt-4", "Service unavailable"
         )
 
-        mock_engine.providers = {"openai": failing_provider, "claude": working_provider}
+        mock_engine.providers = {
+            "openai": failing_provider,
+            "claude": working_provider,
+        }
         mock_engine.current_provider = failing_provider
 
         # Test that we can switch to working provider when current fails
         async def mock_switch_model(provider_name, model_name=None):
             if provider_name in mock_engine.providers:
-                mock_engine.current_provider = mock_engine.providers[provider_name]
+                mock_engine.current_provider = mock_engine.providers[
+                    provider_name
+                ]
                 return True
             return False
 
@@ -322,16 +356,25 @@ class TestProviderValidation:
     ):
         """Test provider credential validation."""
         # Create providers with different credential states
-        valid_provider = mock_provider_factory.create_working_provider("openai")
-        invalid_provider = mock_provider_factory.create_failing_provider("claude")
+        valid_provider = mock_provider_factory.create_working_provider(
+            "openai"
+        )
+        invalid_provider = mock_provider_factory.create_failing_provider(
+            "claude"
+        )
         invalid_provider.validate_credentials = AsyncMock(return_value=False)
 
-        mock_engine.providers = {"openai": valid_provider, "claude": invalid_provider}
+        mock_engine.providers = {
+            "openai": valid_provider,
+            "claude": invalid_provider,
+        }
 
         # Mock validate_current_provider
         async def mock_validate_current_provider():
             if mock_engine.current_provider:
-                return await mock_engine.current_provider.validate_credentials()
+                return (
+                    await mock_engine.current_provider.validate_credentials()
+                )
             return False
 
         mock_engine.validate_current_provider = mock_validate_current_provider
@@ -352,18 +395,29 @@ class TestProviderValidation:
     ):
         """Test checking model availability across providers."""
         # Create providers with different model availability
-        openai_provider = mock_provider_factory.create_working_provider("openai")
+        openai_provider = mock_provider_factory.create_working_provider(
+            "openai"
+        )
         openai_provider.get_available_models.return_value = [
             create_model_info("gpt-4", "openai", "GPT-4", available=True),
-            create_model_info("gpt-3.5-turbo", "openai", "GPT-3.5", available=False),
+            create_model_info(
+                "gpt-3.5-turbo", "openai", "GPT-3.5", available=False
+            ),
         ]
 
-        claude_provider = mock_provider_factory.create_working_provider("claude")
+        claude_provider = mock_provider_factory.create_working_provider(
+            "claude"
+        )
         claude_provider.get_available_models.return_value = [
-            create_model_info("claude-3-sonnet", "claude", "Claude 3", available=True)
+            create_model_info(
+                "claude-3-sonnet", "claude", "Claude 3", available=True
+            )
         ]
 
-        mock_engine.providers = {"openai": openai_provider, "claude": claude_provider}
+        mock_engine.providers = {
+            "openai": openai_provider,
+            "claude": claude_provider,
+        }
 
         # Mock get_available_models
         def mock_get_available_models():
@@ -394,7 +448,9 @@ class TestRetryBehavior:
     """Test retry behavior and exponential backoff."""
 
     @pytest.mark.asyncio
-    async def test_retry_on_temporary_failure(self, mock_engine, mock_provider_factory):
+    async def test_retry_on_temporary_failure(
+        self, mock_engine, mock_provider_factory
+    ):
         """Test retry behavior on temporary failures."""
         # Create provider that fails first, then succeeds
         retry_provider = MagicMock()
@@ -408,7 +464,9 @@ class TestRetryBehavior:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return create_chat_response(content="", error="Temporary failure")
+                return create_chat_response(
+                    content="", error="Temporary failure"
+                )
             else:
                 return create_chat_response(content="Success after retry")
 
@@ -421,7 +479,9 @@ class TestRetryBehavior:
         async def mock_engine_send_message(message):
             max_retries = 2
             for attempt in range(max_retries):
-                response = await mock_engine.current_provider.send_message(message, [])
+                response = await mock_engine.current_provider.send_message(
+                    message, []
+                )
                 if response.is_success or attempt == max_retries - 1:
                     return response
                 # In real implementation, would have exponential backoff here
@@ -436,14 +496,18 @@ class TestRetryBehavior:
         assert call_count == 2
 
     @pytest.mark.asyncio
-    async def test_max_retries_exceeded(self, mock_engine, mock_provider_factory):
+    async def test_max_retries_exceeded(
+        self, mock_engine, mock_provider_factory
+    ):
         """Test behavior when max retries are exceeded."""
         # Create provider that always fails
         failing_provider = MagicMock()
         failing_provider.get_provider_name.return_value = "openai"
         failing_provider.model = "gpt-4"
         failing_provider.send_message = AsyncMock(
-            return_value=create_chat_response(content="", error="Persistent failure")
+            return_value=create_chat_response(
+                content="", error="Persistent failure"
+            )
         )
 
         mock_engine.providers = {"openai": failing_provider}
@@ -459,8 +523,10 @@ class TestRetryBehavior:
 
             for attempt in range(max_retries):
                 call_count += 1
-                last_response = await mock_engine.current_provider.send_message(
-                    message, []
+                last_response = (
+                    await mock_engine.current_provider.send_message(
+                        message, []
+                    )
                 )
                 if last_response.is_success:
                     break
@@ -481,7 +547,9 @@ class TestConcurrentProviderOperations:
     """Test concurrent operations across multiple providers."""
 
     @pytest.mark.asyncio
-    async def test_concurrent_model_queries(self, mock_engine, mock_provider_factory):
+    async def test_concurrent_model_queries(
+        self, mock_engine, mock_provider_factory
+    ):
         """Test querying multiple providers concurrently."""
         import asyncio
 
@@ -508,13 +576,19 @@ class TestConcurrentProviderOperations:
         assert all(len(models) > 0 for models in results)
 
     @pytest.mark.asyncio
-    async def test_provider_health_check(self, mock_engine, mock_provider_factory):
+    async def test_provider_health_check(
+        self, mock_engine, mock_provider_factory
+    ):
         """Test health checking across all providers."""
         import asyncio
 
         # Create providers with different health states
-        healthy_provider = mock_provider_factory.create_working_provider("openai")
-        unhealthy_provider = mock_provider_factory.create_failing_provider("claude")
+        healthy_provider = mock_provider_factory.create_working_provider(
+            "openai"
+        )
+        unhealthy_provider = mock_provider_factory.create_failing_provider(
+            "claude"
+        )
 
         mock_engine.providers = {
             "openai": healthy_provider,
@@ -530,7 +604,10 @@ class TestConcurrentProviderOperations:
                 return False
 
         # Test concurrent health checks
-        tasks = [check_provider_health(name) for name in mock_engine.providers.keys()]
+        tasks = [
+            check_provider_health(name)
+            for name in mock_engine.providers.keys()
+        ]
         health_results = await asyncio.gather(*tasks)
 
         assert health_results[0] is True  # openai healthy
@@ -542,19 +619,26 @@ class TestProviderConfigurationIntegration:
     """Test integration between provider configuration and switching."""
 
     @pytest.mark.asyncio
-    async def test_configuration_driven_provider_setup(self, mock_engine, test_config):
+    async def test_configuration_driven_provider_setup(
+        self, mock_engine, test_config
+    ):
         """Test setting up providers based on configuration."""
 
         # Mock initialize_providers to use configuration
         async def mock_initialize_providers():
             mock_engine.providers.clear()
 
-            for provider_name, provider_config in test_config.providers.items():
+            for (
+                provider_name,
+                provider_config,
+            ) in test_config.providers.items():
                 # In real implementation, would create actual providers
                 mock_provider = MagicMock()
                 mock_provider.get_provider_name.return_value = provider_name
                 mock_provider.model = provider_config.model
-                mock_provider.validate_credentials = AsyncMock(return_value=True)
+                mock_provider.validate_credentials = AsyncMock(
+                    return_value=True
+                )
                 mock_engine.providers[provider_name] = mock_provider
 
             # Set default provider
@@ -574,7 +658,9 @@ class TestProviderConfigurationIntegration:
         assert mock_engine.current_provider.get_provider_name() == "openai"
 
     @pytest.mark.asyncio
-    async def test_dynamic_configuration_update(self, mock_engine, mock_config_manager):
+    async def test_dynamic_configuration_update(
+        self, mock_engine, mock_config_manager
+    ):
         """Test updating provider configuration dynamically."""
         # Initial setup
         mock_engine.providers = {"openai": MagicMock()}
@@ -586,7 +672,9 @@ class TestProviderConfigurationIntegration:
                 for key, value in kwargs.items():
                     setattr(provider, key, value)
 
-        mock_config_manager.update_provider_settings = mock_update_provider_settings
+        mock_config_manager.update_provider_settings = (
+            mock_update_provider_settings
+        )
         mock_engine.config_manager = mock_config_manager
 
         # Test configuration update

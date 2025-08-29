@@ -113,7 +113,9 @@ class ProgressIndicator:
             return
 
         operation = OperationInfo(
-            operation_type=operation_type, description=description, details=details
+            operation_type=operation_type,
+            description=description,
+            details=details,
         )
         self.current_operations[operation_id] = operation
 
@@ -152,7 +154,9 @@ class ProgressIndicator:
 
         self._update_display()
 
-    def complete_operation(self, operation_id: str, status: str = "completed") -> None:
+    def complete_operation(
+        self, operation_id: str, status: str = "completed"
+    ) -> None:
         """
         Complete an operation and move it to history.
 
@@ -191,7 +195,9 @@ class ProgressIndicator:
 
         # Trim history
         if len(self.operation_history) > self.max_history:
-            self.operation_history = self.operation_history[-self.max_history :]
+            self.operation_history = self.operation_history[
+                -self.max_history :
+            ]
 
         # Always stop live display when clearing all operations
         self.stop_live_display()
@@ -241,7 +247,9 @@ class ProgressIndicator:
                 progress_str = ""
 
             # Operation details
-            details_str = f" - {operation.details}" if operation.details else ""
+            details_str = (
+                f" - {operation.details}" if operation.details else ""
+            )
 
             current_table.add_row(
                 f"[{color}]{icon}[/{color}]",
@@ -302,7 +310,9 @@ def start_operation(
     """Global function to start tracking an operation."""
     indicator = get_progress_indicator()
     if indicator:
-        indicator.start_operation(operation_id, operation_type, description, details)
+        indicator.start_operation(
+            operation_id, operation_type, description, details
+        )
 
 
 def update_operation(

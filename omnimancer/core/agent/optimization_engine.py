@@ -69,7 +69,9 @@ class OptimizationRule:
     priority: int = 50  # 0-100, higher is more important
     enabled: bool = True
 
-    def evaluate(self, context: Dict[str, Any]) -> Optional[OptimizationSuggestion]:
+    def evaluate(
+        self, context: Dict[str, Any]
+    ) -> Optional[OptimizationSuggestion]:
         """Evaluate rule and generate suggestion if conditions are met."""
         if not self.enabled:
             return None
@@ -78,7 +80,9 @@ class OptimizationRule:
             if self.condition_check(context):
                 return self.suggestion_generator(context)
         except Exception as e:
-            logger.error(f"Error evaluating optimization rule {self.rule_id}: {e}")
+            logger.error(
+                f"Error evaluating optimization rule {self.rule_id}: {e}"
+            )
 
         return None
 
@@ -100,7 +104,9 @@ class AlertRule:
     cooldown_period: timedelta = timedelta(minutes=15)
     last_triggered: Optional[datetime] = None
 
-    def check_condition(self, current_value: float, context: Dict[str, Any]) -> bool:
+    def check_condition(
+        self, current_value: float, context: Dict[str, Any]
+    ) -> bool:
         """Check if alert condition is met."""
         if not self.enabled:
             return False
@@ -142,7 +148,9 @@ class AlertRule:
             current_value=current_value,
             provider_name=context.get("provider_name"),
             persona_name=context.get("persona_name"),
-            suggested_actions=self._generate_suggested_actions(current_value, context),
+            suggested_actions=self._generate_suggested_actions(
+                current_value, context
+            ),
         )
 
     def _generate_suggested_actions(
@@ -167,7 +175,10 @@ class AlertRule:
                     "Review context size and complexity",
                 ]
             )
-        elif "cpu" in self.metric_name.lower() or "memory" in self.metric_name.lower():
+        elif (
+            "cpu" in self.metric_name.lower()
+            or "memory" in self.metric_name.lower()
+        ):
             actions.extend(
                 [
                     "Monitor system resource usage",
@@ -196,7 +207,9 @@ class TrendAnalyzer:
         # Simple linear regression to detect trend
         try:
             # Convert timestamps to numeric values (seconds since first timestamp)
-            time_numeric = [(t - timestamps[0]).total_seconds() for t in timestamps]
+            time_numeric = [
+                (t - timestamps[0]).total_seconds() for t in timestamps
+            ]
 
             # Calculate trend using linear regression
             n = len(values)
@@ -206,20 +219,25 @@ class TrendAnalyzer:
             sum_x_squared = sum(x * x for x in time_numeric)
 
             # Calculate slope (trend direction)
-            slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x_squared - sum_x * sum_x)
+            slope = (n * sum_xy - sum_x * sum_y) / (
+                n * sum_x_squared - sum_x * sum_x
+            )
 
             # Calculate correlation coefficient for confidence
             mean_x = sum_x / n
             mean_y = sum_y / n
 
             numerator = sum(
-                (x - mean_x) * (y - mean_y) for x, y in zip(time_numeric, values)
+                (x - mean_x) * (y - mean_y)
+                for x, y in zip(time_numeric, values)
             )
             denom_x = sum((x - mean_x) ** 2 for x in time_numeric)
             denom_y = sum((y - mean_y) ** 2 for y in values)
 
             correlation = (
-                numerator / (denom_x * denom_y) ** 0.5 if denom_x * denom_y > 0 else 0
+                numerator / (denom_x * denom_y) ** 0.5
+                if denom_x * denom_y > 0
+                else 0
             )
 
             # Determine trend direction
@@ -273,7 +291,9 @@ class OptimizationEngine:
         metrics_collector: Optional[PerformanceMetricsCollector] = None,
     ):
         """Initialize optimization engine."""
-        self.performance_monitor = performance_monitor or get_performance_monitor()
+        self.performance_monitor = (
+            performance_monitor or get_performance_monitor()
+        )
         self.token_tracker = token_tracker or get_token_tracker()
         self.metrics_collector = metrics_collector or get_metrics_collector()
         self.persona_manager = get_persona_manager()
@@ -395,7 +415,9 @@ class OptimizationEngine:
 
         self.is_running = True
         self.analysis_thread = threading.Thread(
-            target=self._analysis_loop, name="OptimizationAnalysis", daemon=True
+            target=self._analysis_loop,
+            name="OptimizationAnalysis",
+            daemon=True,
         )
         self.analysis_thread.start()
         logger.info("Optimization analysis started")
@@ -452,17 +474,21 @@ class OptimizationEngine:
 
             # Token usage data
             if self.token_tracker:
-                context["token_summary_1h"] = self.token_tracker.get_usage_summary(
-                    timedelta(hours=1)
+                context["token_summary_1h"] = (
+                    self.token_tracker.get_usage_summary(timedelta(hours=1))
                 )
-                context["token_summary_24h"] = self.token_tracker.get_usage_summary(
-                    timedelta(hours=24)
+                context["token_summary_24h"] = (
+                    self.token_tracker.get_usage_summary(timedelta(hours=24))
                 )
-                context["usage_patterns"] = self.token_tracker.analyze_usage_patterns(7)
+                context["usage_patterns"] = (
+                    self.token_tracker.analyze_usage_patterns(7)
+                )
 
             # Metrics data
             if self.metrics_collector:
-                context["metrics_data"] = self.metrics_collector.get_dashboard_metrics()
+                context["metrics_data"] = (
+                    self.metrics_collector.get_dashboard_metrics()
+                )
 
             # Current timestamp
             context["analysis_time"] = datetime.now()
@@ -484,11 +510,15 @@ class OptimizationEngine:
                 if suggestion:
                     suggestions.append(suggestion)
             except Exception as e:
-                logger.error(f"Error evaluating optimization rule {rule.rule_id}: {e}")
+                logger.error(
+                    f"Error evaluating optimization rule {rule.rule_id}: {e}"
+                )
 
         return suggestions
 
-    def _evaluate_alert_rules(self, context: Dict[str, Any]) -> List[PerformanceAlert]:
+    def _evaluate_alert_rules(
+        self, context: Dict[str, Any]
+    ) -> List[PerformanceAlert]:
         """Evaluate all alert rules."""
         alerts = []
 
@@ -496,7 +526,9 @@ class OptimizationEngine:
             try:
                 # Get current metric value
                 metric_summary = self.metrics_collector.get_metric_summary(
-                    rule.metric_name, rule.time_window, AggregationMethod.AVERAGE
+                    rule.metric_name,
+                    rule.time_window,
+                    AggregationMethod.AVERAGE,
                 )
 
                 if metric_summary and rule.check_condition(
@@ -506,7 +538,9 @@ class OptimizationEngine:
                     alerts.append(alert)
 
             except Exception as e:
-                logger.error(f"Error evaluating alert rule {rule.rule_id}: {e}")
+                logger.error(
+                    f"Error evaluating alert rule {rule.rule_id}: {e}"
+                )
 
         return alerts
 
@@ -557,7 +591,9 @@ class OptimizationEngine:
     def _check_inefficient_tokens(self, context: Dict[str, Any]) -> bool:
         """Check for inefficient token usage patterns."""
         token_summary = context.get("token_summary_1h", {})
-        avg_tokens_per_request = token_summary.get("average_tokens_per_request", 0)
+        avg_tokens_per_request = token_summary.get(
+            "average_tokens_per_request", 0
+        )
 
         # Alert if average request uses more than 2000 tokens
         return avg_tokens_per_request > 2000
@@ -634,7 +670,9 @@ class OptimizationEngine:
             potential_improvement="40-60% faster responses",
             confidence=0.7,
             implementation_difficulty="medium",
-            estimated_impact={"response_time_improvement": response_time * 0.5},
+            estimated_impact={
+                "response_time_improvement": response_time * 0.5
+            },
             required_actions=[
                 "Switch to faster providers",
                 "Optimize network connectivity",
@@ -648,7 +686,9 @@ class OptimizationEngine:
         """Add optimization suggestion handler."""
         self.optimization_handlers.append(handler)
 
-    def add_alert_handler(self, handler: Callable[[PerformanceAlert], None]) -> None:
+    def add_alert_handler(
+        self, handler: Callable[[PerformanceAlert], None]
+    ) -> None:
         """Add alert handler."""
         self.alert_handlers.append(handler)
 
@@ -709,7 +749,9 @@ def set_optimization_engine(engine: OptimizationEngine) -> None:
         _optimization_engine = engine
 
 
-def initialize_optimization_engine(auto_start: bool = True) -> OptimizationEngine:
+def initialize_optimization_engine(
+    auto_start: bool = True,
+) -> OptimizationEngine:
     """Initialize optimization engine."""
     engine = get_optimization_engine()
     if auto_start:

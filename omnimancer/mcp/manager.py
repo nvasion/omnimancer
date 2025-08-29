@@ -15,7 +15,11 @@ from ..core.models import (
     MCPError,
     MCPServerError,
 )
-from ..utils.errors import MCPConnectionError, MCPTimeoutError, MCPConfigurationError
+from ..utils.errors import (
+    MCPConnectionError,
+    MCPTimeoutError,
+    MCPConfigurationError,
+)
 from ..utils.error_handler import handle_mcp_error
 from .client import MCPClient
 
@@ -65,11 +69,15 @@ class MCPManager:
             if not config.enabled
         }
         if disabled_servers:
-            logger.debug(f"Disabled MCP servers: {', '.join(disabled_servers.keys())}")
+            logger.debug(
+                f"Disabled MCP servers: {', '.join(disabled_servers.keys())}"
+            )
 
         enabled_servers = self.mcp_config.get_enabled_servers()
         if not enabled_servers:
-            logger.info("No enabled MCP servers found - MCP initialization complete")
+            logger.info(
+                "No enabled MCP servers found - MCP initialization complete"
+            )
             self.initialized = True  # Successfully initialized with no servers
             return
 
@@ -79,7 +87,8 @@ class MCPManager:
 
         # Limit concurrent server connections
         max_concurrent = min(
-            len(enabled_servers), getattr(self.mcp_config, "max_concurrent_servers", 3)
+            len(enabled_servers),
+            getattr(self.mcp_config, "max_concurrent_servers", 3),
         )
 
         # Create semaphore to limit concurrent connections
@@ -92,15 +101,21 @@ class MCPManager:
 
             async with semaphore:
                 try:
-                    logger.debug(f"Attempting to connect to MCP server: {server_name}")
+                    logger.debug(
+                        f"Attempting to connect to MCP server: {server_name}"
+                    )
                     client = MCPClient(server_config)
                     await client.connect()
                     self.clients[server_name] = client
                     successful_connections += 1
-                    logger.info(f"Successfully initialized MCP server: {server_name}")
+                    logger.info(
+                        f"Successfully initialized MCP server: {server_name}"
+                    )
 
                 except MCPConfigurationError as e:
-                    error_msg, suggestions, _ = handle_mcp_error(e, server_name)
+                    error_msg, suggestions, _ = handle_mcp_error(
+                        e, server_name
+                    )
                     logger.error(
                         f"Configuration error for MCP server '{server_name}': {error_msg}"
                     )
@@ -124,7 +139,9 @@ class MCPManager:
                             logger.info(
                                 f"Retrying connection to MCP server: {server_name}"
                             )
-                            await asyncio.sleep(2.0)  # Brief delay before retry
+                            await asyncio.sleep(
+                                2.0
+                            )  # Brief delay before retry
                             client = MCPClient(server_config)
                             await client.connect()
                             self.clients[server_name] = client
@@ -145,22 +162,29 @@ class MCPManager:
                         )
 
                 except MCPTimeoutError as e:
-                    error_msg, suggestions, _ = handle_mcp_error(e, server_name)
+                    error_msg, suggestions, _ = handle_mcp_error(
+                        e, server_name
+                    )
                     logger.warning(
                         f"Timeout connecting to MCP server '{server_name}': {error_msg}"
                     )
                     failed_connections.append((server_name, "timeout", str(e)))
 
                 except Exception as e:
-                    error_msg, suggestions, _ = handle_mcp_error(e, server_name)
+                    error_msg, suggestions, _ = handle_mcp_error(
+                        e, server_name
+                    )
                     logger.error(
                         f"Unexpected error initializing MCP server '{server_name}': {error_msg}"
                     )
-                    failed_connections.append((server_name, "unknown_error", str(e)))
+                    failed_connections.append(
+                        (server_name, "unknown_error", str(e))
+                    )
 
         # Connect to all servers concurrently
         tasks = [
-            connect_server(name, config) for name, config in enabled_servers.items()
+            connect_server(name, config)
+            for name, config in enabled_servers.items()
         ]
 
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -196,7 +220,9 @@ class MCPManager:
         logger.info("Shutting down MCP servers...")
 
         # Disconnect all clients
-        disconnect_tasks = [client.disconnect() for client in self.clients.values()]
+        disconnect_tasks = [
+            client.disconnect() for client in self.clients.values()
+        ]
 
         await asyncio.gather(*disconnect_tasks, return_exceptions=True)
 
@@ -310,7 +336,9 @@ class MCPManager:
                             name, arguments
                         )
                     except Exception as alt_error:
-                        logger.error(f"Alternative server also failed: {alt_error}")
+                        logger.error(
+                            f"Alternative server also failed: {alt_error}"
+                        )
 
             raise MCPError(f"Failed to execute tool '{name}': {e}")
 
@@ -373,7 +401,9 @@ class MCPManager:
                 server_names.append(server_name)
 
         if health_tasks:
-            results = await asyncio.gather(*health_tasks, return_exceptions=True)
+            results = await asyncio.gather(
+                *health_tasks, return_exceptions=True
+            )
 
             for server_name, result in zip(server_names, results):
                 if isinstance(result, Exception):
@@ -434,13 +464,17 @@ class MCPManager:
     @property
     def connected_server_count(self) -> int:
         """Get the number of connected servers."""
-        return sum(1 for client in self.clients.values() if client.is_connected)
+        return sum(
+            1 for client in self.clients.values() if client.is_connected
+        )
 
     @property
     def total_tool_count(self) -> int:
         """Get the total number of available tools across all servers."""
         return sum(
-            len(client.tools) for client in self.clients.values() if client.is_connected
+            len(client.tools)
+            for client in self.clients.values()
+            if client.is_connected
         )
 
     async def recover_failed_servers(self) -> Dict[str, bool]:
@@ -479,11 +513,15 @@ class MCPManager:
                     self.clients[server_name] = new_client
 
                     recovery_results[server_name] = True
-                    logger.info(f"Successfully recovered MCP server: {server_name}")
+                    logger.info(
+                        f"Successfully recovered MCP server: {server_name}"
+                    )
 
                 except Exception as e:
                     recovery_results[server_name] = False
-                    logger.error(f"Failed to recover MCP server '{server_name}': {e}")
+                    logger.error(
+                        f"Failed to recover MCP server '{server_name}': {e}"
+                    )
             else:
                 recovery_results[server_name] = True  # Already healthy
 
@@ -507,7 +545,9 @@ class MCPManager:
 
                 # Identify unhealthy servers
                 unhealthy_servers = [
-                    name for name, healthy in health_status.items() if not healthy
+                    name
+                    for name, healthy in health_status.items()
+                    if not healthy
                 ]
 
                 if unhealthy_servers:
@@ -526,7 +566,9 @@ class MCPManager:
                                     f"Successfully recovered server: {server_name}"
                                 )
                             else:
-                                logger.error(f"Failed to recover server: {server_name}")
+                                logger.error(
+                                    f"Failed to recover server: {server_name}"
+                                )
 
                 # Wait before next check
                 await asyncio.sleep(check_interval)
@@ -558,7 +600,9 @@ class MCPManager:
             "enabled_servers": enabled_servers,
             "connected_servers": connected_servers,
             "available_tools": self.total_tool_count,
-            "functionality_impact": self._get_functionality_impact(degradation_level),
+            "functionality_impact": self._get_functionality_impact(
+                degradation_level
+            ),
         }
 
     def _get_functionality_impact(self, degradation_level: str) -> List[str]:
@@ -625,7 +669,9 @@ class MCPManager:
             # If all tools failed, raise the original error
             raise primary_error
 
-    def get_available_tools_by_server(self, server_name: str) -> List[ToolDefinition]:
+    def get_available_tools_by_server(
+        self, server_name: str
+    ) -> List[ToolDefinition]:
         """Get tools available from a specific server."""
         return self.get_tools_by_server(server_name)
 

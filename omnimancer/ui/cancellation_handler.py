@@ -145,7 +145,10 @@ class CancellationHandler:
         Returns:
             True if an operation is running
         """
-        return self.active_operation is not None and not self.active_operation.done()
+        return (
+            self.active_operation is not None
+            and not self.active_operation.done()
+        )
 
     def cancel_active_operation(self) -> bool:
         """
@@ -178,7 +181,11 @@ class CancellationHandler:
         """
         Resume the status display after user interaction.
         """
-        if self.status_display and self.is_paused and self.is_operation_active():
+        if (
+            self.status_display
+            and self.is_paused
+            and self.is_operation_active()
+        ):
             self.is_paused = False
             try:
                 self.status_display.start()
@@ -215,7 +222,9 @@ class EnhancedStatusDisplay:
         )
         return self.console.status(enhanced_message, spinner="dots")
 
-    def show_cancellation_notice(self, message: str = "Operation cancelled") -> None:
+    def show_cancellation_notice(
+        self, message: str = "Operation cancelled"
+    ) -> None:
         """
         Show a cancellation notice to the user.
 
@@ -224,7 +233,9 @@ class EnhancedStatusDisplay:
         """
         self.console.print(f"[yellow]⚠️  {message}[/yellow]")
 
-    def show_completion_notice(self, message: str = "Operation completed") -> None:
+    def show_completion_notice(
+        self, message: str = "Operation completed"
+    ) -> None:
         """
         Show a completion notice to the user.
 

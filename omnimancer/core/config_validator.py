@@ -81,7 +81,9 @@ class ConfigValidator:
         try:
             # Convert config to JSON string
             if hasattr(config, "model_dump"):
-                config_json = json.dumps(config.model_dump(mode="json"), sort_keys=True)
+                config_json = json.dumps(
+                    config.model_dump(mode="json"), sort_keys=True
+                )
             else:
                 # Handle mock objects or dictionaries
                 config_json = json.dumps(str(config), sort_keys=True)
@@ -117,7 +119,10 @@ class ConfigValidator:
             # Check for enabled providers
             enabled_providers = []
             for provider_name, provider_config in config.items():
-                if hasattr(provider_config, "enabled") and provider_config.enabled:
+                if (
+                    hasattr(provider_config, "enabled")
+                    and provider_config.enabled
+                ):
                     enabled_providers.append(provider_name)
 
             if not enabled_providers:
@@ -126,11 +131,17 @@ class ConfigValidator:
             return errors
 
         # Handle mock objects
-        if hasattr(config, "_mock_name") or str(type(config)).find("Mock") != -1:
+        if (
+            hasattr(config, "_mock_name")
+            or str(type(config)).find("Mock") != -1
+        ):
             # For mock objects, validate individual components
             # Check if default provider is configured
             if hasattr(config, "default_provider"):
-                if not config.default_provider or config.default_provider == "":
+                if (
+                    not config.default_provider
+                    or config.default_provider == ""
+                ):
                     errors.append("No default provider configured")
                 elif (
                     hasattr(config, "providers")
@@ -151,7 +162,9 @@ class ConfigValidator:
                 mcp_errors = self._validate_mcp_config(config.mcp)
                 errors.extend(mcp_errors)
             if hasattr(config, "chat_settings"):
-                chat_errors = self._validate_chat_settings(config.chat_settings)
+                chat_errors = self._validate_chat_settings(
+                    config.chat_settings
+                )
                 errors.extend(chat_errors)
             return errors
 
@@ -159,7 +172,8 @@ class ConfigValidator:
         if not config.default_provider or config.default_provider == "":
             errors.append("No default provider configured")
         elif (
-            config.default_provider and config.default_provider not in config.providers
+            config.default_provider
+            and config.default_provider not in config.providers
         ):
             errors.append(
                 f"Default provider '{config.default_provider}' is not configured"
@@ -239,7 +253,9 @@ class ConfigValidator:
             errors.append(f"Provider '{provider_name}' has no model specified")
 
         # Provider-specific validation
-        validator_method = getattr(self, f"_validate_{provider_name}_config", None)
+        validator_method = getattr(
+            self, f"_validate_{provider_name}_config", None
+        )
         if validator_method:
             provider_errors = validator_method(provider_config)
             errors.extend(provider_errors)
@@ -275,34 +291,53 @@ class ConfigValidator:
                 try:
                     if hasattr(mcp_config, "timeout"):
                         timeout_val = mcp_config.timeout
-                        if isinstance(timeout_val, (int, float)) and timeout_val < 0:
-                            errors.append(f"Invalid MCP timeout: {timeout_val}")
+                        if (
+                            isinstance(timeout_val, (int, float))
+                            and timeout_val < 0
+                        ):
+                            errors.append(
+                                f"Invalid MCP timeout: {timeout_val}"
+                            )
                 except (TypeError, AttributeError):
                     pass
 
                 # Check servers in mock objects
                 if hasattr(mcp_config, "servers"):
-                    for server_name, server_config in mcp_config.servers.items():
+                    for (
+                        server_name,
+                        server_config,
+                    ) in mcp_config.servers.items():
                         if hasattr(server_config, "name") and (
                             not server_config.name or server_config.name == ""
                         ):
-                            errors.append(f"MCP server '{server_name}' has no name")
+                            errors.append(
+                                f"MCP server '{server_name}' has no name"
+                            )
                         if hasattr(server_config, "command") and (
-                            not server_config.command or server_config.command == ""
+                            not server_config.command
+                            or server_config.command == ""
                         ):
-                            errors.append(f"MCP server '{server_name}' has no command")
+                            errors.append(
+                                f"MCP server '{server_name}' has no command"
+                            )
 
                 # Validate global MCP settings for mock objects
                 if hasattr(mcp_config, "auto_approve_timeout"):
                     timeout_val = mcp_config.auto_approve_timeout
-                    if isinstance(timeout_val, (int, float)) and timeout_val <= 0:
+                    if (
+                        isinstance(timeout_val, (int, float))
+                        and timeout_val <= 0
+                    ):
                         errors.append(
                             f"Invalid MCP auto_approve_timeout: {timeout_val}"
                         )
 
                 if hasattr(mcp_config, "max_concurrent_servers"):
                     servers_val = mcp_config.max_concurrent_servers
-                    if isinstance(servers_val, (int, float)) and servers_val <= 0:
+                    if (
+                        isinstance(servers_val, (int, float))
+                        and servers_val <= 0
+                    ):
                         errors.append(
                             f"Invalid MCP max_concurrent_servers: {servers_val}"
                         )
@@ -313,9 +348,16 @@ class ConfigValidator:
             if hasattr(mcp_config, "servers"):
                 for server_name, server_config in mcp_config.servers.items():
                     if not server_config.name or server_config.name == "":
-                        errors.append(f"MCP server '{server_name}' has no name")
-                    if not server_config.command or server_config.command == "":
-                        errors.append(f"MCP server '{server_name}' has no command")
+                        errors.append(
+                            f"MCP server '{server_name}' has no name"
+                        )
+                    if (
+                        not server_config.command
+                        or server_config.command == ""
+                    ):
+                        errors.append(
+                            f"MCP server '{server_name}' has no command"
+                        )
 
                     # Handle mock objects for timeout validation
                     try:
@@ -333,7 +375,9 @@ class ConfigValidator:
             # Validate global MCP settings
             try:
                 if hasattr(mcp_config, "auto_approve_timeout"):
-                    timeout_val = getattr(mcp_config, "auto_approve_timeout", None)
+                    timeout_val = getattr(
+                        mcp_config, "auto_approve_timeout", None
+                    )
                     if timeout_val is not None and timeout_val <= 0:
                         errors.append(
                             f"Invalid MCP auto_approve_timeout: {timeout_val}"
@@ -344,7 +388,9 @@ class ConfigValidator:
 
             try:
                 if hasattr(mcp_config, "max_concurrent_servers"):
-                    servers_val = getattr(mcp_config, "max_concurrent_servers", None)
+                    servers_val = getattr(
+                        mcp_config, "max_concurrent_servers", None
+                    )
                     if servers_val is not None and servers_val <= 0:
                         errors.append(
                             f"Invalid MCP max_concurrent_servers: {servers_val}"
@@ -434,7 +480,12 @@ class ConfigValidator:
             errors.append("Cohere provider requires an API key")
 
         # Validate model
-        valid_models = ["command-r", "command-r-plus", "command-light", "command"]
+        valid_models = [
+            "command-r",
+            "command-r-plus",
+            "command-light",
+            "command",
+        ]
         if config.model not in valid_models:
             errors.append(
                 f"Unknown Cohere model '{config.model}'. Valid models: {', '.join(valid_models)}"
@@ -450,7 +501,9 @@ class ConfigValidator:
         # But we should validate the base_url if provided
         if config.base_url:
             if not config.base_url.startswith(("http://", "https://")):
-                errors.append("Ollama base_url must start with 'http://' or 'https://'")
+                errors.append(
+                    "Ollama base_url must start with 'http://' or 'https://'"
+                )
 
         # Model validation is difficult for Ollama since models are dynamic
         # We'll just ensure it's not empty
@@ -512,7 +565,9 @@ class ConfigValidator:
             "mistral-7b",
             "mistral-8x7b",
         ]
-        model_valid = any(pattern in config.model for pattern in valid_model_patterns)
+        model_valid = any(
+            pattern in config.model for pattern in valid_model_patterns
+        )
         if not model_valid:
             errors.append(
                 f"Unknown Mistral model '{config.model}'. Valid model patterns: {', '.join(valid_model_patterns)}"
@@ -531,7 +586,9 @@ class ConfigValidator:
         if not config.azure_endpoint:
             errors.append("Azure provider requires an endpoint URL")
         elif not config.azure_endpoint.startswith(("http://", "https://")):
-            errors.append("Azure endpoint must start with 'http://' or 'https://'")
+            errors.append(
+                "Azure endpoint must start with 'http://' or 'https://'"
+            )
 
         if not config.azure_deployment:
             errors.append("Azure provider requires a deployment name")
@@ -579,7 +636,9 @@ class ConfigValidator:
 
         return errors
 
-    def _validate_claude_code_config(self, config: ProviderConfig) -> List[str]:
+    def _validate_claude_code_config(
+        self, config: ProviderConfig
+    ) -> List[str]:
         """Validate Claude-code provider configuration."""
         errors = []
 
@@ -587,7 +646,10 @@ class ConfigValidator:
 
         # Validate model
         valid_modes = ["opus", "sonnet"]
-        if config.claude_code_mode and config.claude_code_mode not in valid_modes:
+        if (
+            config.claude_code_mode
+            and config.claude_code_mode not in valid_modes
+        ):
             errors.append(
                 f"Unknown Claude-code mode '{config.claude_code_mode}'. Valid modes: {', '.join(valid_modes)}"
             )
@@ -684,7 +746,10 @@ class ConfigValidator:
                 if chat_settings.max_tokens <= 0:
                     errors.append("max_tokens must be positive")
 
-            if hasattr(chat_settings, "top_p") and chat_settings.top_p is not None:
+            if (
+                hasattr(chat_settings, "top_p")
+                and chat_settings.top_p is not None
+            ):
                 if not (0 <= chat_settings.top_p <= 1):
                     errors.append("Top-p must be between 0 and 1")
         except (TypeError, AttributeError):
@@ -708,7 +773,10 @@ class ConfigValidator:
 
         # Return a result object that matches test expectations
         return ValidationResult(
-            is_valid=len(errors) == 0, errors=errors, warnings=[], config=config
+            is_valid=len(errors) == 0,
+            errors=errors,
+            warnings=[],
+            config=config,
         )
 
     def get_cache_stats(self) -> Dict[str, Any]:
@@ -724,7 +792,10 @@ class ConfigValidator:
             valid_entries = 0
             expired_entries = 0
 
-            for cache_key, (errors, timestamp) in self._validation_cache.items():
+            for cache_key, (
+                errors,
+                timestamp,
+            ) in self._validation_cache.items():
                 if (current_time - timestamp) < self._cache_ttl:
                     valid_entries += 1
                 else:
@@ -743,7 +814,11 @@ class ValidationResult:
     """Result object for configuration validation."""
 
     def __init__(
-        self, is_valid: bool, errors: List[str], warnings: List[str] = None, config=None
+        self,
+        is_valid: bool,
+        errors: List[str],
+        warnings: List[str] = None,
+        config=None,
     ):
         self.is_valid = is_valid
         self.errors = errors

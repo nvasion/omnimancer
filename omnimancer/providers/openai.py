@@ -39,7 +39,9 @@ class OpenAIProvider(BaseProvider):
         self.max_tokens = kwargs.get("max_tokens", 4096)
         self.temperature = kwargs.get("temperature", 0.7)
 
-    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
+    async def send_message(
+        self, message: str, context: ChatContext
+    ) -> ChatResponse:
         """
         Send a message to OpenAI API.
 
@@ -173,7 +175,9 @@ class OpenAIProvider(BaseProvider):
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get("message", "Unknown error")
+                error_msg = error_data.get("error", {}).get(
+                    "message", "Unknown error"
+                )
             except:
                 error_msg = f"HTTP {response.status_code}"
 
@@ -322,7 +326,9 @@ class OpenAIProvider(BaseProvider):
                     model_id = model_data.get("id", "")
 
                     # Filter for chat models (exclude fine-tuned and other model types)
-                    if any(prefix in model_id for prefix in ["gpt-3.5", "gpt-4"]):
+                    if any(
+                        prefix in model_id for prefix in ["gpt-3.5", "gpt-4"]
+                    ):
                         # Determine model capabilities
                         supports_tools = (
                             "gpt-3.5-turbo" in model_id or "gpt-4" in model_id

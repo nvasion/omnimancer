@@ -263,11 +263,15 @@ class TestModuleCompatibility:
             from omnimancer.core.agent_engine import AgentEngine
 
             # Import the program executor that was failing
-            from omnimancer.core.agent.program_executor import EnhancedProgramExecutor
+            from omnimancer.core.agent.program_executor import (
+                EnhancedProgramExecutor,
+            )
 
             # Import security components
             from omnimancer.core.security.sandbox_manager import SandboxManager
-            from omnimancer.core.security.approval_workflow import ApprovalWorkflow
+            from omnimancer.core.security.approval_workflow import (
+                ApprovalWorkflow,
+            )
 
             # Verify all are classes that can be instantiated
             assert issubclass(AgentEngine, object)
@@ -320,8 +324,14 @@ class TestErrorModuleSpecific:
     def test_program_executor_error_usage(self):
         """Test that program_executor can use the error classes."""
         # Import the module that was failing
-        from omnimancer.core.agent.program_executor import EnhancedProgramExecutor
-        from omnimancer.utils.errors import ExecutionError, TimeoutError, SecurityError
+        from omnimancer.core.agent.program_executor import (
+            EnhancedProgramExecutor,
+        )
+        from omnimancer.utils.errors import (
+            ExecutionError,
+            TimeoutError,
+            SecurityError,
+        )
 
         # Verify the executor can reference these error types
         try:

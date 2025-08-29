@@ -60,7 +60,10 @@ def test_config():
             ),
         },
         chat_settings=ChatSettings(
-            max_tokens=4096, temperature=0.7, context_length=4000, save_history=True
+            max_tokens=4096,
+            temperature=0.7,
+            context_length=4000,
+            save_history=True,
         ),
         storage_path="/tmp/omnimancer_test",
     )
@@ -252,7 +255,9 @@ def mock_chat_manager(sample_chat_context):
 def mock_conversation_manager(temp_dir):
     """Create a mock conversation manager."""
     conv_manager = MagicMock(spec=ConversationManager)
-    conv_manager.save_conversation.return_value = "conversation_20240101_120000.json"
+    conv_manager.save_conversation.return_value = (
+        "conversation_20240101_120000.json"
+    )
     conv_manager.load_conversation.return_value = MagicMock()
     conv_manager.list_conversations.return_value = [
         {
@@ -288,7 +293,10 @@ def mock_engine(
     engine.conversation_manager = mock_conversation_manager
 
     # Provider management
-    engine.providers = {"openai": mock_openai_provider, "claude": mock_claude_provider}
+    engine.providers = {
+        "openai": mock_openai_provider,
+        "claude": mock_claude_provider,
+    }
     engine.current_provider = mock_openai_provider
     engine.register_provider = MagicMock()
     engine.set_current_provider = MagicMock()
@@ -339,7 +347,9 @@ def mock_engine(
         "session_id": "test-session",
     }
     engine.clear_conversation = MagicMock()
-    engine.save_conversation = MagicMock(return_value="saved_conversation.json")
+    engine.save_conversation = MagicMock(
+        return_value="saved_conversation.json"
+    )
     engine.load_conversation = MagicMock()
     engine.list_conversations = MagicMock(return_value=[])
     engine.delete_conversation = MagicMock(return_value=True)
@@ -538,9 +548,13 @@ def mock_provider_factory():
 
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line("markers", "integration: mark test as integration test")
+    config.addinivalue_line(
+        "markers", "integration: mark test as integration test"
+    )
     config.addinivalue_line("markers", "slow: mark test as slow running")
-    config.addinivalue_line("markers", "network: mark test as requiring network access")
+    config.addinivalue_line(
+        "markers", "network: mark test as requiring network access"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -600,9 +614,15 @@ def generate_model_list(provider_count: int = 2) -> List[ModelInfo]:
         if provider == "openai":
             models.extend(
                 [
-                    create_model_info("gpt-4", provider, "GPT-4 model", 8192, 0.00003),
                     create_model_info(
-                        "gpt-3.5-turbo", provider, "GPT-3.5 Turbo", 4096, 0.000002
+                        "gpt-4", provider, "GPT-4 model", 8192, 0.00003
+                    ),
+                    create_model_info(
+                        "gpt-3.5-turbo",
+                        provider,
+                        "GPT-3.5 Turbo",
+                        4096,
+                        0.000002,
                     ),
                 ]
             )
@@ -610,10 +630,18 @@ def generate_model_list(provider_count: int = 2) -> List[ModelInfo]:
             models.extend(
                 [
                     create_model_info(
-                        "claude-3-sonnet", provider, "Claude 3 Sonnet", 4096, 0.00002
+                        "claude-3-sonnet",
+                        provider,
+                        "Claude 3 Sonnet",
+                        4096,
+                        0.00002,
                     ),
                     create_model_info(
-                        "claude-3-haiku", provider, "Claude 3 Haiku", 4096, 0.000005
+                        "claude-3-haiku",
+                        provider,
+                        "Claude 3 Haiku",
+                        4096,
+                        0.000005,
                     ),
                 ]
             )

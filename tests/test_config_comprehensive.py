@@ -77,13 +77,18 @@ class TestConfigValidator:
         mock_config.storage_path = "/tmp/omnimancer"
         mock_config.mcp = Mock()
 
-        with patch.object(self.validator, "validate_provider_config", return_value=[]):
-            with patch.object(self.validator, "validate_mcp_config", return_value=[]):
+        with patch.object(
+            self.validator, "validate_provider_config", return_value=[]
+        ):
+            with patch.object(
+                self.validator, "validate_mcp_config", return_value=[]
+            ):
                 errors = self.validator._validate_config(mock_config)
 
                 assert len(errors) > 0
                 assert any(
-                    "No default provider configured" in error for error in errors
+                    "No default provider configured" in error
+                    for error in errors
                 )
 
     def test_validate_config_default_provider_not_configured(self):
@@ -100,7 +105,8 @@ class TestConfigValidator:
 
         assert len(errors) > 0
         assert any(
-            "Default provider 'claude' is not configured" in error for error in errors
+            "Default provider 'claude' is not configured" in error
+            for error in errors
         )
 
     def test_validate_config_caching(self):
@@ -130,7 +136,9 @@ class TestConfigValidator:
         """Test provider validation with no model."""
         provider_config = ProviderConfig(model="", api_key="sk-test123")
 
-        errors = self.validator.validate_provider_config("openai", provider_config)
+        errors = self.validator.validate_provider_config(
+            "openai", provider_config
+        )
 
         assert len(errors) > 0
         assert any("has no model specified" in error for error in errors)
@@ -282,7 +290,10 @@ class TestConfigRepair:
 
         assert isinstance(issues, list)
         # Should have minimal issues for valid config
-        assert len([issue for issue in issues if issue["severity"] == "error"]) == 0
+        assert (
+            len([issue for issue in issues if issue["severity"] == "error"])
+            == 0
+        )
 
     def test_is_error_fixable(self):
         """Test error fixability detection."""
@@ -365,14 +376,19 @@ class TestConfigTemplateManager:
 
         # Should have appropriate settings for coding
         assert "temperature" in template.settings
-        assert template.settings["temperature"] <= 0.3  # Lower temperature for coding
+        assert (
+            template.settings["temperature"] <= 0.3
+        )  # Lower temperature for coding
 
     def test_template_mcp_servers_disabled_by_default(self):
         """Test that MCP servers in templates are disabled by default."""
         # Test coding template
         coding_template = self.manager._create_coding_template()
         if coding_template.mcp_servers:
-            for server_name, server_config in coding_template.mcp_servers.items():
+            for (
+                server_name,
+                server_config,
+            ) in coding_template.mcp_servers.items():
                 assert (
                     server_config.get("enabled", True) is False
                 ), f"Server {server_name} should be disabled by default"
@@ -380,7 +396,10 @@ class TestConfigTemplateManager:
         # Test research template
         research_template = self.manager._create_research_template()
         if research_template.mcp_servers:
-            for server_name, server_config in research_template.mcp_servers.items():
+            for (
+                server_name,
+                server_config,
+            ) in research_template.mcp_servers.items():
                 assert (
                     server_config.get("enabled", True) is False
                 ), f"Server {server_name} should be disabled by default"
@@ -415,7 +434,10 @@ class TestConfigMigration:
 
     def teardown_method(self):
         """Clean up test fixtures."""
-        if hasattr(self, "tmp_config_path") and Path(self.tmp_config_path).exists():
+        if (
+            hasattr(self, "tmp_config_path")
+            and Path(self.tmp_config_path).exists()
+        ):
             Path(self.tmp_config_path).unlink()
 
     def test_init(self):
@@ -462,7 +484,10 @@ class TestConfigTemplate:
             description="Test template description",
             use_case="testing",
             recommended_providers=["openai", "claude"],
-            recommended_models={"openai": "gpt-4", "claude": "claude-3-sonnet"},
+            recommended_models={
+                "openai": "gpt-4",
+                "claude": "claude-3-sonnet",
+            },
             mcp_tools=["filesystem", "git"],
             settings={"temperature": 0.7, "max_tokens": 2048},
             provider_configs={"openai": {"api_key": "test"}},
@@ -481,7 +506,9 @@ class TestConfigTemplate:
         assert template.mcp_servers["filesystem"]["command"] == "fs-server"
 
 
-@pytest.mark.skip(reason="ConfigGenerator and ConfigRepair removed as over-engineered")
+@pytest.mark.skip(
+    reason="ConfigGenerator and ConfigRepair removed as over-engineered"
+)
 class TestConfigIntegration:
     """Integration tests for config components."""
 
@@ -498,7 +525,10 @@ class TestConfigIntegration:
 
     def teardown_method(self):
         """Clean up test fixtures."""
-        if hasattr(self, "tmp_config_path") and Path(self.tmp_config_path).exists():
+        if (
+            hasattr(self, "tmp_config_path")
+            and Path(self.tmp_config_path).exists()
+        ):
             Path(self.tmp_config_path).unlink()
 
     def test_end_to_end_config_workflow(self):
@@ -529,13 +559,17 @@ class TestConfigIntegration:
         # 5. Analyze for issues
         # issues = self.repair.analyze_config(config)  # Removed as over-engineered
         issues = []
-        error_issues = [issue for issue in issues if issue["severity"] == "error"]
+        error_issues = [
+            issue for issue in issues if issue["severity"] == "error"
+        ]
         assert len(error_issues) == 0
 
         # 6. Test migration detection
         config_dict = {
             "default_provider": "openai",
-            "providers": {"openai": {"model": "gpt-4", "api_key": "sk-test123"}},
+            "providers": {
+                "openai": {"model": "gpt-4", "api_key": "sk-test123"}
+            },
         }
         # Write config to temp file for migration test
         with open(self.tmp_config_path, "w") as f:
@@ -576,7 +610,9 @@ class TestConfigIntegration:
         assert len(errors) == 0
 
         # Get template as config dict
-        config_dict = self.template_manager.get_template_config_dict("research")
+        config_dict = self.template_manager.get_template_config_dict(
+            "research"
+        )
         assert isinstance(config_dict, dict)
         assert "provider_configs" in config_dict
         assert "settings" in config_dict
@@ -585,7 +621,9 @@ class TestConfigIntegration:
         """Test migration integration with validation."""
         # Write old config data to temp file
         old_config = {
-            "providers": {"openai": {"model": "gpt-3.5-turbo", "api_key": "sk-test123"}}
+            "providers": {
+                "openai": {"model": "gpt-3.5-turbo", "api_key": "sk-test123"}
+            }
         }
         with open(self.tmp_config_path, "w") as f:
             json.dump(old_config, f)

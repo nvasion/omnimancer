@@ -55,7 +55,9 @@ class XAIProvider(BaseProvider):
         self.enable_web_search = kwargs.get("enable_web_search", True)
         self.enable_real_time = kwargs.get("enable_real_time", True)
 
-    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
+    async def send_message(
+        self, message: str, context: ChatContext
+    ) -> ChatResponse:
         """
         Send a message to xAI API.
 
@@ -102,14 +104,22 @@ class XAIProvider(BaseProvider):
             raise NetworkError("Request to xAI API timed out")
         except httpx.RequestError as e:
             raise NetworkError(f"Network error: {e}")
-        except (AuthenticationError, RateLimitError, ModelNotFoundError, ProviderError):
+        except (
+            AuthenticationError,
+            RateLimitError,
+            ModelNotFoundError,
+            ProviderError,
+        ):
             # Re-raise provider-specific errors without wrapping
             raise
         except Exception as e:
             raise ProviderError(f"Unexpected error: {e}")
 
     async def send_message_with_tools(
-        self, message: str, context: ChatContext, available_tools: List[ToolDefinition]
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
     ) -> ChatResponse:
         """
         Send a message with available tools for Grok to use.
@@ -228,7 +238,9 @@ class XAIProvider(BaseProvider):
         mode_temperatures = {"precise": 0.1, "balanced": 0.7, "creative": 1.0}
         return mode_temperatures.get(self.grok_mode, self.temperature)
 
-    def _convert_tools_to_xai_format(self, tools: List[ToolDefinition]) -> List[Dict]:
+    def _convert_tools_to_xai_format(
+        self, tools: List[ToolDefinition]
+    ) -> List[Dict]:
         """
         Convert tool definitions to xAI API format.
 
@@ -293,13 +305,17 @@ class XAIProvider(BaseProvider):
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get("message", "Unknown error")
+                error_msg = error_data.get("error", {}).get(
+                    "message", "Unknown error"
+                )
             except:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"xAI API error: {error_msg}")
 
-    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
+    def _handle_response_with_tools(
+        self, response: httpx.Response
+    ) -> ChatResponse:
         """
         Handle xAI API response with tool calls.
 

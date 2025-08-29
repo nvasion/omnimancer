@@ -28,7 +28,11 @@ from ..core.agent.approval_manager import (
     BatchApprovalRequest,
     PreviewFormat,
 )
-from ..core.security.approval_workflow import ApprovalRequest, RiskLevel, ApprovalStatus
+from ..core.security.approval_workflow import (
+    ApprovalRequest,
+    RiskLevel,
+    ApprovalStatus,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +177,9 @@ class CLIApprovalFormatter:
             )
 
             operation_panel = Panel(
-                self._format_single_batch_operation(mini_request, preview, i + 1),
+                self._format_single_batch_operation(
+                    mini_request, preview, i + 1
+                ),
                 title=f"Operation {i + 1}",
                 border_style="dim",
             )
@@ -188,7 +194,9 @@ class CLIApprovalFormatter:
         return Group(*components)
 
     def _format_header(
-        self, approval_request: ApprovalRequest, preview: Optional[ChangePreview]
+        self,
+        approval_request: ApprovalRequest,
+        preview: Optional[ChangePreview],
     ) -> Panel:
         """Format the approval dialog header."""
         # Get icon for change type
@@ -255,7 +263,10 @@ class CLIApprovalFormatter:
                 table.add_row("Content Size", f"{size_kb:.1f} KB")
 
         return Panel(
-            table, title="Operation Details", title_align="left", border_style="blue"
+            table,
+            title="Operation Details",
+            title_align="left",
+            border_style="blue",
         )
 
     def _format_change_preview(self, preview: ChangePreview) -> Panel:
@@ -271,13 +282,18 @@ class CLIApprovalFormatter:
         attrs_table.add_column("Attribute", style="cyan", min_width=12)
         attrs_table.add_column("Value", style="white")
 
-        attrs_table.add_row("Reversible", "✅ Yes" if preview.reversible else "❌ No")
+        attrs_table.add_row(
+            "Reversible", "✅ Yes" if preview.reversible else "❌ No"
+        )
 
         if preview.risk_assessment:
             attrs_table.add_row("Risk", preview.risk_assessment)
 
         # File-specific information
-        if preview.change_type in [ChangeType.FILE_CREATE, ChangeType.FILE_MODIFY]:
+        if preview.change_type in [
+            ChangeType.FILE_CREATE,
+            ChangeType.FILE_MODIFY,
+        ]:
             if preview.proposed_state:
                 lines = len(preview.proposed_state.splitlines())
                 attrs_table.add_row("New Lines", str(lines))
@@ -331,7 +347,11 @@ class CLIApprovalFormatter:
         try:
             # Use syntax highlighting for diff
             syntax = Syntax(
-                diff_text, "diff", theme="monokai", line_numbers=False, word_wrap=False
+                diff_text,
+                "diff",
+                theme="monokai",
+                line_numbers=False,
+                word_wrap=False,
             )
         except Exception:
             # Fallback to plain text if syntax highlighting fails
@@ -344,7 +364,9 @@ class CLIApprovalFormatter:
             border_style="magenta",
         )
 
-    def _format_risk_assessment(self, approval_request: ApprovalRequest) -> Panel:
+    def _format_risk_assessment(
+        self, approval_request: ApprovalRequest
+    ) -> Panel:
         """Format risk assessment with visual indicators."""
         risk_level = approval_request.risk_level
         risk_color = self.risk_colors[risk_level]
@@ -408,7 +430,9 @@ class CLIApprovalFormatter:
             if "path" in preview.metadata:
                 path = preview.metadata["path"]
                 item_count = preview.metadata.get("item_count", 0)
-                impact_items.append(f"• Directory: {path} ({item_count} items)")
+                impact_items.append(
+                    f"• Directory: {path} ({item_count} items)"
+                )
 
         # Command execution impact
         if preview.change_type == ChangeType.COMMAND_EXECUTE:
@@ -424,7 +448,9 @@ class CLIApprovalFormatter:
                 impact_items.append(f"• Network {method}: {url}")
 
         # Reversibility impact
-        reversible_text = "✅ Reversible" if preview.reversible else "❌ Not reversible"
+        reversible_text = (
+            "✅ Reversible" if preview.reversible else "❌ Not reversible"
+        )
         impact_items.append(f"• Recovery: {reversible_text}")
 
         if not impact_items:
@@ -462,8 +488,12 @@ class CLIApprovalFormatter:
 
         try:
             # Pretty print metadata as JSON
-            metadata_json = json.dumps(filtered_metadata, indent=2, default=str)
-            syntax = Syntax(metadata_json, "json", theme="monokai", line_numbers=False)
+            metadata_json = json.dumps(
+                filtered_metadata, indent=2, default=str
+            )
+            syntax = Syntax(
+                metadata_json, "json", theme="monokai", line_numbers=False
+            )
         except Exception:
             # Fallback to simple text display
             lines = [f"{k}: {v}" for k, v in filtered_metadata.items()]
@@ -481,12 +511,16 @@ class CLIApprovalFormatter:
         time_content = []
 
         # Request time
-        request_time = approval_request.requested_at.strftime("%Y-%m-%d %H:%M:%S")
+        request_time = approval_request.requested_at.strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         time_content.append(Text(f"Requested: {request_time}", style="white"))
 
         # Expiration time
         if approval_request.expires_at:
-            expires_time = approval_request.expires_at.strftime("%Y-%m-%d %H:%M:%S")
+            expires_time = approval_request.expires_at.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
             time_remaining = approval_request.time_remaining()
 
             if time_remaining and time_remaining.total_seconds() > 0:
@@ -541,7 +575,9 @@ class CLIApprovalFormatter:
             border_style="white",
         )
 
-    def _format_batch_header(self, batch_request: BatchApprovalRequest) -> Panel:
+    def _format_batch_header(
+        self, batch_request: BatchApprovalRequest
+    ) -> Panel:
         """Format batch approval header."""
         summary = batch_request.get_approval_summary()
 
@@ -552,7 +588,9 @@ class CLIApprovalFormatter:
                 style="dim white",
             ),
             Text(),
-            Text(f"🔢 Operations: {summary['total_operations']}", style="blue"),
+            Text(
+                f"🔢 Operations: {summary['total_operations']}", style="blue"
+            ),
             Text(
                 f"⏰ Created: {batch_request.created_at.strftime('%H:%M:%S')}",
                 style="white",
@@ -566,7 +604,9 @@ class CLIApprovalFormatter:
             border_style="blue",
         )
 
-    def _format_batch_summary(self, batch_request: BatchApprovalRequest) -> Panel:
+    def _format_batch_summary(
+        self, batch_request: BatchApprovalRequest
+    ) -> Panel:
         """Format batch operations summary table."""
         table = Table(show_header=True, header_style="bold cyan")
         table.add_column("Op", width=3)
@@ -633,7 +673,9 @@ class CLIApprovalFormatter:
             details_text.append(f"Risk: {preview.risk_assessment}")
 
         if details_text:
-            components.append(Text(" | ".join(details_text), style="dim white"))
+            components.append(
+                Text(" | ".join(details_text), style="dim white")
+            )
 
         return Group(*components)
 
@@ -643,9 +685,13 @@ class CLIApprovalFormatter:
             Text("Batch Approval Options:", style="bold white"),
             Text(),
             Text(
-                "• [bold green]all[/bold green] - Approve all operations", style="green"
+                "• [bold green]all[/bold green] - Approve all operations",
+                style="green",
             ),
-            Text("• [bold red]none[/bold red] - Deny all operations", style="red"),
+            Text(
+                "• [bold red]none[/bold red] - Deny all operations",
+                style="red",
+            ),
             Text(
                 f"• [bold blue]select[/bold blue] - Choose specific operations (1-{operation_count})",
                 style="blue",

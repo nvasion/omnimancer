@@ -46,7 +46,9 @@ class TestPersonaConfiguration:
     def test_get_template(self):
         """Test getting template from configuration."""
         template_manager = ConfigTemplateManager()
-        config = PersonaConfiguration(template_id="coding", primary_provider="claude")
+        config = PersonaConfiguration(
+            template_id="coding", primary_provider="claude"
+        )
 
         template = config.get_template(template_manager)
         assert template is not None
@@ -56,7 +58,9 @@ class TestPersonaConfiguration:
         """Test getting primary provider configuration."""
         template_manager = ConfigTemplateManager()
         config = PersonaConfiguration(
-            template_id="coding", primary_provider="claude", temperature_override=0.2
+            template_id="coding",
+            primary_provider="claude",
+            temperature_override=0.2,
         )
 
         provider_config = config.get_primary_provider_config(template_manager)
@@ -70,15 +74,21 @@ class TestPersonaConfiguration:
             template_id="coding", primary_provider="invalid_provider"
         )
 
-        with pytest.raises(ValueError, match="Provider invalid_provider not found"):
+        with pytest.raises(
+            ValueError, match="Provider invalid_provider not found"
+        ):
             config.get_primary_provider_config(template_manager)
 
     def test_to_provider_config(self):
         """Test converting to ProviderConfig."""
         template_manager = ConfigTemplateManager()
-        config = PersonaConfiguration(template_id="coding", primary_provider="claude")
+        config = PersonaConfiguration(
+            template_id="coding", primary_provider="claude"
+        )
 
-        provider_config = config.to_provider_config("test_persona", template_manager)
+        provider_config = config.to_provider_config(
+            "test_persona", template_manager
+        )
         assert isinstance(provider_config, ProviderConfig)
         assert provider_config.provider_type == ProviderType.ANTHROPIC
         assert provider_config.enabled is True
@@ -283,11 +293,15 @@ class TestPersonaManager:
         """Test filtering personas by category."""
         manager = PersonaManager()
 
-        dev_personas = manager.get_personas_by_category(PersonaCategory.DEVELOPMENT)
+        dev_personas = manager.get_personas_by_category(
+            PersonaCategory.DEVELOPMENT
+        )
         assert len(dev_personas) == 1
         assert dev_personas[0].id == "coding"
 
-        research_personas = manager.get_personas_by_category(PersonaCategory.RESEARCH)
+        research_personas = manager.get_personas_by_category(
+            PersonaCategory.RESEARCH
+        )
         assert len(research_personas) == 1
         assert research_personas[0].id == "research"
 
@@ -300,7 +314,10 @@ class TestPersonaManager:
 
         # All personas should be available or active by default
         for persona in available:
-            assert persona.status in [PersonaStatus.AVAILABLE, PersonaStatus.ACTIVE]
+            assert persona.status in [
+                PersonaStatus.AVAILABLE,
+                PersonaStatus.ACTIVE,
+            ]
 
     @patch("omnimancer.core.agent.persona.logger")
     def test_activate_persona(self, mock_logger):
@@ -364,12 +381,16 @@ class TestPersonaManager:
         assert any(p.id == "research" for p in research_recs)
 
         # Test creative context
-        creative_recs = manager.get_persona_recommendations("Help me write a story")
+        creative_recs = manager.get_persona_recommendations(
+            "Help me write a story"
+        )
         assert len(creative_recs) >= 1
         assert any(p.id == "creative" for p in creative_recs)
 
         # Test performance context
-        performance_recs = manager.get_persona_recommendations("I need fast responses")
+        performance_recs = manager.get_persona_recommendations(
+            "I need fast responses"
+        )
         assert len(performance_recs) >= 1
         assert any(p.id == "performance" for p in performance_recs)
 
@@ -397,7 +418,10 @@ class TestPersonaManager:
             "id": "custom_test",
             "name": "Custom Test Agent",
             "description": "A test custom persona",
-            "configuration": {"template_id": "general", "primary_provider": "claude"},
+            "configuration": {
+                "template_id": "general",
+                "primary_provider": "claude",
+            },
         }
 
         result = manager.register_custom_persona(persona_data)
@@ -429,7 +453,9 @@ class TestPersonaManager:
 
         # Should have received persona_activated event
         assert len(events_received) > 0
-        assert any(event[0] == "persona_activated" for event in events_received)
+        assert any(
+            event[0] == "persona_activated" for event in events_received
+        )
 
         # Remove listener
         manager.remove_event_listener(test_listener)

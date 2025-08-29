@@ -22,7 +22,10 @@ from omnimancer.core.agent.persona import (
     PersonaStatus,
     PersonaCategory,
 )
-from omnimancer.core.agent.persona_validator import PersonaValidator, ValidationResult
+from omnimancer.core.agent.persona_validator import (
+    PersonaValidator,
+    ValidationResult,
+)
 from omnimancer.core.agent.agent_switcher import AgentSwitcher, SessionState
 from omnimancer.core.models import ConfigTemplateManager
 
@@ -39,7 +42,9 @@ class TestApplicationContext:
         config = Mock(spec=PersonaConfiguration)
         config.template_id = "test_template"
 
-        context = ApplicationContext(persona=persona, target_configuration=config)
+        context = ApplicationContext(
+            persona=persona, target_configuration=config
+        )
 
         assert context.persona == persona
         assert context.target_configuration == config
@@ -235,13 +240,17 @@ class TestTemplateApplicator:
         assert context.stage == ApplicationStage.COMPLETE
         assert len(applicator.application_history) == 1
 
-    def test_apply_template_persona_not_found(self, applicator, mock_persona_manager):
+    def test_apply_template_persona_not_found(
+        self, applicator, mock_persona_manager
+    ):
         """Test template application with non-existent persona."""
         mock_persona_manager.get_persona = Mock(return_value=None)
 
         config = Mock(spec=PersonaConfiguration)
 
-        with pytest.raises(ValueError, match="Persona 'nonexistent' not found"):
+        with pytest.raises(
+            ValueError, match="Persona 'nonexistent' not found"
+        ):
             applicator.apply_template("nonexistent", config)
 
     def test_apply_template_validation_failure(self, applicator):
@@ -252,12 +261,16 @@ class TestTemplateApplicator:
         validation_result = ValidationResult(is_valid=False)
         validation_result.add_issue(Mock(severity=Mock(value="error")))
         validation_result.has_blocking_issues = Mock(return_value=True)
-        applicator.validator.validate_persona = Mock(return_value=validation_result)
+        applicator.validator.validate_persona = Mock(
+            return_value=validation_result
+        )
 
         result, context = applicator.apply_template("test_persona", config)
 
         assert result == ApplicationResult.VALIDATION_FAILED
-        assert context.error_message == "Validation failed with blocking issues"
+        assert (
+            context.error_message == "Validation failed with blocking issues"
+        )
 
     def test_apply_template_with_force_application(
         self, applicator, mock_persona_manager
@@ -284,11 +297,15 @@ class TestTemplateApplicator:
         )
 
         options = ApplicationOptions(force_application=True)
-        result, context = applicator.apply_template("test_persona", config, options)
+        result, context = applicator.apply_template(
+            "test_persona", config, options
+        )
 
         assert result == ApplicationResult.SUCCESS
 
-    def test_apply_template_with_backup(self, applicator, mock_persona_manager):
+    def test_apply_template_with_backup(
+        self, applicator, mock_persona_manager
+    ):
         """Test template application creates backup."""
         persona = mock_persona_manager.get_persona("test_persona")
         original_config = Mock(spec=PersonaConfiguration)
@@ -296,15 +313,21 @@ class TestTemplateApplicator:
         persona.status = PersonaStatus.ACTIVE
 
         new_config = Mock(spec=PersonaConfiguration)
-        new_config.get_template = Mock(return_value=Mock())  # Mock template access
+        new_config.get_template = Mock(
+            return_value=Mock()
+        )  # Mock template access
 
         # Mock successful validation for both initial and post-application
         validation_result = ValidationResult(is_valid=True)
         validation_result.has_blocking_issues = Mock(return_value=False)
-        applicator.validator.validate_persona = Mock(return_value=validation_result)
+        applicator.validator.validate_persona = Mock(
+            return_value=validation_result
+        )
 
         options = ApplicationOptions(create_backup=True)
-        result, context = applicator.apply_template("test_persona", new_config, options)
+        result, context = applicator.apply_template(
+            "test_persona", new_config, options
+        )
 
         assert result == ApplicationResult.SUCCESS
         # Check that backup was created (original_configuration should exist)
@@ -323,13 +346,17 @@ class TestTemplateApplicator:
             pre_application_hook=pre_hook, post_application_hook=post_hook
         )
 
-        result, context = applicator.apply_template("test_persona", config, options)
+        result, context = applicator.apply_template(
+            "test_persona", config, options
+        )
 
         assert result == ApplicationResult.SUCCESS
         pre_hook.assert_called_once()
         post_hook.assert_called_once()
 
-    def test_apply_template_rollback_on_failure(self, applicator, mock_persona_manager):
+    def test_apply_template_rollback_on_failure(
+        self, applicator, mock_persona_manager
+    ):
         """Test template application rollback on failure."""
         persona = mock_persona_manager.get_persona("test_persona")
         original_config = Mock(spec=PersonaConfiguration)
@@ -341,17 +368,25 @@ class TestTemplateApplicator:
         # Mock successful validation
         validation_result = ValidationResult(is_valid=True)
         validation_result.has_blocking_issues = Mock(return_value=False)
-        applicator.validator.validate_persona = Mock(return_value=validation_result)
+        applicator.validator.validate_persona = Mock(
+            return_value=validation_result
+        )
 
         # Mock agent switcher failure to trigger rollback
         applicator.agent_switcher.switch_persona = Mock(
             return_value=(False, "Activation failed")
         )
-        mock_persona_manager.active_persona = persona  # Make it the active persona
+        mock_persona_manager.active_persona = (
+            persona  # Make it the active persona
+        )
 
-        options = ApplicationOptions(rollback_on_failure=True, create_backup=True)
+        options = ApplicationOptions(
+            rollback_on_failure=True, create_backup=True
+        )
 
-        result, context = applicator.apply_template("test_persona", config, options)
+        result, context = applicator.apply_template(
+            "test_persona", config, options
+        )
 
         # The current implementation returns APPLICATION_FAILED when activation fails,
         # not ROLLBACK_SUCCESS, because rollback only happens on exceptions
@@ -369,20 +404,28 @@ class TestTemplateApplicator:
         config = Mock(spec=PersonaConfiguration)
         options = ApplicationOptions(skip_verification=False)
 
-        result, context = applicator.apply_template("test_persona", config, options)
+        result, context = applicator.apply_template(
+            "test_persona", config, options
+        )
 
         assert result == ApplicationResult.PARTIAL_SUCCESS
         assert context.error_message == "Application verification failed"
 
-    def test_apply_template_skip_verification(self, applicator, mock_persona_manager):
+    def test_apply_template_skip_verification(
+        self, applicator, mock_persona_manager
+    ):
         """Test template application skipping verification."""
         persona = mock_persona_manager.get_persona("test_persona")
-        persona.status = PersonaStatus.ERROR  # Would normally fail verification
+        persona.status = (
+            PersonaStatus.ERROR
+        )  # Would normally fail verification
 
         config = Mock(spec=PersonaConfiguration)
         options = ApplicationOptions(skip_verification=True)
 
-        result, context = applicator.apply_template("test_persona", config, options)
+        result, context = applicator.apply_template(
+            "test_persona", config, options
+        )
 
         assert result == ApplicationResult.SUCCESS
 
@@ -394,16 +437,22 @@ class TestTemplateApplicator:
         persona.configuration = original_config
 
         new_config = Mock(spec=PersonaConfiguration)
-        new_config.get_template = Mock(return_value=Mock())  # Mock template access
+        new_config.get_template = Mock(
+            return_value=Mock()
+        )  # Mock template access
 
         # Mock successful validation
         validation_result = ValidationResult(is_valid=True)
         validation_result.has_blocking_issues = Mock(return_value=False)
-        applicator.validator.validate_persona = Mock(return_value=validation_result)
+        applicator.validator.validate_persona = Mock(
+            return_value=validation_result
+        )
 
         options = ApplicationOptions(create_backup=True)
 
-        result, context = applicator.apply_template("test_persona", new_config, options)
+        result, context = applicator.apply_template(
+            "test_persona", new_config, options
+        )
         assert result == ApplicationResult.SUCCESS
 
         # Now test rollback
@@ -445,7 +494,10 @@ class TestTemplateApplicator:
         # Add some fake active contexts
         context1 = Mock()
         context2 = Mock()
-        applicator.active_contexts = {"persona1": context1, "persona2": context2}
+        applicator.active_contexts = {
+            "persona1": context1,
+            "persona2": context2,
+        }
 
         active = applicator.get_active_applications()
 
@@ -517,9 +569,13 @@ class TestTemplateApplicator:
     ):
         """Test persona activation using agent switcher."""
         persona = mock_persona_manager.get_persona("test_persona")
-        mock_persona_manager.active_persona = persona  # Make it the active persona
+        mock_persona_manager.active_persona = (
+            persona  # Make it the active persona
+        )
 
-        context = ApplicationContext(persona=persona, target_configuration=Mock())
+        context = ApplicationContext(
+            persona=persona, target_configuration=Mock()
+        )
 
         success = applicator._activate_persona(context)
 
@@ -534,21 +590,29 @@ class TestTemplateApplicator:
         """Test persona activation failure with switcher."""
         persona = mock_persona_manager.get_persona("test_persona")
         mock_persona_manager.active_persona = persona
-        mock_agent_switcher.switch_persona = Mock(return_value=(False, "Switch failed"))
+        mock_agent_switcher.switch_persona = Mock(
+            return_value=(False, "Switch failed")
+        )
 
-        context = ApplicationContext(persona=persona, target_configuration=Mock())
+        context = ApplicationContext(
+            persona=persona, target_configuration=Mock()
+        )
 
         success = applicator._activate_persona(context)
 
         assert success is False
 
-    def test_activate_persona_direct_activation(self, applicator, mock_persona_manager):
+    def test_activate_persona_direct_activation(
+        self, applicator, mock_persona_manager
+    ):
         """Test direct persona activation without switcher."""
         applicator.agent_switcher = None  # No switcher available
         persona = mock_persona_manager.get_persona("test_persona")
         mock_persona_manager.active_persona = persona
 
-        context = ApplicationContext(persona=persona, target_configuration=Mock())
+        context = ApplicationContext(
+            persona=persona, target_configuration=Mock()
+        )
 
         success = applicator._activate_persona(context)
 
@@ -567,9 +631,13 @@ class TestTemplateApplicator:
         # Mock validation success
         validation_result = ValidationResult(is_valid=True)
         validation_result.has_blocking_issues = Mock(return_value=False)
-        applicator.validator.validate_persona = Mock(return_value=validation_result)
+        applicator.validator.validate_persona = Mock(
+            return_value=validation_result
+        )
 
-        context = ApplicationContext(persona=persona, target_configuration=Mock())
+        context = ApplicationContext(
+            persona=persona, target_configuration=Mock()
+        )
 
         success = applicator._verify_application(context)
 
@@ -580,7 +648,9 @@ class TestTemplateApplicator:
         persona = Mock()
         persona.status = PersonaStatus.ERROR
 
-        context = ApplicationContext(persona=persona, target_configuration=Mock())
+        context = ApplicationContext(
+            persona=persona, target_configuration=Mock()
+        )
 
         success = applicator._verify_application(context)
 
@@ -594,9 +664,13 @@ class TestTemplateApplicator:
         # Mock validation failure
         validation_result = ValidationResult(is_valid=False)
         validation_result.has_blocking_issues = Mock(return_value=True)
-        applicator.validator.validate_persona = Mock(return_value=validation_result)
+        applicator.validator.validate_persona = Mock(
+            return_value=validation_result
+        )
 
-        context = ApplicationContext(persona=persona, target_configuration=Mock())
+        context = ApplicationContext(
+            persona=persona, target_configuration=Mock()
+        )
 
         success = applicator._verify_application(context)
 

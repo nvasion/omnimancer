@@ -69,7 +69,9 @@ class BedrockProvider(BaseProvider):
         self.top_k = kwargs.get("top_k", 250)
 
         # Build base URL for Bedrock API key authentication
-        self.base_url = f"https://bedrock-runtime.{self.aws_region}.amazonaws.com"
+        self.base_url = (
+            f"https://bedrock-runtime.{self.aws_region}.amazonaws.com"
+        )
 
     def _is_arn(self, model_id: str) -> bool:
         """Check if the model ID is in ARN format."""
@@ -91,7 +93,9 @@ class BedrockProvider(BaseProvider):
             return model_id
         return f"arn:aws:bedrock:{self.aws_region}::{model_type}/{model_id}"
 
-    def _suggest_arn_conversion(self, model_id: str, error_message: str) -> dict:
+    def _suggest_arn_conversion(
+        self, model_id: str, error_message: str
+    ) -> dict:
         """Suggest ARN conversion when permission denied."""
         if not self._is_arn(model_id):
             foundation_arn = self._convert_to_arn(model_id, "foundation-model")
@@ -114,7 +118,9 @@ class BedrockProvider(BaseProvider):
             }
         return {"success": False, "message": error_message}
 
-    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
+    async def send_message(
+        self, message: str, context: ChatContext
+    ) -> ChatResponse:
         """
         Send a message to AWS Bedrock API.
 
@@ -155,7 +161,10 @@ class BedrockProvider(BaseProvider):
             raise ProviderError(f"AWS Bedrock API error: {str(e)}")
 
     async def send_message_with_tools(
-        self, message: str, context: ChatContext, available_tools: List[ToolDefinition]
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
     ) -> ChatResponse:
         """
         Send a message with available tools for Bedrock to use.
@@ -266,7 +275,10 @@ class BedrockProvider(BaseProvider):
                 )
 
             if response.status_code == 200:
-                return {"success": True, "message": f"Model {self.model} is accessible"}
+                return {
+                    "success": True,
+                    "message": f"Model {self.model} is accessible",
+                }
             else:
                 try:
                     error_data = response.json()
@@ -275,13 +287,17 @@ class BedrockProvider(BaseProvider):
                     )
 
                     # Parse different error types and provide intelligent suggestions
-                    if "not authorized" in error_msg or "explicit deny" in error_msg:
+                    if (
+                        "not authorized" in error_msg
+                        or "explicit deny" in error_msg
+                    ):
                         return self._suggest_arn_conversion(
                             self.model,
                             f"Access denied to model {self.model}. This may be due to SCP restrictions or regional access issues.",
                         )
                     elif (
-                        "not supported" in error_msg or "inference profile" in error_msg
+                        "not supported" in error_msg
+                        or "inference profile" in error_msg
                     ):
                         if not self._is_arn(self.model):
                             # Suggest ARN format for inference profile access
@@ -321,9 +337,14 @@ class BedrockProvider(BaseProvider):
                     }
 
         except Exception as e:
-            return {"success": False, "message": f"Failed to test model: {str(e)}"}
+            return {
+                "success": False,
+                "message": f"Failed to test model: {str(e)}",
+            }
 
-    def _prepare_bedrock_request(self, message: str, context: ChatContext) -> str:
+    def _prepare_bedrock_request(
+        self, message: str, context: ChatContext
+    ) -> str:
         """
         Prepare request body for AWS Bedrock Converse API.
 
@@ -397,7 +418,10 @@ class BedrockProvider(BaseProvider):
         # Add tools in Bedrock Converse format
         if tools:
             request_data["toolConfig"] = {
-                "tools": [self._convert_tool_to_bedrock_format(tool) for tool in tools]
+                "tools": [
+                    self._convert_tool_to_bedrock_format(tool)
+                    for tool in tools
+                ]
             }
 
         return json.dumps(request_data)
@@ -453,7 +477,9 @@ class BedrockProvider(BaseProvider):
                 else:
                     raise ProviderError("Empty content in Bedrock response")
             else:
-                raise ProviderError("Invalid response format from Bedrock Converse API")
+                raise ProviderError(
+                    "Invalid response format from Bedrock Converse API"
+                )
 
         elif response.status_code == 401:
             raise AuthenticationError("Invalid API key for Bedrock")
@@ -468,7 +494,9 @@ class BedrockProvider(BaseProvider):
                     "message", error_data.get("Message", "Unknown error")
                 )
                 # Include more error details for debugging
-                error_code = error_data.get("__type", error_data.get("code", ""))
+                error_code = error_data.get(
+                    "__type", error_data.get("code", "")
+                )
                 if error_code:
                     error_msg = f"{error_code}: {error_msg}"
             except:
@@ -476,7 +504,9 @@ class BedrockProvider(BaseProvider):
 
             raise ProviderError(f"AWS Bedrock API error: {error_msg}")
 
-    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
+    def _handle_response_with_tools(
+        self, response: httpx.Response
+    ) -> ChatResponse:
         """
         Handle AWS Bedrock Converse API response with tool calls.
 
@@ -517,7 +547,9 @@ class BedrockProvider(BaseProvider):
                     timestamp=datetime.now(),
                 )
             else:
-                raise ProviderError("Invalid response format from Bedrock Converse API")
+                raise ProviderError(
+                    "Invalid response format from Bedrock Converse API"
+                )
         else:
             return self._handle_response(response)
 
@@ -591,7 +623,9 @@ class BedrockProvider(BaseProvider):
             latest_version="claude-3-5-sonnet" in self.model,
             context_window=config["max_tokens"],
             is_free=False,
-            release_date=datetime(2024, 6, 1),  # Approximate Bedrock availability
+            release_date=datetime(
+                2024, 6, 1
+            ),  # Approximate Bedrock availability
         )
 
         # Update SWE rating based on score

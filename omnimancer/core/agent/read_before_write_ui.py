@@ -121,7 +121,11 @@ class ReadBeforeWriteUI:
             preview_content = new_content
 
         syntax = Syntax(
-            preview_content, lexer, theme="monokai", line_numbers=True, word_wrap=True
+            preview_content,
+            lexer,
+            theme="monokai",
+            line_numbers=True,
+            word_wrap=True,
         )
 
         content_panel = Panel(
@@ -206,7 +210,9 @@ class ReadBeforeWriteUI:
 
         self.console.print(diff_panel)
 
-    def _display_side_by_side_preview(self, current_content: str, new_content: str):
+    def _display_side_by_side_preview(
+        self, current_content: str, new_content: str
+    ):
         """Display side-by-side preview when diff is not available."""
         # Create table for side-by-side view
         table = Table(show_header=True, header_style="bold magenta")
@@ -220,7 +226,9 @@ class ReadBeforeWriteUI:
             else current_content
         )
         new_preview = (
-            new_content[:1000] + "..." if len(new_content) > 1000 else new_content
+            new_content[:1000] + "..."
+            if len(new_content) > 1000
+            else new_content
         )
 
         table.add_row(current_preview, new_preview)
@@ -251,13 +259,19 @@ class ReadBeforeWriteUI:
             else "[bold blue]Content Statistics[/bold blue]"
         )
 
-        stats_panel = Panel(stats_text, title=title, border_style="blue", width=40)
+        stats_panel = Panel(
+            stats_text, title=title, border_style="blue", width=40
+        )
 
         self.console.print(stats_panel)
 
-    def _display_content_comparison_stats(self, current_content: str, new_content: str):
+    def _display_content_comparison_stats(
+        self, current_content: str, new_content: str
+    ):
         """Display comparison statistics between current and new content."""
-        current_lines = len(current_content.split("\n")) if current_content else 0
+        current_lines = (
+            len(current_content.split("\n")) if current_content else 0
+        )
         new_lines = len(new_content.split("\n"))
         current_chars = len(current_content) if current_content else 0
         new_chars = len(new_content)
@@ -293,7 +307,9 @@ class ReadBeforeWriteUI:
 
         self.console.print(stats_panel)
 
-    async def _get_user_decision(self, review_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _get_user_decision(
+        self, review_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Get user decision about the file modification."""
         self.console.print()  # Add some spacing
 
@@ -346,7 +362,9 @@ class ReadBeforeWriteUI:
             )
             return {"approved": False, "reason": reason}
 
-    async def _handle_edit_content(self, review_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_edit_content(
+        self, review_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Handle user editing of content before writing."""
         self.console.print("\n[yellow]Content editing functionality:[/yellow]")
         self.console.print("You can:")
@@ -368,7 +386,9 @@ class ReadBeforeWriteUI:
             # Go back to original decision
             return await self._get_user_decision(review_data)
 
-    async def _inline_content_edit(self, review_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _inline_content_edit(
+        self, review_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Handle inline content editing."""
         self.console.print("\n[yellow]Inline content editing:[/yellow]")
         self.console.print(
@@ -419,10 +439,14 @@ class ReadBeforeWriteUI:
         self.console.print(
             "[yellow]External editor functionality not yet implemented[/yellow]"
         )
-        self.console.print("[yellow]Falling back to inline editing...[/yellow]")
+        self.console.print(
+            "[yellow]Falling back to inline editing...[/yellow]"
+        )
         return await self._inline_content_edit(review_data)
 
-    async def confirm_file_overwrite(self, file_info: Dict[str, Any]) -> Dict[str, Any]:
+    async def confirm_file_overwrite(
+        self, file_info: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Prompt user for confirmation when a file already exists.
 
@@ -475,7 +499,9 @@ class ReadBeforeWriteUI:
         # Create warning header
         warning_text = Text()
         warning_text.append("⚠️  File Exists Warning\n", style="bold yellow")
-        warning_text.append(f"The {file_type} already exists:\n", style="yellow")
+        warning_text.append(
+            f"The {file_type} already exists:\n", style="yellow"
+        )
         warning_text.append(f"{file_path}\n\n", style="cyan")
 
         # Add file details if available
@@ -511,7 +537,9 @@ class ReadBeforeWriteUI:
 
         # Present options to user
         options_text = Text()
-        options_text.append("What would you like to do?\n\n", style="bold cyan")
+        options_text.append(
+            "What would you like to do?\n\n", style="bold cyan"
+        )
         options_text.append("1. ", style="bold green")
         options_text.append("Overwrite the existing file\n", style="green")
         options_text.append("2. ", style="bold yellow")
@@ -563,7 +591,9 @@ class ReadBeforeWriteUI:
                     "reason": "User confirmed overwrite",
                 }
             else:
-                return await self._get_overwrite_decision(file_info)  # Ask again
+                return await self._get_overwrite_decision(
+                    file_info
+                )  # Ask again
 
         elif choice in ["2", "backup"]:
             return {
@@ -637,7 +667,9 @@ def create_confirmation_callback(console: Optional[Console] = None):
     """
     ui = ReadBeforeWriteUI(console)
 
-    async def confirmation_callback(file_info: Dict[str, Any]) -> Dict[str, Any]:
+    async def confirmation_callback(
+        file_info: Dict[str, Any],
+    ) -> Dict[str, Any]:
         return await ui.confirm_file_overwrite(file_info)
 
     return confirmation_callback

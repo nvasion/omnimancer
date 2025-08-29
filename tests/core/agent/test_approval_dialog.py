@@ -125,7 +125,9 @@ class TestSecurityFlags:
     def test_get_risk_factors(self):
         """Test extracting risk factors from security flags."""
         flags = SecurityFlags(
-            requires_sudo=True, modifies_system_files=True, accesses_network=True
+            requires_sudo=True,
+            modifies_system_files=True,
+            accesses_network=True,
         )
 
         factors = flags.get_risk_factors()
@@ -214,7 +216,9 @@ class TestOperationDetails:
         details2 = OperationDetails(
             operation_type="file_delete", target="/test/file.txt"
         )
-        assert details2.get_operation_summary() == "file_delete on /test/file.txt"
+        assert (
+            details2.get_operation_summary() == "file_delete on /test/file.txt"
+        )
 
         # With multiple files
         details3 = OperationDetails(
@@ -225,9 +229,12 @@ class TestOperationDetails:
 
         # With single file
         details4 = OperationDetails(
-            operation_type="file_read", files_affected=[Path("/test/single.py")]
+            operation_type="file_read",
+            files_affected=[Path("/test/single.py")],
         )
-        assert details4.get_operation_summary() == "file_read on /test/single.py"
+        assert (
+            details4.get_operation_summary() == "file_read on /test/single.py"
+        )
 
 
 class TestApprovalDecision:
@@ -300,7 +307,9 @@ class TestApprovalContext:
         context.add_conversation_entry("Agent analyzing risk")
 
         assert len(context.conversation_history) == 2
-        assert "User requested file operation" in context.conversation_history[0]
+        assert (
+            "User requested file operation" in context.conversation_history[0]
+        )
         assert "Agent analyzing risk" in context.conversation_history[1]
         # Should have timestamps
         assert "[" in context.conversation_history[0]
@@ -389,7 +398,9 @@ class TestApprovalDialog:
         console = Console()
         options = DialogOptions(compact_mode=True)
 
-        dialog = ApprovalDialog(renderer=renderer, console=console, options=options)
+        dialog = ApprovalDialog(
+            renderer=renderer, console=console, options=options
+        )
 
         assert dialog.renderer == renderer
         assert dialog.console == console
@@ -409,7 +420,9 @@ class TestApprovalDialog:
 
         # Mock the Live context manager
         mock_live_instance = Mock()
-        mock_live.return_value.__enter__ = Mock(return_value=mock_live_instance)
+        mock_live.return_value.__enter__ = Mock(
+            return_value=mock_live_instance
+        )
         mock_live.return_value.__exit__ = Mock(return_value=None)
 
         # Create test context
@@ -455,7 +468,9 @@ class TestApprovalDialog:
     def test_render_header(self):
         """Test header rendering."""
         dialog = ApprovalDialog()
-        context = ApprovalContext(agent_name="Test Agent", timestamp=datetime.now())
+        context = ApprovalContext(
+            agent_name="Test Agent", timestamp=datetime.now()
+        )
 
         header = dialog._render_header(context)
 
@@ -483,7 +498,10 @@ class TestApprovalDialog:
         operation = OperationDetails(
             operation_type="system_command",
             risk_level=RiskLevel.HIGH,
-            risk_factors=["Executes system command", "Modifies critical files"],
+            risk_factors=[
+                "Executes system command",
+                "Modifies critical files",
+            ],
         )
 
         risk_panel = dialog._render_risk_assessment(operation)
@@ -598,7 +616,10 @@ class TestContextCreationUtilities:
         assert context.agent_name == "Command Agent"
         assert context.operation_details.operation_type == "command_execute"
         assert context.operation_details.command == "python"
-        assert context.operation_details.arguments == ["script.py", "--verbose"]
+        assert context.operation_details.arguments == [
+            "script.py",
+            "--verbose",
+        ]
         assert context.operation_details.working_directory == "/test/dir"
         assert context.operation_details.target == "python"
 
@@ -614,41 +635,62 @@ class TestContextCreationUtilities:
 
         assert context.agent_name == "Web Agent"
         assert context.operation_details.operation_type == "web_request"
-        assert context.operation_details.target == "https://api.example.com/data"
+        assert (
+            context.operation_details.target == "https://api.example.com/data"
+        )
         assert context.operation_details.metadata["method"] == "POST"
         assert context.operation_details.metadata["headers"] == headers
-        assert context.operation_details.security_flags.accesses_network is True
+        assert (
+            context.operation_details.security_flags.accesses_network is True
+        )
 
     def test_command_security_assessment(self):
         """Test security assessment for commands."""
         # Test sudo command
-        context1 = create_command_execution_context("sudo", ["rm", "/etc/config"])
+        context1 = create_command_execution_context(
+            "sudo", ["rm", "/etc/config"]
+        )
         assert context1.operation_details.security_flags.requires_sudo is True
 
         # Test network command
-        context2 = create_command_execution_context("curl", ["https://example.com"])
-        assert context2.operation_details.security_flags.accesses_network is True
+        context2 = create_command_execution_context(
+            "curl", ["https://example.com"]
+        )
+        assert (
+            context2.operation_details.security_flags.accesses_network is True
+        )
 
         # Test code execution
-        context3 = create_command_execution_context("python", ["-c", "print('hello')"])
+        context3 = create_command_execution_context(
+            "python", ["-c", "print('hello')"]
+        )
         assert context3.operation_details.security_flags.executes_code is True
 
         # Test system file modification
         context4 = create_command_execution_context("rm", ["/etc/hosts"])
-        assert context4.operation_details.security_flags.modifies_system_files is True
+        assert (
+            context4.operation_details.security_flags.modifies_system_files
+            is True
+        )
 
     def test_web_request_security_assessment(self):
         """Test security assessment for web requests."""
         # Test sensitive URL
         context1 = create_web_request_context("https://admin.example.com/api")
-        assert context1.operation_details.security_flags.accesses_sensitive_data is True
+        assert (
+            context1.operation_details.security_flags.accesses_sensitive_data
+            is True
+        )
 
         # Test regular URL
         context2 = create_web_request_context("https://httpbin.org/get")
         assert (
-            context2.operation_details.security_flags.accesses_sensitive_data is False
+            context2.operation_details.security_flags.accesses_sensitive_data
+            is False
         )
-        assert context2.operation_details.security_flags.accesses_network is True
+        assert (
+            context2.operation_details.security_flags.accesses_network is True
+        )
 
 
 class TestEdgeCases:
@@ -660,7 +702,9 @@ class TestEdgeCases:
         dialog = ApprovalDialog()
         context = ApprovalContext()
 
-        with patch.object(dialog, "_wait_for_decision", side_effect=KeyboardInterrupt):
+        with patch.object(
+            dialog, "_wait_for_decision", side_effect=KeyboardInterrupt
+        ):
             decision = await dialog.show_approval_dialog(context)
 
             assert decision.approved is False
@@ -705,7 +749,10 @@ class TestEdgeCases:
         """Test handling malformed context data."""
         # Test with None values
         details = OperationDetails(
-            operation_type="test", target=None, description=None, files_affected=[]
+            operation_type="test",
+            target=None,
+            description=None,
+            files_affected=[],
         )
 
         summary = details.get_operation_summary()
@@ -714,7 +761,9 @@ class TestEdgeCases:
     def test_large_file_list(self):
         """Test handling large numbers of files."""
         files = [Path(f"/test/file_{i}.py") for i in range(100)]
-        details = OperationDetails(operation_type="batch_process", files_affected=files)
+        details = OperationDetails(
+            operation_type="batch_process", files_affected=files
+        )
 
         # Should handle large lists without issues
         total = details.get_total_files_affected()

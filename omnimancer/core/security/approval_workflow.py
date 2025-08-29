@@ -63,7 +63,9 @@ class ApprovalWorkflow:
     """Manages approval workflows for high-risk operations."""
 
     def __init__(
-        self, default_expiry_minutes: int = 30, auto_approve_low_risk: bool = True
+        self,
+        default_expiry_minutes: int = 30,
+        auto_approve_low_risk: bool = True,
     ):
         self.pending_requests: Dict[str, ApprovalRequest] = {}
         self.completed_requests: Dict[str, ApprovalRequest] = {}
@@ -105,7 +107,9 @@ class ApprovalWorkflow:
         """Assess the risk level of an operation."""
 
         # Base risk from operation type
-        base_risk = self.risk_assessment_rules.get(operation_type, RiskLevel.MEDIUM)
+        base_risk = self.risk_assessment_rules.get(
+            operation_type, RiskLevel.MEDIUM
+        )
 
         if not metadata:
             return base_risk
@@ -155,7 +159,8 @@ class ApprovalWorkflow:
         if "url" in metadata:
             url = metadata["url"]
             if not any(
-                domain in url for domain in ["localhost", "127.0.0.1", "0.0.0.0"]
+                domain in url
+                for domain in ["localhost", "127.0.0.1", "0.0.0.0"]
             ):
                 risk_factors.append("external_network")
 
@@ -217,7 +222,9 @@ class ApprovalWorkflow:
 
         return request
 
-    async def _trigger_approval_handlers(self, request: ApprovalRequest) -> None:
+    async def _trigger_approval_handlers(
+        self, request: ApprovalRequest
+    ) -> None:
         """Trigger approval handlers for a request."""
 
         handlers = self.approval_handlers.get(request.risk_level, [])
@@ -260,7 +267,9 @@ class ApprovalWorkflow:
 
         return True
 
-    def deny_request(self, request_id: str, approver: str, reason: str) -> bool:
+    def deny_request(
+        self, request_id: str, approver: str, reason: str
+    ) -> bool:
         """Deny a pending request."""
 
         if request_id not in self.pending_requests:

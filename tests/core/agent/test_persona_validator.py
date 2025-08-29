@@ -277,12 +277,15 @@ class TestPersonaValidator:
         result = validator.validate_persona(persona)
 
         assert result.is_valid is False
-        assert len(result.errors) >= 2  # Missing id, description, and configuration
+        assert (
+            len(result.errors) >= 2
+        )  # Missing id, description, and configuration
 
         # Check specific error messages
         error_messages = [issue.message for issue in result.errors]
         assert any(
-            "'id'" in msg and "missing or empty" in msg for msg in error_messages
+            "'id'" in msg and "missing or empty" in msg
+            for msg in error_messages
         )
         assert any(
             "'description'" in msg and "missing or empty" in msg
@@ -353,7 +356,9 @@ class TestPersonaValidator:
             for msg in error_messages
         )
 
-    def test_validate_template_compatibility(self, validator, mock_template_manager):
+    def test_validate_template_compatibility(
+        self, validator, mock_template_manager
+    ):
         """Test validating template compatibility."""
         config = Mock(spec=PersonaConfiguration)
         config.template_id = "test_template"
@@ -361,11 +366,15 @@ class TestPersonaValidator:
         config.fallback_providers = ["also_nonexistent"]
 
         result = ValidationResult(True)
-        validator._validate_template_compatibility("test_template", config, result)
+        validator._validate_template_compatibility(
+            "test_template", config, result
+        )
 
         # Should add errors for incompatible providers
         error_messages = [issue.message for issue in result.errors]
-        assert any("not available in template" in msg for msg in error_messages)
+        assert any(
+            "not available in template" in msg for msg in error_messages
+        )
 
     def test_validate_conflicting_capabilities(self, validator):
         """Test validating conflicting capabilities."""
@@ -379,7 +388,9 @@ class TestPersonaValidator:
 
         # Should add warning for conflicting capabilities
         warning_messages = [issue.message for issue in result.warnings]
-        assert any("Conflicting capabilities" in msg for msg in warning_messages)
+        assert any(
+            "Conflicting capabilities" in msg for msg in warning_messages
+        )
 
     def test_validate_template_not_found(self, validator):
         """Test validating non-existent template."""
@@ -396,7 +407,9 @@ class TestPersonaValidator:
     def test_provider_availability_caching(self, validator):
         """Test provider availability caching."""
         # Mock provider registry
-        validator.provider_registry.get_provider_info = Mock(return_value=Mock())
+        validator.provider_registry.get_provider_info = Mock(
+            return_value=Mock()
+        )
 
         # First call should hit the registry
         result1 = validator._is_provider_available("test_provider")
@@ -414,14 +427,20 @@ class TestPersonaValidator:
         """Test model availability for basic models."""
         # Known models should be available
         assert (
-            validator._is_model_available("claude", "claude-3-sonnet-20240229") is True
+            validator._is_model_available("claude", "claude-3-sonnet-20240229")
+            is True
         )
         assert validator._is_model_available("openai", "gpt-4") is True
         assert validator._is_model_available("gemini", "gemini-pro") is True
 
         # Unknown models should not be available
-        assert validator._is_model_available("unknown", "unknown-model") is False
-        assert validator._is_model_available("claude", "nonexistent-model") is False
+        assert (
+            validator._is_model_available("unknown", "unknown-model") is False
+        )
+        assert (
+            validator._is_model_available("claude", "nonexistent-model")
+            is False
+        )
 
     def test_clear_cache(self, validator):
         """Test clearing validation caches."""

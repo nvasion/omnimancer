@@ -190,7 +190,9 @@ class TargetPatternFilter(BatchFilter):
 class StatusFilter(BatchFilter):
     """Filter operations by approval status."""
 
-    def __init__(self, statuses: List[str], batch_request: BatchApprovalRequest):
+    def __init__(
+        self, statuses: List[str], batch_request: BatchApprovalRequest
+    ):
         """
         Initialize status filter.
 
@@ -250,7 +252,9 @@ class CustomQueryFilter(BatchFilter):
 
         # Tokenize the query
         tokens = re.findall(
-            r"\w+:\w+|\w+:\*?\.\w+|\w+:\*|AND|OR|NOT|\(|\)", query, re.IGNORECASE
+            r"\w+:\w+|\w+:\*?\.\w+|\w+:\*|AND|OR|NOT|\(|\)",
+            query,
+            re.IGNORECASE,
         )
 
         filters = []
@@ -276,7 +280,9 @@ class CustomQueryFilter(BatchFilter):
             elif ":" in token:
                 # Field:value expression
                 field, value = token.split(":", 1)
-                filter_obj = self._create_field_filter(field.lower(), value.lower())
+                filter_obj = self._create_field_filter(
+                    field.lower(), value.lower()
+                )
                 if filter_obj:
                     if negated:
                         filter_obj = NegatedFilter(filter_obj)
@@ -293,7 +299,9 @@ class CustomQueryFilter(BatchFilter):
 
         return filters
 
-    def _create_field_filter(self, field: str, value: str) -> Optional[BatchFilter]:
+    def _create_field_filter(
+        self, field: str, value: str
+    ) -> Optional[BatchFilter]:
         """Create appropriate filter based on field and value."""
         if field == "risk":
             return RiskLevelFilter([value])
@@ -318,7 +326,10 @@ class CustomQueryFilter(BatchFilter):
         return None
 
     def _evaluate_filters(
-        self, filters: List[Any], operation: Operation, preview: Optional[ChangePreview]
+        self,
+        filters: List[Any],
+        operation: Operation,
+        preview: Optional[ChangePreview],
     ) -> bool:
         """Evaluate parsed filters against operation."""
         if not filters:
@@ -481,11 +492,15 @@ class BatchSorter:
 
         # Apply secondary sort if specified
         if criteria.secondary_sort:
-            secondary_func = self.sort_functions.get(criteria.secondary_sort.sort_by)
+            secondary_func = self.sort_functions.get(
+                criteria.secondary_sort.sort_by
+            )
             if secondary_func:
                 # Stable sort to preserve primary ordering
                 sorted_items = secondary_func(
-                    sorted_items, criteria.secondary_sort.direction, batch_request
+                    sorted_items,
+                    criteria.secondary_sort.direction,
+                    batch_request,
                 )
 
         # Unzip back to separate lists
@@ -504,10 +519,16 @@ class BatchSorter:
         """Sort by timestamp (using batch creation time as proxy)."""
         # Since operations don't have individual timestamps, use batch timestamp
         # In practice, this would sort by when each operation was added
-        timestamp = batch_request.created_at if batch_request else datetime.now()
+        timestamp = (
+            batch_request.created_at if batch_request else datetime.now()
+        )
 
         # For now, maintain original order since all operations have same timestamp
-        return items if direction == SortDirection.ASCENDING else list(reversed(items))
+        return (
+            items
+            if direction == SortDirection.ASCENDING
+            else list(reversed(items))
+        )
 
     def _sort_by_risk(
         self,
@@ -516,7 +537,13 @@ class BatchSorter:
         batch_request: Optional[BatchApprovalRequest],
     ) -> List[Tuple[Operation, ChangePreview]]:
         """Sort by risk level."""
-        risk_order = {"critical": 4, "high": 3, "medium": 2, "low": 1, "unknown": 0}
+        risk_order = {
+            "critical": 4,
+            "high": 3,
+            "medium": 2,
+            "low": 1,
+            "unknown": 0,
+        }
 
         def get_risk_score(item):
             operation, preview = item
@@ -557,7 +584,9 @@ class BatchSorter:
                 for field in ["path", "url", "command", "target"]:
                     if field in operation.data:
                         return str(operation.data[field]).lower()
-            return operation.description.lower() if operation.description else ""
+            return (
+                operation.description.lower() if operation.description else ""
+            )
 
         reverse = direction == SortDirection.DESCENDING
         return sorted(items, key=get_target, reverse=reverse)
@@ -595,7 +624,9 @@ class BatchSorter:
 
         def get_description(item):
             operation, preview = item
-            return operation.description.lower() if operation.description else ""
+            return (
+                operation.description.lower() if operation.description else ""
+            )
 
         reverse = direction == SortDirection.DESCENDING
         return sorted(items, key=get_description, reverse=reverse)
@@ -628,7 +659,10 @@ class BatchPaginator:
         self.page_size = page_size
 
     def paginate(
-        self, operations: List[Operation], previews: List[ChangePreview], page: int = 0
+        self,
+        operations: List[Operation],
+        previews: List[ChangePreview],
+        page: int = 0,
     ) -> Tuple[List[Operation], List[ChangePreview], Dict[str, Any]]:
         """
         Paginate operations and previews.

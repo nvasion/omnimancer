@@ -14,7 +14,9 @@ from unittest.mock import AsyncMock, Mock, patch
 from typing import Dict, Any
 
 from omnimancer.core.agent.file_system_manager import FileSystemManager
-from omnimancer.core.agent.read_before_write_ui import create_confirmation_callback
+from omnimancer.core.agent.read_before_write_ui import (
+    create_confirmation_callback,
+)
 from omnimancer.core.security import SecurityManager
 
 
@@ -50,7 +52,9 @@ class TestFileCreationIntegration:
         mock_callback = AsyncMock()
 
         result = await file_system_manager.write_file_with_confirmation(
-            path=test_file, content=content, confirmation_callback=mock_callback
+            path=test_file,
+            content=content,
+            confirmation_callback=mock_callback,
         )
 
         assert result["success"] is True
@@ -85,7 +89,9 @@ class TestFileCreationIntegration:
             }
 
         result = await file_system_manager.write_file_with_confirmation(
-            path=test_file, content=new_content, confirmation_callback=mock_callback
+            path=test_file,
+            content=new_content,
+            confirmation_callback=mock_callback,
         )
 
         assert result["success"] is True
@@ -115,7 +121,9 @@ class TestFileCreationIntegration:
             }
 
         result = await file_system_manager.write_file_with_confirmation(
-            path=test_file, content=new_content, confirmation_callback=mock_callback
+            path=test_file,
+            content=new_content,
+            confirmation_callback=mock_callback,
         )
 
         assert result["success"] is True
@@ -151,7 +159,9 @@ class TestFileCreationIntegration:
             }
 
         result = await file_system_manager.write_file_with_confirmation(
-            path=test_file, content=new_content, confirmation_callback=mock_callback
+            path=test_file,
+            content=new_content,
+            confirmation_callback=mock_callback,
         )
 
         assert result["success"] is False
@@ -201,7 +211,9 @@ class TestFileCreationIntegration:
             raise RuntimeError("Callback failed")
 
         result = await file_system_manager.write_file_with_confirmation(
-            path=test_file, content=new_content, confirmation_callback=failing_callback
+            path=test_file,
+            content=new_content,
+            confirmation_callback=failing_callback,
         )
 
         assert result["success"] is False
@@ -224,15 +236,19 @@ class TestFileCreationIntegration:
 
         # Create UI callback and mock the confirmation
         with patch(
-            "omnimancer.core.agent.read_before_write_ui.Prompt.ask", return_value="1"
+            "omnimancer.core.agent.read_before_write_ui.Prompt.ask",
+            return_value="1",
         ) as mock_prompt, patch(
-            "omnimancer.core.agent.read_before_write_ui.Confirm.ask", return_value=True
+            "omnimancer.core.agent.read_before_write_ui.Confirm.ask",
+            return_value=True,
         ) as mock_confirm:
 
             ui_callback = create_confirmation_callback()
 
             result = await file_system_manager.write_file_with_confirmation(
-                path=test_file, content=new_content, confirmation_callback=ui_callback
+                path=test_file,
+                content=new_content,
+                confirmation_callback=ui_callback,
             )
 
             assert result["success"] is True
@@ -277,7 +293,9 @@ class TestFileCreationIntegration:
         import os
 
         if os.name == "nt":
-            pytest.skip("Symbolic links require special permissions on Windows")
+            pytest.skip(
+                "Symbolic links require special permissions on Windows"
+            )
 
         original_file = temp_dir / "original.txt"
         symlink_file = temp_dir / "symlink.txt"
@@ -291,7 +309,9 @@ class TestFileCreationIntegration:
         async def mock_callback(file_info):
             # Verify this is indeed a symlink
             if not file_info.get("is_symlink", False):
-                raise AssertionError(f"Expected symlink, got file_info: {file_info}")
+                raise AssertionError(
+                    f"Expected symlink, got file_info: {file_info}"
+                )
             return {
                 "confirmed": True,
                 "action": "overwrite",
@@ -299,7 +319,9 @@ class TestFileCreationIntegration:
             }
 
         result = await file_system_manager.write_file_with_confirmation(
-            path=symlink_file, content=content, confirmation_callback=mock_callback
+            path=symlink_file,
+            content=content,
+            confirmation_callback=mock_callback,
         )
 
         assert result["success"] is True
@@ -352,7 +374,9 @@ class TestFileCreationWorkflow:
         for filename, content in files_to_create:
             file_path = temp_dir / filename
             result = await file_system_manager.write_file_with_confirmation(
-                path=file_path, content=content, confirmation_callback=approval_callback
+                path=file_path,
+                content=content,
+                confirmation_callback=approval_callback,
             )
             results.append((filename, result))
 
@@ -390,7 +414,10 @@ class TestFileCreationWorkflow:
                 'def main():\n    print("Updated app!")\n\nif __name__ == "__main__":\n    main()',
             ),
             ("version.txt", "1.1.0"),
-            ("new_feature.py", 'def new_feature():\n    return "Coming soon!"'),
+            (
+                "new_feature.py",
+                'def new_feature():\n    return "Coming soon!"',
+            ),
         ]
 
         # Track user decisions
@@ -465,7 +492,9 @@ class TestFileCreationWorkflow:
 
         # Check new_feature.py (new file)
         new_file_result = next(
-            result for filename, result in results if filename == "new_feature.py"
+            result
+            for filename, result in results
+            if filename == "new_feature.py"
         )
         assert new_file_result["success"] is True
         assert new_file_result["file_existed_before"] is False

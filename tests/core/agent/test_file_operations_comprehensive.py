@@ -36,7 +36,10 @@ class TestFileReadingFunction:
         # Create mock security manager that allows all operations
         mock_security = Mock()
         mock_security.secure_file_access = AsyncMock(
-            return_value={"success": True, "message": "Access granted for testing"}
+            return_value={
+                "success": True,
+                "message": "Access granted for testing",
+            }
         )
 
         return FileSystemManager(
@@ -58,7 +61,9 @@ class TestFileReadingFunction:
         assert isinstance(result, str)
 
     @pytest.mark.asyncio
-    async def test_read_multiline_text_file(self, file_system_manager, temp_dir):
+    async def test_read_multiline_text_file(
+        self, file_system_manager, temp_dir
+    ):
         """Test reading a multiline text file."""
         test_file = temp_dir / "multiline.txt"
         content = """Line 1
@@ -90,21 +95,27 @@ Line 4"""
         content = "Hello 世界! 🌍 Café naïve résumé"
         test_file.write_text(content, encoding="utf-8")
 
-        result = await file_system_manager.read_file(test_file, encoding="utf-8")
+        result = await file_system_manager.read_file(
+            test_file, encoding="utf-8"
+        )
 
         assert result == content
         assert "世界" in result
         assert "🌍" in result
 
     @pytest.mark.asyncio
-    async def test_read_different_encodings(self, file_system_manager, temp_dir):
+    async def test_read_different_encodings(
+        self, file_system_manager, temp_dir
+    ):
         """Test reading files with different encodings."""
         # Test with latin-1 encoding
         test_file = temp_dir / "latin1.txt"
         content = "Café naïve résumé"
         test_file.write_text(content, encoding="latin-1")
 
-        result = await file_system_manager.read_file(test_file, encoding="latin-1")
+        result = await file_system_manager.read_file(
+            test_file, encoding="latin-1"
+        )
 
         assert result == content
 
@@ -195,7 +206,9 @@ if __name__ == "__main__":
             await file_system_manager.read_file(test_dir)
 
     @pytest.mark.asyncio
-    async def test_read_file_permission_denied(self, file_system_manager, temp_dir):
+    async def test_read_file_permission_denied(
+        self, file_system_manager, temp_dir
+    ):
         """Test reading file with permission denied."""
         test_file = temp_dir / "restricted.txt"
         test_file.write_text("Secret content")
@@ -249,7 +262,9 @@ if __name__ == "__main__":
         import os
 
         if os.name == "nt":
-            pytest.skip("Symbolic links require special permissions on Windows")
+            pytest.skip(
+                "Symbolic links require special permissions on Windows"
+            )
 
         original_file = temp_dir / "original.txt"
         symlink_file = temp_dir / "symlink.txt"
@@ -264,7 +279,9 @@ if __name__ == "__main__":
         assert result == content
 
     @pytest.mark.asyncio
-    async def test_read_file_encoding_error(self, file_system_manager, temp_dir):
+    async def test_read_file_encoding_error(
+        self, file_system_manager, temp_dir
+    ):
         """Test reading file with wrong encoding raises error."""
         test_file = temp_dir / "encoded.txt"
         # Write with one encoding, try to read with another
@@ -289,7 +306,9 @@ if __name__ == "__main__":
             pass
 
     @pytest.mark.asyncio
-    async def test_read_file_with_null_bytes(self, file_system_manager, temp_dir):
+    async def test_read_file_with_null_bytes(
+        self, file_system_manager, temp_dir
+    ):
         """Test reading file containing null bytes."""
         test_file = temp_dir / "null_bytes.txt"
         content = "Text with\x00null\x00bytes"
@@ -319,7 +338,9 @@ if __name__ == "__main__":
         binary_file = temp_dir / "binary.bin"
         binary_file.write_bytes(b"\x00\x01\x02")
 
-        binary_result = await file_system_manager.read_file(binary_file, binary=True)
+        binary_result = await file_system_manager.read_file(
+            binary_file, binary=True
+        )
         assert isinstance(binary_result, bytes)
 
 
@@ -339,7 +360,10 @@ class TestFileReadingEdgeCases:
         # Create mock security manager that allows all operations
         mock_security = Mock()
         mock_security.secure_file_access = AsyncMock(
-            return_value={"success": True, "message": "Access granted for testing"}
+            return_value={
+                "success": True,
+                "message": "Access granted for testing",
+            }
         )
 
         return FileSystemManager(
@@ -349,7 +373,9 @@ class TestFileReadingEdgeCases:
         )
 
     @pytest.mark.asyncio
-    async def test_read_file_concurrent_access(self, file_system_manager, temp_dir):
+    async def test_read_file_concurrent_access(
+        self, file_system_manager, temp_dir
+    ):
         """Test reading file concurrently from multiple coroutines."""
         test_file = temp_dir / "concurrent.txt"
         content = "Content for concurrent reading test"
@@ -365,7 +391,9 @@ class TestFileReadingEdgeCases:
             assert result == content
 
     @pytest.mark.asyncio
-    async def test_read_file_path_variations(self, file_system_manager, temp_dir):
+    async def test_read_file_path_variations(
+        self, file_system_manager, temp_dir
+    ):
         """Test reading files with different path representations."""
         test_file = temp_dir / "pathtest.txt"
         content = "Path test content"
@@ -399,7 +427,10 @@ class TestWriteOperationsIntegration:
         # Create mock security manager that allows all operations
         mock_security = Mock()
         mock_security.secure_file_access = AsyncMock(
-            return_value={"success": True, "message": "Access granted for testing"}
+            return_value={
+                "success": True,
+                "message": "Access granted for testing",
+            }
         )
 
         return FileSystemManager(
@@ -485,7 +516,8 @@ class TestWriteOperationsIntegration:
         assert result["success"] is True
         # Should NOT have read_before_write operation info
         assert (
-            "operation" not in result or result.get("operation") != "read_before_write"
+            "operation" not in result
+            or result.get("operation") != "read_before_write"
         )
         assert test_file.exists()
         assert test_file.read_text() == content
@@ -542,7 +574,10 @@ class TestWriteOperationsIntegration:
 
         # Mock user callback that rejects
         async def mock_callback(review_data):
-            return {"approved": False, "reason": "User does not want this change"}
+            return {
+                "approved": False,
+                "reason": "User does not want this change",
+            }
 
         result = await file_system_manager.write_file(
             path=test_file,

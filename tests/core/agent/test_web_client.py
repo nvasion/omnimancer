@@ -255,7 +255,9 @@ class TestRateLimiter:
         elapsed = time.time() - start_time
 
         # Should have waited at least some time
-        assert elapsed >= 0.0  # Basic check - exact timing can be flaky in tests
+        assert (
+            elapsed >= 0.0
+        )  # Basic check - exact timing can be flaky in tests
 
     @pytest.mark.asyncio
     async def test_rate_limiter_per_domain(self):
@@ -264,7 +266,9 @@ class TestRateLimiter:
 
         # Should allow requests to different domains
         await limiter.wait_if_needed("example.com")
-        await limiter.wait_if_needed("another.com")  # Should not be rate limited
+        await limiter.wait_if_needed(
+            "another.com"
+        )  # Should not be rate limited
 
 
 class TestResponseCache:
@@ -395,7 +399,9 @@ class TestWebClient:
             charset="utf-8",
         )
 
-        mock_session.request.return_value = create_mock_context_manager(mock_response)
+        mock_session.request.return_value = create_mock_context_manager(
+            mock_response
+        )
 
         response = await web_client.get("https://example.com")
 
@@ -420,7 +426,9 @@ class TestWebClient:
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 return None
 
-        mock_response = MockResponse(status=200, content=b"Success after retry")
+        mock_response = MockResponse(
+            status=200, content=b"Success after retry"
+        )
 
         # First two requests fail, third succeeds
         mock_session.request.side_effect = [
@@ -436,7 +444,9 @@ class TestWebClient:
 
     @patch("aiohttp.ClientSession")
     @pytest.mark.asyncio
-    async def test_request_failure_after_retries(self, mock_session_class, web_client):
+    async def test_request_failure_after_retries(
+        self, mock_session_class, web_client
+    ):
         """Test request failure after all retries."""
         from unittest.mock import Mock
 
@@ -456,7 +466,9 @@ class TestWebClient:
             lambda *args, **kwargs: AlwaysFailingContextManager()
         )
 
-        with pytest.raises(Exception, match=r"Request failed after \d+ attempts"):
+        with pytest.raises(
+            Exception, match=r"Request failed after \d+ attempts"
+        ):
             await web_client.get("https://example.com")
 
     @patch("aiohttp.ClientSession")
@@ -473,7 +485,9 @@ class TestWebClient:
             headers={"Content-Type": "text/html"},
             content=b"<html>Cached content</html>",
         )
-        mock_session.request.return_value = create_mock_context_manager(mock_response)
+        mock_session.request.return_value = create_mock_context_manager(
+            mock_response
+        )
 
         # First request should hit the network
         response1 = await web_client.get("https://example.com")
@@ -489,7 +503,9 @@ class TestWebClient:
 
     @patch("aiohttp.ClientSession")
     @pytest.mark.asyncio
-    async def test_different_http_methods(self, mock_session_class, web_client):
+    async def test_different_http_methods(
+        self, mock_session_class, web_client
+    ):
         """Test different HTTP methods."""
         # Mock session for all methods
         from unittest.mock import Mock
@@ -555,7 +571,9 @@ class TestWebClient:
             content_type="text/html",
             charset="utf-8",
         )
-        mock_session.request.return_value = create_mock_context_manager(mock_response)
+        mock_session.request.return_value = create_mock_context_manager(
+            mock_response
+        )
 
         result = await web_client.scrape_content("https://example.com")
 
@@ -602,7 +620,9 @@ class TestWebClient:
             await web_client.get("https://evil.com")
         except ValueError as e:
             # Should be blocked by security manager, not blacklist
-            assert "security policy" not in str(e) or "Request blocked" in str(e)
+            assert "security policy" not in str(e) or "Request blocked" in str(
+                e
+            )
 
     @pytest.mark.asyncio
     async def test_cache_clearing(self, web_client):
@@ -655,7 +675,9 @@ class TestWebClient:
 class TestWebClientIntegration:
     """Integration tests for WebClient."""
 
-    @pytest.mark.skip(reason="Mock session not intercepting requests correctly")
+    @pytest.mark.skip(
+        reason="Mock session not intercepting requests correctly"
+    )
     @pytest.mark.asyncio
     async def test_complete_workflow(self, web_client):
         """Test complete web client workflow."""
@@ -687,7 +709,9 @@ class TestWebClientIntegration:
         )
 
         # Configure mock to return the response
-        mock_session.request.return_value = create_mock_context_manager(mock_response)
+        mock_session.request.return_value = create_mock_context_manager(
+            mock_response
+        )
 
         # 1. Make initial request
         response = await web_client.get("https://example.com")
@@ -707,7 +731,9 @@ class TestWebClientIntegration:
         cached_response = await web_client.get("https://example.com")
         assert cached_response.from_cache
 
-    @pytest.mark.skip(reason="Mock session not intercepting requests correctly")
+    @pytest.mark.skip(
+        reason="Mock session not intercepting requests correctly"
+    )
     @pytest.mark.asyncio
     async def test_error_handling_workflow(self, web_client):
         """Test error handling in complete workflow."""
@@ -731,7 +757,9 @@ class TestWebClientIntegration:
             lambda *args, **kwargs: FailingContextManager()
         )
 
-        with pytest.raises(RuntimeError, match=r"Request failed after \d+ attempts"):
+        with pytest.raises(
+            RuntimeError, match=r"Request failed after \d+ attempts"
+        ):
             await web_client.get("https://example.com")
 
         # Verify error is tracked in stats

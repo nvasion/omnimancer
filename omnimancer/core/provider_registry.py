@@ -26,7 +26,9 @@ class ProviderRegistry:
         self.last_update: Optional[datetime] = None
         self._provider_instances: Dict[str, BaseProvider] = {}
 
-    def register_provider(self, name: str, provider_class: Type[BaseProvider]) -> None:
+    def register_provider(
+        self, name: str, provider_class: Type[BaseProvider]
+    ) -> None:
         """
         Register a provider with the registry.
 
@@ -102,7 +104,9 @@ class ProviderRegistry:
             raise ConfigurationError(f"Provider '{name}' is not registered")
         return self.providers[name]
 
-    def get_all_models_with_details(self) -> Dict[str, List[EnhancedModelInfo]]:
+    def get_all_models_with_details(
+        self,
+    ) -> Dict[str, List[EnhancedModelInfo]]:
         """
         Get comprehensive model catalog with all details.
 
@@ -111,7 +115,9 @@ class ProviderRegistry:
         """
         return self.model_catalog.copy()
 
-    def get_models_for_provider(self, provider_name: str) -> List[EnhancedModelInfo]:
+    def get_models_for_provider(
+        self, provider_name: str
+    ) -> List[EnhancedModelInfo]:
         """
         Get models for a specific provider.
 
@@ -163,7 +169,9 @@ class ProviderRegistry:
             elif capability == "free":
                 filtered = [m for m in models if m.is_free]
             elif capability == "available":
-                filtered = [m for m in models if m.available and not m.deprecated]
+                filtered = [
+                    m for m in models if m.available and not m.deprecated
+                ]
             else:
                 filtered = models
 
@@ -193,7 +201,8 @@ class ProviderRegistry:
                     budget_models.append(model)
                 else:
                     avg_cost = (
-                        model.cost_per_million_input + model.cost_per_million_output
+                        model.cost_per_million_input
+                        + model.cost_per_million_output
                     ) / 2
                     if avg_cost <= max_cost_per_million:
                         budget_models.append(model)
@@ -246,7 +255,8 @@ class ProviderRegistry:
             matches = [
                 m
                 for m in models
-                if query_lower in m.name.lower() or query_lower in m.description.lower()
+                if query_lower in m.name.lower()
+                or query_lower in m.description.lower()
             ]
 
             if matches:
@@ -316,7 +326,9 @@ class ProviderRegistry:
         Returns:
             Dictionary with catalog statistics
         """
-        total_models = sum(len(models) for models in self.model_catalog.values())
+        total_models = sum(
+            len(models) for models in self.model_catalog.values()
+        )
         total_providers = len(self.providers)
 
         # Count models by capability
@@ -326,15 +338,23 @@ class ProviderRegistry:
         multimodal_models = sum(
             len(models) for models in self.get_multimodal_models().values()
         )
-        free_models = sum(len(models) for models in self.get_free_models().values())
-        latest_models = sum(len(models) for models in self.get_latest_models().values())
+        free_models = sum(
+            len(models) for models in self.get_free_models().values()
+        )
+        latest_models = sum(
+            len(models) for models in self.get_latest_models().values()
+        )
 
         # Count models by performance tier
         high_perf = sum(
-            len(models) for models in self.get_models_by_performance(60.0).values()
+            len(models)
+            for models in self.get_models_by_performance(60.0).values()
         )
         mid_perf = (
-            sum(len(models) for models in self.get_models_by_performance(40.0).values())
+            sum(
+                len(models)
+                for models in self.get_models_by_performance(40.0).values()
+            )
             - high_perf
         )
 
@@ -370,10 +390,14 @@ class ProviderRegistry:
             for model in models:
                 # Validate model data
                 if not model.validate_pricing():
-                    errors.append(f"Invalid pricing for {provider_name}:{model.name}")
+                    errors.append(
+                        f"Invalid pricing for {provider_name}:{model.name}"
+                    )
 
                 if not model.validate_swe_score():
-                    errors.append(f"Invalid SWE score for {provider_name}:{model.name}")
+                    errors.append(
+                        f"Invalid SWE score for {provider_name}:{model.name}"
+                    )
 
                 # Check for duplicate models
                 duplicates = [m for m in models if m.name == model.name]
@@ -412,12 +436,18 @@ class ProviderRegistry:
             "available_models": len(
                 [m for m in models if m.available and not m.deprecated]
             ),
-            "tool_capable_models": len([m for m in models if m.supports_tools]),
-            "multimodal_models": len([m for m in models if m.supports_multimodal]),
+            "tool_capable_models": len(
+                [m for m in models if m.supports_tools]
+            ),
+            "multimodal_models": len(
+                [m for m in models if m.supports_multimodal]
+            ),
             "free_models": len([m for m in models if m.is_free]),
             "latest_models": len([m for m in models if m.latest_version]),
             "deprecated_models": len([m for m in models if m.deprecated]),
-            "models": [m.name for m in models if m.available and not m.deprecated],
+            "models": [
+                m.name for m in models if m.available and not m.deprecated
+            ],
         }
 
     def __str__(self) -> str:

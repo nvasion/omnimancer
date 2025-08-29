@@ -72,7 +72,9 @@ class BatchApprovalPanel:
         self.console = console or Console()
         self.config = config or BatchDisplayConfig()
 
-    def render_batch_overview(self, batch_request: BatchApprovalRequest) -> Panel:
+    def render_batch_overview(
+        self, batch_request: BatchApprovalRequest
+    ) -> Panel:
         """
         Render overview panel for batch approval request.
 
@@ -100,7 +102,9 @@ class BatchApprovalPanel:
         overview_table.add_row(
             "Created:", batch_request.created_at.strftime("%Y-%m-%d %H:%M:%S")
         )
-        overview_table.add_row("Status:", self._format_status(batch_request.status))
+        overview_table.add_row(
+            "Status:", self._format_status(batch_request.status)
+        )
 
         if batch_request.expires_at:
             time_remaining = batch_request.expires_at - datetime.now()
@@ -114,9 +118,13 @@ class BatchApprovalPanel:
         # Operation counts
         overview_table.add_row("Total Operations:", str(total_operations))
         if approved_count > 0:
-            overview_table.add_row("Approved:", f"[green]{approved_count}[/green]")
+            overview_table.add_row(
+                "Approved:", f"[green]{approved_count}[/green]"
+            )
         if pending_count > 0:
-            overview_table.add_row("Pending:", f"[yellow]{pending_count}[/yellow]")
+            overview_table.add_row(
+                "Pending:", f"[yellow]{pending_count}[/yellow]"
+            )
 
         # Risk distribution
         if risk_counts:
@@ -198,7 +206,9 @@ class BatchApprovalPanel:
 
             # Determine status
             original_idx = (
-                i if show_approved else self._get_original_index(batch_request, i)
+                i
+                if show_approved
+                else self._get_original_index(batch_request, i)
             )
             is_approved = original_idx in batch_request.approved_operations
             status = (
@@ -228,7 +238,9 @@ class BatchApprovalPanel:
             if self.config.mode == DisplayMode.DETAILED:
                 description = operation.description or "No description"
                 if len(description) > self.config.max_preview_length:
-                    description = description[: self.config.max_preview_length] + "..."
+                    description = (
+                        description[: self.config.max_preview_length] + "..."
+                    )
                 row.append(description)
 
             table.add_row(*row)
@@ -271,12 +283,19 @@ class BatchApprovalPanel:
         info_table.add_column("Label", style="bold cyan")
         info_table.add_column("Value", style="bright_white")
 
-        info_table.add_row("Type:", self._format_operation_type(operation.type))
-        info_table.add_row("Description:", operation.description or "No description")
         info_table.add_row(
-            "Requires Approval:", "Yes" if operation.requires_approval else "No"
+            "Type:", self._format_operation_type(operation.type)
         )
-        info_table.add_row("Reversible:", "Yes" if operation.reversible else "No")
+        info_table.add_row(
+            "Description:", operation.description or "No description"
+        )
+        info_table.add_row(
+            "Requires Approval:",
+            "Yes" if operation.requires_approval else "No",
+        )
+        info_table.add_row(
+            "Reversible:", "Yes" if operation.reversible else "No"
+        )
 
         if operation.data:
             info_table.add_row("", "")  # Separator
@@ -298,12 +317,15 @@ class BatchApprovalPanel:
             preview_table.add_column("Value", style="bright_white")
 
             preview_table.add_row(
-                "Change Type:", preview.change_type.value.replace("_", " ").title()
+                "Change Type:",
+                preview.change_type.value.replace("_", " ").title(),
             )
             preview_table.add_row(
                 "Risk Assessment:", self._format_risk_assessment(preview)
             )
-            preview_table.add_row("Reversible:", "Yes" if preview.reversible else "No")
+            preview_table.add_row(
+                "Reversible:", "Yes" if preview.reversible else "No"
+            )
 
             if preview.metadata:
                 preview_table.add_row("", "")  # Separator
@@ -312,7 +334,11 @@ class BatchApprovalPanel:
                     preview_table.add_row(f"  {key}:", str(value))
 
             details_group.append(
-                Panel(preview_table, title="Change Preview", border_style="yellow")
+                Panel(
+                    preview_table,
+                    title="Change Preview",
+                    border_style="yellow",
+                )
             )
 
             # Show diff if available
@@ -336,7 +362,9 @@ class BatchApprovalPanel:
             border_style="white",
         )
 
-    def render_batch_summary(self, batch_request: BatchApprovalRequest) -> Panel:
+    def render_batch_summary(
+        self, batch_request: BatchApprovalRequest
+    ) -> Panel:
         """
         Render summary of batch operations and risk assessment.
 
@@ -379,7 +407,9 @@ class BatchApprovalPanel:
         for risk_level, count in risk_counts.items():
             if count > 0:
                 percentage = (
-                    (count / total_with_risk) * 100 if total_with_risk > 0 else 0
+                    (count / total_with_risk) * 100
+                    if total_with_risk > 0
+                    else 0
                 )
                 color = self._get_risk_color(risk_level)
                 risk_table.add_row(
@@ -402,7 +432,9 @@ class BatchApprovalPanel:
             border_style="blue",
         )
 
-    def render_progress_display(self, batch_request: BatchApprovalRequest) -> Panel:
+    def render_progress_display(
+        self, batch_request: BatchApprovalRequest
+    ) -> Panel:
         """
         Render progress display for batch processing.
 
@@ -442,7 +474,13 @@ class BatchApprovalPanel:
         self, previews: List[ChangePreview]
     ) -> Dict[str, int]:
         """Calculate distribution of risk levels in previews."""
-        risk_counts = {"low": 0, "medium": 0, "high": 0, "critical": 0, "unknown": 0}
+        risk_counts = {
+            "low": 0,
+            "medium": 0,
+            "high": 0,
+            "critical": 0,
+            "unknown": 0,
+        }
 
         for preview in previews:
             if preview.risk_assessment:
@@ -571,7 +609,8 @@ class BatchApprovalPanel:
 
 
 def create_batch_approval_panel(
-    console: Optional[Console] = None, config: Optional[BatchDisplayConfig] = None
+    console: Optional[Console] = None,
+    config: Optional[BatchDisplayConfig] = None,
 ) -> BatchApprovalPanel:
     """
     Create a batch approval panel with default configuration.
@@ -586,7 +625,9 @@ def create_batch_approval_panel(
     return BatchApprovalPanel(console=console, config=config)
 
 
-def create_compact_batch_panel(console: Optional[Console] = None) -> BatchApprovalPanel:
+def create_compact_batch_panel(
+    console: Optional[Console] = None,
+) -> BatchApprovalPanel:
     """
     Create a batch approval panel optimized for compact display.
 

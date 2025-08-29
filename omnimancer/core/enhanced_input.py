@@ -114,7 +114,9 @@ class EnhancedInput:
         try:
             return self._enhanced_input()
         except Exception as e:
-            logger.warning(f"Enhanced input failed, falling back to basic input: {e}")
+            logger.warning(
+                f"Enhanced input failed, falling back to basic input: {e}"
+            )
             return self._fallback_input()
 
     def _fallback_input(self) -> Optional[str]:
@@ -177,7 +179,9 @@ class EnhancedInput:
         """Restore terminal to original state."""
         if self.old_termios is not None:
             try:
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_termios)
+                termios.tcsetattr(
+                    sys.stdin, termios.TCSADRAIN, self.old_termios
+                )
             except Exception as e:
                 logger.warning(f"Could not restore terminal: {e}")
 
@@ -384,7 +388,9 @@ class EnhancedInput:
                 completion = completions[0]
                 if words:
                     # Replace last word
-                    prefix = self.current_line[: self.cursor_pos - len(current_word)]
+                    prefix = self.current_line[
+                        : self.cursor_pos - len(current_word)
+                    ]
                     suffix = self.current_line[self.cursor_pos :]
                     self.current_line = prefix + completion + suffix
                     self.cursor_pos = len(prefix + completion)
@@ -446,7 +452,9 @@ class EnhancedInput:
         sys.stdout.write(self.current_line)
         # Move cursor to correct position
         if self.cursor_pos < len(self.current_line):
-            sys.stdout.write(f"\033[{len(self.current_line) - self.cursor_pos}D")
+            sys.stdout.write(
+                f"\033[{len(self.current_line) - self.cursor_pos}D"
+            )
         sys.stdout.flush()
 
     def _update_cursor(self) -> None:
@@ -487,7 +495,9 @@ def create_completion_callback(engine) -> Callable[[str], List[str]]:
             from ..cli.commands import SlashCommand
 
             slash_commands = [cmd.value for cmd in SlashCommand]
-            completions.extend([cmd for cmd in slash_commands if cmd.startswith(text)])
+            completions.extend(
+                [cmd for cmd in slash_commands if cmd.startswith(text)]
+            )
 
         # File path completions
         elif "/" in text or text.startswith(".") or text.startswith("~"):

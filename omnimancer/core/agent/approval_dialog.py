@@ -24,9 +24,18 @@ from rich.align import Align
 from rich.box import ROUNDED, SIMPLE, MINIMAL
 from rich.live import Live
 
-from .rich_renderer import RichTextRenderer, RiskLevel, OperationType, create_renderer
+from .rich_renderer import (
+    RichTextRenderer,
+    RiskLevel,
+    OperationType,
+    create_renderer,
+)
 from .diff_renderer import EnhancedDiffRenderer, DiffType, create_diff_renderer
-from .approval_context import ApprovalContext, OperationDetails, ApprovalDecision
+from .approval_context import (
+    ApprovalContext,
+    OperationDetails,
+    ApprovalDecision,
+)
 from .input_handler import (
     InteractiveInputHandler,
     KeyAction,
@@ -113,7 +122,9 @@ class ApprovalDialog:
             input_handler: Interactive input handler for keyboard controls
         """
         self.renderer = renderer or create_renderer()
-        self.diff_renderer = diff_renderer or create_diff_renderer(self.renderer)
+        self.diff_renderer = diff_renderer or create_diff_renderer(
+            self.renderer
+        )
         self.console = console or self.renderer.console
         self.options = options or DialogOptions()
 
@@ -227,7 +238,10 @@ class ApprovalDialog:
         subtitle.append(context.timestamp.strftime("%H:%M:%S"), style="value")
 
         return Panel(
-            Align.center(subtitle), title=title, border_style="cyan", box=ROUNDED
+            Align.center(subtitle),
+            title=title,
+            border_style="cyan",
+            box=ROUNDED,
         )
 
     def _render_operation_summary(self, operation: OperationDetails) -> Panel:
@@ -240,7 +254,9 @@ class ApprovalDialog:
         # Add operation details
         table.add_row("Operation", operation.operation_type)
         table.add_row("Target", operation.target or "N/A")
-        table.add_row("Risk Level", self._format_risk_level(operation.risk_level))
+        table.add_row(
+            "Risk Level", self._format_risk_level(operation.risk_level)
+        )
 
         if operation.estimated_time:
             table.add_row("Est. Time", f"{operation.estimated_time}s")
@@ -256,7 +272,10 @@ class ApprovalDialog:
             table.add_row("Description", description)
 
         return Panel(
-            table, title="📋 Operation Summary", border_style="blue", box=SIMPLE
+            table,
+            title="📋 Operation Summary",
+            border_style="blue",
+            box=SIMPLE,
         )
 
     def _render_risk_assessment(self, operation: OperationDetails) -> Panel:
@@ -353,7 +372,11 @@ class ApprovalDialog:
             content = "\n".join([str(s) for s in sections])
 
         return Panel(
-            content, title="🔍 Details", border_style="cyan", box=SIMPLE, expand=True
+            content,
+            title="🔍 Details",
+            border_style="cyan",
+            box=SIMPLE,
+            expand=True,
         )
 
     def _render_command_details(self, operation: OperationDetails) -> Table:
@@ -386,12 +409,16 @@ class ApprovalDialog:
 
         if len(operation.files_affected) > 5:
             table.add_row(
-                f"... and {len(operation.files_affected) - 5} more files", "", ""
+                f"... and {len(operation.files_affected) - 5} more files",
+                "",
+                "",
             )
 
         return table
 
-    def _render_environment_details(self, operation: OperationDetails) -> Table:
+    def _render_environment_details(
+        self, operation: OperationDetails
+    ) -> Table:
         """Render environment and context details."""
         table = Table(show_header=True, box=MINIMAL)
         table.add_column("Variable", style="label")
@@ -440,9 +467,13 @@ class ApprovalDialog:
             # Simple button layout
             content = Text("Use 'y' to approve, 'n' to deny, 'q' to quit")
 
-        return Panel(content, title="⌨️ Controls", border_style="green", box=SIMPLE)
+        return Panel(
+            content, title="⌨️ Controls", border_style="green", box=SIMPLE
+        )
 
-    def _format_risk_level(self, risk_level: Union[RiskLevel, int, str]) -> Text:
+    def _format_risk_level(
+        self, risk_level: Union[RiskLevel, int, str]
+    ) -> Text:
         """Format risk level with appropriate styling."""
         if isinstance(risk_level, int):
             risk_text = f"Level {risk_level}"
@@ -458,7 +489,9 @@ class ApprovalDialog:
 
         return Text(risk_text, style=style)
 
-    def _get_risk_border_color(self, risk_level: Union[RiskLevel, int, str]) -> str:
+    def _get_risk_border_color(
+        self, risk_level: Union[RiskLevel, int, str]
+    ) -> str:
         """Get appropriate border color for risk level."""
         if isinstance(risk_level, int):
             if risk_level <= 3:
@@ -477,7 +510,9 @@ class ApprovalDialog:
 
         return risk_colors.get(risk_level, "yellow")
 
-    async def show_approval_dialog(self, context: ApprovalContext) -> ApprovalDecision:
+    async def show_approval_dialog(
+        self, context: ApprovalContext
+    ) -> ApprovalDecision:
         """
         Display the approval dialog and wait for user decision.
 
@@ -539,7 +574,9 @@ class ApprovalDialog:
             logger.error(f"Dialog error: {e}", exc_info=True)
             self.state = DialogState.CANCELLED
             return ApprovalDecision(
-                approved=False, reason=f"Dialog error: {e}", timestamp=datetime.now()
+                approved=False,
+                reason=f"Dialog error: {e}",
+                timestamp=datetime.now(),
             )
 
     async def _wait_for_decision(self) -> ApprovalDecision:
@@ -554,21 +591,30 @@ class ApprovalDialog:
                     approved=True,
                     reason="Approved by user",
                     timestamp=datetime.now(),
-                    additional_data={"input_action": "approve", "interactive": True},
+                    additional_data={
+                        "input_action": "approve",
+                        "interactive": True,
+                    },
                 )
             elif final_action == KeyAction.DENY:
                 return ApprovalDecision(
                     approved=False,
                     reason="Denied by user",
                     timestamp=datetime.now(),
-                    additional_data={"input_action": "deny", "interactive": True},
+                    additional_data={
+                        "input_action": "deny",
+                        "interactive": True,
+                    },
                 )
             else:  # QUIT or timeout
                 return ApprovalDecision(
                     approved=False,
                     reason="Operation cancelled or timed out",
                     timestamp=datetime.now(),
-                    additional_data={"input_action": "quit", "interactive": True},
+                    additional_data={
+                        "input_action": "quit",
+                        "interactive": True,
+                    },
                 )
 
         except Exception as e:
@@ -633,7 +679,8 @@ class ApprovalDialog:
                     ):
                         # Potentially update diff rendering based on expanded state
                         diff_panel = self._render_diff_panel(
-                            self.current_context, expanded=input_state.diff_expanded
+                            self.current_context,
+                            expanded=input_state.diff_expanded,
                         )
                         self.sections["diff"].update(diff_panel)
 
@@ -650,7 +697,9 @@ class ApprovalDialog:
 
                 # Update status/controls with current input state
                 if "controls" in self.sections:
-                    controls_panel = self._render_controls_with_state(input_state)
+                    controls_panel = self._render_controls_with_state(
+                        input_state
+                    )
                     self.sections["controls"].update(controls_panel)
 
                 # Refresh the display
@@ -674,7 +723,9 @@ class ApprovalDialog:
         # Render diff using enhanced diff renderer
         renderables = self.diff_renderer.render_diff_set(
             context.diff_content,
-            diff_type=DiffType.SIDE_BY_SIDE if expanded else self.options.diff_type,
+            diff_type=(
+                DiffType.SIDE_BY_SIDE if expanded else self.options.diff_type
+            ),
             show_summary=not self.options.compact_mode or expanded,
             show_file_tree=self.options.show_file_tree,
         )
@@ -713,7 +764,9 @@ class ApprovalDialog:
 
         # File operations
         if operation.files_affected:
-            sections.append(self._render_file_details(operation, show_all=expanded))
+            sections.append(
+                self._render_file_details(operation, show_all=expanded)
+            )
 
         # Environment/Context
         if operation.environment_vars or operation.working_directory:
@@ -723,7 +776,9 @@ class ApprovalDialog:
 
         # Metadata
         if operation.metadata:
-            sections.append(self._render_metadata(operation, show_all=expanded))
+            sections.append(
+                self._render_metadata(operation, show_all=expanded)
+            )
 
         if not sections:
             content = Align.center("No additional details available")
@@ -760,7 +815,9 @@ class ApprovalDialog:
 
         if not show_all and len(operation.files_affected) > 5:
             table.add_row(
-                f"... and {len(operation.files_affected) - 5} more files", "", ""
+                f"... and {len(operation.files_affected) - 5} more files",
+                "",
+                "",
             )
 
         return table
@@ -778,7 +835,9 @@ class ApprovalDialog:
 
         if operation.environment_vars:
             var_limit = len(operation.environment_vars) if show_all else 3
-            for key, value in list(operation.environment_vars.items())[:var_limit]:
+            for key, value in list(operation.environment_vars.items())[
+                :var_limit
+            ]:
                 # Mask sensitive values
                 if any(
                     sensitive in key.lower()
@@ -819,9 +878,15 @@ class ApprovalDialog:
 
             # Add state information
             state_info = Text()
-            state_info.append(f"Mode: {input_state.mode.value} | ", style="dim")
-            state_info.append(f"Section: {input_state.current_section} | ", style="dim")
-            state_info.append(f"Scroll: {input_state.scroll_position}", style="dim")
+            state_info.append(
+                f"Mode: {input_state.mode.value} | ", style="dim"
+            )
+            state_info.append(
+                f"Section: {input_state.current_section} | ", style="dim"
+            )
+            state_info.append(
+                f"Scroll: {input_state.scroll_position}", style="dim"
+            )
 
             content = f"{shortcuts_text}\n{state_info}"
         else:
@@ -830,14 +895,17 @@ class ApprovalDialog:
                 f"Use 'y' to approve, 'n' to deny, 'q' to quit | Mode: {input_state.mode.value}"
             )
 
-        return Panel(content, title="⌨️ Controls", border_style="green", box=SIMPLE)
+        return Panel(
+            content, title="⌨️ Controls", border_style="green", box=SIMPLE
+        )
 
 
 # Utility functions
 
 
 def create_approval_dialog(
-    renderer: Optional[RichTextRenderer] = None, options: Optional[DialogOptions] = None
+    renderer: Optional[RichTextRenderer] = None,
+    options: Optional[DialogOptions] = None,
 ) -> ApprovalDialog:
     """Create an approval dialog with default configuration."""
     return ApprovalDialog(renderer=renderer, options=options)
@@ -859,7 +927,9 @@ async def show_quick_approval(
     )
 
     # Use compact dialog for quick approval
-    options = DialogOptions(compact_mode=True, show_file_tree=False, timeout_seconds=30)
+    options = DialogOptions(
+        compact_mode=True, show_file_tree=False, timeout_seconds=30
+    )
     dialog = create_approval_dialog(options=options)
 
     if console:

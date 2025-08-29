@@ -104,7 +104,9 @@ class BehaviorRules:
     auto_approve_patterns: List[str] = field(default_factory=list)
     forbidden_operations: List[str] = field(default_factory=list)
     custom_restrictions: List[str] = field(default_factory=list)
-    reasoning_style: str = "balanced"  # concise, balanced, verbose, step_by_step
+    reasoning_style: str = (
+        "balanced"  # concise, balanced, verbose, step_by_step
+    )
     creativity_level: str = "medium"  # low, medium, high
     safety_level: str = "standard"  # strict, standard, permissive
 
@@ -125,10 +127,13 @@ class CustomAgentConfig:
     # Configuration components
     model_settings: ModelSettings = field(
         default_factory=lambda: ModelSettings(
-            provider_type=ProviderType.ANTHROPIC, model_name="claude-3-haiku-20240307"
+            provider_type=ProviderType.ANTHROPIC,
+            model_name="claude-3-haiku-20240307",
         )
     )
-    context_parameters: ContextParameters = field(default_factory=ContextParameters)
+    context_parameters: ContextParameters = field(
+        default_factory=ContextParameters
+    )
     behavior_rules: BehaviorRules = field(default_factory=BehaviorRules)
 
     # Capabilities and tools
@@ -136,7 +141,10 @@ class CustomAgentConfig:
         default_factory=lambda: {PersonaCapability.GENERAL_PURPOSE}
     )
     enabled_tools: Set[AgentTool] = field(
-        default_factory=lambda: {AgentTool.FILE_OPERATIONS, AgentTool.PROGRAM_EXECUTOR}
+        default_factory=lambda: {
+            AgentTool.FILE_OPERATIONS,
+            AgentTool.PROGRAM_EXECUTOR,
+        }
     )
 
     # Security and permissions (inherit from base if not overridden)
@@ -145,7 +153,9 @@ class CustomAgentConfig:
 
     # Metadata
     metadata: PersonaMetadata = field(
-        default_factory=lambda: PersonaMetadata(is_builtin=False, is_custom=True)
+        default_factory=lambda: PersonaMetadata(
+            is_builtin=False, is_custom=True
+        )
     )
     status: CustomAgentStatus = CustomAgentStatus.DRAFT
 
@@ -184,7 +194,9 @@ class CustomAgentConfig:
         # Validate capability consistency
         if PersonaCapability.WEB_SEARCH in self.capabilities:
             if AgentTool.WEB_CLIENT not in self.enabled_tools:
-                raise ValueError("Web search capability requires web client tool")
+                raise ValueError(
+                    "Web search capability requires web client tool"
+                )
 
         if PersonaCapability.FILE_OPERATIONS in self.capabilities:
             if AgentTool.FILE_OPERATIONS not in self.enabled_tools:
@@ -192,7 +204,9 @@ class CustomAgentConfig:
                     "File operations capability requires file operations tool"
                 )
 
-    def inherit_from_template(self, template_manager: ConfigTemplateManager) -> None:
+    def inherit_from_template(
+        self, template_manager: ConfigTemplateManager
+    ) -> None:
         """Inherit settings from a base template."""
         if not self.base_template_id:
             return
@@ -211,7 +225,9 @@ class CustomAgentConfig:
                     try:
                         self.capabilities.add(PersonaCapability(cap_name))
                     except ValueError:
-                        logger.warning(f"Unknown capability in template: {cap_name}")
+                        logger.warning(
+                            f"Unknown capability in template: {cap_name}"
+                        )
 
             # Inherit model settings if using default
             if (
@@ -220,19 +236,25 @@ class CustomAgentConfig:
             ):
 
                 # Use template's recommended model
-                primary_provider = template.metadata.get("primary_provider", "claude")
+                primary_provider = template.metadata.get(
+                    "primary_provider", "claude"
+                )
                 if primary_provider in template.recommended_models:
-                    self.model_settings.model_name = template.recommended_models[
-                        primary_provider
-                    ]
+                    self.model_settings.model_name = (
+                        template.recommended_models[primary_provider]
+                    )
 
                 # Use template's provider configuration
                 if primary_provider in template.provider_configs:
-                    provider_config = template.provider_configs[primary_provider]
+                    provider_config = template.provider_configs[
+                        primary_provider
+                    ]
                     self.model_settings.temperature = provider_config.get(
                         "temperature", 0.7
                     )
-                    self.model_settings.max_tokens = provider_config.get("max_tokens")
+                    self.model_settings.max_tokens = provider_config.get(
+                        "max_tokens"
+                    )
 
         except Exception as e:
             logger.warning(
@@ -289,12 +311,16 @@ class CustomAgentConfig:
         # Handle ModelSettings
         if "model_settings" in data:
             model_data = data["model_settings"].copy()
-            model_data["provider_type"] = ProviderType(model_data["provider_type"])
+            model_data["provider_type"] = ProviderType(
+                model_data["provider_type"]
+            )
             data["model_settings"] = ModelSettings(**model_data)
 
         # Handle ContextParameters
         if "context_parameters" in data:
-            data["context_parameters"] = ContextParameters(**data["context_parameters"])
+            data["context_parameters"] = ContextParameters(
+                **data["context_parameters"]
+            )
 
         # Handle BehaviorRules
         if "behavior_rules" in data:
@@ -308,7 +334,9 @@ class CustomAgentConfig:
 
         # Handle enabled_tools set
         if "enabled_tools" in data:
-            data["enabled_tools"] = {AgentTool(tool) for tool in data["enabled_tools"]}
+            data["enabled_tools"] = {
+                AgentTool(tool) for tool in data["enabled_tools"]
+            }
 
         # Handle datetime fields
         for field_name in ["created_at", "updated_at"]:
@@ -385,7 +413,10 @@ class CustomAgentValidator:
                             "minimum": 0.0,
                             "maximum": 2.0,
                         },
-                        "max_tokens": {"type": ["integer", "null"], "minimum": 1},
+                        "max_tokens": {
+                            "type": ["integer", "null"],
+                            "minimum": 1,
+                        },
                         "top_p": {
                             "type": ["number", "null"],
                             "minimum": 0.0,
@@ -398,7 +429,10 @@ class CustomAgentValidator:
                 "context_parameters": {
                     "type": "object",
                     "properties": {
-                        "context_window_size": {"type": "integer", "minimum": 1000},
+                        "context_window_size": {
+                            "type": "integer",
+                            "minimum": 1000,
+                        },
                         "memory_limit": {"type": "integer", "minimum": 1},
                         "system_prompt": {"type": "string"},
                         "response_format": {
@@ -485,7 +519,9 @@ class AgentRepository:
                 agent_config = self._load_from_file(config_file)
                 self._cache[agent_config.id] = agent_config
             except Exception as e:
-                logger.warning(f"Failed to load agent config from {config_file}: {e}")
+                logger.warning(
+                    f"Failed to load agent config from {config_file}: {e}"
+                )
 
         self._cache_loaded = True
 
@@ -549,17 +585,27 @@ class AgentRepository:
         self._load_cache()
         return list(self._cache.values())
 
-    def list_by_category(self, category: PersonaCategory) -> List[CustomAgentConfig]:
+    def list_by_category(
+        self, category: PersonaCategory
+    ) -> List[CustomAgentConfig]:
         """Get agent configurations by category."""
         self._load_cache()
         return [
-            config for config in self._cache.values() if config.category == category
+            config
+            for config in self._cache.values()
+            if config.category == category
         ]
 
-    def list_by_status(self, status: CustomAgentStatus) -> List[CustomAgentConfig]:
+    def list_by_status(
+        self, status: CustomAgentStatus
+    ) -> List[CustomAgentConfig]:
         """Get agent configurations by status."""
         self._load_cache()
-        return [config for config in self._cache.values() if config.status == status]
+        return [
+            config
+            for config in self._cache.values()
+            if config.status == status
+        ]
 
     def update(self, config: CustomAgentConfig) -> CustomAgentConfig:
         """Update existing agent configuration."""
@@ -607,7 +653,10 @@ class AgentRepository:
 
             if "name" in fields and query_lower in config.name.lower():
                 match = True
-            if "description" in fields and query_lower in config.description.lower():
+            if (
+                "description" in fields
+                and query_lower in config.description.lower()
+            ):
                 match = True
             if "capabilities" in fields:
                 for cap in config.capabilities:
@@ -703,6 +752,8 @@ class AgentRepository:
                     removed_count += 1
                     logger.info(f"Removed orphaned config file: {config_file}")
                 except Exception as e:
-                    logger.warning(f"Failed to remove orphaned file {config_file}: {e}")
+                    logger.warning(
+                        f"Failed to remove orphaned file {config_file}: {e}"
+                    )
 
         return removed_count

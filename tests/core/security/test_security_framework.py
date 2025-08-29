@@ -20,7 +20,10 @@ from omnimancer.core.security.permission_controller import (
     PermissionLevel,
 )
 from omnimancer.core.security.sandbox_manager import ResourceLimits
-from omnimancer.core.security.approval_workflow import RiskLevel, ApprovalStatus
+from omnimancer.core.security.approval_workflow import (
+    RiskLevel,
+    ApprovalStatus,
+)
 from omnimancer.core.security.audit_logger import AuditEventType, AuditLevel
 
 
@@ -34,10 +37,15 @@ class TestPermissionController:
     def test_validate_safe_path_access(self):
         """Test validation of safe path access."""
         # Test reading from current directory
-        assert self.controller.validate_path_access("./test.txt", "read") == True
+        assert (
+            self.controller.validate_path_access("./test.txt", "read") == True
+        )
 
         # Test writing to current directory
-        assert self.controller.validate_path_access("./output.txt", "write") == True
+        assert (
+            self.controller.validate_path_access("./output.txt", "write")
+            == True
+        )
 
     def test_block_restricted_paths(self):
         """Test blocking of restricted paths."""
@@ -93,7 +101,9 @@ class TestPermissionController:
         assert self.controller.validate_operation(safe_op) == True
 
         # Unsafe operation
-        unsafe_op = PermissionOperation(operation_type="file_write", path="/etc/passwd")
+        unsafe_op = PermissionOperation(
+            operation_type="file_write", path="/etc/passwd"
+        )
         assert self.controller.validate_operation(unsafe_op) == False
 
     def test_add_remove_restrictions(self):
@@ -136,7 +146,8 @@ class TestSandboxManager:
     def test_execute_safe_command(self):
         """Test execution of safe commands in sandbox."""
         result = self.manager.execute_sandboxed_command(
-            ["echo", "Hello, World!"], limits=ResourceLimits(timeout_seconds=10)
+            ["echo", "Hello, World!"],
+            limits=ResourceLimits(timeout_seconds=10),
         )
 
         assert result["success"] == True
@@ -157,7 +168,9 @@ class TestSandboxManager:
         """Test resource limit enforcement."""
         # Test with very restrictive limits
         restrictive_limits = ResourceLimits(
-            max_memory_mb=1, max_cpu_seconds=1, timeout_seconds=5  # Very low memory
+            max_memory_mb=1,
+            max_cpu_seconds=1,
+            timeout_seconds=5,  # Very low memory
         )
 
         # This should still work for simple commands
@@ -266,9 +279,13 @@ class TestApprovalWorkflow:
         assert request.id not in self.workflow.pending_requests
         assert request.id in self.workflow.completed_requests
         assert (
-            self.workflow.completed_requests[request.id].status == ApprovalStatus.DENIED
+            self.workflow.completed_requests[request.id].status
+            == ApprovalStatus.DENIED
         )
-        assert self.workflow.completed_requests[request.id].denial_reason == "Too risky"
+        assert (
+            self.workflow.completed_requests[request.id].denial_reason
+            == "Too risky"
+        )
 
     def test_risk_assessment(self):
         """Test risk level assessment."""
@@ -279,7 +296,9 @@ class TestApprovalWorkflow:
         assert low_risk == RiskLevel.LOW
 
         # Medium risk escalated to high due to sensitive path
-        medium_risk = self.workflow.assess_risk_level("file_write", {"path": ".env"})
+        medium_risk = self.workflow.assess_risk_level(
+            "file_write", {"path": ".env"}
+        )
         assert medium_risk == RiskLevel.HIGH
 
         # High risk escalated to critical due to multiple factors
@@ -367,7 +386,9 @@ class TestAuditLogger:
         """Test event filtering by type and level."""
         # Log different types of events
         self.logger.log_event(
-            AuditEventType.PERMISSION_CHECK, AuditLevel.INFO, "Permission check"
+            AuditEventType.PERMISSION_CHECK,
+            AuditLevel.INFO,
+            "Permission check",
         )
         self.logger.log_event(
             AuditEventType.SECURITY_ALERT, AuditLevel.WARNING, "Security alert"
@@ -381,10 +402,14 @@ class TestAuditLogger:
             count=10, event_type=AuditEventType.PERMISSION_CHECK
         )
         assert len(permission_events) == 1
-        assert permission_events[0].event_type == AuditEventType.PERMISSION_CHECK
+        assert (
+            permission_events[0].event_type == AuditEventType.PERMISSION_CHECK
+        )
 
         # Filter by level
-        error_events = self.logger.get_recent_events(count=10, level=AuditLevel.ERROR)
+        error_events = self.logger.get_recent_events(
+            count=10, level=AuditLevel.ERROR
+        )
         assert len(error_events) == 1
         assert error_events[0].level == AuditLevel.ERROR
 
@@ -419,7 +444,9 @@ class TestSecurityManager:
     @pytest.mark.asyncio
     async def test_block_unsafe_operation(self):
         """Test blocking of unsafe operations."""
-        operation = PermissionOperation(operation_type="file_write", path="/etc/passwd")
+        operation = PermissionOperation(
+            operation_type="file_write", path="/etc/passwd"
+        )
 
         result = await self.manager.validate_operation(operation)
 
@@ -430,7 +457,9 @@ class TestSecurityManager:
     @pytest.mark.asyncio
     async def test_execute_secure_command(self):
         """Test secure command execution."""
-        result = await self.manager.execute_secure_command("echo 'Hello, Security!'")
+        result = await self.manager.execute_secure_command(
+            "echo 'Hello, Security!'"
+        )
 
         assert result["success"] == True
         assert result["return_code"] == 0
@@ -487,13 +516,17 @@ class TestSecurityManager:
 
     def test_update_security_policy(self):
         """Test updating security policies."""
-        success = self.manager.update_security_policy("max_command_timeout", 600)
+        success = self.manager.update_security_policy(
+            "max_command_timeout", 600
+        )
 
         assert success == True
         assert self.manager.security_policies["max_command_timeout"] == 600
 
         # Test invalid policy
-        success = self.manager.update_security_policy("invalid_policy", "value")
+        success = self.manager.update_security_policy(
+            "invalid_policy", "value"
+        )
         assert success == False
 
 
@@ -533,7 +566,9 @@ class TestSecurityIntegration:
         assert read_result["content"] == test_content
 
         # Delete file
-        delete_result = await self.manager.secure_file_access(test_file, "delete")
+        delete_result = await self.manager.secure_file_access(
+            test_file, "delete"
+        )
 
         assert delete_result["success"] == True
         assert not os.path.exists(test_file)
@@ -545,7 +580,9 @@ class TestSecurityIntegration:
         initial_count = 0
         if self.manager.audit:
             # Get initial event count
-            initial_count = len(self.manager.audit.get_recent_events(count=100))
+            initial_count = len(
+                self.manager.audit.get_recent_events(count=100)
+            )
 
         # Execute a safe command
         result = await self.manager.execute_secure_command("ls /tmp")
@@ -577,7 +614,9 @@ class TestSecurityIntegration:
     async def test_security_policy_enforcement(self):
         """Test that security policies are properly enforced."""
         # Test file size limit
-        large_content = "x" * (101 * 1024 * 1024)  # 101MB > default 100MB limit
+        large_content = "x" * (
+            101 * 1024 * 1024
+        )  # 101MB > default 100MB limit
         test_file = os.path.join(self.temp_dir, "large_file.txt")
 
         result = await self.manager.secure_file_access(

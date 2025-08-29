@@ -16,7 +16,12 @@ from omnimancer.core.config_validator import ConfigValidator
 from omnimancer.core.health_monitor import HealthMonitor
 
 # from omnimancer.core.config_repair import ConfigRepair  # Removed as over-engineered
-from omnimancer.core.models import Config, ProviderConfig, EnhancedModelInfo, MCPConfig
+from omnimancer.core.models import (
+    Config,
+    ProviderConfig,
+    EnhancedModelInfo,
+    MCPConfig,
+)
 
 
 class TestProviderInitializer:
@@ -35,14 +40,20 @@ class TestProviderInitializer:
         mock_provider_class.__name__ = "TestProvider"
 
         # Directly set in cache to test cache functionality
-        ProviderInitializer._provider_classes["test_provider"] = mock_provider_class
+        ProviderInitializer._provider_classes["test_provider"] = (
+            mock_provider_class
+        )
 
         # First call should use cache
-        provider_class1 = ProviderInitializer.get_provider_class("test_provider")
+        provider_class1 = ProviderInitializer.get_provider_class(
+            "test_provider"
+        )
         assert provider_class1 == mock_provider_class
 
         # Second call should also use cache
-        provider_class2 = ProviderInitializer.get_provider_class("test_provider")
+        provider_class2 = ProviderInitializer.get_provider_class(
+            "test_provider"
+        )
         assert provider_class2 == mock_provider_class
         assert provider_class1 is provider_class2  # Same instance from cache
 
@@ -58,7 +69,9 @@ class TestProviderInitializer:
 
         # Mock get_provider_class
         with patch.object(
-            ProviderInitializer, "get_provider_class", return_value=mock_provider_class
+            ProviderInitializer,
+            "get_provider_class",
+            return_value=mock_provider_class,
         ):
             # Create config
             config = ProviderConfig(api_key="test_key", model="test_model")
@@ -79,12 +92,16 @@ class TestProviderInitializer:
             mock_provider_class.assert_not_called()
 
             # Different config should create new instance
-            config2 = ProviderConfig(api_key="test_key", model="different_model")
+            config2 = ProviderConfig(
+                api_key="test_key", model="different_model"
+            )
             mock_provider_class.reset_mock()
             instance3 = ProviderInitializer.get_provider_instance(
                 "test_provider", config2
             )
-            assert instance3 == mock_instance  # In our mock, same instance is returned
+            assert (
+                instance3 == mock_instance
+            )  # In our mock, same instance is returned
             mock_provider_class.assert_called_once()
 
     def test_model_info_caching(self):
@@ -112,7 +129,9 @@ class TestProviderInitializer:
 
         # Mock get_provider_class
         with patch.object(
-            ProviderInitializer, "get_provider_class", return_value=mock_provider_class
+            ProviderInitializer,
+            "get_provider_class",
+            return_value=mock_provider_class,
         ):
             # First call should fetch models
             models1 = ProviderInitializer.get_model_info("test_provider")
@@ -187,7 +206,9 @@ class TestConfigValidator:
         # Create test config
         config = Config(
             default_provider="test",
-            providers={"test": ProviderConfig(api_key="test_key", model="test_model")},
+            providers={
+                "test": ProviderConfig(api_key="test_key", model="test_model")
+            },
             storage_path="/tmp/omnimancer",
         )
 
@@ -279,7 +300,9 @@ class TestHealthMonitor:
             return_value=mock_provider,
         ):
             # First call should check health
-            status1 = await monitor.check_provider_health("test_provider", config)
+            status1 = await monitor.check_provider_health(
+                "test_provider", config
+            )
             assert status1["status"] == "healthy"
             assert status1["credentials_valid"] is True
             assert status1["model_available"] is True
@@ -287,7 +310,9 @@ class TestHealthMonitor:
 
             # Second call should use cached result
             mock_provider.validate_credentials.reset_mock()
-            status2 = await monitor.check_provider_health("test_provider", config)
+            status2 = await monitor.check_provider_health(
+                "test_provider", config
+            )
             assert status2["status"] == "healthy"
             mock_provider.validate_credentials.assert_not_called()
 
@@ -315,7 +340,9 @@ class TestHealthMonitor:
         def mock_get_provider(provider_name, config):
             mock_provider = MagicMock()
             mock_provider.validate_credentials.return_value = True
-            mock_provider.get_model_info.return_value = MagicMock(available=True)
+            mock_provider.get_model_info.return_value = MagicMock(
+                available=True
+            )
             mock_provider.supports_tools.return_value = True
             mock_provider.supports_multimodal.return_value = False
             mock_provider.supports_streaming.return_value = True
@@ -342,7 +369,9 @@ class TestHealthMonitor:
 class TestConfigRepair:
     """Tests for the ConfigRepair class."""
 
-    @pytest.mark.skip(reason="ConfigRepair functionality not fully implemented yet")
+    @pytest.mark.skip(
+        reason="ConfigRepair functionality not fully implemented yet"
+    )
     def test_analyze_config(self):
         """Test configuration analysis for issues."""
         # repair = ConfigRepair()  # Removed as over-engineered
@@ -351,7 +380,9 @@ class TestConfigRepair:
         config = Config(
             default_provider="test",
             providers={
-                "test": ProviderConfig(api_key="test_key", model=""),  # Missing model
+                "test": ProviderConfig(
+                    api_key="test_key", model=""
+                ),  # Missing model
                 "ollama": ProviderConfig(
                     api_key="",  # No API key (allowed for Ollama)
                     model="llama3",
@@ -373,25 +404,37 @@ class TestConfigRepair:
 
         # Check for specific issues
         model_issue = next(
-            (i for i in issues if "has no model specified" in i["message"]), None
+            (i for i in issues if "has no model specified" in i["message"]),
+            None,
         )
         assert model_issue is not None
         assert model_issue["fixable"] is True
 
         timeout_issue = next(
-            (i for i in issues if "timeout should be at least" in i["message"]), None
+            (
+                i
+                for i in issues
+                if "timeout should be at least" in i["message"]
+            ),
+            None,
         )
         assert timeout_issue is not None
         assert timeout_issue["fixable"] is True
 
         mcp_issue = next(
-            (i for i in issues if "Invalid MCP auto_approve_timeout" in i["message"]),
+            (
+                i
+                for i in issues
+                if "Invalid MCP auto_approve_timeout" in i["message"]
+            ),
             None,
         )
         assert mcp_issue is not None
         assert mcp_issue["fixable"] is True
 
-    @pytest.mark.skip(reason="ConfigRepair functionality not fully implemented yet")
+    @pytest.mark.skip(
+        reason="ConfigRepair functionality not fully implemented yet"
+    )
     def test_fix_issues(self):
         """Test fixing configuration issues."""
         # repair = ConfigRepair()  # Removed as over-engineered
@@ -400,7 +443,9 @@ class TestConfigRepair:
         config = Config(
             default_provider="test",
             providers={
-                "test": ProviderConfig(api_key="test_key", model=""),  # Missing model
+                "test": ProviderConfig(
+                    api_key="test_key", model=""
+                ),  # Missing model
                 "ollama": ProviderConfig(
                     api_key="",  # No API key (allowed for Ollama)
                     model="llama3",
@@ -422,9 +467,13 @@ class TestConfigRepair:
 
         # Verify fixes
         assert len(applied_fixes) > 0
-        assert fixed_config.providers["test"].model != ""  # Model should be set
+        assert (
+            fixed_config.providers["test"].model != ""
+        )  # Model should be set
         assert (
             fixed_config.providers["ollama"].timeout >= 10
         )  # Timeout should be increased
         assert fixed_config.mcp.auto_approve_timeout > 0  # Should be positive
-        assert fixed_config.mcp.max_concurrent_servers == 5  # Should be reduced
+        assert (
+            fixed_config.mcp.max_concurrent_servers == 5
+        )  # Should be reduced

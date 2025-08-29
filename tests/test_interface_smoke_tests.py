@@ -237,7 +237,14 @@ class TestRegressionSafety:
     def test_command_parsing_still_works(self):
         """Test that command parsing still works after refactoring."""
         # Test various command types
-        commands = ["/help", "/quit", "/status", "Hello world", "/switch claude", ""]
+        commands = [
+            "/help",
+            "/quit",
+            "/status",
+            "Hello world",
+            "/switch claude",
+            "",
+        ]
 
         for cmd_text in commands:
             try:

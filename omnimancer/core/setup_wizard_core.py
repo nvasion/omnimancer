@@ -24,7 +24,9 @@ class SetupWizardCore:
     """Core orchestration methods for the setup wizard."""
 
     def __init__(
-        self, config_manager: ConfigManager, provider_registry: ProviderRegistry
+        self,
+        config_manager: ConfigManager,
+        provider_registry: ProviderRegistry,
     ):
         """
         Initialize the setup wizard core.
@@ -147,7 +149,11 @@ class SetupWizardCore:
                     "Code generation",
                     "Privacy-focused",
                 ],
-                "models": ["mistral-small-3.1", "mistral-medium", "mistral-large"],
+                "models": [
+                    "mistral-small-3.1",
+                    "mistral-medium",
+                    "mistral-large",
+                ],
                 "api_key_url": "https://console.mistral.ai/",
                 "api_key_prefix": "mistral-",
                 "setup_notes": "Get your API key from the Mistral Console",
@@ -284,7 +290,9 @@ class SetupWizardCore:
 
             # Create helper instances
             ui = SetupWizardUI(self.console, self.provider_info)
-            provider_setup = SetupWizardProviderSetup(self.console, self.provider_info)
+            provider_setup = SetupWizardProviderSetup(
+                self.console, self.provider_info
+            )
             validation = SetupWizardValidation(
                 self.console,
                 self.provider_info,
@@ -306,12 +314,16 @@ class SetupWizardCore:
                 return False
 
             # Configure the selected provider
-            provider_config = await provider_setup.configure_provider(provider_name)
+            provider_config = await provider_setup.configure_provider(
+                provider_name
+            )
             if not provider_config:
                 return False
 
             # Test the configuration
-            if not await validation.test_configuration(provider_name, provider_config):
+            if not await validation.test_configuration(
+                provider_name, provider_config
+            ):
                 return False
 
             # Save configuration
@@ -338,7 +350,9 @@ class SetupWizardCore:
         Returns:
             True if user confirms, False otherwise
         """
-        self.console.print("[yellow]⚠️  Existing configuration detected[/yellow]")
+        self.console.print(
+            "[yellow]⚠️  Existing configuration detected[/yellow]"
+        )
         return Confirm.ask("Do you want to continue and add another provider?")
 
     def get_available_providers(self) -> List[str]:
@@ -350,7 +364,9 @@ class SetupWizardCore:
         """
         return list(self.provider_info.keys())
 
-    def get_provider_info(self, provider_name: str) -> Optional[Dict[str, Any]]:
+    def get_provider_info(
+        self, provider_name: str
+    ) -> Optional[Dict[str, Any]]:
         """
         Get information about a specific provider.
 
@@ -362,7 +378,9 @@ class SetupWizardCore:
         """
         return self.provider_info.get(provider_name)
 
-    def get_common_setup_issues(self, provider_name: str) -> List[Dict[str, str]]:
+    def get_common_setup_issues(
+        self, provider_name: str
+    ) -> List[Dict[str, str]]:
         """
         Get common setup issues and solutions for a provider.
 

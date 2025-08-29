@@ -87,7 +87,9 @@ class SignalHandler:
             if loop.is_running():
                 loop.create_task(self._graceful_shutdown())
             else:
-                logger.warning("Event loop is not running, cannot create shutdown task")
+                logger.warning(
+                    "Event loop is not running, cannot create shutdown task"
+                )
         except RuntimeError:
             # No event loop running, exit immediately
             logger.warning("No event loop available, exiting immediately")
@@ -122,13 +124,19 @@ class SignalHandler:
             )
             try:
                 await asyncio.wait_for(
-                    asyncio.gather(*self.active_operations, return_exceptions=True),
+                    asyncio.gather(
+                        *self.active_operations, return_exceptions=True
+                    ),
                     timeout=5.0,
                 )
                 logger.info("All operations completed successfully")
             except asyncio.TimeoutError:
-                print("Timeout waiting for operations to complete. Forcing shutdown...")
-                logger.warning("Timeout during graceful shutdown, forcing exit")
+                print(
+                    "Timeout waiting for operations to complete. Forcing shutdown..."
+                )
+                logger.warning(
+                    "Timeout during graceful shutdown, forcing exit"
+                )
 
         # Cleanup agent resources
         if self.agent_engine and hasattr(self.agent_engine, "cleanup"):

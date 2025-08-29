@@ -136,13 +136,17 @@ class IntegrationTestRunner:
                         f"[green]✅ Module {test_module['module']} passed[/green]"
                     )
 
-                progress.update(module_task, completed=test_module["test_count"])
+                progress.update(
+                    module_task, completed=test_module["test_count"]
+                )
 
         self.total_duration = time.time() - self.start_time
         self._display_results()
 
         # Return True if all tests passed
-        failed_tests = [r for r in self.test_results if r.result == TestResult.FAILED]
+        failed_tests = [
+            r for r in self.test_results if r.result == TestResult.FAILED
+        ]
         return len(failed_tests) == 0
 
     def _run_test_module(
@@ -168,7 +172,9 @@ class IntegrationTestRunner:
 
             # For demonstration, we'll simulate test results
             # In a real implementation, you'd capture pytest output
-            self._simulate_test_results(module_name, description, exit_code == 0)
+            self._simulate_test_results(
+                module_name, description, exit_code == 0
+            )
 
             # Update progress
             progress.advance(main_task, advance=20 if exit_code == 0 else 15)
@@ -187,7 +193,9 @@ class IntegrationTestRunner:
             )
             return False
 
-    def _simulate_test_results(self, module_name: str, description: str, success: bool):
+    def _simulate_test_results(
+        self, module_name: str, description: str, success: bool
+    ):
         """Simulate test results for demonstration purposes."""
         # This would be replaced with actual pytest result parsing
         if "integration" in module_name:
@@ -240,7 +248,8 @@ class IntegrationTestRunner:
                     test_name=f"{module_name}::{test_case}",
                     result=result,
                     duration=0.1
-                    + (hash(test_case) % 100) / 1000.0,  # Simulate varying duration
+                    + (hash(test_case) % 100)
+                    / 1000.0,  # Simulate varying duration
                     error_message=error_msg,
                 )
             )
@@ -270,7 +279,9 @@ class IntegrationTestRunner:
 
         summary_table.add_row("Total Tests", str(total_tests), "100%")
         summary_table.add_row(
-            "Passed", str(passed_tests), f"{(passed_tests/total_tests)*100:.1f}%"
+            "Passed",
+            str(passed_tests),
+            f"{(passed_tests/total_tests)*100:.1f}%",
         )
 
         if failed_tests > 0:
@@ -303,7 +314,9 @@ class IntegrationTestRunner:
         # Display failed tests if any
         if failed_tests > 0 or error_tests > 0:
             self.console.print("\n")
-            failure_table = Table(title="Failed Tests Details", title_style="red")
+            failure_table = Table(
+                title="Failed Tests Details", title_style="red"
+            )
             failure_table.add_column("Test Name", style="cyan")
             failure_table.add_column("Status", style="red")
             failure_table.add_column("Error", style="yellow")
@@ -352,12 +365,16 @@ class IntegrationTestRunner:
             exit_code = pytest.main([test_name, "-v", "--tb=long"])
 
             if exit_code == 0:
-                self.console.print(f"[green]✅ Test {test_name} passed[/green]")
+                self.console.print(
+                    f"[green]✅ Test {test_name} passed[/green]"
+                )
             else:
                 self.console.print(f"[red]❌ Test {test_name} failed[/red]")
 
         except Exception as e:
-            self.console.print(f"[red]Error running test {test_name}: {e}[/red]")
+            self.console.print(
+                f"[red]Error running test {test_name}: {e}[/red]"
+            )
 
     def run_smoke_tests(self):
         """Run a subset of critical tests for quick validation."""
@@ -392,7 +409,9 @@ class IntegrationTestRunner:
                 self.console.print(f"[red]✗ Error: {e}[/red]")
 
         if passed == total:
-            self.console.print(f"[green]🎉 All {total} smoke tests passed![/green]")
+            self.console.print(
+                f"[green]🎉 All {total} smoke tests passed![/green]"
+            )
         else:
             self.console.print(
                 f"[yellow]⚠️  {passed}/{total} smoke tests passed[/yellow]"
@@ -404,9 +423,13 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Integration Test Runner")
-    parser.add_argument("--smoke", action="store_true", help="Run smoke tests only")
+    parser.add_argument(
+        "--smoke", action="store_true", help="Run smoke tests only"
+    )
     parser.add_argument("--test", type=str, help="Run specific test")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Verbose output"
+    )
 
     args = parser.parse_args()
 

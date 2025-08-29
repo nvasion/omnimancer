@@ -47,17 +47,24 @@ class TestReadBeforeWriteLogicIntegration:
         """Create mock security manager."""
         mock_security = Mock()
         mock_security.secure_file_access = AsyncMock(
-            return_value={"success": True, "message": "Access granted for testing"}
+            return_value={
+                "success": True,
+                "message": "Access granted for testing",
+            }
         )
         return mock_security
 
     @pytest.fixture
     def error_handler(self):
         """Create error handler for testing."""
-        return ReadBeforeWriteErrorHandler(enable_recovery=True, log_errors=True)
+        return ReadBeforeWriteErrorHandler(
+            enable_recovery=True, log_errors=True
+        )
 
     @pytest.fixture
-    def file_system_manager(self, temp_dir, mock_security_manager, error_handler):
+    def file_system_manager(
+        self, temp_dir, mock_security_manager, error_handler
+    ):
         """Create FileSystemManager with full configuration for testing."""
         return FileSystemManager(
             security_manager=mock_security_manager,
@@ -161,7 +168,10 @@ class TestReadBeforeWriteLogicIntegration:
             assert review_data["current_content"] == original_content
             assert review_data["new_content"] == proposed_content
 
-            return {"approved": True, "modified_content": user_modified_content}
+            return {
+                "approved": True,
+                "modified_content": user_modified_content,
+            }
 
         # Test the workflow with user modification
         result = await file_system_manager.write_file(
@@ -189,7 +199,10 @@ class TestReadBeforeWriteLogicIntegration:
 
         # Mock user callback that rejects
         async def rejection_callback(review_data):
-            return {"approved": False, "reason": "User does not want these changes"}
+            return {
+                "approved": False,
+                "reason": "User does not want these changes",
+            }
 
         # Test the workflow with user rejection
         result = await file_system_manager.write_file(
@@ -202,7 +215,9 @@ class TestReadBeforeWriteLogicIntegration:
         # Verify rejection was handled correctly
         assert result["success"] is False
         assert "User rejected" in result["error"]
-        assert test_file.read_text() == original_content  # Original content preserved
+        assert (
+            test_file.read_text() == original_content
+        )  # Original content preserved
 
     @pytest.mark.asyncio
     async def test_read_before_write_fallback_on_callback_error(
@@ -311,7 +326,8 @@ class TestReadBeforeWriteLogicIntegration:
         assert result["success"] is False
         assert "error_details" in result
         assert (
-            result["error_details"]["error"]["error_type"] == "content_validation_error"
+            result["error_details"]["error"]["error_type"]
+            == "content_validation_error"
         )
 
     @pytest.mark.asyncio
@@ -414,7 +430,9 @@ Line 5"""
         # Verify atomic operation succeeded
         assert result["success"] is True
         assert test_file.read_text() == new_content
-        assert result.get("atomic", False)  # Should indicate atomic operation was used
+        assert result.get(
+            "atomic", False
+        )  # Should indicate atomic operation was used
 
     @pytest.mark.asyncio
     async def test_read_before_write_with_backup_enabled(
@@ -518,7 +536,8 @@ class TestReadBeforeWriteUIIntegration:
 
         # Mock the user input to return approval
         with patch(
-            "omnimancer.core.agent.read_before_write_ui.Prompt.ask", return_value="1"
+            "omnimancer.core.agent.read_before_write_ui.Prompt.ask",
+            return_value="1",
         ):
             result = await review_callback(review_data)
 
@@ -566,7 +585,10 @@ class TestReadBeforeWriteEdgeCases:
         """Create FileSystemManager for edge case testing."""
         mock_security = Mock()
         mock_security.secure_file_access = AsyncMock(
-            return_value={"success": True, "message": "Access granted for testing"}
+            return_value={
+                "success": True,
+                "message": "Access granted for testing",
+            }
         )
 
         return FileSystemManager(
@@ -693,7 +715,9 @@ class TestReadBeforeWriteErrorHandler:
     @pytest.fixture
     def error_handler(self):
         """Create error handler for testing."""
-        return ReadBeforeWriteErrorHandler(enable_recovery=True, log_errors=True)
+        return ReadBeforeWriteErrorHandler(
+            enable_recovery=True, log_errors=True
+        )
 
     @pytest.fixture
     def temp_dir(self):
@@ -736,12 +760,16 @@ class TestReadBeforeWriteErrorHandler:
         write_error = FileWriteError(str(test_file), original_exception)
 
         # First attempt - should retry
-        result = error_handler.handle_error(write_error, retry_count=0, max_retries=2)
+        result = error_handler.handle_error(
+            write_error, retry_count=0, max_retries=2
+        )
         assert result["recovery_result"]["should_retry"] is True
         assert "attempt 1/2" in result["recovery_result"]["message"]
 
         # Max retries exceeded - should abort
-        result = error_handler.handle_error(write_error, retry_count=2, max_retries=2)
+        result = error_handler.handle_error(
+            write_error, retry_count=2, max_retries=2
+        )
         assert result["recovery_result"]["should_abort"] is True
         assert "Maximum retries" in result["recovery_result"]["message"]
 
@@ -753,7 +781,10 @@ class TestReadBeforeWriteErrorHandler:
         rejection_error = UserRejectionError(str(test_file), rejection_reason)
         result = error_handler.handle_error(rejection_error)
 
-        assert result["recovery_strategy"] == RecoveryStrategy.SKIP_OPERATION.value
+        assert (
+            result["recovery_strategy"]
+            == RecoveryStrategy.SKIP_OPERATION.value
+        )
         assert result["recovery_result"]["fallback_action"] == "skip"
         assert "Skipping operation" in result["recovery_result"]["message"]
 
@@ -776,10 +807,14 @@ class TestReadBeforeWriteErrorHandler:
         test_file = temp_dir / "test.txt"
         validation_issue = "Content contains suspicious patterns"
 
-        validation_error = ContentValidationError(str(test_file), validation_issue)
+        validation_error = ContentValidationError(
+            str(test_file), validation_issue
+        )
         result = error_handler.handle_error(validation_error)
 
-        assert result["recovery_strategy"] == RecoveryStrategy.PROMPT_USER.value
+        assert (
+            result["recovery_strategy"] == RecoveryStrategy.PROMPT_USER.value
+        )
         assert result["recovery_result"]["fallback_action"] == "prompt_user"
 
 

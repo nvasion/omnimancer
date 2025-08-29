@@ -44,7 +44,9 @@ class TestWorkflowOrchestrator:
         return mock
 
     @pytest.fixture
-    def orchestrator(self, mock_file_system, mock_approval_manager, mock_executor):
+    def orchestrator(
+        self, mock_file_system, mock_approval_manager, mock_executor
+    ):
         """Create a workflow orchestrator with mocked dependencies."""
         return WorkflowOrchestrator(
             file_system=mock_file_system,
@@ -69,7 +71,9 @@ class TestWorkflowOrchestrator:
         """Test registering a custom workflow."""
         steps = [
             WorkflowStep(
-                name="test_step", type=WorkflowStepType.CUSTOM, description="Test step"
+                name="test_step",
+                type=WorkflowStepType.CUSTOM,
+                description="Test step",
             )
         ]
 
@@ -78,7 +82,9 @@ class TestWorkflowOrchestrator:
         assert len(orchestrator.workflows["test_workflow"]) == 1
 
     @pytest.mark.asyncio
-    async def test_project_analysis_workflow(self, orchestrator, sample_context):
+    async def test_project_analysis_workflow(
+        self, orchestrator, sample_context
+    ):
         """Test the built-in project analysis workflow."""
         with patch("pathlib.Path.iterdir") as mock_iterdir:
             # Mock directory contents
@@ -98,7 +104,9 @@ class TestWorkflowOrchestrator:
 
             # Check that steps were executed
             completed_steps = [
-                s for s in result.history if s.status == WorkflowStatus.COMPLETED
+                s
+                for s in result.history
+                if s.status == WorkflowStatus.COMPLETED
             ]
             assert len(completed_steps) > 0
 
@@ -107,9 +115,14 @@ class TestWorkflowOrchestrator:
             assert "tech_stack" in result.data
 
     @pytest.mark.asyncio
-    async def test_file_modification_workflow(self, orchestrator, sample_context):
+    async def test_file_modification_workflow(
+        self, orchestrator, sample_context
+    ):
         """Test the built-in file modification workflow."""
-        parameters = {"file_path": "test.txt", "changes": {"content": "new content"}}
+        parameters = {
+            "file_path": "test.txt",
+            "changes": {"content": "new content"},
+        }
 
         result = await orchestrator.execute_workflow(
             "file_modification", sample_context, parameters
@@ -154,7 +167,9 @@ class TestWorkflowOrchestrator:
         orchestrator.register_workflow("dependency_test", steps)
 
         context = WorkflowContext(working_directory=Path.cwd())
-        result = await orchestrator.execute_workflow("dependency_test", context)
+        result = await orchestrator.execute_workflow(
+            "dependency_test", context
+        )
 
         # Check that all steps completed
         completed_steps = [
@@ -182,7 +197,9 @@ class TestWorkflowOrchestrator:
 
         orchestrator.register_workflow("approval_test", steps)
 
-        result = await orchestrator.execute_workflow("approval_test", sample_context)
+        result = await orchestrator.execute_workflow(
+            "approval_test", sample_context
+        )
 
         # Check that approval was requested
         orchestrator.approval_manager.request_approval.assert_called()
@@ -218,10 +235,14 @@ class TestWorkflowOrchestrator:
 
         orchestrator.register_workflow("error_test", steps)
 
-        result = await orchestrator.execute_workflow("error_test", sample_context)
+        result = await orchestrator.execute_workflow(
+            "error_test", sample_context
+        )
 
         # Check that first step failed but workflow continued
-        failed_steps = [s for s in result.history if s.status == WorkflowStatus.FAILED]
+        failed_steps = [
+            s for s in result.history if s.status == WorkflowStatus.FAILED
+        ]
         completed_steps = [
             s for s in result.history if s.status == WorkflowStatus.COMPLETED
         ]
@@ -351,7 +372,9 @@ class TestWorkflowIntegration:
         orchestrator.register_workflow("continuous_test", steps)
 
         context = WorkflowContext(working_directory=Path.cwd())
-        result = await orchestrator.execute_workflow("continuous_test", context)
+        result = await orchestrator.execute_workflow(
+            "continuous_test", context
+        )
 
         # Verify continuous execution
         assert execution_order == ["analyze", "prepare", "execute", "validate"]

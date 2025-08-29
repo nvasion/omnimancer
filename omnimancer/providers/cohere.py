@@ -43,7 +43,9 @@ class CohereProvider(BaseProvider):
         self.max_tokens = kwargs.get("max_tokens", 4096)
         self.temperature = kwargs.get("temperature", 0.7)
 
-    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
+    async def send_message(
+        self, message: str, context: ChatContext
+    ) -> ChatResponse:
         """
         Send a message to Cohere API.
 
@@ -83,7 +85,12 @@ class CohereProvider(BaseProvider):
             raise NetworkError("Request to Cohere API timed out")
         except httpx.RequestError as e:
             raise NetworkError(f"Network error: {e}")
-        except (AuthenticationError, RateLimitError, ModelNotFoundError, ProviderError):
+        except (
+            AuthenticationError,
+            RateLimitError,
+            ModelNotFoundError,
+            ProviderError,
+        ):
             # Re-raise provider-specific errors without wrapping
             raise
         except Exception as e:
@@ -104,7 +111,11 @@ class CohereProvider(BaseProvider):
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.api_key}",
                     },
-                    json={"model": self.model, "message": "Hi", "max_tokens": 10},
+                    json={
+                        "model": self.model,
+                        "message": "Hi",
+                        "max_tokens": 10,
+                    },
                     timeout=10.0,
                 )
 
@@ -113,7 +124,9 @@ class CohereProvider(BaseProvider):
         except Exception:
             return False
 
-    def _prepare_chat_history(self, context: ChatContext) -> List[Dict[str, str]]:
+    def _prepare_chat_history(
+        self, context: ChatContext
+    ) -> List[Dict[str, str]]:
         """
         Prepare chat history for Cohere API format.
 
@@ -131,7 +144,9 @@ class CohereProvider(BaseProvider):
             if msg.role.value == "user":
                 chat_history.append({"role": "USER", "message": msg.content})
             elif msg.role.value == "assistant":
-                chat_history.append({"role": "CHATBOT", "message": msg.content})
+                chat_history.append(
+                    {"role": "CHATBOT", "message": msg.content}
+                )
             # Skip system messages as Cohere doesn't support them in chat history
 
         return chat_history
@@ -172,7 +187,8 @@ class CohereProvider(BaseProvider):
                     )
             except (ValueError, KeyError) as e:
                 raise ProviderError(
-                    f"Invalid JSON response from Cohere API: {e}", provider="cohere"
+                    f"Invalid JSON response from Cohere API: {e}",
+                    provider="cohere",
                 )
 
         elif response.status_code == 400:
@@ -180,21 +196,30 @@ class CohereProvider(BaseProvider):
                 error_data = response.json()
                 error_msg = error_data.get("message", "Bad request")
 
-                if "model" in error_msg.lower() or "not found" in error_msg.lower():
-                    available_models = [m.name for m in self.get_available_models()]
+                if (
+                    "model" in error_msg.lower()
+                    or "not found" in error_msg.lower()
+                ):
+                    available_models = [
+                        m.name for m in self.get_available_models()
+                    ]
                     raise ModelNotFoundError(
                         f"Cohere model '{self.model}' not found or not accessible",
                         provider="cohere",
                         model_name=self.model,
                         available_models=available_models,
                     )
-                elif "token" in error_msg.lower() and "limit" in error_msg.lower():
+                elif (
+                    "token" in error_msg.lower()
+                    and "limit" in error_msg.lower()
+                ):
                     raise ProviderError(
                         f"Token limit exceeded: {error_msg}. Try reducing message length.",
                         provider="cohere",
                     )
                 elif (
-                    "invalid" in error_msg.lower() and "parameter" in error_msg.lower()
+                    "invalid" in error_msg.lower()
+                    and "parameter" in error_msg.lower()
                 ):
                     raise ProviderConfigurationError(
                         f"Invalid parameter in request: {error_msg}",
@@ -206,7 +231,9 @@ class CohereProvider(BaseProvider):
                         f"Cohere API error: {error_msg}", provider="cohere"
                     )
             except (ValueError, KeyError):
-                raise ProviderError("Bad request to Cohere API", provider="cohere")
+                raise ProviderError(
+                    "Bad request to Cohere API", provider="cohere"
+                )
 
         elif response.status_code == 401:
             raise AuthenticationError(
@@ -218,7 +245,10 @@ class CohereProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("message", "")
-                if "billing" in error_msg.lower() or "payment" in error_msg.lower():
+                if (
+                    "billing" in error_msg.lower()
+                    or "payment" in error_msg.lower()
+                ):
                     raise QuotaExceededError(
                         "Cohere API access restricted due to billing issues",
                         provider="cohere",
@@ -252,7 +282,10 @@ class CohereProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("message", "")
-                if "quota" in error_msg.lower() or "usage" in error_msg.lower():
+                if (
+                    "quota" in error_msg.lower()
+                    or "usage" in error_msg.lower()
+                ):
                     raise QuotaExceededError(
                         "Cohere API usage quota exceeded", provider="cohere"
                     )
@@ -285,7 +318,9 @@ class CohereProvider(BaseProvider):
             except:
                 error_msg = f"HTTP {response.status_code}"
 
-            raise ProviderError(f"Cohere API error: {error_msg}", provider="cohere")
+            raise ProviderError(
+                f"Cohere API error: {error_msg}", provider="cohere"
+            )
 
     def get_model_info(self) -> ModelInfo:
         """

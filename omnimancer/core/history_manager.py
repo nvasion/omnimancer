@@ -200,7 +200,9 @@ class HistoryManager:
             self._current_index = len(filtered)
             return ""
 
-    def search_history(self, query: str, limit: int = 50) -> List[HistoryEntry]:
+    def search_history(
+        self, query: str, limit: int = 50
+    ) -> List[HistoryEntry]:
         """
         Search command history.
 
@@ -283,7 +285,11 @@ class HistoryManager:
             List of commands from the session
         """
         target_session = session_id or self.session_id
-        return [entry for entry in self._history if entry.session_id == target_session]
+        return [
+            entry
+            for entry in self._history
+            if entry.session_id == target_session
+        ]
 
     def get_statistics(self) -> Dict[str, Any]:
         """
@@ -311,7 +317,11 @@ class HistoryManager:
             "newest_entry": self._history[-1].datetime.isoformat(),
             "unique_commands": unique_commands,
             "sessions": len(
-                set(entry.session_id for entry in self._history if entry.session_id)
+                set(
+                    entry.session_id
+                    for entry in self._history
+                    if entry.session_id
+                )
             ),
         }
 
@@ -370,7 +380,9 @@ class HistoryManager:
                     f.write(f"# Session ID: {self.session_id}\n\n")
 
                     for entry in self._history:
-                        f.write(f"# {entry.datetime.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                        f.write(
+                            f"# {entry.datetime.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                        )
                         f.write(f"{entry.command}\n\n")
 
             else:

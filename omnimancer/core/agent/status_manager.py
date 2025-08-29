@@ -12,7 +12,16 @@ import weakref
 import threading
 from datetime import datetime
 from collections import defaultdict, deque
-from typing import Dict, List, Optional, Any, Callable, Set, Union, AsyncIterator
+from typing import (
+    Dict,
+    List,
+    Optional,
+    Any,
+    Callable,
+    Set,
+    Union,
+    AsyncIterator,
+)
 from concurrent.futures import ThreadPoolExecutor
 
 from .status_core import (
@@ -114,7 +123,9 @@ class UnifiedStatusManager:
 
         # Operation tracking
         self.active_operations: Dict[str, AgentOperation] = {}
-        self.operation_history: deque = deque(maxlen=self.config.max_operation_history)
+        self.operation_history: deque = deque(
+            maxlen=self.config.max_operation_history
+        )
         self.operations_by_agent: Dict[str, List[str]] = defaultdict(list)
 
         # Event system
@@ -135,7 +146,8 @@ class UnifiedStatusManager:
         self.last_event_time = time.time()
         self.event_count = 0
         self.update_collector = StatusUpdateCollector(
-            batch_size=self.config.batch_size, flush_interval=self.config.flush_interval
+            batch_size=self.config.batch_size,
+            flush_interval=self.config.flush_interval,
         )
 
         # Metrics and monitoring
@@ -172,8 +184,12 @@ class UnifiedStatusManager:
         self.shutdown_event.clear()
 
         # Start background processing tasks
-        self._event_processor_task = asyncio.create_task(self._process_events())
-        self._stream_processor_task = asyncio.create_task(self._process_stream_events())
+        self._event_processor_task = asyncio.create_task(
+            self._process_events()
+        )
+        self._stream_processor_task = asyncio.create_task(
+            self._process_stream_events()
+        )
         self._distributor_task = asyncio.create_task(self._distribute_events())
 
         logger.info("UnifiedStatusManager initialized and started")
@@ -343,7 +359,9 @@ class UnifiedStatusManager:
             )
 
     async def complete_operation(
-        self, operation_id: str, result_metadata: Optional[Dict[str, Any]] = None
+        self,
+        operation_id: str,
+        result_metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Mark operation as completed.
@@ -498,7 +516,9 @@ class UnifiedStatusManager:
 
     # Streaming System
     async def emit_stream_event(
-        self, event: AgentEvent, priority: StreamPriority = StreamPriority.NORMAL
+        self,
+        event: AgentEvent,
+        priority: StreamPriority = StreamPriority.NORMAL,
     ) -> bool:
         """
         Emit an event to the status stream.
@@ -534,7 +554,9 @@ class UnifiedStatusManager:
             logger.error(f"Error emitting stream event: {e}")
             return False
 
-    async def add_stream_listener(self, listener: StatusStreamListener) -> bool:
+    async def add_stream_listener(
+        self, listener: StatusStreamListener
+    ) -> bool:
         """
         Add a listener to the status stream.
 
@@ -545,12 +567,16 @@ class UnifiedStatusManager:
             True if listener was added successfully
         """
         if len(self.stream_listeners) >= self.config.max_listeners:
-            logger.warning(f"Maximum listeners ({self.config.max_listeners}) reached")
+            logger.warning(
+                f"Maximum listeners ({self.config.max_listeners}) reached"
+            )
             return False
 
         async with self._lock:
             if listener.listener_id in self.stream_listeners:
-                logger.warning(f"Listener {listener.listener_id} already exists")
+                logger.warning(
+                    f"Listener {listener.listener_id} already exists"
+                )
                 return False
 
             self.stream_listeners[listener.listener_id] = listener
@@ -613,13 +639,16 @@ class UnifiedStatusManager:
         return {
             "running": self.running,
             "queue_size": metrics.queue_size,
-            "queue_full": metrics.queue_size >= self.config.max_queue_size * 0.9,
+            "queue_full": metrics.queue_size
+            >= self.config.max_queue_size * 0.9,
             "listeners_count": metrics.listeners_count,
             "events_processed": metrics.events_processed,
             "events_dropped": metrics.events_dropped,
             "avg_processing_time": metrics.avg_processing_time,
             "last_update": (
-                metrics.last_update.isoformat() if metrics.last_update else None
+                metrics.last_update.isoformat()
+                if metrics.last_update
+                else None
             ),
             "healthy": (
                 self.running
@@ -630,7 +659,9 @@ class UnifiedStatusManager:
 
     # Private Methods
     async def _emit_event(
-        self, event: AgentEvent, stream_priority: Optional[StreamPriority] = None
+        self,
+        event: AgentEvent,
+        stream_priority: Optional[StreamPriority] = None,
     ) -> None:
         """
         Emit an event to both event listeners and stream listeners.
@@ -672,7 +703,9 @@ class UnifiedStatusManager:
         while self.running and not self.shutdown_event.is_set():
             try:
                 # Wait for event with timeout to allow shutdown checking
-                event = await asyncio.wait_for(self.event_queue.get(), timeout=1.0)
+                event = await asyncio.wait_for(
+                    self.event_queue.get(), timeout=1.0
+                )
 
                 # Process event for all listeners
                 for listener in self.event_listeners[
@@ -736,7 +769,9 @@ class UnifiedStatusManager:
 
         logger.debug("Stream event processor stopped")
 
-    async def _handle_stream_event(self, stream_event: StatusStreamEvent) -> None:
+    async def _handle_stream_event(
+        self, stream_event: StatusStreamEvent
+    ) -> None:
         """Handle a single stream event."""
         start_time = time.time()
 
@@ -807,7 +842,9 @@ class UnifiedStatusManager:
                     asyncio.gather(*tasks, return_exceptions=True), timeout=1.0
                 )
             except asyncio.TimeoutError:
-                logger.warning("Some stream listeners timed out processing event")
+                logger.warning(
+                    "Some stream listeners timed out processing event"
+                )
 
     def _move_to_history(self, operation: AgentOperation) -> None:
         """Move completed operation from active to history."""
@@ -819,9 +856,12 @@ class UnifiedStatusManager:
         # Clean up agent operation list
         if (
             operation.agent_id
-            and operation.operation_id in self.operations_by_agent[operation.agent_id]
+            and operation.operation_id
+            in self.operations_by_agent[operation.agent_id]
         ):
-            self.operations_by_agent[operation.agent_id].remove(operation.operation_id)
+            self.operations_by_agent[operation.agent_id].remove(
+                operation.operation_id
+            )
 
 
 # Global instance management

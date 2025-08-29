@@ -26,7 +26,10 @@ from ..core.history_manager import HistoryManager
 
 # Enhanced input temporarily disabled to fix arrow key display issues
 # from ..core.enhanced_input import EnhancedInput, create_completion_callback
-from ..ui.cancellation_handler import CancellationHandler, EnhancedStatusDisplay
+from ..ui.cancellation_handler import (
+    CancellationHandler,
+    EnhancedStatusDisplay,
+)
 from ..ui.progress_indicator import (
     ProgressIndicator,
     OperationType,
@@ -59,7 +62,10 @@ class DisplayManager:
 
         # Message format configurations
         self._formats = {
-            MessageType.SUCCESS: {"text": "[green]✓ {message}[/green]", "panel": None},
+            MessageType.SUCCESS: {
+                "text": "[green]✓ {message}[/green]",
+                "panel": None,
+            },
             MessageType.ERROR: {
                 "text": None,
                 "panel": {"title": "Error", "style": "red"},
@@ -68,7 +74,10 @@ class DisplayManager:
                 "text": "[yellow]⚠ {message}[/yellow]",
                 "panel": None,
             },
-            MessageType.INFO: {"text": "[cyan]ℹ {message}[/cyan]", "panel": None},
+            MessageType.INFO: {
+                "text": "[cyan]ℹ {message}[/cyan]",
+                "panel": None,
+            },
         }
 
     def show_message(self, message: str, msg_type: MessageType) -> None:
@@ -82,7 +91,9 @@ class DisplayManager:
             # Panel format
             panel_config = format_config["panel"]
             panel = Panel(
-                message, title=panel_config["title"], border_style=panel_config["style"]
+                message,
+                title=panel_config["title"],
+                border_style=panel_config["style"],
             )
             self.console.print(panel)
 
@@ -112,7 +123,9 @@ class CompletionManager:
 
         # Static completion mappings
         static_completions = {
-            "mcp": {0: ["status", "reload", "connect", "disconnect", "health"]},
+            "mcp": {
+                0: ["status", "reload", "connect", "disconnect", "health"]
+            },
             "history": {0: ["list", "clear", "export", "import"]},
             "config": {
                 0: [
@@ -167,7 +180,9 @@ class CommandLineInterface:
         self.completion_manager = CompletionManager()
 
         # Initialize signal handler for graceful shutdown
-        self.signal_handler = SignalHandler(getattr(engine, "agent_engine", None))
+        self.signal_handler = SignalHandler(
+            getattr(engine, "agent_engine", None)
+        )
 
         # Initialize cancellation handler for ESC key support
         self.cancellation_handler = CancellationHandler(self.console)
@@ -184,7 +199,8 @@ class CommandLineInterface:
 
         # Initialize agent CLI handler with verbose support
         verbose_mode = (
-            getattr(engine, "verbose", False) or sys.argv.count("--verbose") > 0
+            getattr(engine, "verbose", False)
+            or sys.argv.count("--verbose") > 0
         )
         self.agent_cli_handler = AgentCLIHandler(
             agent_engine=getattr(engine, "agent_engine", None),
@@ -297,7 +313,9 @@ class CommandLineInterface:
                 from ..core.agent_mode_manager import AgentModeManager
                 from ..core.agent_progress_ui import AgentProgressUI
 
-                self.agent_manager = AgentModeManager(self.engine.config_manager)
+                self.agent_manager = AgentModeManager(
+                    self.engine.config_manager
+                )
                 self.agent_progress_ui = AgentProgressUI(
                     self.agent_manager, self.console
                 )
@@ -315,7 +333,10 @@ class CommandLineInterface:
             # Enhanced input already initialized in constructor
 
             # Main interaction loop
-            while self.running and not self.signal_handler.shutdown_event.is_set():
+            while (
+                self.running
+                and not self.signal_handler.shutdown_event.is_set()
+            ):
                 try:
                     # Create a task for user input handling
                     input_task = asyncio.create_task(self._handle_user_input())
@@ -352,7 +373,10 @@ class CommandLineInterface:
 
             # Cleanup approval integration
             try:
-                if hasattr(self, "approval_integration") and self.approval_integration:
+                if (
+                    hasattr(self, "approval_integration")
+                    and self.approval_integration
+                ):
                     await self.approval_integration.cleanup()
             except Exception as e:
                 logger.debug(f"Error cleaning up approval integration: {e}")
@@ -417,7 +441,13 @@ class CommandLineInterface:
                 # Test console functionality
                 console.size  # This will fail if terminal detection is broken
                 return console
-        except (OSError, ImportError, AttributeError, ValueError, RuntimeError) as e:
+        except (
+            OSError,
+            ImportError,
+            AttributeError,
+            ValueError,
+            RuntimeError,
+        ) as e:
             logger.debug(f"Full-featured console initialization failed: {e}")
 
         # Level 2: Basic console with minimal features
@@ -431,7 +461,13 @@ class CommandLineInterface:
             # Test basic functionality
             console.size
             return console
-        except (OSError, ImportError, AttributeError, ValueError, RuntimeError) as e:
+        except (
+            OSError,
+            ImportError,
+            AttributeError,
+            ValueError,
+            RuntimeError,
+        ) as e:
             logger.debug(f"Basic console initialization failed: {e}")
 
         # Level 3: Safe console (no advanced features)
@@ -447,7 +483,13 @@ class CommandLineInterface:
                 legacy_windows=True,
             )
             return console
-        except (OSError, ImportError, AttributeError, ValueError, RuntimeError) as e:
+        except (
+            OSError,
+            ImportError,
+            AttributeError,
+            ValueError,
+            RuntimeError,
+        ) as e:
             logger.debug(f"Safe console initialization failed: {e}")
 
         # Level 4: Minimal console to stderr (last resort)
@@ -520,7 +562,9 @@ class CommandLineInterface:
                 else:
                     print("---")
 
-        logger.warning("All console initialization methods failed, using mock console")
+        logger.warning(
+            "All console initialization methods failed, using mock console"
+        )
         return MockConsole()
 
     def _setup_approval_integration(self):
@@ -541,7 +585,9 @@ class CommandLineInterface:
                     "approval_manager": approval_manager,
                     "agent_engine": agent_engine,
                 }
-                logger.debug("CLI approval integration deferred for async setup")
+                logger.debug(
+                    "CLI approval integration deferred for async setup"
+                )
             else:
                 logger.debug(
                     "No agent engine or approval manager available for integration"
@@ -553,7 +599,10 @@ class CommandLineInterface:
 
     async def _complete_approval_integration_setup(self):
         """Complete the async setup of approval integration if deferred."""
-        if hasattr(self, "_approval_setup_params") and not self.approval_integration:
+        if (
+            hasattr(self, "_approval_setup_params")
+            and not self.approval_integration
+        ):
             try:
                 from .approval_integration import (
                     create_cli_approval_integration,
@@ -563,25 +612,31 @@ class CommandLineInterface:
                 params = self._approval_setup_params
 
                 # Create approval integration
-                self.approval_integration = await create_cli_approval_integration(
-                    approval_manager=params["approval_manager"],
-                    console=self.console,
-                    config={
-                        "enable_auto_approval": True,
-                        "approval_timeout_seconds": 300,  # 5 minutes
-                    },
+                self.approval_integration = (
+                    await create_cli_approval_integration(
+                        approval_manager=params["approval_manager"],
+                        console=self.console,
+                        config={
+                            "enable_auto_approval": True,
+                            "approval_timeout_seconds": 300,  # 5 minutes
+                        },
+                    )
                 )
 
                 # Configure no-approval flag if set
                 if self.no_approval:
-                    self.approval_integration.add_no_approval_flag_support(True)
+                    self.approval_integration.add_no_approval_flag_support(
+                        True
+                    )
 
                 # Inject into agent engine
                 inject_approval_integration_into_agent_engine(
                     params["agent_engine"], self.approval_integration
                 )
 
-                logger.debug("CLI approval integration set up successfully (async)")
+                logger.debug(
+                    "CLI approval integration set up successfully (async)"
+                )
 
                 # Clean up setup params
                 delattr(self, "_approval_setup_params")
@@ -602,7 +657,9 @@ class CommandLineInterface:
             # Check if we have an agent engine
             agent_engine = getattr(self.engine, "agent_engine", None)
 
-            if agent_engine and hasattr(agent_engine, "set_read_before_write_callback"):
+            if agent_engine and hasattr(
+                agent_engine, "set_read_before_write_callback"
+            ):
                 # Create review callback with our console
                 review_callback = create_review_callback(console=self.console)
                 confirmation_callback = create_confirmation_callback(
@@ -613,12 +670,16 @@ class CommandLineInterface:
                 agent_engine.set_read_before_write_callback(review_callback)
 
                 # Also set up file existence confirmation if available
-                if hasattr(agent_engine.file_system, "set_confirmation_callback"):
+                if hasattr(
+                    agent_engine.file_system, "set_confirmation_callback"
+                ):
                     agent_engine.file_system.set_confirmation_callback(
                         confirmation_callback
                     )
 
-                logger.debug("File interaction UI integration set up successfully")
+                logger.debug(
+                    "File interaction UI integration set up successfully"
+                )
             else:
                 logger.debug(
                     "No agent engine available for file interaction integration"
@@ -777,7 +838,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
             )
 
             # Show the response to the user
-            self._show_assistant_message(executed_response, current_response.model_used)
+            self._show_assistant_message(
+                executed_response, current_response.model_used
+            )
 
             # Check if there were any operation markers that got executed
             import re
@@ -803,13 +866,17 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
 
             # Get next response from AI
             try:
-                next_response = await self.engine.send_message(continue_message)
+                next_response = await self.engine.send_message(
+                    continue_message
+                )
             except (asyncio.TimeoutError, ConnectionError, OSError) as e:
                 # Handle network-related errors gracefully
                 break
 
             if not next_response.is_success:
-                self._show_error(f"Workflow continuation failed: {next_response.error}")
+                self._show_error(
+                    f"Workflow continuation failed: {next_response.error}"
+                )
                 break
 
             # Check if AI indicates it's done
@@ -825,7 +892,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
                 "everything looks good",
             ]
             content_lower = next_response.content.lower()
-            if any(indicator in content_lower for indicator in done_indicators):
+            if any(
+                indicator in content_lower for indicator in done_indicators
+            ):
                 # Show final response and break
                 self._show_assistant_message(
                     next_response.content, next_response.model_used
@@ -912,7 +981,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
         ]
 
         # Check for imperative patterns
-        imperative_patterns = [normalized.startswith(verb) for verb in action_verbs]
+        imperative_patterns = [
+            normalized.startswith(verb) for verb in action_verbs
+        ]
 
         # Check for action verbs anywhere in the message
         contains_action_verb = any(verb in normalized for verb in action_verbs)
@@ -934,7 +1005,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
 
         # Determine if this is an action request
         is_action = (
-            any(imperative_patterns) or contains_action_verb or contains_action_question
+            any(imperative_patterns)
+            or contains_action_verb
+            or contains_action_question
         )
 
         # Exclude pure questions without action intent
@@ -948,11 +1021,15 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
             "where is",
             "why",
         ]
-        is_pure_question = any(normalized.startswith(q) for q in pure_question_starters)
+        is_pure_question = any(
+            normalized.startswith(q) for q in pure_question_starters
+        )
 
         return is_action and not is_pure_question
 
-    async def _parse_and_execute_operations(self, response_content: str) -> str:
+    async def _parse_and_execute_operations(
+        self, response_content: str
+    ) -> str:
         """Parse model response for operation markers and execute them."""
         import re
         from ..core.agent.types import Operation, OperationType
@@ -963,7 +1040,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
         try:
             # Parse FILE_WRITE operations
             file_write_pattern = r"\[FILE_WRITE:([^\]]+)\](.*?)\[/FILE_WRITE\]"
-            for match in re.finditer(file_write_pattern, response_content, re.DOTALL):
+            for match in re.finditer(
+                file_write_pattern, response_content, re.DOTALL
+            ):
                 filename = match.group(1).strip()
                 content = match.group(2).strip()
 
@@ -977,8 +1056,10 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
 
                 # Execute using agent engine (if available)
                 if hasattr(self.engine, "agent_engine"):
-                    result = await self.engine.agent_engine.execute_with_approval(
-                        operation
+                    result = (
+                        await self.engine.agent_engine.execute_with_approval(
+                            operation
+                        )
                     )
                     if result.success:
                         updated_response = updated_response.replace(
@@ -1020,15 +1101,18 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
 
                 # Execute using agent engine (if available)
                 if hasattr(self.engine, "agent_engine"):
-                    result = await self.engine.agent_engine.execute_with_approval(
-                        operation
+                    result = (
+                        await self.engine.agent_engine.execute_with_approval(
+                            operation
+                        )
                     )
                     if result.success:
                         file_content = result.data
                         # Truncate if too long
                         if len(file_content) > 5000:
                             file_content = (
-                                file_content[:5000] + "\n\n[... content truncated ...]"
+                                file_content[:5000]
+                                + "\n\n[... content truncated ...]"
                             )
                         updated_response = updated_response.replace(
                             match.group(0),
@@ -1047,7 +1131,8 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
                         # Truncate if too long
                         if len(file_content) > 5000:
                             file_content = (
-                                file_content[:5000] + "\n\n[... content truncated ...]"
+                                file_content[:5000]
+                                + "\n\n[... content truncated ...]"
                             )
                         updated_response = updated_response.replace(
                             match.group(0),
@@ -1061,7 +1146,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
 
             # Parse COMMAND_EXEC operations
             command_pattern = r"\[COMMAND_EXEC\](.*?)\[/COMMAND_EXEC\]"
-            for match in re.finditer(command_pattern, response_content, re.DOTALL):
+            for match in re.finditer(
+                command_pattern, response_content, re.DOTALL
+            ):
                 command = match.group(1).strip()
 
                 # Execute command
@@ -1069,7 +1156,11 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
                     import subprocess
 
                     result = subprocess.run(
-                        command, shell=True, capture_output=True, text=True, timeout=30
+                        command,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
                     )
                     if result.returncode == 0:
                         output = result.stdout.strip()
@@ -1151,16 +1242,24 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
             try:
                 # Add agent capabilities to message if agent mode is enabled
                 final_message = command.content
-                if self.agent_manager and self.agent_manager.mode.value == "on":
+                if (
+                    self.agent_manager
+                    and self.agent_manager.mode.value == "on"
+                ):
                     agent_prompt = self._get_agent_capabilities_prompt()
-                    final_message = f"{agent_prompt}\n\nUser: {command.content}"
+                    final_message = (
+                        f"{agent_prompt}\n\nUser: {command.content}"
+                    )
 
                 # Send message to AI provider
                 response = await self.engine.send_message(final_message)
 
                 if response.is_success:
                     # Handle agent workflows with continuous execution
-                    if self.agent_manager and self.agent_manager.mode.value == "on":
+                    if (
+                        self.agent_manager
+                        and self.agent_manager.mode.value == "on"
+                    ):
                         await self._execute_continuous_workflow(
                             command.content, response
                         )
@@ -1169,7 +1268,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
                             response.content, response.model_used
                         )
                 else:
-                    self._show_error(f"Failed to get response: {response.error}")
+                    self._show_error(
+                        f"Failed to get response: {response.error}"
+                    )
 
             except Exception as e:
                 raise
@@ -1215,7 +1316,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
             self._clear_screen()
         elif slash_cmd == SlashCommand.STATUS:
             self._show_status()
-        elif slash_cmd == SlashCommand.MODELS or slash_cmd == SlashCommand.MODEL:
+        elif (
+            slash_cmd == SlashCommand.MODELS or slash_cmd == SlashCommand.MODEL
+        ):
             await self._show_models(command)
         elif slash_cmd == SlashCommand.SWITCH:
             await self._handle_switch_command(command)
@@ -1260,7 +1363,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
         elif slash_cmd == SlashCommand.PERMISSIONS:
             await self._handle_permissions_command(command)
         else:
-            self._show_info(f"Command {slash_cmd.value} is not yet implemented")
+            self._show_info(
+                f"Command {slash_cmd.value} is not yet implemented"
+            )
 
     async def _handle_dynamic_command(self, command: Command) -> None:
         """
@@ -1310,7 +1415,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
 
         # Check if handler is async
         if inspect.iscoroutinefunction(handler):
-            return await handler(args, engine=self.engine, console=self.console)
+            return await handler(
+                args, engine=self.engine, console=self.console
+            )
         else:
             return handler(args, engine=self.engine, console=self.console)
 
@@ -1336,7 +1443,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
             stdout, stderr = await process.communicate()
 
             if process.returncode != 0:
-                error_msg = stderr.decode() if stderr else "Script execution failed"
+                error_msg = (
+                    stderr.decode() if stderr else "Script execution failed"
+                )
                 self._show_error(f"Script error: {error_msg}")
                 return None
 
@@ -1363,14 +1472,20 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
     def _show_welcome(self) -> None:
         """Show welcome message."""
         welcome_text = Text("Welcome to Omnimancer!", style="bold blue")
-        welcome_panel = Panel(welcome_text, title="Omnimancer CLI", border_style="blue")
+        welcome_panel = Panel(
+            welcome_text, title="Omnimancer CLI", border_style="blue"
+        )
         self.console.print(welcome_panel)
-        self.console.print("Type /help for available commands or start chatting!")
+        self.console.print(
+            "Type /help for available commands or start chatting!"
+        )
         self.console.print()
 
     def _show_goodbye(self) -> None:
         """Show goodbye message."""
-        self.console.print("\n[blue]Goodbye! Thanks for using Omnimancer.[/blue]")
+        self.console.print(
+            "\n[blue]Goodbye! Thanks for using Omnimancer.[/blue]"
+        )
 
     def _show_help(self) -> None:
         """Show comprehensive help information with enhanced command documentation."""
@@ -1635,7 +1750,9 @@ Just type your message to start chatting with AI!"""
 
         if help_content:
             help_panel = Panel(
-                help_content, title=f"Help: /{command_name}", border_style="green"
+                help_content,
+                title=f"Help: /{command_name}",
+                border_style="green",
             )
             self.console.print(help_panel)
         else:
@@ -2465,7 +2582,9 @@ Best for: Free Claude access, privacy-focused usage, code tasks""",
             )
             self.console.print(help_panel)
         else:
-            self._show_error(f"No help available for provider: {provider_name}")
+            self._show_error(
+                f"No help available for provider: {provider_name}"
+            )
             self._show_info(
                 "Available providers: claude, openai, gemini, cohere, ollama"
             )
@@ -2579,7 +2698,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 return
 
             # Get enhanced models list with filtering
-            result = await self._get_enhanced_models_list(filter_type, filter_value)
+            result = await self._get_enhanced_models_list(
+                filter_type, filter_value
+            )
 
             title = "Available Models"
             if filter_type:
@@ -2634,7 +2755,10 @@ Model available: {'Yes' if model_info else 'No'}"""
                         m
                         for m in models
                         if getattr(m, "is_free", False)
-                        or (hasattr(m, "cost_per_token") and m.cost_per_token == 0)
+                        or (
+                            hasattr(m, "cost_per_token")
+                            and m.cost_per_token == 0
+                        )
                     ]
                     if free_models:
                         filtered_models[provider] = free_models
@@ -2643,7 +2767,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 filtered_models = {}
                 for provider, models in all_models.items():
                     latest_models = [
-                        m for m in models if getattr(m, "latest_version", False)
+                        m
+                        for m in models
+                        if getattr(m, "latest_version", False)
                     ]
                     if latest_models:
                         filtered_models[provider] = latest_models
@@ -2663,7 +2789,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 # Provider header with basic info
                 provider_status = "✓"
                 current_marker = (
-                    " (active)" if provider_name == current_provider_name else ""
+                    " (active)"
+                    if provider_name == current_provider_name
+                    else ""
                 )
                 output_lines.append(
                     f"\n[bold cyan]{provider_name.upper()}[/bold cyan] {provider_status}{current_marker}:"
@@ -2762,7 +2890,9 @@ Model available: {'Yes' if model_info else 'No'}"""
         model_name = args[1] if len(args) > 1 else None
 
         try:
-            with self.console.status("[bold yellow]Switching...", spinner="dots"):
+            with self.console.status(
+                "[bold yellow]Switching...", spinner="dots"
+            ):
                 # Check if provider is available but not initialized
                 from ..providers.factory import ProviderFactory
 
@@ -2782,14 +2912,17 @@ Model available: {'Yes' if model_info else 'No'}"""
                         suggestions = [
                             p
                             for p in available_providers
-                            if provider_name in p.lower() or p.lower() in provider_name
+                            if provider_name in p.lower()
+                            or p.lower() in provider_name
                         ]
                         if suggestions:
                             self._show_error(
                                 f"Provider '{provider_name}' not found. Did you mean: {', '.join(suggestions)}?"
                             )
                         else:
-                            self._show_error(f"Provider '{provider_name}' not found.")
+                            self._show_error(
+                                f"Provider '{provider_name}' not found."
+                            )
                         from .commands import Command, CommandType
 
                         providers_command = Command(
@@ -2807,9 +2940,13 @@ Model available: {'Yes' if model_info else 'No'}"""
                     model_names = [m.name for m in available_models]
 
                     # Also check custom models for this provider
-                    custom_models = self.engine.config_manager.get_custom_models()
+                    custom_models = (
+                        self.engine.config_manager.get_custom_models()
+                    )
                     custom_model_names = [
-                        m.name for m in custom_models if m.provider == provider_name
+                        m.name
+                        for m in custom_models
+                        if m.provider == provider_name
                     ]
 
                     # Combine both lists
@@ -2837,7 +2974,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                                 )
                         return
 
-                success = await self.engine.switch_model(provider_name, model_name)
+                success = await self.engine.switch_model(
+                    provider_name, model_name
+                )
 
             if success:
                 current_model = (
@@ -2859,14 +2998,18 @@ Model available: {'Yes' if model_info else 'No'}"""
                     model_info = provider_info.get_model_info()
                     model_details = []
                     if model_info and model_info.max_tokens:
-                        model_details.append(f"Max tokens: {model_info.max_tokens:,}")
+                        model_details.append(
+                            f"Max tokens: {model_info.max_tokens:,}"
+                        )
                     if model_info and model_info.cost_per_token:
                         model_details.append(
                             f"Cost: ${model_info.cost_per_token:.6f}/token"
                         )
 
                     detail_text = (
-                        f" | {' | '.join(model_details)}" if model_details else ""
+                        f" | {' | '.join(model_details)}"
+                        if model_details
+                        else ""
                     )
                 except:
                     detail_text = ""
@@ -2899,7 +3042,10 @@ Model available: {'Yes' if model_info else 'No'}"""
         except Exception as e:
             self._show_error(f"Switch failed: {e}")
             # Show available options on error
-            if "not available" in str(e).lower() or "not found" in str(e).lower():
+            if (
+                "not available" in str(e).lower()
+                or "not found" in str(e).lower()
+            ):
                 self._show_info("Available options:")
                 from .commands import Command, CommandType
 
@@ -3077,7 +3223,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                         "model": "gpt-4o-mini",
                         "enabled": True,
                     }
-                    self._show_info(f"✅ Generated basic configuration: {output_path}")
+                    self._show_info(
+                        f"✅ Generated basic configuration: {output_path}"
+                    )
 
                 # Write configuration file
                 Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -3090,7 +3238,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                     "1. Edit the configuration file to add your API keys"
                 )
                 self.console.print("2. Review and customize provider settings")
-                self.console.print("3. Run Omnimancer to test your configuration")
+                self.console.print(
+                    "3. Run Omnimancer to test your configuration"
+                )
 
         except Exception as e:
             self._show_error(f"Failed to generate configuration: {e}")
@@ -3142,20 +3292,27 @@ Model available: {'Yes' if model_info else 'No'}"""
         try:
             if hasattr(provider, "api_key") and provider.api_key:
                 # Basic format validation
-                if provider_name == "claude" and not provider.api_key.startswith(
-                    "sk-ant-"
+                if (
+                    provider_name == "claude"
+                    and not provider.api_key.startswith("sk-ant-")
                 ):
                     validation_results.append(
-                        ("API Key Format", False, "Should start with 'sk-ant-'")
+                        (
+                            "API Key Format",
+                            False,
+                            "Should start with 'sk-ant-'",
+                        )
                     )
-                elif provider_name == "openai" and not provider.api_key.startswith(
-                    "sk-"
+                elif (
+                    provider_name == "openai"
+                    and not provider.api_key.startswith("sk-")
                 ):
                     validation_results.append(
                         ("API Key Format", False, "Should start with 'sk-'")
                     )
-                elif provider_name == "gemini" and not provider.api_key.startswith(
-                    "AIza"
+                elif (
+                    provider_name == "gemini"
+                    and not provider.api_key.startswith("AIza")
                 ):
                     validation_results.append(
                         ("API Key Format", False, "Should start with 'AIza'")
@@ -3174,7 +3331,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                         ("API Key", True, "Not required for this provider")
                     )
         except Exception as e:
-            validation_results.append(("API Key", False, f"Validation error: {e}"))
+            validation_results.append(
+                ("API Key", False, f"Validation error: {e}")
+            )
 
         # 3. Model availability check
         try:
@@ -3218,7 +3377,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                     ("Connection", False, "No response from provider")
                 )
         except Exception as e:
-            validation_results.append(("Connection", False, f"Connection failed: {e}"))
+            validation_results.append(
+                ("Connection", False, f"Connection failed: {e}")
+            )
 
         # 5. Capability checks
         try:
@@ -3230,14 +3391,20 @@ Model available: {'Yes' if model_info else 'No'}"""
 
             if capabilities:
                 validation_results.append(
-                    ("Capabilities", True, f"Supports: {', '.join(capabilities)}")
+                    (
+                        "Capabilities",
+                        True,
+                        f"Supports: {', '.join(capabilities)}",
+                    )
                 )
             else:
                 validation_results.append(
                     ("Capabilities", True, "Basic text generation")
                 )
         except Exception as e:
-            validation_results.append(("Capabilities", False, f"Check failed: {e}"))
+            validation_results.append(
+                ("Capabilities", False, f"Check failed: {e}")
+            )
 
         # Display results
         from rich.table import Table
@@ -3308,8 +3475,12 @@ Model available: {'Yes' if model_info else 'No'}"""
                 # Model availability
                 models = provider.get_available_models()
                 current_model = provider.model
-                if not any(m.name == current_model and m.available for m in models):
-                    provider_status["issues"].append("Current model not available")
+                if not any(
+                    m.name == current_model and m.available for m in models
+                ):
+                    provider_status["issues"].append(
+                        "Current model not available"
+                    )
 
             except Exception as e:
                 provider_status["issues"].append(
@@ -3350,11 +3521,15 @@ Model available: {'Yes' if model_info else 'No'}"""
 
             # Capabilities
             capabilities = (
-                " ".join(status["capabilities"]) if status["capabilities"] else "—"
+                " ".join(status["capabilities"])
+                if status["capabilities"]
+                else "—"
             )
 
             # Issues
-            issues = "; ".join(status["issues"]) if status["issues"] else "None"
+            issues = (
+                "; ".join(status["issues"]) if status["issues"] else "None"
+            )
             if len(issues) > 30:
                 issues = issues[:27] + "..."
 
@@ -3396,7 +3571,9 @@ Model available: {'Yes' if model_info else 'No'}"""
         if issues_found:
             self.console.print("\n[bold]Recommendations:[/bold]")
             for status in issues_found:
-                self.console.print(f"  • {status['name']}: {status['issues'][0]}")
+                self.console.print(
+                    f"  • {status['name']}: {status['issues'][0]}"
+                )
 
             self.console.print(
                 "\n[dim]Use '/config validate <provider>' for detailed diagnostics[/dim]"
@@ -3497,9 +3674,13 @@ Model available: {'Yes' if model_info else 'No'}"""
                         masked_value = (
                             value[:8] + "..." if len(str(value)) > 8 else "***"
                         )
-                        self.console.print(f"[bold]{key}:[/bold] {masked_value}")
+                        self.console.print(
+                            f"[bold]{key}:[/bold] {masked_value}"
+                        )
                     else:
-                        self.console.print(f"[bold]{key}:[/bold] [dim]Not set[/dim]")
+                        self.console.print(
+                            f"[bold]{key}:[/bold] [dim]Not set[/dim]"
+                        )
                 else:
                     self.console.print(f"[bold]{key}:[/bold] {value}")
             else:
@@ -3510,7 +3691,10 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_config_setup(self, args: list) -> None:
         """Handle config setup subcommand using the new configuration wizard."""
         try:
-            from .config_setup_wizard import run_config_setup_wizard, run_quick_setup
+            from .config_setup_wizard import (
+                run_config_setup_wizard,
+                run_quick_setup,
+            )
             from ..core.config_manager import ConfigManager
 
             # Parse arguments
@@ -3537,7 +3721,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 success = run_config_setup_wizard(config_manager)
 
             if success:
-                self.console.print("[green]✅ Configuration setup completed![/green]")
+                self.console.print(
+                    "[green]✅ Configuration setup completed![/green]"
+                )
             else:
                 self.console.print(
                     "[yellow]⚠️ Configuration setup was cancelled or failed.[/yellow]"
@@ -3549,7 +3735,10 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_config_mode(self, args: list) -> None:
         """Handle config mode subcommand."""
         try:
-            from ..core.config_provider import ConfigurationProvider, ConfigurationMode
+            from ..core.config_provider import (
+                ConfigurationProvider,
+                ConfigurationMode,
+            )
             from ..core.config_manager import ConfigManager
 
             config_manager = ConfigManager()
@@ -3573,7 +3762,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 modes_table.add_column("Target Audience", style="yellow")
 
                 for mode_key, mode_info in available_modes.items():
-                    current_marker = "→ " if mode_key == current_mode.value else "  "
+                    current_marker = (
+                        "→ " if mode_key == current_mode.value else "  "
+                    )
                     modes_table.add_row(
                         f"{current_marker}{mode_info['name']}",
                         mode_info["description"],
@@ -3618,7 +3809,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                     template = args[i + 1]
 
             # Analyze current configuration
-            self.console.print("[blue]Analyzing current configuration...[/blue]")
+            self.console.print(
+                "[blue]Analyzing current configuration...[/blue]"
+            )
             analysis = migration_helper.analyze_current_configuration()
 
             self._show_migration_analysis(analysis)
@@ -3630,7 +3823,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             if not template:
                 template = analysis.recommended_template
                 if not template:
-                    self._show_error("No suitable template found for migration.")
+                    self._show_error(
+                        "No suitable template found for migration."
+                    )
                     return
 
             if not force and not Confirm.ask(
@@ -3647,7 +3842,9 @@ Model available: {'Yes' if model_info else 'No'}"""
 
             self._show_migration_plan(migration_plan)
 
-            if not force and not Confirm.ask("Execute migration plan?", default=False):
+            if not force and not Confirm.ask(
+                "Execute migration plan?", default=False
+            ):
                 self.console.print("Migration cancelled.")
                 return
 
@@ -3696,7 +3893,9 @@ Model available: {'Yes' if model_info else 'No'}"""
 
             if use_case:
                 templates = [
-                    t for t in templates if use_case.lower() in t["use_case"].lower()
+                    t
+                    for t in templates
+                    if use_case.lower() in t["use_case"].lower()
                 ]
 
             if not templates:
@@ -3713,7 +3912,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 # Show templates table
                 from rich.table import Table
 
-                templates_table = Table(title="Available Configuration Templates")
+                templates_table = Table(
+                    title="Available Configuration Templates"
+                )
                 templates_table.add_column("Name", style="cyan")
                 templates_table.add_column("Description", style="white")
                 templates_table.add_column("Use Case", style="yellow")
@@ -3766,7 +3967,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 )
 
             config_manager.reset_config()
-            self.console.print("[green]✅ Configuration reset to defaults.[/green]")
+            self.console.print(
+                "[green]✅ Configuration reset to defaults.[/green]"
+            )
             self.console.print("Run '/config setup' to configure Omnimancer.")
 
         except Exception as e:
@@ -3787,7 +3990,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             self.console.print("[blue]Validating configuration...[/blue]")
 
             # Run comprehensive validation (includes compatibility check)
-            validation_report = await config_provider.comprehensive_validation()
+            validation_report = (
+                await config_provider.comprehensive_validation()
+            )
 
             if report_only:
                 # Generate and show full report
@@ -3817,7 +4022,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             )
 
             # Validation status
-            valid_status = "✅ Valid" if validation_report.is_valid else "❌ Invalid"
+            valid_status = (
+                "✅ Valid" if validation_report.is_valid else "❌ Invalid"
+            )
             error_count = len(validation_report.critical_errors)
             warning_count = len(validation_report.warnings)
             details = f"Errors: {error_count}, Warnings: {warning_count}"
@@ -3857,10 +4064,13 @@ Model available: {'Yes' if model_info else 'No'}"""
 
             # Offer fixes if requested
             if fix and (
-                not validation_report.is_valid or not validation_report.is_compatible
+                not validation_report.is_valid
+                or not validation_report.is_compatible
             ):
                 self.console.print("\n[blue]Applying fixes...[/blue]")
-                success, messages = config_provider.ensure_backward_compatibility()
+                success, messages = (
+                    config_provider.ensure_backward_compatibility()
+                )
 
                 for message in messages:
                     if message.startswith("✓"):
@@ -3881,7 +4091,10 @@ Model available: {'Yes' if model_info else 'No'}"""
                         "[yellow]⚠️ Some issues require manual attention.[/yellow]"
                     )
 
-            elif not validation_report.is_valid or not validation_report.is_compatible:
+            elif (
+                not validation_report.is_valid
+                or not validation_report.is_compatible
+            ):
                 self.console.print(
                     f"\nRun [cyan]/config validate --fix[/cyan] to attempt automatic fixes."
                 )
@@ -3933,14 +4146,18 @@ Model available: {'Yes' if model_info else 'No'}"""
         table.add_column("Current State", style="magenta")
 
         table.add_row("Complexity Level", analysis.current_complexity.title())
-        table.add_row("Recommended Template", analysis.recommended_template or "None")
+        table.add_row(
+            "Recommended Template", analysis.recommended_template or "None"
+        )
         table.add_row("Confidence", f"{analysis.confidence:.0%}")
         table.add_row("Estimated Time", analysis.estimated_time)
 
         self.console.print(table)
 
         if analysis.simplification_opportunities:
-            self.console.print("\n[green]Simplification Opportunities:[/green]")
+            self.console.print(
+                "\n[green]Simplification Opportunities:[/green]"
+            )
             for opportunity in analysis.simplification_opportunities:
                 self.console.print(f"  • {opportunity}")
 
@@ -4136,7 +4353,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 lines.append("")
 
             conversations_panel = Panel(
-                "\n".join(lines), title="Saved Conversations", border_style="cyan"
+                "\n".join(lines),
+                title="Saved Conversations",
+                border_style="cyan",
             )
             self.console.print(conversations_panel)
 
@@ -4149,7 +4368,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             result = await self._get_enhanced_providers_list()
 
             providers_panel = Panel(
-                result, title="AI Providers - Comprehensive Status", border_style="cyan"
+                result,
+                title="AI Providers - Comprehensive Status",
+                border_style="cyan",
             )
             self.console.print(providers_panel)
 
@@ -4164,7 +4385,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             from rich.console import Console
             from io import StringIO
 
-            available_provider_names = ProviderFactory.get_available_providers()
+            available_provider_names = (
+                ProviderFactory.get_available_providers()
+            )
             if not available_provider_names:
                 return "No providers available."
 
@@ -4277,7 +4500,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             from ..providers.factory import ProviderFactory
 
             temp_config = ProviderConfig(api_key="dummy", model="dummy")
-            temp_provider = ProviderFactory.create_provider(provider_name, temp_config)
+            temp_provider = ProviderFactory.create_provider(
+                provider_name, temp_config
+            )
             capabilities = []
             if temp_provider.supports_tools():
                 capabilities.append("🔧 Tools")
@@ -4351,7 +4576,9 @@ Model available: {'Yes' if model_info else 'No'}"""
         # Summary statistics
         total_providers = len(available_provider_names)
         active_providers = len(self.engine.providers)
-        tool_providers, multimodal_providers = self._count_provider_capabilities()
+        tool_providers, multimodal_providers = (
+            self._count_provider_capabilities()
+        )
 
         lines.extend(
             [
@@ -4444,7 +4671,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             ):
                 result = await self.engine._handle_mcp_command(command)
 
-            mcp_panel = Panel(result, title="MCP Command Result", border_style="cyan")
+            mcp_panel = Panel(
+                result, title="MCP Command Result", border_style="cyan"
+            )
             self.console.print(mcp_panel)
 
         except Exception as e:
@@ -4479,8 +4708,10 @@ Model available: {'Yes' if model_info else 'No'}"""
                 try:
                     while True:
                         # Perform health check
-                        health_status = await self.engine.check_provider_health(
-                            provider_name
+                        health_status = (
+                            await self.engine.check_provider_health(
+                                provider_name
+                            )
                         )
 
                         # Display results
@@ -4508,7 +4739,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                     )
 
                     if not health_status:
-                        self._show_error("No providers configured or available.")
+                        self._show_error(
+                            "No providers configured or available."
+                        )
                         return
 
                     # Format and display results
@@ -4600,7 +4833,9 @@ Model available: {'Yes' if model_info else 'No'}"""
 
                     # Check for missing model
                     if not provider_config.model:
-                        issues.append(f"{provider_name}: Missing model specification")
+                        issues.append(
+                            f"{provider_name}: Missing model specification"
+                        )
 
                 else:
                     # Check all providers
@@ -4608,7 +4843,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                         if not prov_config.api_key:
                             issues.append(f"{prov_name}: Missing API key")
                         if not prov_config.model:
-                            issues.append(f"{prov_name}: Missing model specification")
+                            issues.append(
+                                f"{prov_name}: Missing model specification"
+                            )
 
                 if not issues:
                     self._show_info("✅ No configuration issues found.")
@@ -4625,8 +4862,12 @@ Model available: {'Yes' if model_info else 'No'}"""
                         f"\n🔧 Auto-fix mode enabled - attempting repairs..."
                     )
                     # Basic auto-fix logic would go here
-                    issue_lines.append("⚠️ Auto-fix functionality not yet implemented.")
-                    issue_lines.append("Please manually fix the issues listed above.")
+                    issue_lines.append(
+                        "⚠️ Auto-fix functionality not yet implemented."
+                    )
+                    issue_lines.append(
+                        "Please manually fix the issues listed above."
+                    )
                 else:
                     issue_lines.append(
                         f"\nUse '/repair --fix' to attempt automatic repairs."
@@ -4679,11 +4920,15 @@ Model available: {'Yes' if model_info else 'No'}"""
                 # Check provider health
                 try:
                     if provider_name:
-                        health_status = await self.engine.check_provider_health(
-                            provider_name
+                        health_status = (
+                            await self.engine.check_provider_health(
+                                provider_name
+                            )
                         )
                     else:
-                        health_status = await self.engine.check_provider_health()
+                        health_status = (
+                            await self.engine.check_provider_health()
+                        )
                     diagnostics["providers"] = health_status
                 except Exception as e:
                     diagnostics["providers"] = {"error": str(e)}
@@ -4702,7 +4947,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 diag_lines.append("\n📋 Configuration:")
                 config_diag = diagnostics["config"]
                 if config_diag["valid"]:
-                    diag_lines.append(f"  ✅ Configuration loaded successfully")
+                    diag_lines.append(
+                        f"  ✅ Configuration loaded successfully"
+                    )
                     diag_lines.append(
                         f"  📊 Providers configured: {config_diag['providers_configured']}"
                     )
@@ -4717,7 +4964,10 @@ Model available: {'Yes' if model_info else 'No'}"""
                 # Provider health
                 diag_lines.append("\n🏥 Provider Health:")
                 providers_diag = diagnostics["providers"]
-                if isinstance(providers_diag, dict) and "error" not in providers_diag:
+                if (
+                    isinstance(providers_diag, dict)
+                    and "error" not in providers_diag
+                ):
                     healthy_count = sum(
                         1
                         for status in providers_diag.values()
@@ -4731,7 +4981,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                     if detailed:
                         for prov_name, status in providers_diag.items():
                             status_icon = (
-                                "✅" if status.get("status") == "healthy" else "❌"
+                                "✅"
+                                if status.get("status") == "healthy"
+                                else "❌"
                             )
                             diag_lines.append(
                                 f"    {status_icon} {prov_name}: {status.get('message', 'Unknown status')}"
@@ -4752,7 +5004,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 # Recommendations
                 diag_lines.append("\n💡 Recommendations:")
                 if diagnostics["config"]["providers_configured"] == 0:
-                    diag_lines.append("  • Run '/setup' to configure providers")
+                    diag_lines.append(
+                        "  • Run '/setup' to configure providers"
+                    )
                 elif diagnostics["providers"] and isinstance(
                     diagnostics["providers"], dict
                 ):
@@ -4765,8 +5019,12 @@ Model available: {'Yes' if model_info else 'No'}"""
                         diag_lines.append(
                             f"  • Check credentials for: {', '.join(unhealthy_providers)}"
                         )
-                        diag_lines.append("  • Run '/validate' to check configuration")
-                        diag_lines.append("  • Run '/repair --fix' to attempt fixes")
+                        diag_lines.append(
+                            "  • Run '/validate' to check configuration"
+                        )
+                        diag_lines.append(
+                            "  • Run '/repair --fix' to attempt fixes"
+                        )
 
                 diagnose_panel = Panel(
                     "\n".join(diag_lines),
@@ -4815,20 +5073,29 @@ Model available: {'Yes' if model_info else 'No'}"""
                     # Test connection if API key exists
                     if provider_config.api_key:
                         try:
-                            health_status = await self.engine.check_provider_health(
-                                provider_name
+                            health_status = (
+                                await self.engine.check_provider_health(
+                                    provider_name
+                                )
                             )
-                            if health_status[provider_name]["status"] != "healthy":
+                            if (
+                                health_status[provider_name]["status"]
+                                != "healthy"
+                            ):
                                 validation_errors.append(
                                     f"Provider health check failed: {health_status[provider_name]['message']}"
                                 )
                         except Exception as e:
-                            validation_errors.append(f"Health check failed: {str(e)}")
+                            validation_errors.append(
+                                f"Health check failed: {str(e)}"
+                            )
 
                     if validation_errors:
                         validation_panel = Panel(
                             f"❌ Validation failed for {provider_name}:\n"
-                            + "\n".join(f"  • {error}" for error in validation_errors),
+                            + "\n".join(
+                                f"  • {error}" for error in validation_errors
+                            ),
                             title=f"Validation Results - {provider_name}",
                             border_style="red",
                         )
@@ -4862,10 +5129,15 @@ Model available: {'Yes' if model_info else 'No'}"""
                         # Health check
                         if prov_config.api_key:
                             try:
-                                health_status = await self.engine.check_provider_health(
-                                    prov_name
+                                health_status = (
+                                    await self.engine.check_provider_health(
+                                        prov_name
+                                    )
                                 )
-                                if health_status[prov_name]["status"] != "healthy":
+                                if (
+                                    health_status[prov_name]["status"]
+                                    != "healthy"
+                                ):
                                     errors.append(
                                         f"Health check failed: {health_status[prov_name]['message']}"
                                     )
@@ -4978,7 +5250,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 if success:
                     mode_text = "Agent mode enabled"
                     if auto_approve:
-                        mode_text += " with auto-approval for low-risk operations"
+                        mode_text += (
+                            " with auto-approval for low-risk operations"
+                        )
 
                     self.console.print(
                         Panel(
@@ -5082,7 +5356,9 @@ Model available: {'Yes' if model_info else 'No'}"""
         self.console.print(status_panel)
 
         # Show operations table
-        operations_table = self.agent_progress_ui.show_operations_table(limit=10)
+        operations_table = self.agent_progress_ui.show_operations_table(
+            limit=10
+        )
         self.console.print(operations_table)
 
         # Show approval queue if any
@@ -5146,18 +5422,25 @@ Model available: {'Yes' if model_info else 'No'}"""
         """
         try:
             # Check if we have status integration available
-            if not hasattr(self, "status_integration") or not self.status_integration:
+            if (
+                not hasattr(self, "status_integration")
+                or not self.status_integration
+            ):
                 try:
                     # Try to create status integration
                     from ..core.agent.cli_integration import (
                         create_cli_status_integration,
                     )
 
-                    self.status_integration = await create_cli_status_integration(
-                        self.config_manager, self.console
+                    self.status_integration = (
+                        await create_cli_status_integration(
+                            self.config_manager, self.console
+                        )
                     )
                 except Exception as setup_error:
-                    self._show_error(f"Status display not available: {setup_error}")
+                    self._show_error(
+                        f"Status display not available: {setup_error}"
+                    )
                     self._show_info(
                         "To enable status display, ensure you're using a status-integrated agent engine"
                     )
@@ -5193,17 +5476,25 @@ Model available: {'Yes' if model_info else 'No'}"""
                 or not self.approval_integration
             ):
                 # Try to initialize approval integration
-                from .approval_integration import create_cli_approval_integration
+                from .approval_integration import (
+                    create_cli_approval_integration,
+                )
 
                 try:
-                    self.approval_integration = await create_cli_approval_integration(
-                        console=self.console
+                    self.approval_integration = (
+                        await create_cli_approval_integration(
+                            console=self.console
+                        )
                     )
                 except Exception as setup_error:
-                    self._show_error(f"Approval system not available: {setup_error}")
+                    self._show_error(
+                        f"Approval system not available: {setup_error}"
+                    )
                     return
 
-            permission_controller = self.approval_integration.permission_controller
+            permission_controller = (
+                self.approval_integration.permission_controller
+            )
             args = command.args if command.args else ["list"]
             action = args[0].lower()
 
@@ -5211,10 +5502,14 @@ Model available: {'Yes' if model_info else 'No'}"""
                 await self._list_stored_approvals(permission_controller)
             elif action == "revoke":
                 if len(args) < 2:
-                    self._show_error("Revoke action requires a signature to revoke")
+                    self._show_error(
+                        "Revoke action requires a signature to revoke"
+                    )
                     return
                 signature = args[1]
-                await self._revoke_stored_approval(permission_controller, signature)
+                await self._revoke_stored_approval(
+                    permission_controller, signature
+                )
             elif action == "clear":
                 await self._clear_stored_approvals(permission_controller)
             elif action == "stats":
@@ -5287,7 +5582,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             stored_at = "Unknown"
             if "stored_at" in approval_data:
                 try:
-                    stored_dt = datetime.fromisoformat(approval_data["stored_at"])
+                    stored_dt = datetime.fromisoformat(
+                        approval_data["stored_at"]
+                    )
                     stored_at = stored_dt.strftime("%Y-%m-%d %H:%M")
                 except:
                     pass
@@ -5295,7 +5592,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             expires_at = "Never"
             if "expires_at" in approval_data:
                 try:
-                    expires_dt = datetime.fromisoformat(approval_data["expires_at"])
+                    expires_dt = datetime.fromisoformat(
+                        approval_data["expires_at"]
+                    )
                     expires_at = expires_dt.strftime("%Y-%m-%d %H:%M")
                     # Check if expired
                     if datetime.now() > expires_dt:
@@ -5308,7 +5607,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             # Get risk level from metadata
             risk_level = "Unknown"
             if "metadata" in approval_data:
-                risk_level = approval_data["metadata"].get("risk_level", "Unknown")
+                risk_level = approval_data["metadata"].get(
+                    "risk_level", "Unknown"
+                )
 
             # Truncate signature for display
             display_signature = (
@@ -5316,11 +5617,17 @@ Model available: {'Yes' if model_info else 'No'}"""
             )
 
             table.add_row(
-                display_signature, operation_type, stored_at, expires_at, risk_level
+                display_signature,
+                operation_type,
+                stored_at,
+                expires_at,
+                risk_level,
             )
 
         self.console.print(table)
-        self.console.print(f"\n[blue]Total stored approvals: {len(approvals)}[/blue]")
+        self.console.print(
+            f"\n[blue]Total stored approvals: {len(approvals)}[/blue]"
+        )
 
     async def _revoke_stored_approval(
         self, permission_controller, signature: str
@@ -5349,7 +5656,9 @@ Model available: {'Yes' if model_info else 'No'}"""
         # Clear all approvals
         permission_controller._approval_memory.clear()
 
-        self.console.print(f"[green]✅ Cleared {count} stored approval(s)[/green]")
+        self.console.print(
+            f"[green]✅ Cleared {count} stored approval(s)[/green]"
+        )
 
     async def _show_approval_stats(self, permission_controller) -> None:
         """Show approval statistics."""
@@ -5372,7 +5681,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             # Check expiration
             if "expires_at" in approval_data:
                 try:
-                    expires_dt = datetime.fromisoformat(approval_data["expires_at"])
+                    expires_dt = datetime.fromisoformat(
+                        approval_data["expires_at"]
+                    )
                     if datetime.now() > expires_dt:
                         expired_count += 1
                 except:
@@ -5393,7 +5704,9 @@ Model available: {'Yes' if model_info else 'No'}"""
         stats_table.add_column("Value", style="green")
 
         stats_table.add_row("Total Stored Approvals", str(total_approvals))
-        stats_table.add_row("Active Approvals", str(total_approvals - expired_count))
+        stats_table.add_row(
+            "Active Approvals", str(total_approvals - expired_count)
+        )
         stats_table.add_row("Expired Approvals", str(expired_count))
 
         self.console.print(stats_table)
@@ -5429,7 +5742,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 f"[green]✅ Cleaned up {cleaned_count} expired approval(s)[/green]"
             )
         else:
-            self.console.print("[blue]ℹ️  No expired approvals found to clean up[/blue]")
+            self.console.print(
+                "[blue]ℹ️  No expired approvals found to clean up[/blue]"
+            )
 
     async def _list_batch_requests(self) -> None:
         """List all pending batch approval requests."""
@@ -5448,13 +5763,20 @@ Model available: {'Yes' if model_info else 'No'}"""
             table = Table(show_header=True, header_style="bold magenta")
             table.add_column("Batch ID", style="cyan", width=12)
             table.add_column("Created", style="dim", width=16)
-            table.add_column("Operations", style="green", justify="right", width=10)
-            table.add_column("Approved", style="bright_green", justify="right", width=8)
+            table.add_column(
+                "Operations", style="green", justify="right", width=10
+            )
+            table.add_column(
+                "Approved", style="bright_green", justify="right", width=8
+            )
             table.add_column("Status", style="yellow", width=10)
             table.add_column("Risk", style="red", width=8)
             table.add_column("Expires", style="red", width=12)
 
-            for batch_id, batch_request in approval_manager.pending_batches.items():
+            for (
+                batch_id,
+                batch_request,
+            ) in approval_manager.pending_batches.items():
                 # Calculate basic stats
                 total_ops = len(batch_request.operations)
                 approved_ops = len(batch_request.approved_operations)
@@ -5472,7 +5794,9 @@ Model available: {'Yes' if model_info else 'No'}"""
 
                     time_remaining = batch_request.expires_at - datetime.now()
                     if time_remaining.total_seconds() > 0:
-                        minutes_left = int(time_remaining.total_seconds() // 60)
+                        minutes_left = int(
+                            time_remaining.total_seconds() // 60
+                        )
                         expires_str = f"{minutes_left}m"
                     else:
                         expires_str = "[red]EXPIRED[/red]"
@@ -5487,7 +5811,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                     expires_str,
                 )
 
-            self.console.print("\n[bold]Pending Batch Approval Requests[/bold]\n")
+            self.console.print(
+                "\n[bold]Pending Batch Approval Requests[/bold]\n"
+            )
             self.console.print(table)
 
             self.console.print(
@@ -5534,7 +5860,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             self.console.print(overview)
 
             # Display operations table
-            operations_table = panel.render_operations_table(batch_request, page=0)
+            operations_table = panel.render_operations_table(
+                batch_request, page=0
+            )
             self.console.print(operations_table)
 
             # Display summary
@@ -5566,13 +5894,13 @@ Model available: {'Yes' if model_info else 'No'}"""
             risk_counts = self._calculate_batch_risk_distribution(
                 batch_request.previews
             )
-            high_risk_ops = risk_counts.get("high", 0) + risk_counts.get("critical", 0)
+            high_risk_ops = risk_counts.get("high", 0) + risk_counts.get(
+                "critical", 0
+            )
 
             warning_msg = ""
             if high_risk_ops > 0:
-                warning_msg = (
-                    f" [red](Warning: {high_risk_ops} high-risk operations)[/red]"
-                )
+                warning_msg = f" [red](Warning: {high_risk_ops} high-risk operations)[/red]"
 
             self.console.print(
                 f"\n[yellow]⚠️  About to approve {total_ops} operations{warning_msg}[/yellow]"
@@ -5683,7 +6011,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                         "mcp": OperationType.MCP_TOOL_CALL,
                     }
                     op_types = [
-                        type_map[name] for name in type_names if name in type_map
+                        type_map[name]
+                        for name in type_names
+                        if name in type_map
                     ]
                     if op_types:
                         filter_manager.add_filter(ActionTypeFilter(op_types))
@@ -5694,7 +6024,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                     i += 2
                 elif filter_args[i] == "--status" and i + 1 < len(filter_args):
                     statuses = filter_args[i + 1].split(",")
-                    filter_manager.add_filter(StatusFilter(statuses, batch_request))
+                    filter_manager.add_filter(
+                        StatusFilter(statuses, batch_request)
+                    )
                     i += 2
                 else:
                     i += 1
@@ -5732,7 +6064,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                 )
 
             if filtered_ops:
-                operations_table = panel.render_operations_table(filtered_batch, page=0)
+                operations_table = panel.render_operations_table(
+                    filtered_batch, page=0
+                )
                 self.console.print(operations_table)
 
                 summary = panel.render_batch_summary(filtered_batch)
@@ -5784,7 +6118,10 @@ Model available: {'Yes' if model_info else 'No'}"""
                     batch_request
                 )
                 sorted_ops, sorted_previews = sorter.sort_batch(
-                    filtered_ops, filtered_previews, sort_criteria, batch_request
+                    filtered_ops,
+                    filtered_previews,
+                    sort_criteria,
+                    batch_request,
                 )
 
                 # Create layout
@@ -5806,12 +6143,16 @@ Model available: {'Yes' if model_info else 'No'}"""
                     approved_operations=batch_request.approved_operations,
                 )
 
-                layout["header"].update(panel.render_batch_overview(temp_batch))
+                layout["header"].update(
+                    panel.render_batch_overview(temp_batch)
+                )
 
                 # Main operations table
                 layout["main"].update(
                     panel.render_operations_table(
-                        temp_batch, page=current_page, show_approved=show_approved
+                        temp_batch,
+                        page=current_page,
+                        show_approved=show_approved,
                     )
                 )
 
@@ -5866,18 +6207,25 @@ Model available: {'Yes' if model_info else 'No'}"""
                                 input("Reason for denial: ").strip()
                                 or "User denied in interactive mode"
                             )
-                            approval_result = {"deny_all": True, "reason": reason}
+                            approval_result = {
+                                "deny_all": True,
+                                "reason": reason,
+                            }
                             approval_manager._process_batch_approval_result(
                                 batch_request, approval_result
                             )
-                            self.console.print("[red]❌ Denied entire batch[/red]")
+                            self.console.print(
+                                "[red]❌ Denied entire batch[/red]"
+                            )
                             break
                         elif key in ["h", "toggle"]:
                             # Toggle showing approved operations
                             show_approved = not show_approved
                             live.update(create_display())
                         elif key in ["help", "?"]:
-                            self.console.print("\n[bold]Interactive Controls:[/bold]")
+                            self.console.print(
+                                "\n[bold]Interactive Controls:[/bold]"
+                            )
                             self.console.print(
                                 "  [green]a/approve[/green] - Approve entire batch"
                             )
@@ -5891,7 +6239,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                                 "  [blue]q/quit[/blue] - Exit interactive mode"
                             )
                         else:
-                            self.console.print(f"[dim]Unknown command: {key}[/dim]")
+                            self.console.print(
+                                f"[dim]Unknown command: {key}[/dim]"
+                            )
 
                     except KeyboardInterrupt:
                         break
@@ -5905,11 +6255,19 @@ Model available: {'Yes' if model_info else 'No'}"""
 
     def _calculate_batch_risk_distribution(self, previews) -> dict:
         """Calculate risk distribution for batch previews."""
-        risk_counts = {"low": 0, "medium": 0, "high": 0, "critical": 0, "unknown": 0}
+        risk_counts = {
+            "low": 0,
+            "medium": 0,
+            "high": 0,
+            "critical": 0,
+            "unknown": 0,
+        }
 
         for preview in previews:
             if preview and preview.risk_assessment:
-                risk_level = self._extract_batch_risk_level(preview.risk_assessment)
+                risk_level = self._extract_batch_risk_level(
+                    preview.risk_assessment
+                )
                 risk_counts[risk_level] = risk_counts.get(risk_level, 0) + 1
             else:
                 risk_counts["unknown"] += 1
@@ -5980,7 +6338,9 @@ Model available: {'Yes' if model_info else 'No'}"""
                             "Invalid count for recent commands. Using default (20)."
                         )
 
-                recent_commands = self.history_manager.get_recent_commands(count)
+                recent_commands = self.history_manager.get_recent_commands(
+                    count
+                )
 
                 if not recent_commands:
                     self._show_info("No command history available.")
@@ -5988,7 +6348,9 @@ Model available: {'Yes' if model_info else 'No'}"""
 
                 from rich.table import Table
 
-                table = Table(title=f"Recent Commands (Last {len(recent_commands)})")
+                table = Table(
+                    title=f"Recent Commands (Last {len(recent_commands)})"
+                )
                 table.add_column("Index", style="dim", width=6)
                 table.add_column("Time", style="cyan", width=16)
                 table.add_column("Command", style="white")
@@ -6092,13 +6454,17 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
                     )
                     format_type = "json"
 
-                success = self.history_manager.export_history(filename, format_type)
+                success = self.history_manager.export_history(
+                    filename, format_type
+                )
                 if success:
                     self._show_success(
                         f"History exported to {filename} in {format_type} format."
                     )
                 else:
-                    self._show_error(f"Failed to export history to {filename}.")
+                    self._show_error(
+                        f"Failed to export history to {filename}."
+                    )
 
             else:
                 self._show_error(f"Unknown history action: {action}")
@@ -6113,7 +6479,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
         """Setup readline for command history and arrow key navigation."""
         try:
             # Setup history file
-            history_file = self.history_manager.storage_path / "readline_history"
+            history_file = (
+                self.history_manager.storage_path / "readline_history"
+            )
             history_file.parent.mkdir(parents=True, exist_ok=True)
 
             # Configure readline with tab completion
@@ -6140,7 +6508,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
             # If readline fails, just continue without arrow key support
             pass
 
-    def _create_completion_callback(self) -> Optional[Callable[[str], List[str]]]:
+    def _create_completion_callback(
+        self,
+    ) -> Optional[Callable[[str], List[str]]]:
         """Create a completion callback for the improved terminal input."""
 
         def completion_callback(text: str) -> List[str]:
@@ -6303,7 +6673,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
             if hasattr(self.engine, "config_manager"):
                 custom_models = self.engine.config_manager.get_custom_models()
                 custom_model_names = [
-                    m.name for m in custom_models if m.provider == provider_name
+                    m.name
+                    for m in custom_models
+                    if m.provider == provider_name
                 ]
                 model_names.extend(custom_model_names)
 
@@ -6322,7 +6694,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
                     for provider_models in custom_models.values():
                         if isinstance(provider_models, dict):
                             model_names.extend(provider_models.keys())
-                    return [name for name in model_names if name.startswith(text)]
+                    return [
+                        name for name in model_names if name.startswith(text)
+                    ]
             return []
         except Exception:
             return []
@@ -6385,9 +6759,17 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
                         elif key == "swe_score":
                             swe_score = float(value)
                         elif key == "supports_tools":
-                            supports_tools = value.lower() in ["true", "yes", "1"]
+                            supports_tools = value.lower() in [
+                                "true",
+                                "yes",
+                                "1",
+                            ]
                         elif key == "supports_multimodal":
-                            supports_multimodal = value.lower() in ["true", "yes", "1"]
+                            supports_multimodal = value.lower() in [
+                                "true",
+                                "yes",
+                                "1",
+                            ]
                         elif key == "is_free":
                             is_free = value.lower() in ["true", "yes", "1"]
                     except ValueError:
@@ -6430,7 +6812,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
         try:
             args = command.args
             if len(args) != 2:
-                self._show_error("Remove-model command requires model ID and provider")
+                self._show_error(
+                    "Remove-model command requires model ID and provider"
+                )
                 return
 
             model_name = args[0]
@@ -6453,7 +6837,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
         except Exception as e:
             self._show_error(f"Failed to remove custom model: {e}")
 
-    async def _handle_list_custom_models_command(self, command: Command) -> None:
+    async def _handle_list_custom_models_command(
+        self, command: Command
+    ) -> None:
         """Handle the list-custom-models command."""
         try:
             from rich.table import Table
@@ -6467,12 +6853,16 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
 
             # Create table for custom models
             table = Table(
-                title="Custom Models", show_header=True, header_style="bold blue"
+                title="Custom Models",
+                show_header=True,
+                header_style="bold blue",
             )
             table.add_column("Model", style="cyan", width=25)
             table.add_column("Provider", style="green", width=15)
             table.add_column("Description", style="white", width=35)
-            table.add_column("Tokens", justify="right", style="yellow", width=8)
+            table.add_column(
+                "Tokens", justify="right", style="yellow", width=8
+            )
             table.add_column("Cost/1M", justify="right", style="red", width=12)
             table.add_column("SWE", justify="center", style="magenta", width=6)
             table.add_column("Tools", justify="center", style="blue", width=6)
@@ -6480,7 +6870,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
 
             for model in custom_models:
                 cost_display = f"${model.cost_per_million_input:.1f}/${model.cost_per_million_output:.1f}"
-                swe_display = f"{model.swe_score:.1f}" if model.swe_score else "N/A"
+                swe_display = (
+                    f"{model.swe_score:.1f}" if model.swe_score else "N/A"
+                )
                 tools_display = "✓" if model.supports_tools else "✗"
                 mm_display = "✓" if model.supports_multimodal else "✗"
 
@@ -6525,8 +6917,12 @@ def main() -> None:
     from ..core.engine import CoreEngine
 
     @click.command()
-    @click.option("--help", "-h", is_flag=True, help="Show this help message and exit")
-    @click.option("--version", "-v", is_flag=True, help="Show version information")
+    @click.option(
+        "--help", "-h", is_flag=True, help="Show this help message and exit"
+    )
+    @click.option(
+        "--version", "-v", is_flag=True, help="Show version information"
+    )
     @click.option("--config", "-c", help="Path to configuration file")
     @click.option(
         "--no-approval",

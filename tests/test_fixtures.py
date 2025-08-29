@@ -98,7 +98,9 @@ class TestFactoryFunctions:
     def test_create_model_info(self):
         """Test model info factory."""
         model = create_model_info(
-            name="test-model", provider="test-provider", description="Test description"
+            name="test-model",
+            provider="test-provider",
+            description="Test description",
         )
 
         assert isinstance(model, ModelInfo)
@@ -109,7 +111,9 @@ class TestFactoryFunctions:
 
     def test_create_chat_message(self):
         """Test chat message factory."""
-        message = create_chat_message(role=MessageRole.USER, content="Test message")
+        message = create_chat_message(
+            role=MessageRole.USER, content="Test message"
+        )
 
         assert message.role == MessageRole.USER
         assert message.content == "Test message"
@@ -122,7 +126,9 @@ class TestMockProviderFactory:
     def test_create_working_provider(self, mock_provider_factory):
         """Test creating a working provider."""
         provider = mock_provider_factory.create_working_provider(
-            name="test-provider", model="test-model", response_content="Test response"
+            name="test-provider",
+            model="test-model",
+            response_content="Test response",
         )
 
         assert provider.get_provider_name() == "test-provider"
@@ -259,7 +265,9 @@ class TestMockManagerFixtures:
 
         # Test that methods can be called
         mock_config_manager.set_default_provider("claude")
-        mock_config_manager.set_default_provider.assert_called_once_with("claude")
+        mock_config_manager.set_default_provider.assert_called_once_with(
+            "claude"
+        )
 
     def test_mock_chat_manager(self, mock_chat_manager, sample_chat_context):
         """Test mock chat manager."""

@@ -141,7 +141,9 @@ class TestRichTextRenderer:
         )
 
         assert renderer.color_scheme.risk_high == "purple"
-        assert renderer.capabilities.width == 80  # Default when auto_detect=False
+        assert (
+            renderer.capabilities.width == 80
+        )  # Default when auto_detect=False
 
     def test_get_risk_color(self):
         """Test risk level color mapping."""
@@ -170,9 +172,17 @@ class TestRichTextRenderer:
         renderer = RichTextRenderer()
 
         # Test enum input
-        assert renderer.get_operation_color(OperationType.FILE_READ) == "op.read"
-        assert renderer.get_operation_color(OperationType.FILE_WRITE) == "op.write"
-        assert renderer.get_operation_color(OperationType.FILE_DELETE) == "op.delete"
+        assert (
+            renderer.get_operation_color(OperationType.FILE_READ) == "op.read"
+        )
+        assert (
+            renderer.get_operation_color(OperationType.FILE_WRITE)
+            == "op.write"
+        )
+        assert (
+            renderer.get_operation_color(OperationType.FILE_DELETE)
+            == "op.delete"
+        )
 
         # Test string input
         assert renderer.get_operation_color("read") == "op.read"
@@ -212,7 +222,11 @@ class TestRichTextRenderer:
         renderer = RichTextRenderer()
 
         headers = ["Name", "Status", "Count"]
-        rows = [["Agent 1", True, 42], ["Agent 2", False, 0], ["Agent 3", True, 15]]
+        rows = [
+            ["Agent 1", True, 42],
+            ["Agent 2", False, 0],
+            ["Agent 3", True, 15],
+        ]
 
         table = renderer.render_table(headers, rows, title="Test Table")
 
@@ -226,7 +240,9 @@ class TestRichTextRenderer:
         renderer = RichTextRenderer()
 
         content = "This is panel content"
-        panel = renderer.render_panel(content, title="Test Panel", subtitle="Subtitle")
+        panel = renderer.render_panel(
+            content, title="Test Panel", subtitle="Subtitle"
+        )
 
         assert isinstance(panel, Panel)
         assert panel.title == "Test Panel"
@@ -258,7 +274,9 @@ class TestRichTextRenderer:
         """Test progress bar rendering."""
         renderer = RichTextRenderer()
 
-        progress = renderer.render_progress_bar("Test Task", total=100, completed=50)
+        progress = renderer.render_progress_bar(
+            "Test Task", total=100, completed=50
+        )
 
         assert isinstance(progress, Progress)
         # Should have one task
@@ -281,7 +299,9 @@ class TestRichTextRenderer:
 
         # Test with narrow terminal (should use vertical layout)
         renderer.capabilities.width = 60
-        layout = renderer.create_responsive_layout(sections, vertical_threshold=100)
+        layout = renderer.create_responsive_layout(
+            sections, vertical_threshold=100
+        )
         # Should return Layout for narrow terminals
 
         assert layout is not None
@@ -291,11 +311,15 @@ class TestRichTextRenderer:
         renderer = RichTextRenderer()
 
         # Test enabled shortcut
-        shortcut = renderer.format_shortcut("Ctrl+C", "Cancel operation", enabled=True)
+        shortcut = renderer.format_shortcut(
+            "Ctrl+C", "Cancel operation", enabled=True
+        )
         assert isinstance(shortcut, Text)
 
         # Test disabled shortcut
-        disabled = renderer.format_shortcut("Ctrl+S", "Save file", enabled=False)
+        disabled = renderer.format_shortcut(
+            "Ctrl+S", "Save file", enabled=False
+        )
         assert isinstance(disabled, Text)
 
     def test_render_shortcuts_help(self):
@@ -311,7 +335,9 @@ class TestRichTextRenderer:
 
         # Test with wide terminal (should use columns)
         renderer.capabilities.width = 120
-        help_display_wide = renderer.render_shortcuts_help(shortcuts, columns=2)
+        help_display_wide = renderer.render_shortcuts_help(
+            shortcuts, columns=2
+        )
         assert help_display_wide is not None
 
     def test_apply_diff_highlighting(self):
@@ -326,7 +352,9 @@ class TestRichTextRenderer:
      return "world"
 -    # old comment"""
 
-        highlighted = renderer.apply_diff_highlighting(diff_text, file_type="python")
+        highlighted = renderer.apply_diff_highlighting(
+            diff_text, file_type="python"
+        )
 
         assert isinstance(highlighted, Text)
         # Should contain the original text
@@ -355,8 +383,12 @@ class TestRichTextRenderer:
         # Test property methods
         assert renderer.get_terminal_width() == renderer.capabilities.width
         assert renderer.get_terminal_height() == renderer.capabilities.height
-        assert renderer.supports_emoji() == renderer.capabilities.supports_emoji
-        assert renderer.supports_color() == renderer.capabilities.supports_color
+        assert (
+            renderer.supports_emoji() == renderer.capabilities.supports_emoji
+        )
+        assert (
+            renderer.supports_color() == renderer.capabilities.supports_color
+        )
 
 
 class TestUtilityFunctions:
@@ -388,7 +420,9 @@ class TestThemeCreation:
 
     def test_theme_creation_from_color_scheme(self):
         """Test theme creation from color scheme."""
-        color_scheme = ColorScheme(risk_high="magenta", op_write="bright_yellow")
+        color_scheme = ColorScheme(
+            risk_high="magenta", op_write="bright_yellow"
+        )
 
         renderer = RichTextRenderer(color_scheme=color_scheme)
 

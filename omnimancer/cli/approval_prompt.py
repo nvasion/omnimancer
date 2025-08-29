@@ -70,7 +70,8 @@ class ApprovalDecision:
     def should_remember(self) -> bool:
         """Check if this decision should be remembered."""
         return (
-            self.decision == ApprovalDecisionType.APPROVED_AND_REMEMBER or self.remember
+            self.decision == ApprovalDecisionType.APPROVED_AND_REMEMBER
+            or self.remember
         )
 
 
@@ -188,7 +189,9 @@ class CLIApprovalPrompt:
             return {
                 "approved": False,
                 "reason": "Cancelled by user (Ctrl+C)",
-                "response_time_seconds": (datetime.now() - start_time).total_seconds(),
+                "response_time_seconds": (
+                    datetime.now() - start_time
+                ).total_seconds(),
             }
 
         except asyncio.TimeoutError:
@@ -207,7 +210,9 @@ class CLIApprovalPrompt:
             return {
                 "approved": False,
                 "reason": f"Error occurred: {str(e)}",
-                "response_time_seconds": (datetime.now() - start_time).total_seconds(),
+                "response_time_seconds": (
+                    datetime.now() - start_time
+                ).total_seconds(),
             }
 
         finally:
@@ -287,7 +292,9 @@ class CLIApprovalPrompt:
                 response_time_seconds=response_time,
             )
 
-            self.console.print("\n[red]❌ Operation cancelled by user (Ctrl+C)[/red]")
+            self.console.print(
+                "\n[red]❌ Operation cancelled by user (Ctrl+C)[/red]"
+            )
 
             # Log cancellation details for debugging
             logger.info(
@@ -295,7 +302,9 @@ class CLIApprovalPrompt:
             )
 
             # Perform any necessary cleanup
-            await self._handle_cancellation_cleanup(approval_request, "user_interrupt")
+            await self._handle_cancellation_cleanup(
+                approval_request, "user_interrupt"
+            )
 
             return decision
 
@@ -318,7 +327,9 @@ class CLIApprovalPrompt:
             )
 
             # Perform cleanup for timeout
-            await self._handle_cancellation_cleanup(approval_request, "timeout")
+            await self._handle_cancellation_cleanup(
+                approval_request, "timeout"
+            )
 
             return decision
 
@@ -327,7 +338,9 @@ class CLIApprovalPrompt:
             decision = ApprovalDecision(
                 decision=ApprovalDecisionType.DENIED,
                 user_notes=f"Error occurred: {str(e)}",
-                response_time_seconds=(datetime.now() - start_time).total_seconds(),
+                response_time_seconds=(
+                    datetime.now() - start_time
+                ).total_seconds(),
             )
 
             self.console.print(f"[red]❌ Error in approval prompt: {e}[/red]")
@@ -338,7 +351,9 @@ class CLIApprovalPrompt:
             self._restore_interrupt_handling()
 
     async def prompt_for_batch_approval(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: Optional[int] = None
+        self,
+        batch_request: BatchApprovalRequest,
+        timeout_seconds: Optional[int] = None,
     ) -> BatchApprovalDecision:
         """
         Present batch approval dialog and capture user decisions.
@@ -371,9 +386,12 @@ class CLIApprovalPrompt:
             return batch_decision
 
         except KeyboardInterrupt:
-            self.console.print("\n[red]❌ Batch approval cancelled by user[/red]")
+            self.console.print(
+                "\n[red]❌ Batch approval cancelled by user[/red]"
+            )
             return BatchApprovalDecision(
-                decision_type="cancelled", user_notes="Cancelled by user (Ctrl+C)"
+                decision_type="cancelled",
+                user_notes="Cancelled by user (Ctrl+C)",
             )
 
         except asyncio.TimeoutError:
@@ -381,7 +399,8 @@ class CLIApprovalPrompt:
                 f"\n[red]⏰ Batch approval timed out after {timeout} seconds[/red]"
             )
             return BatchApprovalDecision(
-                decision_type="timeout", user_notes=f"Timed out after {timeout} seconds"
+                decision_type="timeout",
+                user_notes=f"Timed out after {timeout} seconds",
             )
 
         finally:
@@ -407,7 +426,9 @@ class CLIApprovalPrompt:
 
             if decision_type is None:
                 # Invalid response, ask again with clearer options
-                self.console.print("[yellow]Invalid response. Please enter:[/yellow]")
+                self.console.print(
+                    "[yellow]Invalid response. Please enter:[/yellow]"
+                )
                 self.console.print("  [green]y[/green] = Yes (approve)")
                 self.console.print(
                     "  [blue]r[/blue] = Remember (approve and auto-approve similar)"
@@ -422,7 +443,9 @@ class CLIApprovalPrompt:
 
                 # Recursive call with reduced timeout
                 remaining_timeout = max(timeout_seconds - 10, 30)
-                return await self._get_user_decision_with_timeout(remaining_timeout)
+                return await self._get_user_decision_with_timeout(
+                    remaining_timeout
+                )
 
             return ApprovalDecision(decision=decision_type)
 
@@ -446,7 +469,9 @@ class CLIApprovalPrompt:
             if response_lower in ["all", "approve-all", "yes-all"]:
                 return BatchApprovalDecision(
                     decision_type="approve_all",
-                    approved_indices=list(range(len(batch_request.operations))),
+                    approved_indices=list(
+                        range(len(batch_request.operations))
+                    ),
                 )
 
             elif response_lower in ["none", "deny-all", "no-all"]:
@@ -469,10 +494,16 @@ class CLIApprovalPrompt:
 
             else:
                 # Invalid response
-                self.console.print("[yellow]Invalid response. Please enter:[/yellow]")
-                self.console.print("  [green]all[/green] = Approve all operations")
+                self.console.print(
+                    "[yellow]Invalid response. Please enter:[/yellow]"
+                )
+                self.console.print(
+                    "  [green]all[/green] = Approve all operations"
+                )
                 self.console.print("  [red]none[/red] = Deny all operations")
-                self.console.print("  [blue]select[/blue] = Choose specific operations")
+                self.console.print(
+                    "  [blue]select[/blue] = Choose specific operations"
+                )
                 self.console.print(
                     "  [yellow]individual[/yellow] = Review each operation separately"
                 )
@@ -556,7 +587,9 @@ class CLIApprovalPrompt:
                 individual_request,
                 preview,
                 operation.data,
-                timeout_seconds=min(timeout_seconds, 120),  # 2 minute max per operation
+                timeout_seconds=min(
+                    timeout_seconds, 120
+                ),  # 2 minute max per operation
             )
 
             individual_decisions.append(decision)
@@ -566,7 +599,9 @@ class CLIApprovalPrompt:
 
             # Check if user wants to cancel the rest
             if decision.decision == ApprovalDecisionType.CANCELLED:
-                self.console.print("[yellow]Cancelled remaining operations[/yellow]")
+                self.console.print(
+                    "[yellow]Cancelled remaining operations[/yellow]"
+                )
                 break
 
         return BatchApprovalDecision(
@@ -602,7 +637,9 @@ class CLIApprovalPrompt:
                     if start < 1 or end > max_operations or start > end:
                         return None
 
-                    indices.update(range(start - 1, end))  # Convert to 0-based indexing
+                    indices.update(
+                        range(start - 1, end)
+                    )  # Convert to 0-based indexing
                 else:
                     # Handle individual numbers
                     num = int(part)
@@ -666,7 +703,9 @@ class CLIApprovalPrompt:
             # Don't call sys.exit here, let the calling code handle it
             raise KeyboardInterrupt("User interrupted with Ctrl+C")
 
-        self._original_sigint_handler = signal.signal(signal.SIGINT, signal_handler)
+        self._original_sigint_handler = signal.signal(
+            signal.SIGINT, signal_handler
+        )
 
     def _restore_interrupt_handling(self):
         """Restore original signal handling."""
@@ -686,7 +725,9 @@ class CLIApprovalPrompt:
             return decision.user_notes or ""
 
     def _display_batch_confirmation(
-        self, batch_decision: BatchApprovalDecision, batch_request: BatchApprovalRequest
+        self,
+        batch_decision: BatchApprovalDecision,
+        batch_request: BatchApprovalRequest,
     ):
         """Display confirmation of batch decision."""
         if batch_decision.decision_type == "approve_all":
@@ -708,7 +749,9 @@ class CLIApprovalPrompt:
 
             # Show which operations were approved
             if approved_count > 0:
-                approved_nums = [str(i + 1) for i in batch_decision.approved_indices]
+                approved_nums = [
+                    str(i + 1) for i in batch_decision.approved_indices
+                ]
                 self.console.print(
                     f"   Approved operations: {', '.join(approved_nums)}"
                 )
@@ -847,7 +890,9 @@ class CLIApprovalPrompt:
         except Exception:
             # Fallback to plain text
             preview_content = (
-                new_content[:2000] + "..." if len(new_content) > 2000 else new_content
+                new_content[:2000] + "..."
+                if len(new_content) > 2000
+                else new_content
             )
             preview_panel = Panel(
                 preview_content,
@@ -931,7 +976,9 @@ class CLIApprovalPrompt:
 
         self.console.print(diff_panel)
 
-    def _display_side_by_side_preview(self, current_content: str, new_content: str):
+    def _display_side_by_side_preview(
+        self, current_content: str, new_content: str
+    ):
         """Display side-by-side preview when diff is not available."""
         # Create table for side-by-side view
         table = Table(show_header=True, header_style="bold magenta")
@@ -945,7 +992,9 @@ class CLIApprovalPrompt:
             else current_content
         )
         new_preview = (
-            new_content[:1000] + "..." if len(new_content) > 1000 else new_content
+            new_content[:1000] + "..."
+            if len(new_content) > 1000
+            else new_content
         )
 
         table.add_row(current_preview, new_preview)
@@ -976,13 +1025,19 @@ class CLIApprovalPrompt:
             else "[bold blue]Content Statistics[/bold blue]"
         )
 
-        stats_panel = Panel(stats_text, title=title, border_style="blue", width=40)
+        stats_panel = Panel(
+            stats_text, title=title, border_style="blue", width=40
+        )
 
         self.console.print(stats_panel)
 
-    def _display_content_comparison_stats(self, current_content: str, new_content: str):
+    def _display_content_comparison_stats(
+        self, current_content: str, new_content: str
+    ):
         """Display comparison statistics between current and new content."""
-        current_lines = len(current_content.split("\n")) if current_content else 0
+        current_lines = (
+            len(current_content.split("\n")) if current_content else 0
+        )
         new_lines = len(new_content.split("\n")) if new_content else 0
         current_chars = len(current_content) if current_content else 0
         new_chars = len(new_content) if new_content else 0
@@ -1057,7 +1112,9 @@ class CLIApprovalPrompt:
         try:
             # Get user choice with timeout
             response = await asyncio.wait_for(
-                self._get_user_input_async("Enter your decision (y/r/e/n/q): "),
+                self._get_user_input_async(
+                    "Enter your decision (y/r/e/n/q): "
+                ),
                 timeout=timeout_seconds,
             )
 
@@ -1078,7 +1135,9 @@ class CLIApprovalPrompt:
                 # Ask for optional reason
                 try:
                     reason_response = await asyncio.wait_for(
-                        self._get_user_input_async("Reason for rejection (optional): "),
+                        self._get_user_input_async(
+                            "Reason for rejection (optional): "
+                        ),
                         timeout=30,
                     )
                     reason = reason_response.strip() or "User rejected changes"
@@ -1094,7 +1153,9 @@ class CLIApprovalPrompt:
                 }
             else:
                 # Invalid response, show help and try again
-                self.console.print("[yellow]Invalid response. Please enter:[/yellow]")
+                self.console.print(
+                    "[yellow]Invalid response. Please enter:[/yellow]"
+                )
                 self.console.print("  [green]y[/green] = Yes (approve)")
                 self.console.print(
                     "  [blue]r[/blue] = Remember (approve and auto-approve similar)"
@@ -1121,7 +1182,9 @@ class CLIApprovalPrompt:
             if cancellation_handler:
                 cancellation_handler.resume_status_display()
 
-    async def _handle_edit_content(self, review_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_edit_content(
+        self, review_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Handle user editing of content before writing."""
         self.console.print("\n[yellow]Content editing functionality:[/yellow]")
         self.console.print("You can:")
@@ -1131,7 +1194,9 @@ class CLIApprovalPrompt:
 
         try:
             edit_choice = await asyncio.wait_for(
-                self._get_user_input_async("Edit method (1=inline/2=editor/3=back): "),
+                self._get_user_input_async(
+                    "Edit method (1=inline/2=editor/3=back): "
+                ),
                 timeout=60,
             )
 
@@ -1155,7 +1220,9 @@ class CLIApprovalPrompt:
                 review_data, 300
             )
 
-    async def _inline_content_edit(self, review_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _inline_content_edit(
+        self, review_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Handle inline content editing."""
         self.console.print("\n[yellow]Inline content editing:[/yellow]")
         self.console.print(
@@ -1190,7 +1257,9 @@ class CLIApprovalPrompt:
 
         try:
             confirm_response = await asyncio.wait_for(
-                self._get_user_input_async("Use this modified content? (y/n): "),
+                self._get_user_input_async(
+                    "Use this modified content? (y/n): "
+                ),
                 timeout=30,
             )
 
@@ -1222,7 +1291,9 @@ class CLIApprovalPrompt:
         self.console.print(
             "[yellow]External editor functionality not yet implemented[/yellow]"
         )
-        self.console.print("[yellow]Falling back to inline editing...[/yellow]")
+        self.console.print(
+            "[yellow]Falling back to inline editing...[/yellow]"
+        )
         return await self._inline_content_edit(review_data)
 
 

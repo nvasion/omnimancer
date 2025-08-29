@@ -45,7 +45,9 @@ class CompletionHandler:
                 # cmd.value already includes the slash, don't add another one
                 self.builtin_commands.add(cmd.value)
 
-            logger.debug(f"Loaded {len(self.builtin_commands)} built-in commands")
+            logger.debug(
+                f"Loaded {len(self.builtin_commands)} built-in commands"
+            )
         except Exception as e:
             logger.error(f"Failed to load built-in commands: {e}")
 
@@ -56,7 +58,9 @@ class CompletionHandler:
             commands_dir = Path.home() / ".omnimancer" / "commands"
 
             if not commands_dir.exists():
-                logger.debug(f"Commands directory does not exist: {commands_dir}")
+                logger.debug(
+                    f"Commands directory does not exist: {commands_dir}"
+                )
                 return
 
             # Set built-in commands to prevent overriding
@@ -71,7 +75,9 @@ class CompletionHandler:
             # Update our dynamic commands cache
             self.dynamic_commands = self.command_registry.commands.copy()
 
-            logger.info(f"Loaded {loaded_count} dynamic commands from {commands_dir}")
+            logger.info(
+                f"Loaded {loaded_count} dynamic commands from {commands_dir}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to load dynamic commands: {e}")

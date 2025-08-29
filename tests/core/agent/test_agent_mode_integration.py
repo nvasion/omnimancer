@@ -20,7 +20,10 @@ from omnimancer.core.agent_mode_manager import (
     AgentMode,
     AgentOperationStatus,
 )
-from omnimancer.core.agent_progress_ui import AgentProgressUI, AgentStatusIndicator
+from omnimancer.core.agent_progress_ui import (
+    AgentProgressUI,
+    AgentStatusIndicator,
+)
 
 # from omnimancer.core.agent_demo import AgentModeDemo, create_demo_instance  # Removed during consolidation
 from omnimancer.core.agent_engine import Operation, OperationType
@@ -89,7 +92,9 @@ class TestAgentModeManager:
         assert agent_manager.mode == AgentMode.ON
 
         # Test disable
-        success = await agent_manager.disable_agent_mode(wait_for_completion=False)
+        success = await agent_manager.disable_agent_mode(
+            wait_for_completion=False
+        )
         assert success
         assert agent_manager.mode == AgentMode.OFF
 
@@ -227,7 +232,10 @@ class TestAgentProgressUI:
 
         assert "test_op_1" in agent_ui.operation_progress
         assert agent_ui.operation_progress["test_op_1"].progress == 50.0
-        assert agent_ui.operation_progress["test_op_1"].status_text == "Processing..."
+        assert (
+            agent_ui.operation_progress["test_op_1"].status_text
+            == "Processing..."
+        )
 
 
 class TestCLIIntegration:
@@ -325,7 +333,9 @@ class TestCLIIntegration:
 class TestPersistentState:
     """Test persistent state management."""
 
-    def test_state_save_load(self, agent_manager, sample_operation, temp_storage):
+    def test_state_save_load(
+        self, agent_manager, sample_operation, temp_storage
+    ):
         """Test state persistence."""
         # Queue an operation and update settings
         agent_manager.queue_operation(sample_operation)
@@ -383,10 +393,14 @@ class TestFullIntegration:
     """Full integration tests combining all components."""
 
     @pytest.mark.asyncio
-    async def test_complete_agent_workflow(self, mock_config_manager, temp_storage):
+    async def test_complete_agent_workflow(
+        self, mock_config_manager, temp_storage
+    ):
         """Test complete agent workflow from start to finish."""
         # Create all components
-        agent_manager = AgentModeManager(mock_config_manager, storage_path=temp_storage)
+        agent_manager = AgentModeManager(
+            mock_config_manager, storage_path=temp_storage
+        )
 
         from rich.console import Console
 

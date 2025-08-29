@@ -107,7 +107,10 @@ class ToolMetrics:
 
         # Bonus for recent success
         recency_bonus = 0.0
-        if self.last_success_time and time.time() - self.last_success_time < 300:
+        if (
+            self.last_success_time
+            and time.time() - self.last_success_time < 300
+        ):
             recency_bonus = 0.1
 
         return max(0.0, min(1.0, base_score - failure_penalty + recency_bonus))
@@ -130,7 +133,9 @@ class EnhancedMCPIntegrator:
 
         # Tool discovery and caching
         self.discovered_tools: Dict[str, ToolDefinition] = {}
-        self.tools_by_capability: Dict[ToolCapability, List[str]] = defaultdict(list)
+        self.tools_by_capability: Dict[ToolCapability, List[str]] = (
+            defaultdict(list)
+        )
         self.tools_by_server: Dict[str, List[str]] = defaultdict(list)
         self.tool_capabilities: Dict[str, Set[ToolCapability]] = {}
 
@@ -192,7 +197,8 @@ class EnhancedMCPIntegrator:
         # Check if discovery is needed
         if (
             not force_refresh
-            and current_time - self.last_discovery_time < self.discovery_interval
+            and current_time - self.last_discovery_time
+            < self.discovery_interval
             and self.discovered_tools
         ):
             return self.discovered_tools
@@ -253,7 +259,9 @@ class EnhancedMCPIntegrator:
             logger.error(f"Tool discovery failed: {e}")
             return {}
 
-    def _analyze_tool_capabilities(self, tool: ToolDefinition) -> Set[ToolCapability]:
+    def _analyze_tool_capabilities(
+        self, tool: ToolDefinition
+    ) -> Set[ToolCapability]:
         """
         Analyze a tool's capabilities based on its name, description, and parameters.
 
@@ -348,7 +356,14 @@ class EnhancedMCPIntegrator:
         # Database
         if any(
             keyword in text_lower
-            for keyword in ["database", "db", "sql", "query", "table", "record"]
+            for keyword in [
+                "database",
+                "db",
+                "sql",
+                "query",
+                "table",
+                "record",
+            ]
         ):
             capabilities.add(ToolCapability.DATABASE)
 
@@ -376,14 +391,27 @@ class EnhancedMCPIntegrator:
         # Communication
         if any(
             keyword in text_lower
-            for keyword in ["email", "message", "notification", "send", "communicate"]
+            for keyword in [
+                "email",
+                "message",
+                "notification",
+                "send",
+                "communicate",
+            ]
         ):
             capabilities.add(ToolCapability.COMMUNICATION)
 
         # Multimedia
         if any(
             keyword in text_lower
-            for keyword in ["image", "video", "audio", "media", "picture", "photo"]
+            for keyword in [
+                "image",
+                "video",
+                "audio",
+                "media",
+                "picture",
+                "photo",
+            ]
         ):
             capabilities.add(ToolCapability.MULTIMEDIA)
 
@@ -451,7 +479,9 @@ class EnhancedMCPIntegrator:
 
             try:
                 # Add context to arguments if applicable
-                enhanced_args = self._enhance_arguments_with_context(arguments, context)
+                enhanced_args = self._enhance_arguments_with_context(
+                    arguments, context
+                )
 
                 # Execute the tool
                 execution_start = time.time()
@@ -467,7 +497,11 @@ class EnhancedMCPIntegrator:
                 # Create success result
                 success_result = ToolExecutionResult(
                     success=True,
-                    data=result.content if hasattr(result, "content") else result,
+                    data=(
+                        result.content
+                        if hasattr(result, "content")
+                        else result
+                    ),
                     execution_time=execution_time,
                     server_name=server_name,
                     tool_name=tool_name,
@@ -486,20 +520,24 @@ class EnhancedMCPIntegrator:
                 )
 
                 # Cache result if applicable
-                if self.cache_enabled and self._is_cacheable(tool_name, arguments):
+                if self.cache_enabled and self._is_cacheable(
+                    tool_name, arguments
+                ):
                     self._cache_result(tool_name, arguments, success_result)
 
                 return success_result
 
             except asyncio.TimeoutError:
-                last_error = (
-                    f"Tool execution timed out after {context.timeout_seconds}s"
+                last_error = f"Tool execution timed out after {context.timeout_seconds}s"
+                logger.warning(
+                    f"Tool {tool_name} timed out on attempt {attempt + 1}"
                 )
-                logger.warning(f"Tool {tool_name} timed out on attempt {attempt + 1}")
 
             except Exception as e:
                 last_error = str(e)
-                logger.warning(f"Tool {tool_name} failed on attempt {attempt + 1}: {e}")
+                logger.warning(
+                    f"Tool {tool_name} failed on attempt {attempt + 1}: {e}"
+                )
 
                 # Don't retry for certain errors
                 if self._is_non_retryable_error(e):
@@ -560,7 +598,10 @@ class EnhancedMCPIntegrator:
             enhanced_args.setdefault("task_context", context.task_context)
 
         # Add relevant conversation history for context-aware tools
-        if context.conversation_history and len(context.conversation_history) > 0:
+        if (
+            context.conversation_history
+            and len(context.conversation_history) > 0
+        ):
             # Only add recent history to avoid overwhelming the tool
             recent_history = context.conversation_history[-5:]
             enhanced_args.setdefault("conversation_context", recent_history)
@@ -588,7 +629,9 @@ class EnhancedMCPIntegrator:
             return False
 
         # Don't cache if arguments contain dynamic data
-        if any(key in arguments for key in ["timestamp", "random", "session_id"]):
+        if any(
+            key in arguments for key in ["timestamp", "random", "session_id"]
+        ):
             return False
 
         return True
@@ -610,7 +653,10 @@ class EnhancedMCPIntegrator:
         return None
 
     def _cache_result(
-        self, tool_name: str, arguments: Dict[str, Any], result: ToolExecutionResult
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        result: ToolExecutionResult,
     ):
         """Cache a tool execution result."""
         cache_key = self._generate_cache_key(tool_name, arguments)
@@ -619,11 +665,15 @@ class EnhancedMCPIntegrator:
         # Limit cache size
         if len(self.result_cache) > 100:
             # Remove oldest entries
-            sorted_cache = sorted(self.result_cache.items(), key=lambda x: x[1][1])
+            sorted_cache = sorted(
+                self.result_cache.items(), key=lambda x: x[1][1]
+            )
             for key, _ in sorted_cache[:20]:  # Remove 20 oldest entries
                 del self.result_cache[key]
 
-    def _generate_cache_key(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+    def _generate_cache_key(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> str:
         """Generate a cache key for tool execution."""
         # Sort arguments for consistent key generation
         sorted_args = json.dumps(arguments, sort_keys=True)
@@ -653,7 +703,8 @@ class EnhancedMCPIntegrator:
             tool_metrics.average_execution_time = execution_time
         else:
             tool_metrics.average_execution_time = (
-                tool_metrics.average_execution_time * 0.8 + execution_time * 0.2
+                tool_metrics.average_execution_time * 0.8
+                + execution_time * 0.2
             )
 
         if success:
@@ -690,12 +741,16 @@ class EnhancedMCPIntegrator:
                 server_metrics.last_failure_time = current_time
                 server_metrics.consecutive_failures += 1
 
-    def find_tools_by_capability(self, capability: ToolCapability) -> List[str]:
+    def find_tools_by_capability(
+        self, capability: ToolCapability
+    ) -> List[str]:
         """Find tools that have a specific capability."""
         return self.tools_by_capability.get(capability, [])
 
     def find_best_tool_for_task(
-        self, task_description: str, capability: Optional[ToolCapability] = None
+        self,
+        task_description: str,
+        capability: Optional[ToolCapability] = None,
     ) -> Optional[str]:
         """
         Find the best tool for a given task based on description and capability.
@@ -735,7 +790,9 @@ class EnhancedMCPIntegrator:
             description = getattr(tool, "description", "")
             if description:
                 desc_lower = description.lower()
-                common_words = set(task_lower.split()) & set(desc_lower.split())
+                common_words = set(task_lower.split()) & set(
+                    desc_lower.split()
+                )
                 score += len(common_words)
 
             # Boost score based on reliability
@@ -756,7 +813,9 @@ class EnhancedMCPIntegrator:
 
         return None
 
-    def get_tool_metrics(self, tool_name: Optional[str] = None) -> Dict[str, Any]:
+    def get_tool_metrics(
+        self, tool_name: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Get performance metrics for tools."""
         if tool_name:
             metrics = self.tool_metrics.get(tool_name)
@@ -834,14 +893,20 @@ class EnhancedMCPIntegrator:
         }
 
         # Check if discovery is stale
-        if time.time() - self.last_discovery_time > self.discovery_interval * 2:
+        if (
+            time.time() - self.last_discovery_time
+            > self.discovery_interval * 2
+        ):
             health_status["discovery_stale"] = True
             health_status["integrator_healthy"] = False
 
         # Check for tools with high failure rates
         problematic_tools = []
         for tool_name, metrics in self.tool_metrics.items():
-            if metrics.reliability_score < 0.5 and metrics.total_executions >= 5:
+            if (
+                metrics.reliability_score < 0.5
+                and metrics.total_executions >= 5
+            ):
                 problematic_tools.append(tool_name)
 
         if problematic_tools:

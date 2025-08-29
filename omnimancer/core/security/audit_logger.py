@@ -174,7 +174,9 @@ class AuditLogger:
         from logging.handlers import RotatingFileHandler
 
         file_handler = RotatingFileHandler(
-            self.log_file, maxBytes=self.max_file_size, backupCount=self.backup_count
+            self.log_file,
+            maxBytes=self.max_file_size,
+            backupCount=self.backup_count,
         )
 
         # Console handler
@@ -212,7 +214,9 @@ class AuditLogger:
                 continue
             except Exception as e:
                 # Fallback to stderr for logging errors
-                print(f"Audit logging error: {e}", file=__import__("sys").stderr)
+                print(
+                    f"Audit logging error: {e}", file=__import__("sys").stderr
+                )
 
     def log_event(
         self,
@@ -279,13 +283,18 @@ class AuditLogger:
             python_level = self._audit_level_to_python_level(event.level)
             log_message = f"[{event.event_type.value.upper()}] {event.message}"
             if event.metadata:
-                log_message += f" | Metadata: {json.dumps(event.metadata, default=str)}"
+                log_message += (
+                    f" | Metadata: {json.dumps(event.metadata, default=str)}"
+                )
 
             self.logger.log(python_level, log_message)
 
         except Exception as e:
             # Fallback logging
-            print(f"Failed to write audit event: {e}", file=__import__("sys").stderr)
+            print(
+                f"Failed to write audit event: {e}",
+                file=__import__("sys").stderr,
+            )
             print(f"Event: {event.to_json()}", file=__import__("sys").stderr)
 
     def _audit_level_to_python_level(self, level: AuditLevel) -> int:
@@ -318,7 +327,9 @@ class AuditLogger:
         )
         level = AuditLevel.INFO if allowed else AuditLevel.WARNING
 
-        message = f"Permission {'granted' if allowed else 'denied'} for {operation}"
+        message = (
+            f"Permission {'granted' if allowed else 'denied'} for {operation}"
+        )
         if path:
             message += f" on {path}"
 
@@ -363,7 +374,9 @@ class AuditLogger:
         # Don't log full output for security, just indicate if present
         if output:
             metadata["output_length"] = len(output)
-            metadata["output_preview"] = output[:100] if len(output) > 100 else output
+            metadata["output_preview"] = (
+                output[:100] if len(output) > 100 else output
+            )
 
         self.log_event(event_type, level, message, metadata=metadata)
 
@@ -378,11 +391,15 @@ class AuditLogger:
         """Log a file access event."""
 
         event_type = (
-            AuditEventType.FILE_ACCESS if allowed else AuditEventType.FILE_ACCESS_DENIED
+            AuditEventType.FILE_ACCESS
+            if allowed
+            else AuditEventType.FILE_ACCESS_DENIED
         )
         level = AuditLevel.INFO if allowed else AuditLevel.WARNING
 
-        message = f"File {operation} {'allowed' if allowed else 'denied'}: {path}"
+        message = (
+            f"File {operation} {'allowed' if allowed else 'denied'}: {path}"
+        )
 
         metadata = {
             "path": path,
@@ -405,7 +422,11 @@ class AuditLogger:
 
         message = f"Security alert: {alert_type} - {description}"
 
-        metadata = {"alert_type": alert_type, "description": description, **kwargs}
+        metadata = {
+            "alert_type": alert_type,
+            "description": description,
+            **kwargs,
+        }
 
         self.log_event(
             AuditEventType.SECURITY_ALERT, severity, message, metadata=metadata
@@ -434,7 +455,9 @@ class AuditLogger:
 
                     # Recreate AuditEvent object
                     event = AuditEvent(
-                        timestamp=datetime.fromisoformat(event_data["timestamp"]),
+                        timestamp=datetime.fromisoformat(
+                            event_data["timestamp"]
+                        ),
                         event_type=AuditEventType(event_data["event_type"]),
                         level=AuditLevel(event_data["level"]),
                         message=event_data["message"],
@@ -475,7 +498,9 @@ class AuditLogger:
             "log_level": self.log_level.value,
             "async_enabled": self.enable_async,
             "total_events": sum(self.event_counts.values()),
-            "event_type_counts": {k.value: v for k, v in self.event_counts.items()},
+            "event_type_counts": {
+                k.value: v for k, v in self.event_counts.items()
+            },
             "level_counts": {k.value: v for k, v in self.level_counts.items()},
             "log_file_size": (
                 self.log_file.stat().st_size if self.log_file.exists() else 0

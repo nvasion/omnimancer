@@ -26,7 +26,9 @@ class HealthMonitor:
     caching and optimized checks to improve performance.
     """
 
-    def __init__(self, provider_configs: Optional[Dict[str, ProviderConfig]] = None):
+    def __init__(
+        self, provider_configs: Optional[Dict[str, ProviderConfig]] = None
+    ):
         """Initialize the health monitor."""
         self._health_cache: Dict[str, Dict[str, Any]] = {}
         self._cache_timestamps: Dict[str, float] = {}
@@ -40,7 +42,9 @@ class HealthMonitor:
         self._monitoring_interval: float = 300.0  # 5 minutes interval
 
         # Provider configs
-        self._provider_configs: Dict[str, ProviderConfig] = provider_configs or {}
+        self._provider_configs: Dict[str, ProviderConfig] = (
+            provider_configs or {}
+        )
 
         # Provider factory for testing
         self.provider_factory = None
@@ -65,8 +69,12 @@ class HealthMonitor:
         if not force:
             # Check if health status is already cached and valid
             with self._lock:
-                if cache_key in self._health_cache and self._is_cache_valid(cache_key):
-                    logger.debug(f"Using cached health status for {provider_name}")
+                if cache_key in self._health_cache and self._is_cache_valid(
+                    cache_key
+                ):
+                    logger.debug(
+                        f"Using cached health status for {provider_name}"
+                    )
                     return self._health_cache[cache_key].copy()
 
         # Perform health check
@@ -100,7 +108,9 @@ class HealthMonitor:
             try:
                 model_info = provider.get_model_info()
                 model_available = (
-                    model_info.available if hasattr(model_info, "available") else True
+                    model_info.available
+                    if hasattr(model_info, "available")
+                    else True
                 )
             except Exception:
                 # If provider is a mock, assume model is available
@@ -216,7 +226,9 @@ class HealthMonitor:
         # Create tasks for concurrent health checks
         tasks = []
         for provider_name, config in configs.items():
-            tasks.append(self.check_provider_health(provider_name, config, force))
+            tasks.append(
+                self.check_provider_health(provider_name, config, force)
+            )
 
         # Run health checks concurrently
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -238,7 +250,9 @@ class HealthMonitor:
 
         return health_status
 
-    def _generate_cache_key(self, provider_name: str, config: ProviderConfig) -> str:
+    def _generate_cache_key(
+        self, provider_name: str, config: ProviderConfig
+    ) -> str:
         """
         Generate cache key for health status.
 
@@ -279,7 +293,9 @@ class HealthMonitor:
         if cache_key not in self._cache_timestamps:
             return False
 
-        return (time.time() - self._cache_timestamps[cache_key]) < self._cache_ttl
+        return (
+            time.time() - self._cache_timestamps[cache_key]
+        ) < self._cache_ttl
 
     def clear_cache(self) -> None:
         """Clear health status cache."""
@@ -300,7 +316,9 @@ class HealthMonitor:
         logger.debug(f"Set health status cache TTL to {ttl_seconds} seconds")
 
     def start_monitoring(
-        self, configs: Dict[str, ProviderConfig], interval_seconds: float = 300.0
+        self,
+        configs: Dict[str, ProviderConfig],
+        interval_seconds: float = 300.0,
     ) -> None:
         """
         Start background health monitoring.
@@ -369,7 +387,9 @@ class HealthMonitor:
 
         logger.info("Health monitoring worker stopped")
 
-    def get_provider_health(self, provider_name: str) -> Optional[Dict[str, Any]]:
+    def get_provider_health(
+        self, provider_name: str
+    ) -> Optional[Dict[str, Any]]:
         """
         Get cached health status for a provider.
 
@@ -404,7 +424,9 @@ class HealthMonitor:
 
         return health_status
 
-    async def check_all_providers(self, config, force: bool = False) -> "HealthResult":
+    async def check_all_providers(
+        self, config, force: bool = False
+    ) -> "HealthResult":
         """
         Check health status for all providers in a config object.
 
@@ -439,7 +461,9 @@ class HealthMonitor:
             provider_health=health_status,
             total_providers=len(health_status),
             healthy_providers=sum(
-                1 for h in health_status.values() if h.get("status") == "healthy"
+                1
+                for h in health_status.values()
+                if h.get("status") == "healthy"
             ),
         )
 

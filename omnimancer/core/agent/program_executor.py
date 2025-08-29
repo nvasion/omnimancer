@@ -14,14 +14,27 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Any, AsyncIterator, Callable, Set, Union
+from typing import (
+    Dict,
+    List,
+    Optional,
+    Any,
+    AsyncIterator,
+    Callable,
+    Set,
+    Union,
+)
 from enum import Enum
 from dataclasses import dataclass, field
 from contextlib import asynccontextmanager
 import psutil
 import shlex
 
-from ..security.sandbox_manager import SandboxManager, ResourceLimits, SandboxedProcess
+from ..security.sandbox_manager import (
+    SandboxManager,
+    ResourceLimits,
+    SandboxedProcess,
+)
 from ..security.approval_workflow import ApprovalWorkflow, RiskLevel
 from ...utils.errors import SecurityError, ExecutionError, TimeoutError
 
@@ -68,7 +81,11 @@ class CommandResult:
     @property
     def full_command(self) -> str:
         """Get the full command string."""
-        return f"{self.command} {' '.join(self.args)}" if self.args else self.command
+        return (
+            f"{self.command} {' '.join(self.args)}"
+            if self.args
+            else self.command
+        )
 
 
 @dataclass
@@ -299,7 +316,9 @@ class CommandValidator:
 
         return risk_mapping.get(category, RiskLevel.HIGH)
 
-    def validate_command_args(self, command: str, args: List[str]) -> List[str]:
+    def validate_command_args(
+        self, command: str, args: List[str]
+    ) -> List[str]:
         """Validate and sanitize command arguments."""
         import re
 
@@ -309,7 +328,9 @@ class CommandValidator:
             if any(char in arg for char in [";", "|", "&", "`", "$", ">"]):
                 # For now, reject arguments with shell metacharacters
                 # In production, this could be more sophisticated
-                raise SecurityError(f"Argument contains dangerous characters: {arg}")
+                raise SecurityError(
+                    f"Argument contains dangerous characters: {arg}"
+                )
 
             # Ensure proper escaping
             sanitized_args.append(shlex.quote(arg))
@@ -325,7 +346,9 @@ class StreamingExecutor:
         self.stdout_buffer = []
         self.stderr_buffer = []
 
-    async def stream_process_output(self, process: asyncio.subprocess.Process) -> None:
+    async def stream_process_output(
+        self, process: asyncio.subprocess.Process
+    ) -> None:
         """Stream output from a running process."""
 
         async def read_stream(
@@ -344,7 +367,9 @@ class StreamingExecutor:
                         try:
                             self.callback(stream_type, line_str.rstrip())
                         except Exception as callback_error:
-                            logger.debug(f"Stream callback error: {callback_error}")
+                            logger.debug(
+                                f"Stream callback error: {callback_error}"
+                            )
 
             except Exception as e:
                 logger.debug(f"Error reading {stream_type}: {e}")
@@ -352,9 +377,13 @@ class StreamingExecutor:
         # Start streaming tasks
         tasks = []
         if process.stdout:
-            tasks.append(read_stream(process.stdout, "stdout", self.stdout_buffer))
+            tasks.append(
+                read_stream(process.stdout, "stdout", self.stdout_buffer)
+            )
         if process.stderr:
-            tasks.append(read_stream(process.stderr, "stderr", self.stderr_buffer))
+            tasks.append(
+                read_stream(process.stderr, "stderr", self.stderr_buffer)
+            )
 
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
@@ -390,7 +419,10 @@ class EnhancedProgramExecutor:
         self.execution_history: List[CommandResult] = []
 
     async def execute_command(
-        self, command: str, args: List[str] = None, config: ExecutionConfig = None
+        self,
+        command: str,
+        args: List[str] = None,
+        config: ExecutionConfig = None,
     ) -> CommandResult:
         """
         Execute a command with full security controls.
@@ -413,7 +445,9 @@ class EnhancedProgramExecutor:
 
         try:
             # Validate command
-            if not self.validator.is_command_allowed(command, config.execution_mode):
+            if not self.validator.is_command_allowed(
+                command, config.execution_mode
+            ):
                 raise SecurityError(
                     f"Command '{command}' not allowed in {config.execution_mode.value} mode"
                 )
@@ -434,7 +468,9 @@ class EnhancedProgramExecutor:
                     )
 
             # Sanitize arguments
-            sanitized_args = self.validator.validate_command_args(command, args)
+            sanitized_args = self.validator.validate_command_args(
+                command, args
+            )
 
             # Execute based on mode
             if config.execution_mode == ExecutionMode.SANDBOX:
@@ -442,7 +478,9 @@ class EnhancedProgramExecutor:
                     command, sanitized_args, config, execution_id
                 )
             else:
-                result = await self._execute_direct(command, sanitized_args, config)
+                result = await self._execute_direct(
+                    command, sanitized_args, config
+                )
 
             result.execution_time = time.time() - start_time
             self.execution_history.append(result)
@@ -569,7 +607,11 @@ class EnhancedProgramExecutor:
             )
 
     async def _execute_sandboxed(
-        self, command: str, args: List[str], config: ExecutionConfig, execution_id: str
+        self,
+        command: str,
+        args: List[str],
+        config: ExecutionConfig,
+        execution_id: str,
     ) -> CommandResult:
         """Execute command in sandbox with resource limits."""
         resource_limits = ResourceLimits(
@@ -581,7 +623,9 @@ class EnhancedProgramExecutor:
         )
 
         try:
-            with self.sandbox_manager.create_sandbox(resource_limits) as sandbox:
+            with self.sandbox_manager.create_sandbox(
+                resource_limits
+            ) as sandbox:
                 # Execute in sandbox
                 sandboxed_process = await sandbox.execute_command(
                     command,
@@ -672,7 +716,10 @@ class EnhancedProgramExecutor:
         return active
 
     async def stream_command_output(
-        self, command: str, args: List[str] = None, config: ExecutionConfig = None
+        self,
+        command: str,
+        args: List[str] = None,
+        config: ExecutionConfig = None,
     ) -> AsyncIterator[tuple[str, str]]:
         """
         Execute command and yield real-time output.

@@ -139,7 +139,9 @@ class TestAgentErrorHandling(unittest.TestCase):
     def test_agent_engine_forbidden_path_detection(self):
         """Test agent engine detects forbidden paths."""
         # Skip this test as the FileSystemManager doesn't currently have path validation
-        self.skipTest("Path validation not implemented in current FileSystemManager")
+        self.skipTest(
+            "Path validation not implemented in current FileSystemManager"
+        )
 
     def test_agent_file_operations_error_handling(self):
         """Test agent file operations handle errors gracefully."""
@@ -173,7 +175,9 @@ class TestAgentErrorHandling(unittest.TestCase):
 
             # Test file manager error handling pattern
             agent.file_manager = Mock()
-            agent.file_manager.read_file.side_effect = PermissionError("Access denied")
+            agent.file_manager.read_file.side_effect = PermissionError(
+                "Access denied"
+            )
 
             with self.assertRaises(PermissionError):
                 # This would be called through agent operations
@@ -498,7 +502,9 @@ class TestErrorReportingAndLogging(unittest.TestCase):
         """Test that error context is preserved in tracebacks."""
 
         def level_3():
-            raise ExecutionError("Deep execution error", details="From level 3")
+            raise ExecutionError(
+                "Deep execution error", details="From level 3"
+            )
 
         def level_2():
             try:

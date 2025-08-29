@@ -86,7 +86,9 @@ class TestAgentPersonaHandler:
         research_persona.icon = "🔍"
         research_persona.category = PersonaCategory.RESEARCH
         research_persona.status = PersonaStatus.AVAILABLE
-        research_persona.description = "Configured for research with web search"
+        research_persona.description = (
+            "Configured for research with web search"
+        )
         research_persona.capabilities = set()
         research_persona.configuration = Mock()
         # Create a simple metadata object for research persona too
@@ -114,7 +116,10 @@ class TestAgentPersonaHandler:
         )()
 
         manager.get_all_personas = Mock(
-            return_value={"coding": coding_persona, "research": research_persona}
+            return_value={
+                "coding": coding_persona,
+                "research": research_persona,
+            }
         )
 
         manager.get_persona = Mock(
@@ -142,7 +147,9 @@ class TestAgentPersonaHandler:
         """Create a mock AgentSwitcher."""
         switcher = Mock(spec=AgentSwitcher)
         switcher.persona_manager = mock_persona_manager
-        switcher.switch_persona = Mock(return_value=(True, "Switched successfully"))
+        switcher.switch_persona = Mock(
+            return_value=(True, "Switched successfully")
+        )
         switcher.get_current_state = Mock(return_value=SwitchState.IDLE)
         switcher.current_session_state = SessionState()
         switcher.get_switch_history = Mock(return_value=[])
@@ -196,7 +203,9 @@ class TestAgentPersonaHandler:
         assert handler.persona_manager.get_all_personas.called
 
     @pytest.mark.asyncio
-    async def test_handle_use_persona_success(self, handler, mock_agent_switcher):
+    async def test_handle_use_persona_success(
+        self, handler, mock_agent_switcher
+    ):
         """Test successful persona switch."""
         command = Command(
             type=CommandType.SLASH_COMMAND,
@@ -282,7 +291,9 @@ class TestAgentPersonaHandler:
         # Verify it's displaying a panel (for current persona)
         from rich.panel import Panel
 
-        assert any(isinstance(call[0][0], Panel) for call in call_args if call[0])
+        assert any(
+            isinstance(call[0][0], Panel) for call in call_args if call[0]
+        )
 
     @pytest.mark.asyncio
     async def test_handle_current_persona_none(self, handler, mock_console):
@@ -427,7 +438,9 @@ class TestAgentPersonaHandler:
         assert len(call_args) > 0
         from rich.panel import Panel
 
-        assert any(isinstance(call[0][0], Panel) for call in call_args if call[0])
+        assert any(
+            isinstance(call[0][0], Panel) for call in call_args if call[0]
+        )
 
     @pytest.mark.asyncio
     async def test_handle_unknown_subcommand(self, handler, mock_console):
@@ -500,8 +513,12 @@ class TestAgentPersonaHandler:
     def test_format_switch_state(self, handler):
         """Test switch state formatting."""
         assert "Idle" in handler._format_switch_state(SwitchState.IDLE)
-        assert "Preparing" in handler._format_switch_state(SwitchState.PREPARING)
-        assert "Switching" in handler._format_switch_state(SwitchState.SWITCHING)
+        assert "Preparing" in handler._format_switch_state(
+            SwitchState.PREPARING
+        )
+        assert "Switching" in handler._format_switch_state(
+            SwitchState.SWITCHING
+        )
         assert "Complete" in handler._format_switch_state(SwitchState.COMPLETE)
         assert "Error" in handler._format_switch_state(SwitchState.ERROR)
 
@@ -518,7 +535,9 @@ class TestAgentPersonaHandler:
         assert len(suggest_calls) > 0
 
     @pytest.mark.asyncio
-    async def test_handle_recommend_persona_no_query(self, handler, mock_console):
+    async def test_handle_recommend_persona_no_query(
+        self, handler, mock_console
+    ):
         """Test persona recommendations without query."""
         command = Command(
             type=CommandType.SLASH_COMMAND,
@@ -539,7 +558,9 @@ class TestAgentPersonaHandler:
         assert len(recommend_calls) > 0
 
     @pytest.mark.asyncio
-    async def test_handle_recommend_persona_with_query(self, handler, mock_console):
+    async def test_handle_recommend_persona_with_query(
+        self, handler, mock_console
+    ):
         """Test persona recommendations with specific query."""
         command = Command(
             type=CommandType.SLASH_COMMAND,
@@ -555,7 +576,8 @@ class TestAgentPersonaHandler:
         coding_calls = [
             call
             for call in mock_console.print.call_args_list
-            if "coding" in str(call).lower() or "programming" in str(call).lower()
+            if "coding" in str(call).lower()
+            or "programming" in str(call).lower()
         ]
         assert len(coding_calls) > 0
 
@@ -579,10 +601,14 @@ class TestAgentPersonaHandler:
         from rich.panel import Panel
 
         table_calls = [
-            call for call in call_args if call[0] and isinstance(call[0][0], Table)
+            call
+            for call in call_args
+            if call[0] and isinstance(call[0][0], Table)
         ]
         panel_calls = [
-            call for call in call_args if call[0] and isinstance(call[0][0], Panel)
+            call
+            for call in call_args
+            if call[0] and isinstance(call[0][0], Panel)
         ]
         assert (
             len(table_calls) > 0 or len(panel_calls) > 0
@@ -610,7 +636,9 @@ class TestAgentPersonaHandler:
         assert len(preview_calls) > 0
 
     @pytest.mark.asyncio
-    async def test_handle_preview_persona_not_found(self, handler, mock_console):
+    async def test_handle_preview_persona_not_found(
+        self, handler, mock_console
+    ):
         """Test preview for non-existent persona."""
         command = Command(
             type=CommandType.SLASH_COMMAND,
@@ -676,7 +704,9 @@ class TestAgentPersonaHandler:
         command = Command(
             type=CommandType.SLASH_COMMAND,
             content="/agent",
-            parameters={"args": ["recommend", "research", "find", "information"]},
+            parameters={
+                "args": ["recommend", "research", "find", "information"]
+            },
             raw_input="/agent recommend research find information",
         )
 
@@ -710,13 +740,16 @@ class TestAgentPersonaHandler:
             call
             for call in mock_console.print.call_args_list
             if any(
-                word in str(call).lower() for word in ["creative", "writing", "general"]
+                word in str(call).lower()
+                for word in ["creative", "writing", "general"]
             )
         ]
         assert len(recommend_calls) > 0
 
     @pytest.mark.asyncio
-    async def test_recommend_with_performance_query(self, handler, mock_console):
+    async def test_recommend_with_performance_query(
+        self, handler, mock_console
+    ):
         """Test recommendations for speed/performance query."""
         command = Command(
             type=CommandType.SLASH_COMMAND,

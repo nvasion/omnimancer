@@ -19,7 +19,11 @@ from rich.status import Status
 from ...core.agent_engine import AgentEngine
 from ...core.agent.approval_manager import EnhancedApprovalManager
 from ...core.agent.config import AgentConfig, ProviderConfig, ProviderType
-from ...core.agent.persona import PersonaManager, get_persona_manager, PersonaStatus
+from ...core.agent.persona import (
+    PersonaManager,
+    get_persona_manager,
+    PersonaStatus,
+)
 from ...utils.errors import AgentError, SecurityError, PermissionError
 
 logger = logging.getLogger(__name__)
@@ -96,7 +100,9 @@ class AgentCLIHandler:
                     self.console.print(
                         f"[yellow]Warning: PersonaManager initialization failed: {e}[/yellow]"
                     )
-                raise ConfigurationError(f"Failed to initialize persona system: {e}")
+                raise ConfigurationError(
+                    f"Failed to initialize persona system: {e}"
+                )
 
             # Current agent tracking
             self.current_agent = None
@@ -112,7 +118,9 @@ class AgentCLIHandler:
                 console.print(
                     f"[red]Error: Failed to initialize agent system: {e}[/red]"
                 )
-            raise ConfigurationError(f"Agent handler initialization failed: {e}")
+            raise ConfigurationError(
+                f"Agent handler initialization failed: {e}"
+            )
 
     async def handle_command(self, args: List[str]) -> None:
         """
@@ -180,7 +188,9 @@ class AgentCLIHandler:
                 "Check your agent configuration and try again.",
             )
         except Exception as e:
-            logger.error(f"Agent command failed unexpectedly: {e}", exc_info=True)
+            logger.error(
+                f"Agent command failed unexpectedly: {e}", exc_info=True
+            )
             self._show_error_with_suggestions(
                 f"Unexpected error occurred: {str(e)[:100]}{'...' if len(str(e)) > 100 else ''}",
                 "Try the command again or use '/agents status' to check system health.",
@@ -226,7 +236,9 @@ class AgentCLIHandler:
                 # Get provider info from configuration
                 config = persona.configuration
                 provider_name = (
-                    config.provider_type.value if config.provider_type else "Unknown"
+                    config.provider_type.value
+                    if config.provider_type
+                    else "Unknown"
                 )
 
                 table.add_row(
@@ -284,7 +296,9 @@ class AgentCLIHandler:
             persona = self.persona_manager.get_persona(agent_id)
             if not persona:
                 # Suggest similar agents
-                available_agents = list(self.persona_manager.get_all_personas().keys())
+                available_agents = list(
+                    self.persona_manager.get_all_personas().keys()
+                )
                 suggestions = [
                     agent
                     for agent in available_agents
@@ -292,11 +306,11 @@ class AgentCLIHandler:
                 ]
 
                 if suggestions:
-                    suggestion_text = f"Did you mean: {', '.join(suggestions)[:50]}?"
-                else:
                     suggestion_text = (
-                        f"Available agents: {', '.join(available_agents)[:50]}..."
+                        f"Did you mean: {', '.join(suggestions)[:50]}?"
                     )
+                else:
+                    suggestion_text = f"Available agents: {', '.join(available_agents)[:50]}..."
 
                 raise AgentNotFoundError(
                     f"Agent '{agent_id}' not found. {suggestion_text}"
@@ -329,7 +343,8 @@ class AgentCLIHandler:
 
             # Show progress indicator for activation
             with Status(
-                f"[bold blue]Activating {persona.name}...", console=self.console
+                f"[bold blue]Activating {persona.name}...",
+                console=self.console,
             ):
                 if self.verbose:
                     self.console.print(
@@ -353,7 +368,8 @@ class AgentCLIHandler:
             # Show success message
             config = persona.configuration
             capabilities_list = [
-                cap.value.replace("_", " ").title() for cap in persona.capabilities
+                cap.value.replace("_", " ").title()
+                for cap in persona.capabilities
             ]
 
             self.console.print(
@@ -375,9 +391,12 @@ class AgentCLIHandler:
             raise
         except Exception as e:
             logger.error(
-                f"Unexpected error enabling agent '{agent_id}': {e}", exc_info=True
+                f"Unexpected error enabling agent '{agent_id}': {e}",
+                exc_info=True,
             )
-            raise ConfigurationError(f"Failed to enable agent '{agent_id}': {e}")
+            raise ConfigurationError(
+                f"Failed to enable agent '{agent_id}': {e}"
+            )
 
     async def handle_disable(self, args: List[str]) -> None:
         """
@@ -393,7 +412,9 @@ class AgentCLIHandler:
             if args:
                 agent_id = args[0].lower()
                 if self.verbose:
-                    self.console.print(f"[dim]Looking up agent '{agent_id}'...[/dim]")
+                    self.console.print(
+                        f"[dim]Looking up agent '{agent_id}'...[/dim]"
+                    )
 
                 persona = self.persona_manager.get_persona(agent_id)
                 if not persona:
@@ -411,7 +432,9 @@ class AgentCLIHandler:
                             f"Did you mean: {', '.join(suggestions)[:50]}?"
                         )
                     else:
-                        suggestion_text = f"Use '/agents list' to see available agents."
+                        suggestion_text = (
+                            f"Use '/agents list' to see available agents."
+                        )
 
                     raise AgentNotFoundError(
                         f"Agent '{agent_id}' not found. {suggestion_text}"
@@ -463,7 +486,9 @@ class AgentCLIHandler:
             # Show confirmation prompt for destructive action
             if active_operations > 0:
                 warning_msg = f"⚠️  Agent '{agent_id}' has {active_operations} active operations.\nDisabling will terminate these operations."
-                if not Confirm.ask(f"{warning_msg}\n\nDisable anyway?", default=False):
+                if not Confirm.ask(
+                    f"{warning_msg}\n\nDisable anyway?", default=False
+                ):
                     self._show_info("Agent remains enabled.")
                     return
             elif not args:  # Only confirm if no specific agent was provided
@@ -475,7 +500,8 @@ class AgentCLIHandler:
 
             # Show progress indicator for deactivation
             with Status(
-                f"[bold red]Deactivating {persona.name}...", console=self.console
+                f"[bold red]Deactivating {persona.name}...",
+                console=self.console,
             ):
                 if self.verbose:
                     self.console.print(
@@ -512,7 +538,9 @@ class AgentCLIHandler:
             # These are handled by the main command handler
             raise
         except Exception as e:
-            logger.error(f"Unexpected error disabling agent: {e}", exc_info=True)
+            logger.error(
+                f"Unexpected error disabling agent: {e}", exc_info=True
+            )
             raise ConfigurationError(f"Failed to disable agent: {e}")
 
     async def handle_status(self, args: List[str]) -> None:
@@ -544,7 +572,8 @@ class AgentCLIHandler:
                 )
                 config = persona.configuration
                 capabilities_list = [
-                    cap.value.replace("_", " ").title() for cap in persona.capabilities
+                    cap.value.replace("_", " ").title()
+                    for cap in persona.capabilities
                 ]
 
                 self.console.print(
@@ -573,7 +602,9 @@ class AgentCLIHandler:
                 if active_persona:
                     status_text += f"Current active agent: {active_persona.name} ({active_persona.id})\n\n"
                     config = active_persona.configuration
-                    status_text += f"[bold green]Active Agent Details:[/bold green]\n"
+                    status_text += (
+                        f"[bold green]Active Agent Details:[/bold green]\n"
+                    )
                     status_text += f"• Name: {active_persona.name}\n"
                     status_text += f"• Provider: {config.provider_type.value if config.provider_type else 'Unknown'}\n"
                     status_text += f"• Model: {config.model_id or 'Unknown'}\n"
@@ -583,7 +614,9 @@ class AgentCLIHandler:
 
                 self.console.print(
                     Panel(
-                        status_text, title="🤖 Agent System Status", border_style="blue"
+                        status_text,
+                        title="🤖 Agent System Status",
+                        border_style="blue",
                     )
                 )
 
@@ -614,7 +647,8 @@ class AgentCLIHandler:
 
             config = persona.configuration
             capabilities_list = [
-                cap.value.replace("_", " ").title() for cap in persona.capabilities
+                cap.value.replace("_", " ").title()
+                for cap in persona.capabilities
             ]
             status_text = (
                 "Active"
@@ -679,7 +713,9 @@ class AgentCLIHandler:
             self.console.print(
                 f"[bold]Provider:[/bold] {config.provider_type.value if config.provider_type else 'Unknown'}"
             )
-            self.console.print(f"[bold]Model:[/bold] {config.model_id or 'Unknown'}")
+            self.console.print(
+                f"[bold]Model:[/bold] {config.model_id or 'Unknown'}"
+            )
         else:
             self.console.print("[dim]No agent is currently active.[/dim]")
 
@@ -705,7 +741,8 @@ class AgentCLIHandler:
 
             config = persona.configuration
             capabilities_list = [
-                cap.value.replace("_", " ").title() for cap in persona.capabilities
+                cap.value.replace("_", " ").title()
+                for cap in persona.capabilities
             ]
 
             # Get status with appropriate emoji
@@ -735,18 +772,18 @@ class AgentCLIHandler:
                 info_text += f"• {capability}\n"
 
             info_text += f"\n[bold]Settings:[/bold]\n"
-            info_text += f"• Tools Enabled: {'Yes' if config.tools_enabled else 'No'}\n"
             info_text += (
-                f"• Web Search: {'Yes' if config.web_search_enabled else 'No'}\n"
+                f"• Tools Enabled: {'Yes' if config.tools_enabled else 'No'}\n"
             )
+            info_text += f"• Web Search: {'Yes' if config.web_search_enabled else 'No'}\n"
             info_text += f"• File Operations: {'Yes' if config.file_operations_enabled else 'No'}\n"
-            info_text += (
-                f"• Approval Required: {'Yes' if config.approval_required else 'No'}\n"
-            )
+            info_text += f"• Approval Required: {'Yes' if config.approval_required else 'No'}\n"
 
             info_text += f"\n[bold]Usage:[/bold]\n"
             info_text += f"• Enable: [cyan]/agents enable {agent_id}[/cyan]\n"
-            info_text += f"• Disable: [cyan]/agents disable {agent_id}[/cyan]\n"
+            info_text += (
+                f"• Disable: [cyan]/agents disable {agent_id}[/cyan]\n"
+            )
             info_text += f"• Status: [cyan]/agents status {agent_id}[/cyan]\n"
 
             self.console.print(
@@ -788,14 +825,20 @@ class AgentCLIHandler:
 [cyan]/agents info research[/cyan]           - Get details about the research agent"""
 
         self.console.print(
-            Panel(help_text, title="🤖 Agent Management Help", border_style="blue")
+            Panel(
+                help_text,
+                title="🤖 Agent Management Help",
+                border_style="blue",
+            )
         )
 
     def _show_error(self, message: str) -> None:
         """Show error message."""
         self.console.print(f"[bold red]Error:[/bold red] {message}")
 
-    def _show_error_with_suggestions(self, error_message: str, suggestion: str) -> None:
+    def _show_error_with_suggestions(
+        self, error_message: str, suggestion: str
+    ) -> None:
         """Show error message with actionable suggestions."""
         self.console.print(
             Panel(
@@ -825,7 +868,9 @@ class AgentCLIHandler:
         """Show success message."""
         self.console.print(f"[bold green]Success:[/bold green] {message}")
 
-    async def _check_permission_for_action(self, action: str, target: str) -> bool:
+    async def _check_permission_for_action(
+        self, action: str, target: str
+    ) -> bool:
         """
         Check if user has permission for a specific action.
 
@@ -847,7 +892,9 @@ class AgentCLIHandler:
                     f"[dim]Checking permission for action '{action}' on target '{target}'[/dim]"
                 )
 
-            return True  # Placeholder - would implement real permission checking
+            return (
+                True  # Placeholder - would implement real permission checking
+            )
 
         except Exception as e:
             logger.error(f"Permission check failed for action '{action}': {e}")

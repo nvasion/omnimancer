@@ -15,14 +15,22 @@ from pathlib import Path
 from rich.console import Console
 
 from .approval_formatter import CLIApprovalFormatter
-from .approval_prompt import CLIApprovalPrompt, ApprovalDecision, BatchApprovalDecision
+from .approval_prompt import (
+    CLIApprovalPrompt,
+    ApprovalDecision,
+    BatchApprovalDecision,
+)
 from ..core.agent.approval_manager import (
     EnhancedApprovalManager,
     ChangePreview,
     BatchApprovalRequest,
 )
 from ..core.agent.types import Operation, OperationType
-from ..core.security.approval_workflow import ApprovalRequest, ApprovalStatus, RiskLevel
+from ..core.security.approval_workflow import (
+    ApprovalRequest,
+    ApprovalStatus,
+    RiskLevel,
+)
 from ..core.security.permission_controller import PermissionController
 
 logger = logging.getLogger(__name__)
@@ -55,7 +63,9 @@ class CLIApprovalIntegration:
             approval_timeout_seconds: Default timeout for approval prompts
         """
         self.approval_manager = approval_manager or EnhancedApprovalManager()
-        self.permission_controller = permission_controller or PermissionController()
+        self.permission_controller = (
+            permission_controller or PermissionController()
+        )
         self.console = console or Console()
         self.enable_auto_approval = enable_auto_approval
         self.approval_timeout_seconds = approval_timeout_seconds
@@ -69,13 +79,19 @@ class CLIApprovalIntegration:
         )
 
         # Set approval callback on the manager
-        self.approval_manager.set_approval_callback(self._handle_single_approval)
-        self.approval_manager.set_batch_approval_callback(self._handle_batch_approval)
+        self.approval_manager.set_approval_callback(
+            self._handle_single_approval
+        )
+        self.approval_manager.set_batch_approval_callback(
+            self._handle_batch_approval
+        )
 
         # Track approval decisions for session
         self.approval_session_log: List[Dict[str, Any]] = []
 
-    async def request_approval_for_operation(self, operation: Operation) -> bool:
+    async def request_approval_for_operation(
+        self, operation: Operation
+    ) -> bool:
         """
         Request approval for a single operation with CLI integration.
 
@@ -93,7 +109,9 @@ class CLIApprovalIntegration:
                     return auto_approval
 
             # Use the enhanced approval manager for full workflow
-            approved = await self.approval_manager.request_single_approval(operation)
+            approved = await self.approval_manager.request_single_approval(
+                operation
+            )
 
             # Log the decision
             self._log_approval_decision(operation, approved)
@@ -140,15 +158,22 @@ class CLIApprovalIntegration:
 
         except Exception as e:
             logger.error(f"Error in batch approval request: {e}")
-            self.console.print(f"[red]❌ Batch approval system error: {e}[/red]")
+            self.console.print(
+                f"[red]❌ Batch approval system error: {e}[/red]"
+            )
             return {
                 "approved_operations": [],
                 "total_operations": len(operations),
-                "approval_summary": {"all_approved": False, "approval_rate": 0.0},
+                "approval_summary": {
+                    "all_approved": False,
+                    "approval_rate": 0.0,
+                },
                 "error": str(e),
             }
 
-    async def _handle_single_approval(self, approval_context: Dict[str, Any]) -> bool:
+    async def _handle_single_approval(
+        self, approval_context: Dict[str, Any]
+    ) -> bool:
         """
         Handle single operation approval through CLI dialog.
 
@@ -165,7 +190,10 @@ class CLIApprovalIntegration:
 
             # Present approval dialog and get user decision
             decision = await self.prompt_handler.prompt_for_approval(
-                approval_request, preview, operation.data, self.approval_timeout_seconds
+                approval_request,
+                preview,
+                operation.data,
+                self.approval_timeout_seconds,
             )
 
             # Handle "remember" decision
@@ -195,27 +223,34 @@ class CLIApprovalIntegration:
         """
         try:
             # Present batch approval dialog
-            batch_decision = await self.prompt_handler.prompt_for_batch_approval(
-                batch_request, self.approval_timeout_seconds
+            batch_decision = (
+                await self.prompt_handler.prompt_for_batch_approval(
+                    batch_request, self.approval_timeout_seconds
+                )
             )
 
             # Process the batch decision
             if batch_decision.decision_type == "approve_all":
                 return {
                     "approve_all": True,
-                    "approved_indices": list(range(len(batch_request.operations))),
+                    "approved_indices": list(
+                        range(len(batch_request.operations))
+                    ),
                 }
             elif batch_decision.decision_type == "deny_all":
                 return {
                     "deny_all": True,
-                    "reason": batch_decision.user_notes or "User denied all operations",
+                    "reason": batch_decision.user_notes
+                    or "User denied all operations",
                 }
             elif batch_decision.decision_type == "selective":
                 return {"approved_indices": batch_decision.approved_indices}
             elif batch_decision.decision_type == "individual":
                 # Handle individual decisions with potential "remember" actions
                 approved_indices = []
-                for i, decision in enumerate(batch_decision.individual_decisions):
+                for i, decision in enumerate(
+                    batch_decision.individual_decisions
+                ):
                     if decision.is_approved:
                         approved_indices.append(i)
 
@@ -228,7 +263,9 @@ class CLIApprovalIntegration:
                                 description=operation.description,
                                 metadata=operation.data,
                             )
-                            await self._store_approval_pattern(operation, temp_request)
+                            await self._store_approval_pattern(
+                                operation, temp_request
+                            )
 
                 return {"approved_indices": approved_indices}
             else:
@@ -240,9 +277,14 @@ class CLIApprovalIntegration:
 
         except Exception as e:
             logger.error(f"Error in batch approval handler: {e}")
-            return {"deny_all": True, "reason": f"Error in batch approval: {str(e)}"}
+            return {
+                "deny_all": True,
+                "reason": f"Error in batch approval: {str(e)}",
+            }
 
-    async def _check_auto_approval(self, operation: Operation) -> Optional[bool]:
+    async def _check_auto_approval(
+        self, operation: Operation
+    ) -> Optional[bool]:
         """
         Check if operation should be auto-approved based on stored patterns.
 
@@ -347,7 +389,9 @@ class CLIApprovalIntegration:
             if "command" in operation.data:
                 command = operation.data["command"]
                 # Use base command name for matching
-                base_command = command.split()[0] if command.split() else command
+                base_command = (
+                    command.split()[0] if command.split() else command
+                )
                 signature_parts.append(f"cmd:{base_command}")
 
         elif operation.type == OperationType.WEB_REQUEST:
@@ -367,12 +411,16 @@ class CLIApprovalIntegration:
         """Log approval decision for audit trail."""
         log_entry = {
             "timestamp": (
-                operation.created_at.isoformat() if operation.created_at else None
+                operation.created_at.isoformat()
+                if operation.created_at
+                else None
             ),
             "operation_type": operation.type.value,
             "operation_description": operation.description,
             "approved": approved,
-            "operation_signature": self._generate_operation_signature(operation),
+            "operation_signature": self._generate_operation_signature(
+                operation
+            ),
         }
 
         self.approval_session_log.append(log_entry)
@@ -422,7 +470,9 @@ class CLIApprovalIntegration:
         # Store in session log
         session_entry = {
             **decision_record,
-            "operation_signature": self._generate_operation_signature(operation),
+            "operation_signature": self._generate_operation_signature(
+                operation
+            ),
         }
 
         self.approval_session_log.append(session_entry)
@@ -433,7 +483,11 @@ class CLIApprovalIntegration:
             return {"total_decisions": 0}
 
         total = len(
-            [entry for entry in self.approval_session_log if "decision_type" in entry]
+            [
+                entry
+                for entry in self.approval_session_log
+                if "decision_type" in entry
+            ]
         )
         approved = len(
             [
@@ -469,7 +523,9 @@ class CLIApprovalIntegration:
             "remember_rate": remembered / total if total > 0 else 0,
             "average_response_time_seconds": avg_response_time,
             "recent_decisions": (
-                self.approval_session_log[-10:] if self.approval_session_log else []
+                self.approval_session_log[-10:]
+                if self.approval_session_log
+                else []
             ),
         }
 
@@ -493,7 +549,9 @@ class CLIApprovalIntegration:
             self.enable_auto_approval = True
         else:
             # Restore normal approval behavior
-            self.approval_manager.set_approval_callback(self._handle_single_approval)
+            self.approval_manager.set_approval_callback(
+                self._handle_single_approval
+            )
 
     async def cleanup(self):
         """Clean up resources and save session information."""
@@ -511,7 +569,9 @@ class CLIApprovalIntegration:
 
             # Clean up expired approvals in permission controller
             if self.permission_controller:
-                expired_count = self.permission_controller.cleanup_expired_approvals()
+                expired_count = (
+                    self.permission_controller.cleanup_expired_approvals()
+                )
                 if expired_count > 0:
                     logger.info(
                         f"Cleaned up {expired_count} expired approvals during shutdown"
@@ -535,9 +595,13 @@ class CLIApprovalIntegration:
 
             # Clean up expired batch requests
             if hasattr(self.approval_manager, "cleanup_expired_requests"):
-                expired_count = self.approval_manager.cleanup_expired_requests()
+                expired_count = (
+                    self.approval_manager.cleanup_expired_requests()
+                )
                 if expired_count > 0:
-                    logger.info(f"Cleaned up {expired_count} expired batch requests")
+                    logger.info(
+                        f"Cleaned up {expired_count} expired batch requests"
+                    )
 
             # Log pending operations that will be cancelled
             pending_operations = getattr(
@@ -586,9 +650,9 @@ class CLIApprovalIntegration:
                     if hasattr(self.approval_manager, "completed_batches"):
                         for batch_id in cancelled_batches:
                             batch_request = pending_batches[batch_id]
-                            self.approval_manager.completed_batches[batch_id] = (
-                                batch_request
-                            )
+                            self.approval_manager.completed_batches[
+                                batch_id
+                            ] = batch_request
                             del pending_batches[batch_id]
 
         except Exception as e:
@@ -658,7 +722,9 @@ class CLIApprovalIntegration:
             # This could include temporary files, locks, etc.
 
         except Exception as e:
-            logger.error(f"Error cleaning up operation state for {operation_id}: {e}")
+            logger.error(
+                f"Error cleaning up operation state for {operation_id}: {e}"
+            )
 
 
 # Utility functions for easy integration
@@ -719,4 +785,6 @@ def inject_approval_integration_into_agent_engine(
 
         logger.info("CLI approval integration injected into agent engine")
     else:
-        logger.warning("Agent engine has no approval manager to integrate with")
+        logger.warning(
+            "Agent engine has no approval manager to integrate with"
+        )

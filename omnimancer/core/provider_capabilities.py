@@ -375,7 +375,9 @@ def get_essential_config_fields() -> List[str]:
     ]
 
 
-def should_store_in_config(field_name: str, value: Any, provider_type: str) -> bool:
+def should_store_in_config(
+    field_name: str, value: Any, provider_type: str
+) -> bool:
     """
     Determine if a configuration field should be stored in the config file.
 

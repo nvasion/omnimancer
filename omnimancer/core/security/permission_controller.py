@@ -175,18 +175,24 @@ class PermissionController:
                 # Don't allow writes to system directories
                 system_prefixes = ["/usr", "/etc", "/System", "/sys", "/proc"]
                 if any(
-                    normalized_path.startswith(prefix) for prefix in system_prefixes
+                    normalized_path.startswith(prefix)
+                    for prefix in system_prefixes
                 ):
                     return False
 
                 # Allow writes to project directory and safe temporary directories
                 project_root = os.getcwd()
-                safe_temp_prefixes = ["/tmp", "/var/tmp", tempfile.gettempdir()]
+                safe_temp_prefixes = [
+                    "/tmp",
+                    "/var/tmp",
+                    tempfile.gettempdir(),
+                ]
 
                 # Check if path is in project directory or safe temp directory
                 is_in_project = normalized_path.startswith(project_root)
                 is_in_safe_temp = any(
-                    normalized_path.startswith(prefix) for prefix in safe_temp_prefixes
+                    normalized_path.startswith(prefix)
+                    for prefix in safe_temp_prefixes
                 )
 
                 if not (is_in_project or is_in_safe_temp):
@@ -362,7 +368,9 @@ class PermissionController:
 
                 # Check if approval has expired
                 if "expires_at" in approval_data:
-                    expires_at = datetime.fromisoformat(approval_data["expires_at"])
+                    expires_at = datetime.fromisoformat(
+                        approval_data["expires_at"]
+                    )
                     if datetime.now() > expires_at:
                         # Remove expired approval
                         del self._approval_memory[operation_signature]
@@ -458,7 +466,8 @@ class PermissionController:
         for signature, approval_data in self._approval_memory.items():
             learned.append(
                 {
-                    "pattern": signature[:50] + ("..." if len(signature) > 50 else ""),
+                    "pattern": signature[:50]
+                    + ("..." if len(signature) > 50 else ""),
                     "decision": "approved",
                     "count": 1,  # Could track actual usage count in the future
                     "last_used": approval_data.get("stored_at", ""),
@@ -494,7 +503,9 @@ class PermissionController:
         for signature, approval_data in self._approval_memory.items():
             if "expires_at" in approval_data:
                 try:
-                    expires_at = datetime.fromisoformat(approval_data["expires_at"])
+                    expires_at = datetime.fromisoformat(
+                        approval_data["expires_at"]
+                    )
                     if now > expires_at:
                         expired_signatures.append(signature)
                 except Exception:

@@ -96,7 +96,10 @@ def sample_tool_definitions():
             parameters={
                 "type": "object",
                 "properties": {
-                    "input": {"type": "string", "description": "Input parameter"}
+                    "input": {
+                        "type": "string",
+                        "description": "Input parameter",
+                    }
                 },
                 "required": ["input"],
             },
@@ -152,7 +155,9 @@ class TestMCPClient:
                                 "description": "A test tool",
                                 "inputSchema": {
                                     "type": "object",
-                                    "properties": {"input": {"type": "string"}},
+                                    "properties": {
+                                        "input": {"type": "string"}
+                                    },
                                 },
                             }
                         ]
@@ -175,7 +180,9 @@ class TestMCPClient:
         assert "test_tool" in client.tools
 
     @pytest.mark.asyncio
-    async def test_client_connect_process_fails(self, sample_mcp_server_config):
+    async def test_client_connect_process_fails(
+        self, sample_mcp_server_config
+    ):
         """Test client connection when process fails to start."""
         client = MCPClient(sample_mcp_server_config)
 
@@ -190,7 +197,9 @@ class TestMCPClient:
         assert client.connected is False
 
     @pytest.mark.asyncio
-    async def test_client_disconnect(self, sample_mcp_server_config, mock_mcp_process):
+    async def test_client_disconnect(
+        self, sample_mcp_server_config, mock_mcp_process
+    ):
         """Test client disconnection."""
         client = MCPClient(sample_mcp_server_config)
         client.process = mock_mcp_process
@@ -205,11 +214,15 @@ class TestMCPClient:
         mock_mcp_process.terminate.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_client_list_tools_not_connected(self, sample_mcp_server_config):
+    async def test_client_list_tools_not_connected(
+        self, sample_mcp_server_config
+    ):
         """Test listing tools when not connected."""
         client = MCPClient(sample_mcp_server_config)
 
-        with pytest.raises(MCPServerError, match="Not connected to MCP server"):
+        with pytest.raises(
+            MCPServerError, match="Not connected to MCP server"
+        ):
             await client.list_tools()
 
     @pytest.mark.asyncio
@@ -318,7 +331,9 @@ class TestMCPClient:
         client.process = mock_mcp_process
 
         # Mock ping response
-        mock_response = json.dumps({"jsonrpc": "2.0", "id": 1, "result": "pong"})
+        mock_response = json.dumps(
+            {"jsonrpc": "2.0", "id": 1, "result": "pong"}
+        )
 
         mock_mcp_process.stdout.readline.return_value = mock_response + "\n"
         mock_mcp_process.stdout.readable.return_value = True
@@ -327,7 +342,9 @@ class TestMCPClient:
         assert is_healthy is True
 
     @pytest.mark.asyncio
-    async def test_client_health_check_unhealthy(self, sample_mcp_server_config):
+    async def test_client_health_check_unhealthy(
+        self, sample_mcp_server_config
+    ):
         """Test health check on unhealthy server."""
         client = MCPClient(sample_mcp_server_config)
         client.connected = False
@@ -335,7 +352,9 @@ class TestMCPClient:
         is_healthy = await client.health_check()
         assert is_healthy is False
 
-    def test_client_properties(self, sample_mcp_server_config, mock_mcp_process):
+    def test_client_properties(
+        self, sample_mcp_server_config, mock_mcp_process
+    ):
         """Test client properties."""
         client = MCPClient(sample_mcp_server_config)
 
@@ -396,7 +415,9 @@ class TestMCPManager:
             args=["arg1"],
             enabled=False,  # Explicitly disabled
         )
-        config = MCPConfig(enabled=True, servers={"disabled_server": disabled_server})
+        config = MCPConfig(
+            enabled=True, servers={"disabled_server": disabled_server}
+        )
         manager = MCPManager(config)
 
         # Mock logging to verify disabled servers are logged
@@ -422,7 +443,9 @@ class TestMCPManager:
         mock_client = AsyncMock(spec=MCPClient)
         mock_client.connect = AsyncMock()
 
-        with patch("omnimancer.mcp.manager.MCPClient", return_value=mock_client):
+        with patch(
+            "omnimancer.mcp.manager.MCPClient", return_value=mock_client
+        ):
             await manager.initialize_servers()
 
         assert manager.initialized is True
@@ -431,11 +454,16 @@ class TestMCPManager:
         mock_client.connect.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_manager_initialize_servers_partial_failure(self, sample_mcp_config):
+    async def test_manager_initialize_servers_partial_failure(
+        self, sample_mcp_config
+    ):
         """Test server initialization with partial failures."""
         # Add another server that will fail
         failing_config = MCPServerConfig(
-            name="failing_server", command="nonexistent_command", args=[], enabled=True
+            name="failing_server",
+            command="nonexistent_command",
+            args=[],
+            enabled=True,
         )
         sample_mcp_config.servers["failing_server"] = failing_config
 
@@ -447,10 +475,14 @@ class TestMCPManager:
             if config.name == "test_server":
                 client.connect = AsyncMock()
             else:
-                client.connect = AsyncMock(side_effect=Exception("Connection failed"))
+                client.connect = AsyncMock(
+                    side_effect=Exception("Connection failed")
+                )
             return client
 
-        with patch("omnimancer.mcp.manager.MCPClient", side_effect=mock_client_factory):
+        with patch(
+            "omnimancer.mcp.manager.MCPClient", side_effect=mock_client_factory
+        ):
             await manager.initialize_servers()
 
         assert manager.initialized is True
@@ -487,7 +519,9 @@ class TestMCPManager:
         # Mock client with tools
         mock_client = AsyncMock(spec=MCPClient)
         mock_client.is_connected = True
-        mock_client.list_tools = AsyncMock(return_value=sample_tool_definitions)
+        mock_client.list_tools = AsyncMock(
+            return_value=sample_tool_definitions
+        )
         manager.clients = {"test_server": mock_client}
 
         tools = await manager.get_available_tools()
@@ -498,7 +532,9 @@ class TestMCPManager:
         mock_client.list_tools.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_manager_get_available_tools_not_initialized(self, sample_mcp_config):
+    async def test_manager_get_available_tools_not_initialized(
+        self, sample_mcp_config
+    ):
         """Test getting tools when manager is not initialized."""
         manager = MCPManager(sample_mcp_config)
         manager.initialized = False
@@ -525,7 +561,9 @@ class TestMCPManager:
         mock_client.call_tool_with_retry = AsyncMock(return_value=mock_result)
         manager.clients = {"test_server": mock_client}
 
-        result = await manager.execute_tool("calculate", {"expression": "6 * 7"})
+        result = await manager.execute_tool(
+            "calculate", {"expression": "6 * 7"}
+        )
 
         assert result == mock_result
         mock_client.call_tool_with_retry.assert_called_once_with(
@@ -549,7 +587,9 @@ class TestMCPManager:
             await manager.execute_tool("nonexistent", {})
 
     @pytest.mark.asyncio
-    async def test_manager_execute_tool_not_initialized(self, sample_mcp_config):
+    async def test_manager_execute_tool_not_initialized(
+        self, sample_mcp_config
+    ):
         """Test executing tool when manager is not initialized."""
         manager = MCPManager(sample_mcp_config)
         manager.initialized = False
@@ -647,9 +687,13 @@ class TestMCPManager:
 
         # Test counts with clients
         assert manager.connected_server_count == 1  # Only server1 is connected
-        assert manager.total_tool_count == 2  # Only tools from connected servers
+        assert (
+            manager.total_tool_count == 2
+        )  # Only tools from connected servers
 
-    def test_manager_get_tool_by_name(self, sample_mcp_config, sample_tool_definitions):
+    def test_manager_get_tool_by_name(
+        self, sample_mcp_config, sample_tool_definitions
+    ):
         """Test getting a tool by name."""
         manager = MCPManager(sample_mcp_config)
 
@@ -678,7 +722,9 @@ class TestMCPManager:
         # Mock client with tools
         mock_client = MagicMock(spec=MCPClient)
         mock_client.is_connected = True
-        mock_client.tools = {tool.name: tool for tool in sample_tool_definitions}
+        mock_client.tools = {
+            tool.name: tool for tool in sample_tool_definitions
+        }
         manager.clients = {"test_server": mock_client}
 
         # Test getting tools from existing server
@@ -719,9 +765,13 @@ class TestMCPIntegrationScenarios:
             error=None,
             metadata={"execution_time": 0.1},
         )
-        mock_client.call_tool_with_retry = AsyncMock(return_value=expected_result)
+        mock_client.call_tool_with_retry = AsyncMock(
+            return_value=expected_result
+        )
 
-        with patch("omnimancer.mcp.manager.MCPClient", return_value=mock_client):
+        with patch(
+            "omnimancer.mcp.manager.MCPClient", return_value=mock_client
+        ):
             # Initialize servers
             await manager.initialize_servers()
             assert manager.initialized is True
@@ -746,14 +796,21 @@ class TestMCPIntegrationScenarios:
         """Test workflow with multiple MCP servers."""
         # Create config with multiple servers
         server1_config = MCPServerConfig(
-            name="server1", command="python3", args=["-m", "server1"], enabled=True
+            name="server1",
+            command="python3",
+            args=["-m", "server1"],
+            enabled=True,
         )
         server2_config = MCPServerConfig(
-            name="server2", command="python3", args=["-m", "server2"], enabled=True
+            name="server2",
+            command="python3",
+            args=["-m", "server2"],
+            enabled=True,
         )
 
         config = MCPConfig(
-            enabled=True, servers={"server1": server1_config, "server2": server2_config}
+            enabled=True,
+            servers={"server1": server1_config, "server2": server2_config},
         )
 
         manager = MCPManager(config)
@@ -791,7 +848,9 @@ class TestMCPIntegrationScenarios:
 
             return client
 
-        with patch("omnimancer.mcp.manager.MCPClient", side_effect=mock_client_factory):
+        with patch(
+            "omnimancer.mcp.manager.MCPClient", side_effect=mock_client_factory
+        ):
             await manager.initialize_servers()
 
             # Should have both servers connected
@@ -839,7 +898,9 @@ class TestMCPIntegrationScenarios:
             client.list_tools = AsyncMock(return_value=[])
             return client
 
-        with patch("omnimancer.mcp.manager.MCPClient", side_effect=mock_client_factory):
+        with patch(
+            "omnimancer.mcp.manager.MCPClient", side_effect=mock_client_factory
+        ):
             # First initialization should fail
             await manager.initialize_servers()
             assert len(manager.clients) == 0  # No successful connections
@@ -877,12 +938,16 @@ class TestMCPIntegrationScenarios:
         async def mock_call_tool_with_retry(name, args):
             await asyncio.sleep(0.1)  # Simulate processing time
             return ToolResult(
-                content=f"Result from {name}", error=None, metadata={"tool": name}
+                content=f"Result from {name}",
+                error=None,
+                metadata={"tool": name},
             )
 
         mock_client.call_tool_with_retry = mock_call_tool_with_retry
 
-        with patch("omnimancer.mcp.manager.MCPClient", return_value=mock_client):
+        with patch(
+            "omnimancer.mcp.manager.MCPClient", return_value=mock_client
+        ):
             await manager.initialize_servers()
 
             # Execute multiple tools concurrently
@@ -917,7 +982,9 @@ class TestMCPErrorHandling:
 
         # Mock process that crashes
         mock_process = MagicMock()
-        mock_process.poll.return_value = 1  # Process has crashed (non-zero exit code)
+        mock_process.poll.return_value = (
+            1  # Process has crashed (non-zero exit code)
+        )
         mock_process.stdin = MagicMock()
         mock_process.stdout = MagicMock()
         mock_process.stderr = MagicMock()
@@ -1001,7 +1068,10 @@ class TestMCPErrorHandling:
                     enabled=True,
                 ),
                 "failing_server": MCPServerConfig(
-                    name="failing_server", command="nonexistent", args=[], enabled=True
+                    name="failing_server",
+                    command="nonexistent",
+                    args=[],
+                    enabled=True,
                 ),
             },
         )
@@ -1022,12 +1092,16 @@ class TestMCPErrorHandling:
                 client.list_tools = AsyncMock(return_value=[working_tool])
                 client.tools = {"working_tool": working_tool}
             else:
-                client.connect = AsyncMock(side_effect=Exception("Failed to connect"))
+                client.connect = AsyncMock(
+                    side_effect=Exception("Failed to connect")
+                )
                 client.is_connected = False
                 client.tools = {}
             return client
 
-        with patch("omnimancer.mcp.manager.MCPClient", side_effect=mock_client_factory):
+        with patch(
+            "omnimancer.mcp.manager.MCPClient", side_effect=mock_client_factory
+        ):
             await manager.initialize_servers()
 
             # Should have one working server

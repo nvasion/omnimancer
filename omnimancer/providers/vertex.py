@@ -63,7 +63,9 @@ class VertexAIProvider(BaseProvider):
 
         # Validate required configuration
         if not self.vertex_project:
-            raise ValueError("vertex_project is required for Vertex AI provider")
+            raise ValueError(
+                "vertex_project is required for Vertex AI provider"
+            )
 
         # Set up authentication
         self._setup_authentication()
@@ -76,7 +78,9 @@ class VertexAIProvider(BaseProvider):
         if self.service_account_path:
             # Use service account file
             if os.path.exists(self.service_account_path):
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.service_account_path
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
+                    self.service_account_path
+                )
             else:
                 raise ValueError(
                     f"Service account file not found: {self.service_account_path}"
@@ -93,9 +97,13 @@ class VertexAIProvider(BaseProvider):
                     "Either service_account_path or api_key must be provided for Vertex AI"
                 )
             except Exception as e:
-                raise ValueError(f"Failed to set up Vertex AI authentication: {e}")
+                raise ValueError(
+                    f"Failed to set up Vertex AI authentication: {e}"
+                )
 
-    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
+    async def send_message(
+        self, message: str, context: ChatContext
+    ) -> ChatResponse:
         """
         Send a message to Vertex AI API.
 
@@ -133,7 +141,10 @@ class VertexAIProvider(BaseProvider):
             raise ProviderError(f"Unexpected error: {e}")
 
     async def send_message_with_tools(
-        self, message: str, context: ChatContext, available_tools: List[ToolDefinition]
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
     ) -> ChatResponse:
         """
         Send a message with available tools for Vertex AI to use.
@@ -186,7 +197,10 @@ class VertexAIProvider(BaseProvider):
 
             test_request = {
                 "contents": [{"role": "user", "parts": [{"text": "Hi"}]}],
-                "generationConfig": {"maxOutputTokens": 10, "temperature": 0.1},
+                "generationConfig": {
+                    "maxOutputTokens": 10,
+                    "temperature": 0.1,
+                },
             }
 
             async with httpx.AsyncClient() as client:
@@ -216,7 +230,9 @@ class VertexAIProvider(BaseProvider):
 
         return headers
 
-    def _prepare_vertex_request(self, message: str, context: ChatContext) -> Dict:
+    def _prepare_vertex_request(
+        self, message: str, context: ChatContext
+    ) -> Dict:
         """
         Prepare request data for Vertex AI API.
 
@@ -315,8 +331,12 @@ class VertexAIProvider(BaseProvider):
         ]
 
         for category in categories:
-            threshold = self.safety_settings.get(category, "BLOCK_MEDIUM_AND_ABOVE")
-            safety_settings.append({"category": category, "threshold": threshold})
+            threshold = self.safety_settings.get(
+                category, "BLOCK_MEDIUM_AND_ABOVE"
+            )
+            safety_settings.append(
+                {"category": category, "threshold": threshold}
+            )
 
         return safety_settings
 
@@ -365,17 +385,23 @@ class VertexAIProvider(BaseProvider):
         elif response.status_code == 429:
             raise RateLimitError("Vertex AI API rate limit exceeded")
         elif response.status_code == 404:
-            raise ModelNotFoundError(f"Vertex AI model '{self.model}' not found")
+            raise ModelNotFoundError(
+                f"Vertex AI model '{self.model}' not found"
+            )
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get("message", "Unknown error")
+                error_msg = error_data.get("error", {}).get(
+                    "message", "Unknown error"
+                )
             except:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Vertex AI API error: {error_msg}")
 
-    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
+    def _handle_response_with_tools(
+        self, response: httpx.Response
+    ) -> ChatResponse:
         """
         Handle Vertex AI API response with tool calls.
 

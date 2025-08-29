@@ -79,9 +79,13 @@ class PerformanceDashboard:
             self._print_header("Omnimancer Performance Overview")
 
             # Get current data
-            dashboard_data = self.performance_monitor.get_performance_dashboard_data()
+            dashboard_data = (
+                self.performance_monitor.get_performance_dashboard_data()
+            )
             metrics_data = self.metrics_collector.get_dashboard_metrics()
-            token_summary = self.token_tracker.get_usage_summary(timedelta(hours=1))
+            token_summary = self.token_tracker.get_usage_summary(
+                timedelta(hours=1)
+            )
 
             # Create layout
             layout = self._create_overview_layout(
@@ -122,7 +126,9 @@ class PerformanceDashboard:
             self.console.clear()
             self.available_views[view_name]()
         except Exception as e:
-            self.console.print(f"[red]Error displaying {view_name} view: {e}[/red]")
+            self.console.print(
+                f"[red]Error displaying {view_name} view: {e}[/red]"
+            )
             logger.error(f"Dashboard view error: {e}")
 
     def start_live_dashboard(self, view: str = "overview") -> None:
@@ -161,9 +167,13 @@ class PerformanceDashboard:
     def _generate_live_layout(self) -> Layout:
         """Generate live updating layout."""
         if self.current_view == "overview":
-            dashboard_data = self.performance_monitor.get_performance_dashboard_data()
+            dashboard_data = (
+                self.performance_monitor.get_performance_dashboard_data()
+            )
             metrics_data = self.metrics_collector.get_dashboard_metrics()
-            token_summary = self.token_tracker.get_usage_summary(timedelta(hours=1))
+            token_summary = self.token_tracker.get_usage_summary(
+                timedelta(hours=1)
+            )
             return self._create_overview_layout(
                 dashboard_data, metrics_data, token_summary
             )
@@ -189,14 +199,18 @@ class PerformanceDashboard:
         layout = Layout()
 
         # Split into header and body
-        layout.split_column(Layout(self._render_header(), size=3), Layout(name="body"))
+        layout.split_column(
+            Layout(self._render_header(), size=3), Layout(name="body")
+        )
 
         # Split body into sections
         layout["body"].split_row(Layout(name="left"), Layout(name="right"))
 
         # Left column: performance and resources
         layout["left"].split_column(
-            Layout(self._create_performance_panel(dashboard_data, metrics_data)),
+            Layout(
+                self._create_performance_panel(dashboard_data, metrics_data)
+            ),
             Layout(self._create_resources_panel(metrics_data)),
         )
 
@@ -210,9 +224,12 @@ class PerformanceDashboard:
 
     def _render_header(self) -> Panel:
         """Render dashboard header."""
-        title_text = Text("Omnimancer Agent Performance Dashboard", style="bold blue")
+        title_text = Text(
+            "Omnimancer Agent Performance Dashboard", style="bold blue"
+        )
         subtitle_text = Text(
-            f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", style="dim"
+            f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            style="dim",
         )
         header_content = Align.center(f"{title_text}\n{subtitle_text}")
 
@@ -226,7 +243,9 @@ class PerformanceDashboard:
         performance_metrics = metrics_data.get("performance", {})
 
         # Performance table
-        table = Table(show_header=True, header_style="bold magenta", box=box.SIMPLE)
+        table = Table(
+            show_header=True, header_style="bold magenta", box=box.SIMPLE
+        )
         table.add_column("Metric", style="cyan")
         table.add_column("Value", justify="right")
         table.add_column("Status", justify="center")
@@ -236,7 +255,9 @@ class PerformanceDashboard:
         response_status = self._get_status_indicator(
             response_time, 1000, 5000
         )  # Good < 1s, Warning < 5s
-        table.add_row("Avg Response Time", f"{response_time:.0f} ms", response_status)
+        table.add_row(
+            "Avg Response Time", f"{response_time:.0f} ms", response_status
+        )
 
         # Success rate
         success_rate = performance_metrics.get("success_rate_percent", 100)
@@ -259,7 +280,9 @@ class PerformanceDashboard:
         resources = metrics_data.get("resources", {})
 
         # Resources table
-        table = Table(show_header=True, header_style="bold magenta", box=box.SIMPLE)
+        table = Table(
+            show_header=True, header_style="bold magenta", box=box.SIMPLE
+        )
         table.add_column("Resource", style="cyan")
         table.add_column("Usage", justify="right")
         table.add_column("Status", justify="center")
@@ -284,7 +307,9 @@ class PerformanceDashboard:
     def _create_token_usage_panel(self, token_summary: Dict) -> Panel:
         """Create token usage panel."""
         # Token usage table
-        table = Table(show_header=True, header_style="bold magenta", box=box.SIMPLE)
+        table = Table(
+            show_header=True, header_style="bold magenta", box=box.SIMPLE
+        )
         table.add_column("Metric", style="cyan")
         table.add_column("Last Hour", justify="right")
         table.add_column("Rate", justify="right")
@@ -294,18 +319,26 @@ class PerformanceDashboard:
         total_requests = token_summary.get("total_requests", 0)
         avg_tokens = token_summary.get("average_tokens_per_request", 0)
 
-        table.add_row("Total Tokens", f"{total_tokens:,}", f"{total_tokens/60:.0f}/min")
-        table.add_row("Requests", f"{total_requests:,}", f"{total_requests/60:.1f}/min")
+        table.add_row(
+            "Total Tokens", f"{total_tokens:,}", f"{total_tokens/60:.0f}/min"
+        )
+        table.add_row(
+            "Requests", f"{total_requests:,}", f"{total_requests/60:.1f}/min"
+        )
         table.add_row("Avg Tokens/Request", f"{avg_tokens:.0f}", "-")
 
         # Cost information
         total_cost = token_summary.get("total_cost", 0.0)
         avg_cost = token_summary.get("average_cost_per_request", 0.0)
 
-        table.add_row("Total Cost", f"${total_cost:.3f}", f"${total_cost/60:.4f}/min")
+        table.add_row(
+            "Total Cost", f"${total_cost:.3f}", f"${total_cost/60:.4f}/min"
+        )
         table.add_row("Avg Cost/Request", f"${avg_cost:.4f}", "-")
 
-        return Panel(table, title="Token Usage (Last Hour)", border_style="blue")
+        return Panel(
+            table, title="Token Usage (Last Hour)", border_style="blue"
+        )
 
     def _create_status_panel(self, dashboard_data: Dict) -> Panel:
         """Create monitoring status panel."""
@@ -325,7 +358,9 @@ class PerformanceDashboard:
         status_text = "\n".join(status_lines)
         status_color = "green" if monitoring_status == "active" else "red"
 
-        return Panel(status_text, title="System Status", border_style=status_color)
+        return Panel(
+            status_text, title="System Status", border_style=status_color
+        )
 
     def _get_status_indicator(
         self,
@@ -367,7 +402,9 @@ class PerformanceDashboard:
         self._print_header("Performance Overview")
 
         # Get data and display
-        dashboard_data = self.performance_monitor.get_performance_dashboard_data()
+        dashboard_data = (
+            self.performance_monitor.get_performance_dashboard_data()
+        )
         self.console.print(json.dumps(dashboard_data, indent=2, default=str))
 
     def _render_token_usage(self) -> None:
@@ -380,7 +417,9 @@ class PerformanceDashboard:
 
         # Create comparison table
         table = Table(
-            title="Token Usage Summary", show_header=True, header_style="bold magenta"
+            title="Token Usage Summary",
+            show_header=True,
+            header_style="bold magenta",
         )
         table.add_column("Metric", style="cyan")
         table.add_column("Last Hour", justify="right")
@@ -437,7 +476,9 @@ class PerformanceDashboard:
         performance = metrics_data.get("performance", {})
 
         perf_table = Table(
-            title="Performance Summary", show_header=True, header_style="bold magenta"
+            title="Performance Summary",
+            show_header=True,
+            header_style="bold magenta",
         )
         perf_table.add_column("Metric", style="cyan")
         perf_table.add_column("Value", justify="right")
@@ -495,7 +536,9 @@ class PerformanceDashboard:
         """Render alerts page."""
         self._print_header("Performance Alerts")
 
-        dashboard_data = self.performance_monitor.get_performance_dashboard_data()
+        dashboard_data = (
+            self.performance_monitor.get_performance_dashboard_data()
+        )
         alerts = dashboard_data.get("active_alerts", [])
 
         if not alerts:
@@ -509,16 +552,22 @@ class PerformanceDashboard:
         """Render optimization suggestions page."""
         self._print_header("Optimization Suggestions")
 
-        dashboard_data = self.performance_monitor.get_performance_dashboard_data()
+        dashboard_data = (
+            self.performance_monitor.get_performance_dashboard_data()
+        )
         suggestions = dashboard_data.get("suggestions", [])
 
         # Also get token usage suggestions
-        token_suggestions = self.token_tracker.get_cost_optimization_suggestions()
+        token_suggestions = (
+            self.token_tracker.get_cost_optimization_suggestions()
+        )
 
         all_suggestions = suggestions + token_suggestions
 
         if not all_suggestions:
-            self.console.print("[green]No optimization suggestions available[/green]")
+            self.console.print(
+                "[green]No optimization suggestions available[/green]"
+            )
             return
 
         for suggestion in all_suggestions:
@@ -600,7 +649,9 @@ class PerformanceDashboard:
             "token_summary_24h": self.token_tracker.get_usage_summary(
                 timedelta(hours=24)
             ),
-            "usage_patterns": asdict(self.token_tracker.analyze_usage_patterns(7)),
+            "usage_patterns": asdict(
+                self.token_tracker.analyze_usage_patterns(7)
+            ),
             "optimization_suggestions": self.token_tracker.get_cost_optimization_suggestions(),
         }
 

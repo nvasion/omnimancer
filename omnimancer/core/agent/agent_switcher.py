@@ -104,7 +104,9 @@ class SessionState:
         if "created_at" in data:
             data["created_at"] = datetime.fromisoformat(data["created_at"])
         if "last_modified" in data:
-            data["last_modified"] = datetime.fromisoformat(data["last_modified"])
+            data["last_modified"] = datetime.fromisoformat(
+                data["last_modified"]
+            )
         return cls(**data)
 
     def to_pickle(self) -> bytes:
@@ -172,7 +174,8 @@ class AgentSwitcher:
         self.agent_config = agent_config
         self.status_manager = status_manager or get_status_manager()
         self.state_storage_path = (
-            state_storage_path or Path.home() / ".omnimancer" / "session_states"
+            state_storage_path
+            or Path.home() / ".omnimancer" / "session_states"
         )
 
         # Ensure storage directory exists
@@ -228,7 +231,9 @@ class AgentSwitcher:
                 self.current_state = SwitchState.PREPARING
 
                 # Get target persona
-                target_persona = self.persona_manager.get_persona(target_persona_id)
+                target_persona = self.persona_manager.get_persona(
+                    target_persona_id
+                )
                 if not target_persona:
                     raise SwitchValidationError(
                         f"Persona not found: {target_persona_id}"
@@ -270,10 +275,15 @@ class AgentSwitcher:
                 if current_persona:
                     self.persona_manager.deactivate_persona()
 
-                success = self.persona_manager.activate_persona(target_persona_id)
+                success = self.persona_manager.activate_persona(
+                    target_persona_id
+                )
                 if not success:
                     self._rollback(context)
-                    return (False, f"Failed to activate persona: {target_persona_id}")
+                    return (
+                        False,
+                        f"Failed to activate persona: {target_persona_id}",
+                    )
 
                 # Post-switch phase
                 for hook in self._post_switch_hooks:
@@ -287,7 +297,9 @@ class AgentSwitcher:
                 self.current_state = SwitchState.COMPLETE
                 self.switch_history.append(context)
 
-                logger.info(f"Successfully switched to persona: {target_persona_id}")
+                logger.info(
+                    f"Successfully switched to persona: {target_persona_id}"
+                )
                 return (True, f"Switched to {target_persona.name}")
 
             except Exception as e:
@@ -333,16 +345,22 @@ class AgentSwitcher:
             try:
                 result = validator(context)
                 if not result[0]:
-                    context.validation_checks.append(f"Failed: {validator.__name__}")
+                    context.validation_checks.append(
+                        f"Failed: {validator.__name__}"
+                    )
                     return result
-                context.validation_checks.append(f"Passed: {validator.__name__}")
+                context.validation_checks.append(
+                    f"Passed: {validator.__name__}"
+                )
             except Exception as e:
                 logger.error(f"Validation hook error: {e}")
                 return (False, f"Validation error: {e}")
 
         return (True, "All validations passed")
 
-    def _validate_persona_available(self, context: SwitchContext) -> Tuple[bool, str]:
+    def _validate_persona_available(
+        self, context: SwitchContext
+    ) -> Tuple[bool, str]:
         """Validate that target persona is available."""
         if context.to_persona.status not in [
             PersonaStatus.AVAILABLE,
@@ -365,7 +383,9 @@ class AgentSwitcher:
             )
         return (True, "No active operations")
 
-    def _validate_state_integrity(self, context: SwitchContext) -> Tuple[bool, str]:
+    def _validate_state_integrity(
+        self, context: SwitchContext
+    ) -> Tuple[bool, str]:
         """Validate state integrity."""
         try:
             # Test serialization/deserialization
@@ -388,19 +408,24 @@ class AgentSwitcher:
         # Persist to disk if we have a from_persona
         if context.from_persona:
             state_file = (
-                self.state_storage_path / f"{context.from_persona.id}_state.json"
+                self.state_storage_path
+                / f"{context.from_persona.id}_state.json"
             )
             try:
                 with open(state_file, "w") as f:
                     f.write(context.session_state.to_json())
-                logger.debug(f"Saved state for persona: {context.from_persona.id}")
+                logger.debug(
+                    f"Saved state for persona: {context.from_persona.id}"
+                )
             except Exception as e:
                 logger.error(f"Failed to save state: {e}")
 
     def _restore_state(self, context: SwitchContext) -> None:
         """Restore state after switch."""
         # Check if we have saved state for the target persona
-        state_file = self.state_storage_path / f"{context.to_persona.id}_state.json"
+        state_file = (
+            self.state_storage_path / f"{context.to_persona.id}_state.json"
+        )
 
         if state_file.exists():
             try:
@@ -415,10 +440,14 @@ class AgentSwitcher:
 
                 # Restore to persona
                 if "session_data" in saved_state.persona_data:
-                    for key, value in saved_state.persona_data["session_data"].items():
+                    for key, value in saved_state.persona_data[
+                        "session_data"
+                    ].items():
                         context.to_persona.set_session_data(key, value)
 
-                logger.debug(f"Restored state for persona: {context.to_persona.id}")
+                logger.debug(
+                    f"Restored state for persona: {context.to_persona.id}"
+                )
             except Exception as e:
                 logger.error(f"Failed to restore state: {e}")
 
@@ -527,7 +556,10 @@ class AgentSwitcher:
 
         # Check if switch is in progress
         if self.current_state != SwitchState.IDLE:
-            return (False, f"Switch in progress (state: {self.current_state.value})")
+            return (
+                False,
+                f"Switch in progress (state: {self.current_state.value})",
+            )
 
         # Create mock context for validation
         mock_context = SwitchContext(
@@ -566,7 +598,9 @@ class AgentSwitcher:
                     )
 
                     # Call the operation handler
-                    handled = operation_handler(current_state.active_operations)
+                    handled = operation_handler(
+                        current_state.active_operations
+                    )
                     if not handled:
                         return (False, "Could not handle active operations")
 
@@ -575,7 +609,9 @@ class AgentSwitcher:
 
             # Proceed with normal switch (outside of lock to avoid deadlock)
             return self.switch_persona(
-                target_persona_id, reason="Switch with operation handling", force=False
+                target_persona_id,
+                reason="Switch with operation handling",
+                force=False,
             )
 
         except Exception as e:
@@ -601,7 +637,9 @@ class AgentSwitcher:
             elif format == "pickle":
                 import base64
 
-                return base64.b64encode(self.current_session_state.to_pickle()).decode()
+                return base64.b64encode(
+                    self.current_session_state.to_pickle()
+                ).decode()
             else:
                 logger.error(f"Unknown export format: {format}")
                 return None
@@ -609,7 +647,9 @@ class AgentSwitcher:
             logger.error(f"Failed to export session state: {e}")
             return None
 
-    def import_session_state(self, state_data: str, format: str = "json") -> bool:
+    def import_session_state(
+        self, state_data: str, format: str = "json"
+    ) -> bool:
         """
         Import session state.
 
@@ -627,7 +667,9 @@ class AgentSwitcher:
                 import base64
 
                 pickle_data = base64.b64decode(state_data.encode())
-                self.current_session_state = SessionState.from_pickle(pickle_data)
+                self.current_session_state = SessionState.from_pickle(
+                    pickle_data
+                )
             else:
                 logger.error(f"Unknown import format: {format}")
                 return False

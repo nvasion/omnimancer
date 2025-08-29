@@ -132,7 +132,11 @@ def mock_successful_response():
                 }
             }
         ],
-        "usage": {"total_tokens": 50, "prompt_tokens": 25, "completion_tokens": 25},
+        "usage": {
+            "total_tokens": 50,
+            "prompt_tokens": 25,
+            "completion_tokens": 25,
+        },
     }
 
 
@@ -157,7 +161,11 @@ def mock_tool_response():
                 }
             }
         ],
-        "usage": {"total_tokens": 40, "prompt_tokens": 20, "completion_tokens": 20},
+        "usage": {
+            "total_tokens": 40,
+            "prompt_tokens": 20,
+            "completion_tokens": 20,
+        },
     }
 
 
@@ -237,7 +245,9 @@ class TestXAIProviderMessageSending:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Test response"}}],
+            "choices": [
+                {"message": {"role": "assistant", "content": "Test response"}}
+            ],
             "usage": {"total_tokens": 10},
         }
 
@@ -245,7 +255,9 @@ class TestXAIProviderMessageSending:
             mock_post = AsyncMock(return_value=mock_response)
             mock_client.return_value.__aenter__.return_value.post = mock_post
 
-            await xai_provider.send_message("Test message", sample_chat_context)
+            await xai_provider.send_message(
+                "Test message", sample_chat_context
+            )
 
             # Check that web search tool is included
             call_args = mock_post.call_args
@@ -262,7 +274,9 @@ class TestXAIProviderMessageSending:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Test response"}}],
+            "choices": [
+                {"message": {"role": "assistant", "content": "Test response"}}
+            ],
             "usage": {"total_tokens": 10},
         }
 
@@ -270,7 +284,9 @@ class TestXAIProviderMessageSending:
             mock_post = AsyncMock(return_value=mock_response)
             mock_client.return_value.__aenter__.return_value.post = mock_post
 
-            await xai_provider_precise.send_message("Test message", sample_chat_context)
+            await xai_provider_precise.send_message(
+                "Test message", sample_chat_context
+            )
 
             # Check that web search tool is not included
             call_args = mock_post.call_args
@@ -287,7 +303,12 @@ class TestXAIProviderMessageSending:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [
-                {"message": {"role": "assistant", "content": "Creative response"}}
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "Creative response",
+                    }
+                }
             ],
             "usage": {"total_tokens": 15},
         }
@@ -306,21 +327,32 @@ class TestXAIProviderMessageSending:
             messages = payload["messages"]
 
             assert messages[0]["role"] == "system"
-            assert messages[0]["content"] == "You are a creative writing assistant."
+            assert (
+                messages[0]["content"]
+                == "You are a creative writing assistant."
+            )
 
     @pytest.mark.asyncio
-    async def test_send_message_timeout(self, xai_provider, sample_chat_context):
+    async def test_send_message_timeout(
+        self, xai_provider, sample_chat_context
+    ):
         """Test message sending with timeout."""
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
                 side_effect=httpx.TimeoutException("Request timed out")
             )
 
-            with pytest.raises(NetworkError, match="Request to xAI API timed out"):
-                await xai_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                NetworkError, match="Request to xAI API timed out"
+            ):
+                await xai_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
-    async def test_send_message_network_error(self, xai_provider, sample_chat_context):
+    async def test_send_message_network_error(
+        self, xai_provider, sample_chat_context
+    ):
         """Test message sending with network error."""
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
@@ -328,7 +360,9 @@ class TestXAIProviderMessageSending:
             )
 
             with pytest.raises(NetworkError, match="Network error"):
-                await xai_provider.send_message("Test message", sample_chat_context)
+                await xai_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
     async def test_send_message_authentication_error(
@@ -343,8 +377,12 @@ class TestXAIProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(AuthenticationError, match="Invalid xAI API key"):
-                await xai_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                AuthenticationError, match="Invalid xAI API key"
+            ):
+                await xai_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
     async def test_send_message_rate_limit_error(
@@ -359,8 +397,12 @@ class TestXAIProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(RateLimitError, match="xAI API rate limit exceeded"):
-                await xai_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                RateLimitError, match="xAI API rate limit exceeded"
+            ):
+                await xai_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
     async def test_send_message_model_not_found(
@@ -375,11 +417,17 @@ class TestXAIProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(ModelNotFoundError, match="xAI model .* not found"):
-                await xai_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                ModelNotFoundError, match="xAI model .* not found"
+            ):
+                await xai_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
-    async def test_send_message_empty_response(self, xai_provider, sample_chat_context):
+    async def test_send_message_empty_response(
+        self, xai_provider, sample_chat_context
+    ):
         """Test handling of empty response."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -390,8 +438,12 @@ class TestXAIProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(ProviderError, match="Empty response from xAI API"):
-                await xai_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                ProviderError, match="Empty response from xAI API"
+            ):
+                await xai_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
 
 class TestXAIProviderToolCalling:
@@ -399,7 +451,11 @@ class TestXAIProviderToolCalling:
 
     @pytest.mark.asyncio
     async def test_send_message_with_tools_success(
-        self, xai_provider, sample_chat_context, sample_tools, mock_tool_response
+        self,
+        xai_provider,
+        sample_chat_context,
+        sample_tools,
+        mock_tool_response,
     ):
         """Test successful message sending with tools."""
         mock_response = MagicMock()
@@ -415,7 +471,10 @@ class TestXAIProviderToolCalling:
                 "Search for AI news", sample_chat_context, sample_tools
             )
 
-            assert response.content == "I'll search for the latest AI developments."
+            assert (
+                response.content
+                == "I'll search for the latest AI developments."
+            )
             assert response.model_used == "grok-beta"
             assert response.tokens_used == 40
             assert response.tool_calls is not None
@@ -430,7 +489,9 @@ class TestXAIProviderToolCalling:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Test response"}}],
+            "choices": [
+                {"message": {"role": "assistant", "content": "Test response"}}
+            ],
             "usage": {"total_tokens": 10},
         }
 
@@ -466,7 +527,9 @@ class TestXAIProviderToolCalling:
             assert tools[1]["function"]["name"] == "calculate"
 
     @pytest.mark.asyncio
-    async def test_convert_tools_to_xai_format(self, xai_provider, sample_tools):
+    async def test_convert_tools_to_xai_format(
+        self, xai_provider, sample_tools
+    ):
         """Test tool conversion to xAI format."""
         xai_tools = xai_provider._convert_tools_to_xai_format(sample_tools)
 
@@ -477,7 +540,8 @@ class TestXAIProviderToolCalling:
         assert tool1["type"] == "function"
         assert tool1["function"]["name"] == "web_search"
         assert (
-            tool1["function"]["description"] == "Search the web for current information"
+            tool1["function"]["description"]
+            == "Search the web for current information"
         )
         assert "parameters" in tool1["function"]
 
@@ -485,7 +549,10 @@ class TestXAIProviderToolCalling:
         tool2 = xai_tools[1]
         assert tool2["type"] == "function"
         assert tool2["function"]["name"] == "calculate"
-        assert tool2["function"]["description"] == "Perform mathematical calculations"
+        assert (
+            tool2["function"]["description"]
+            == "Perform mathematical calculations"
+        )
 
 
 class TestXAIProviderCredentialValidation:
@@ -638,7 +705,10 @@ class TestXAIProviderTemperatureSettings:
     def test_get_temperature_for_mode_unknown(self):
         """Test temperature for unknown mode falls back to default."""
         provider = XAIProvider(
-            api_key="test", model="grok-beta", grok_mode="unknown", temperature=0.5
+            api_key="test",
+            model="grok-beta",
+            grok_mode="unknown",
+            temperature=0.5,
         )
         temp = provider._get_temperature_for_mode()
         assert temp == 0.5  # Falls back to default temperature
@@ -647,15 +717,21 @@ class TestXAIProviderTemperatureSettings:
 class TestXAIProviderMessagePreparation:
     """Test message preparation for API requests."""
 
-    def test_prepare_messages_with_context(self, xai_provider, sample_chat_context):
+    def test_prepare_messages_with_context(
+        self, xai_provider, sample_chat_context
+    ):
         """Test preparing messages with conversation context."""
-        messages = xai_provider._prepare_messages("New message", sample_chat_context)
+        messages = xai_provider._prepare_messages(
+            "New message", sample_chat_context
+        )
 
         assert len(messages) == 3  # 2 from context + 1 new
 
         # Check context messages
         assert messages[0]["role"] == "user"
-        assert messages[0]["content"] == "What are the latest developments in AI?"
+        assert (
+            messages[0]["content"] == "What are the latest developments in AI?"
+        )
         assert messages[1]["role"] == "assistant"
         assert (
             messages[1]["content"]
@@ -678,7 +754,9 @@ class TestXAIProviderMessagePreparation:
 
         # Check system message
         assert messages[0]["role"] == "system"
-        assert messages[0]["content"] == "You are a creative writing assistant."
+        assert (
+            messages[0]["content"] == "You are a creative writing assistant."
+        )
 
         # Check that context and new message follow
         assert messages[1]["role"] == "user"
@@ -701,7 +779,9 @@ class TestXAIProviderMessagePreparation:
 class TestXAIProviderResponseHandling:
     """Test response handling functionality."""
 
-    def test_handle_response_success(self, xai_provider, mock_successful_response):
+    def test_handle_response_success(
+        self, xai_provider, mock_successful_response
+    ):
         """Test handling successful response."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -717,7 +797,9 @@ class TestXAIProviderResponseHandling:
         assert response.tokens_used == 50
         assert response.timestamp is not None
 
-    def test_handle_response_with_tools_success(self, xai_provider, mock_tool_response):
+    def test_handle_response_with_tools_success(
+        self, xai_provider, mock_tool_response
+    ):
         """Test handling response with tool calls."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -725,7 +807,9 @@ class TestXAIProviderResponseHandling:
 
         response = xai_provider._handle_response_with_tools(mock_response)
 
-        assert response.content == "I'll search for the latest AI developments."
+        assert (
+            response.content == "I'll search for the latest AI developments."
+        )
         assert response.model_used == "grok-beta"
         assert response.tokens_used == 40
         assert response.tool_calls is not None

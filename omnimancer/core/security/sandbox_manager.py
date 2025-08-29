@@ -204,7 +204,9 @@ class SandboxManager:
             try:
                 # Set memory limit (in bytes)
                 memory_limit = limits.max_memory_mb * 1024 * 1024
-                resource.setrlimit(resource.RLIMIT_AS, (memory_limit, memory_limit))
+                resource.setrlimit(
+                    resource.RLIMIT_AS, (memory_limit, memory_limit)
+                )
 
                 # Set CPU time limit (in seconds)
                 resource.setrlimit(
@@ -226,7 +228,8 @@ class SandboxManager:
 
                 # Set maximum number of processes
                 resource.setrlimit(
-                    resource.RLIMIT_NPROC, (limits.max_processes, limits.max_processes)
+                    resource.RLIMIT_NPROC,
+                    (limits.max_processes, limits.max_processes),
                 )
 
             except (OSError, ValueError) as e:
@@ -258,7 +261,10 @@ class SandboxManager:
                         break
 
                     # Check CPU time
-                    cpu_time = proc_info.cpu_times().user + proc_info.cpu_times().system
+                    cpu_time = (
+                        proc_info.cpu_times().user
+                        + proc_info.cpu_times().system
+                    )
                     if cpu_time > sandboxed_proc.limits.max_cpu_seconds:
                         print(
                             f"Process {sandboxed_proc.process.pid} exceeded CPU time limit"
@@ -286,7 +292,9 @@ class SandboxManager:
                 print(f"Error monitoring process: {e}")
                 break
 
-    def _filter_environment_variables(self, env: Dict[str, str]) -> Dict[str, str]:
+    def _filter_environment_variables(
+        self, env: Dict[str, str]
+    ) -> Dict[str, str]:
         """Filter environment variables to remove sensitive ones."""
 
         # List of sensitive environment variable patterns
@@ -309,7 +317,9 @@ class SandboxManager:
         filtered_env = {}
         for key, value in env.items():
             # Keep only safe environment variables
-            if not any(pattern in key.upper() for pattern in sensitive_patterns):
+            if not any(
+                pattern in key.upper() for pattern in sensitive_patterns
+            ):
                 filtered_env[key] = value
 
         # Add minimal required variables

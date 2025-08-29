@@ -43,16 +43,22 @@ class TestSystemIntegrationSimple:
                     max_tokens=4000,
                 ),
                 "gemini": ProviderConfig(
-                    api_key="test-gemini-key", model="gemini-1.5-pro", max_tokens=4000
+                    api_key="test-gemini-key",
+                    model="gemini-1.5-pro",
+                    max_tokens=4000,
                 ),
                 "cohere": ProviderConfig(
-                    api_key="test-cohere-key", model="command-r", max_tokens=4000
+                    api_key="test-cohere-key",
+                    model="command-r",
+                    max_tokens=4000,
                 ),
                 "ollama": ProviderConfig(
                     model="llama2", base_url="http://localhost:11434"
                 ),
                 "perplexity": ProviderConfig(
-                    api_key="test-perplexity-key", model="sonar-pro", max_tokens=4000
+                    api_key="test-perplexity-key",
+                    model="sonar-pro",
+                    max_tokens=4000,
                 ),
                 "xai": ProviderConfig(
                     api_key="test-xai-key", model="grok-3", max_tokens=4000
@@ -86,7 +92,9 @@ class TestSystemIntegrationSimple:
                     model="anthropic/claude-3-sonnet",
                     openrouter_referrer="https://test.com",
                 ),
-                "claude-code": ProviderConfig(model="opus", claude_code_mode="opus"),
+                "claude-code": ProviderConfig(
+                    model="opus", claude_code_mode="opus"
+                ),
             },
             storage_path="/tmp/omnimancer_test",
         )
@@ -126,7 +134,8 @@ class TestSystemIntegrationSimple:
             swe_rating="★★★",
             available=True,
             supports_tools=True,
-            supports_multimodal=provider_name in ["gemini", "openai", "claude"],
+            supports_multimodal=provider_name
+            in ["gemini", "openai", "claude"],
             latest_version=True,
             context_window=8192,
         )
@@ -164,7 +173,9 @@ class TestSystemIntegrationSimple:
                 provider_name in available_providers
             ), f"Provider {provider_name} not registered"
 
-        print(f"✅ All {len(expected_providers)} providers are registered in factory")
+        print(
+            f"✅ All {len(expected_providers)} providers are registered in factory"
+        )
         print(f"Available providers: {', '.join(sorted(available_providers))}")
 
     @pytest.mark.asyncio
@@ -192,7 +203,9 @@ class TestSystemIntegrationSimple:
                     assert (
                         model.provider == provider_name
                     ), f"Model provider mismatch: {model.provider} != {provider_name}"
-                    assert model.name, f"Model from {provider_name} has no name"
+                    assert (
+                        model.name
+                    ), f"Model from {provider_name} has no name"
 
         print(f"✅ Retrieved models from {provider_count} providers")
         print(f"✅ Total models available: {total_models}")
@@ -206,11 +219,15 @@ class TestSystemIntegrationSimple:
     async def test_provider_capabilities_integration(self):
         """Test provider capability detection across all providers."""
         # Get models by capability
-        tool_capable_models = ProviderFactory.get_enhanced_models_by_capability("tools")
+        tool_capable_models = (
+            ProviderFactory.get_enhanced_models_by_capability("tools")
+        )
         multimodal_models = ProviderFactory.get_enhanced_models_by_capability(
             "multimodal"
         )
-        latest_models = ProviderFactory.get_enhanced_models_by_capability("latest")
+        latest_models = ProviderFactory.get_enhanced_models_by_capability(
+            "latest"
+        )
 
         # Verify we have models with different capabilities
         assert len(tool_capable_models) > 0, "No tool-capable models found"
@@ -225,7 +242,9 @@ class TestSystemIntegrationSimple:
         )
 
         print(f"✅ Tool-capable models from {tool_provider_count} providers")
-        print(f"✅ Multimodal models from {multimodal_provider_count} providers")
+        print(
+            f"✅ Multimodal models from {multimodal_provider_count} providers"
+        )
         print(f"✅ Latest models from {len(latest_models)} providers")
 
         # Verify reasonable distribution of capabilities
@@ -289,7 +308,9 @@ class TestSystemIntegrationSimple:
         config = self.create_all_providers_config()
 
         # Test health checking for all configured providers
-        health_results = await ProviderFactory.get_all_provider_health(config.providers)
+        health_results = await ProviderFactory.get_all_provider_health(
+            config.providers
+        )
 
         # Verify health check results
         assert len(health_results) > 0, "No health check results returned"
@@ -318,7 +339,9 @@ class TestSystemIntegrationSimple:
             )
 
         print(f"✅ Health checked {len(health_results)} providers")
-        print(f"✅ {configured_providers} configured, {available_providers} available")
+        print(
+            f"✅ {configured_providers} configured, {available_providers} available"
+        )
 
         # Verify we checked a reasonable number of providers
         assert (
@@ -355,7 +378,9 @@ class TestSystemIntegrationSimple:
                     )
                     assert isinstance(models, dict)
                 except Exception as e:
-                    print(f"❌ Capability stress test error for {capability}: {e}")
+                    print(
+                        f"❌ Capability stress test error for {capability}: {e}"
+                    )
                     raise
 
         # Run capability stress tests
@@ -377,14 +402,22 @@ class TestSystemIntegrationSimple:
                 "model": "claude-3-sonnet-20240229",
                 "response": "Claude response",
             },
-            "gemini": {"model": "gemini-1.5-pro", "response": "Gemini response"},
-            "perplexity": {"model": "sonar-pro", "response": "Perplexity response"},
+            "gemini": {
+                "model": "gemini-1.5-pro",
+                "response": "Gemini response",
+            },
+            "perplexity": {
+                "model": "sonar-pro",
+                "response": "Perplexity response",
+            },
             "xai": {"model": "grok-3", "response": "xAI response"},
         }
 
         for provider_name, provider_config in provider_configs.items():
             mock_providers[provider_name] = self.create_mock_provider(
-                provider_name, provider_config["model"], provider_config["response"]
+                provider_name,
+                provider_config["model"],
+                provider_config["response"],
             )
 
         # Simulate provider switching
@@ -398,7 +431,9 @@ class TestSystemIntegrationSimple:
                 switch_count += 1
 
                 # Test sending a message
-                response = await current_provider.send_message("Test message", [])
+                response = await current_provider.send_message(
+                    "Test message", []
+                )
                 assert (
                     response.is_success
                 ), f"Failed to send message with {provider_name}"
@@ -408,7 +443,9 @@ class TestSystemIntegrationSimple:
 
                 print(f"✅ Switched to {provider_name}: {response.content}")
 
-        print(f"✅ Successfully simulated switching between {switch_count} providers")
+        print(
+            f"✅ Successfully simulated switching between {switch_count} providers"
+        )
         assert (
             switch_count >= 5
         ), f"Expected at least 5 provider switches, got {switch_count}"
@@ -430,7 +467,10 @@ class TestSystemIntegrationSimple:
         providers_with_tools = 0
         providers_with_multimodal = 0
 
-        for provider_name, provider_info in all_models_with_capabilities.items():
+        for (
+            provider_name,
+            provider_info,
+        ) in all_models_with_capabilities.items():
             models = provider_info.get("models", [])
             capabilities = provider_info.get("provider_capabilities", {})
 
@@ -453,7 +493,9 @@ class TestSystemIntegrationSimple:
         )
         print(f"✅ Total models in catalog: {total_models}")
         print(f"✅ Providers with tool support: {providers_with_tools}")
-        print(f"✅ Providers with multimodal support: {providers_with_multimodal}")
+        print(
+            f"✅ Providers with multimodal support: {providers_with_multimodal}"
+        )
 
         # Verify reasonable distribution
         assert (
@@ -509,7 +551,9 @@ class TestSystemIntegrationSimple:
         assert len(restored_config.providers) == len(config.providers)
 
         print(f"✅ Configuration integration test passed")
-        print(f"✅ All {len(expected_providers)} providers properly configured")
+        print(
+            f"✅ All {len(expected_providers)} providers properly configured"
+        )
         print(f"✅ Configuration serialization/deserialization works")
 
 

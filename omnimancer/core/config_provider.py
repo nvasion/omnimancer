@@ -261,8 +261,8 @@ class ConfigurationProvider:
         try:
             # Detect configuration format and compatibility
             format_info = self._detect_configuration_format(config_path)
-            is_compatible, comp_errors, comp_warnings = self._validate_compatibility(
-                config_path
+            is_compatible, comp_errors, comp_warnings = (
+                self._validate_compatibility(config_path)
             )
 
             # Load configuration safely
@@ -275,7 +275,9 @@ class ConfigurationProvider:
 
             # Combine all errors and warnings
             all_errors = comp_errors + base_errors
-            critical_errors = [e for e in all_errors if self._is_critical_error(e)]
+            critical_errors = [
+                e for e in all_errors if self._is_critical_error(e)
+            ]
             all_warnings = comp_warnings
 
             # Perform provider health checks
@@ -285,9 +287,13 @@ class ConfigurationProvider:
 
             # Check for performance and security issues
             performance_issues = (
-                self._check_performance_issues(config, format_info) if config else []
+                self._check_performance_issues(config, format_info)
+                if config
+                else []
             )
-            security_issues = self._check_security_issues(config) if config else []
+            security_issues = (
+                self._check_security_issues(config) if config else []
+            )
 
             # Generate suggestions and upgrade recommendations
             suggestions = self._generate_suggestions(
@@ -317,7 +323,9 @@ class ConfigurationProvider:
             return ValidationReport(
                 is_valid=len(critical_errors) == 0,
                 is_compatible=is_compatible,
-                compatibility_level=format_info.get("compatibility_level", "unknown"),
+                compatibility_level=format_info.get(
+                    "compatibility_level", "unknown"
+                ),
                 total_issues=len(all_errors) + len(all_warnings),
                 critical_errors=critical_errors,
                 warnings=all_warnings,
@@ -342,7 +350,9 @@ class ConfigurationProvider:
                 total_issues=1,
                 critical_errors=[f"Validation failed: {str(e)}"],
                 warnings=[],
-                suggestions=["Check configuration file format and permissions"],
+                suggestions=[
+                    "Check configuration file format and permissions"
+                ],
                 health_score=0.0,
                 format_info={},
                 provider_status={},
@@ -359,7 +369,9 @@ class ConfigurationProvider:
     ) -> Dict[str, Any]:
         """Detect the format and version of an existing configuration."""
         if config_path is None:
-            config_path = self.config_manager.get_storage_path() / "config.json"
+            config_path = (
+                self.config_manager.get_storage_path() / "config.json"
+            )
 
         try:
             if not config_path.exists():
@@ -388,7 +400,9 @@ class ConfigurationProvider:
                 "issues": [f"Failed to read configuration: {str(e)}"],
             }
 
-    def _analyze_config_format(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _analyze_config_format(
+        self, config_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Analyze configuration data to determine format."""
         detected_features = []
         format_type = "legacy"
@@ -434,7 +448,11 @@ class ConfigurationProvider:
             )
 
         # Check for deprecated fields
-        deprecated_fields = ["legacy_auth", "old_mcp_format", "deprecated_settings"]
+        deprecated_fields = [
+            "legacy_auth",
+            "old_mcp_format",
+            "deprecated_settings",
+        ]
         for field in deprecated_fields:
             if field in config_data:
                 issues.append(f"Deprecated field '{field}' found")
@@ -445,7 +463,8 @@ class ConfigurationProvider:
             "format_type": format_type,
             "detected_features": detected_features,
             "compatibility_level": compatibility_level,
-            "upgrade_available": upgrade_available and version < self.current_version,
+            "upgrade_available": upgrade_available
+            and version < self.current_version,
             "issues": issues,
         }
 
@@ -474,7 +493,9 @@ class ConfigurationProvider:
 
             # Load and validate configuration
             if config_path is None:
-                config_path = self.config_manager.get_storage_path() / "config.json"
+                config_path = (
+                    self.config_manager.get_storage_path() / "config.json"
+                )
 
             if not config_path.exists():
                 errors.append("Configuration file not found")
@@ -538,7 +559,9 @@ class ConfigurationProvider:
         ]
         return any(keyword in error.lower() for keyword in critical_keywords)
 
-    async def _check_provider_health(self, config: Config) -> Dict[str, Dict[str, Any]]:
+    async def _check_provider_health(
+        self, config: Config
+    ) -> Dict[str, Dict[str, Any]]:
         """Check health of all configured providers."""
         provider_status = {}
 
@@ -560,7 +583,10 @@ class ConfigurationProvider:
 
         # Check API key
         api_key_present = bool(provider_config.api_key)
-        if not api_key_present and provider_name not in ["claude-code", "ollama"]:
+        if not api_key_present and provider_name not in [
+            "claude-code",
+            "ollama",
+        ]:
             issues.append("API key missing")
             recommendations.append("Add API key for this provider")
             status = "error"
@@ -608,7 +634,9 @@ class ConfigurationProvider:
             last_tested=datetime.now().isoformat(),
         )
 
-    def _validate_model_name(self, provider_name: str, model_name: str) -> List[str]:
+    def _validate_model_name(
+        self, provider_name: str, model_name: str
+    ) -> List[str]:
         """Validate model name for a provider."""
         issues = []
 
@@ -664,8 +692,13 @@ class ConfigurationProvider:
             ):
                 issues.append("AWS region not specified")
         elif provider_name.lower() == "ollama":
-            if hasattr(provider_config, "base_url") and provider_config.base_url:
-                if not provider_config.base_url.startswith(("http://", "https://")):
+            if (
+                hasattr(provider_config, "base_url")
+                and provider_config.base_url
+            ):
+                if not provider_config.base_url.startswith(
+                    ("http://", "https://")
+                ):
                     issues.append("Invalid Ollama base URL format")
 
         return issues
@@ -684,13 +717,18 @@ class ConfigurationProvider:
         timeout_issues = sum(
             1
             for provider_config in config.providers.values()
-            if not hasattr(provider_config, "timeout") or not provider_config.timeout
+            if not hasattr(provider_config, "timeout")
+            or not provider_config.timeout
         )
 
         if timeout_issues > len(config.providers) / 2:
             issues.append("Many providers missing timeout configurations")
 
-        if hasattr(config, "mcp") and config.mcp and hasattr(config.mcp, "servers"):
+        if (
+            hasattr(config, "mcp")
+            and config.mcp
+            and hasattr(config.mcp, "servers")
+        ):
             if len(config.mcp.servers) > 10:
                 issues.append(
                     f"Large number of MCP servers ({len(config.mcp.servers)}) may impact startup time"
@@ -701,7 +739,9 @@ class ConfigurationProvider:
             and config.configuration_mode == "simple"
         ):
             if len(config.providers) > 3:
-                issues.append("Simple mode with many providers may cause confusion")
+                issues.append(
+                    "Simple mode with many providers may cause confusion"
+                )
 
         return issues
 
@@ -712,13 +752,21 @@ class ConfigurationProvider:
         for provider_name, provider_config in config.providers.items():
             if provider_config.api_key:
                 if len(provider_config.api_key) < 10:
-                    issues.append(f"Suspiciously short API key for {provider_name}")
-                elif provider_config.api_key.startswith(("demo", "test", "example")):
-                    issues.append(f"Possible demo/test API key for {provider_name}")
+                    issues.append(
+                        f"Suspiciously short API key for {provider_name}"
+                    )
+                elif provider_config.api_key.startswith(
+                    ("demo", "test", "example")
+                ):
+                    issues.append(
+                        f"Possible demo/test API key for {provider_name}"
+                    )
 
         if hasattr(config, "mcp") and config.mcp:
             if hasattr(config.mcp, "auto_approve") and config.mcp.auto_approve:
-                issues.append("MCP auto-approve enabled - may pose security risk")
+                issues.append(
+                    "MCP auto-approve enabled - may pose security risk"
+                )
 
         return issues
 
@@ -757,7 +805,9 @@ class ConfigurationProvider:
             )
 
         if config and len(config.providers) == 1:
-            suggestions.append("Consider adding a backup provider for redundancy")
+            suggestions.append(
+                "Consider adding a backup provider for redundancy"
+            )
         elif config and len(config.providers) > 5:
             suggestions.append(
                 "Consider simplifying provider configuration for better performance"
@@ -775,7 +825,9 @@ class ConfigurationProvider:
         recommendations = []
 
         if format_info.get("upgrade_available", False):
-            compatibility_level = format_info.get("compatibility_level", "unknown")
+            compatibility_level = format_info.get(
+                "compatibility_level", "unknown"
+            )
             if compatibility_level == "full":
                 recommendations.append(
                     "Automatic upgrade available - run 'omnimancer config migrate'"
@@ -888,7 +940,10 @@ class ConfigurationProvider:
             # Provider details
             if validation_report.provider_status:
                 report_lines.append("## Provider Status")
-                for provider, status in validation_report.provider_status.items():
+                for (
+                    provider,
+                    status,
+                ) in validation_report.provider_status.items():
                     status_icon = (
                         "✓"
                         if status["status"] == "healthy"
@@ -951,28 +1006,39 @@ class ConfigurationProvider:
 
                 # Fix deprecated model references
                 for name, provider_config in config.providers.items():
-                    if name == "claude" and provider_config.model == "claude-v1":
+                    if (
+                        name == "claude"
+                        and provider_config.model == "claude-v1"
+                    ):
                         provider_config.model = "claude-3-haiku-20240307"
-                        messages.append(f"✓ Updated {name} model to current version")
+                        messages.append(
+                            f"✓ Updated {name} model to current version"
+                        )
                         fixed_issues += 1
                     elif name == "openai" and provider_config.model in [
                         "text-davinci-003",
                         "code-davinci-002",
                     ]:
                         provider_config.model = "gpt-4o-mini"
-                        messages.append(f"✓ Updated {name} model to current version")
+                        messages.append(
+                            f"✓ Updated {name} model to current version"
+                        )
                         fixed_issues += 1
 
                 # Ensure configuration version is set
                 if not hasattr(config, "version"):
                     config.version = self.current_version
-                    messages.append("✓ Added version information to configuration")
+                    messages.append(
+                        "✓ Added version information to configuration"
+                    )
                     fixed_issues += 1
 
                 # Save fixes
                 if fixed_issues > 0:
                     self.config_manager.save_config(config)
-                    messages.append(f"✓ Applied {fixed_issues} compatibility fixes")
+                    messages.append(
+                        f"✓ Applied {fixed_issues} compatibility fixes"
+                    )
 
                 # Final validation
                 final_report = asyncio.run(self.comprehensive_validation())
@@ -1215,16 +1281,23 @@ class ConfigurationProvider:
         templates = []
 
         # Get all templates and simplify them
-        for name, template in self.template_manager.get_all_templates().items():
+        for (
+            name,
+            template,
+        ) in self.template_manager.get_all_templates().items():
             simplified = {
                 "name": name,
                 "display_name": template.name.title(),
                 "description": template.description,
                 "icon": self._get_template_icon(name),
-                "estimated_setup_time": self._get_estimated_setup_time(template),
+                "estimated_setup_time": self._get_estimated_setup_time(
+                    template
+                ),
                 "cost_estimate": self._get_cost_estimate(template),
                 "complexity": (
-                    "Simple" if name in ["general", "performance"] else "Moderate"
+                    "Simple"
+                    if name in ["general", "performance"]
+                    else "Moderate"
                 ),
                 "providers_needed": len(template.recommended_providers[:3]),
                 "main_providers": template.recommended_providers[:2],
@@ -1289,13 +1362,27 @@ class ConfigurationProvider:
                 "Technical writers",
             ],
             "research": ["Researchers", "Students", "Analysts", "Journalists"],
-            "creative": ["Writers", "Content creators", "Marketing professionals"],
-            "general": ["General users", "Business professionals", "Personal use"],
-            "performance": ["Budget-conscious users", "High-volume usage", "Teams"],
+            "creative": [
+                "Writers",
+                "Content creators",
+                "Marketing professionals",
+            ],
+            "general": [
+                "General users",
+                "Business professionals",
+                "Personal use",
+            ],
+            "performance": [
+                "Budget-conscious users",
+                "High-volume usage",
+                "Teams",
+            ],
         }
         return recommendations.get(template.use_case, ["General users"])
 
-    def get_setup_wizard_steps(self, use_case: str = "general") -> List[Dict[str, Any]]:
+    def get_setup_wizard_steps(
+        self, use_case: str = "general"
+    ) -> List[Dict[str, Any]]:
         """Get step-by-step wizard steps for configuration."""
         steps = []
 
@@ -1412,7 +1499,9 @@ class ConfigurationProvider:
                 "type": "provider_selection",
                 "content": {
                     "message": "We recommend starting with 1-2 providers. You can add more later.",
-                    "providers": self._get_simplified_provider_options(use_case),
+                    "providers": self._get_simplified_provider_options(
+                        use_case
+                    ),
                 },
             }
         )
@@ -1427,7 +1516,12 @@ class ConfigurationProvider:
                 "content": {
                     "message": "API keys are encrypted and stored securely on your device.",
                     "help_link": "Need help getting API keys?",
-                    "providers_with_keys": ["claude", "openai", "gemini", "perplexity"],
+                    "providers_with_keys": [
+                        "claude",
+                        "openai",
+                        "gemini",
+                        "perplexity",
+                    ],
                 },
             }
         )
@@ -1485,14 +1579,19 @@ class ConfigurationProvider:
 
         return steps
 
-    def _get_simplified_provider_options(self, use_case: str) -> List[Dict[str, Any]]:
+    def _get_simplified_provider_options(
+        self, use_case: str
+    ) -> List[Dict[str, Any]]:
         """Get simplified provider options based on use case."""
         all_providers = self.get_simple_mode_providers()
 
         # Filter and rank providers based on use case
         relevant_providers = []
         for provider in all_providers:
-            if use_case in provider.use_case_fit or "general" in provider.use_case_fit:
+            if (
+                use_case in provider.use_case_fit
+                or "general" in provider.use_case_fit
+            ):
                 # Calculate relevance score
                 relevance = 1.0
                 if use_case in provider.use_case_fit:
@@ -1530,7 +1629,9 @@ class ConfigurationProvider:
         }
         return difficulty_map.get(provider_name, "Easy")
 
-    def get_provider_setup_instructions(self, provider_name: str) -> Dict[str, Any]:
+    def get_provider_setup_instructions(
+        self, provider_name: str
+    ) -> Dict[str, Any]:
         """Get setup instructions for a specific provider."""
         instructions = {
             "claude": {
@@ -1583,13 +1684,17 @@ class ConfigurationProvider:
             provider_name,
             {
                 "title": f"{provider_name} Setup",
-                "steps": ["Refer to provider documentation for setup instructions"],
+                "steps": [
+                    "Refer to provider documentation for setup instructions"
+                ],
                 "api_key_format": "Check provider documentation",
                 "cost_info": "Varies by provider",
             },
         )
 
-    def get_configuration_preview(self, answers: Dict[str, Any]) -> Dict[str, Any]:
+    def get_configuration_preview(
+        self, answers: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Generate a preview of what the configuration will look like."""
         preview = {
             "use_case": answers.get("use_case", "general"),
@@ -1600,7 +1705,12 @@ class ConfigurationProvider:
         }
 
         # Calculate enabled providers and costs
-        cost_estimates = {"claude": 15, "openai": 15, "gemini": 5, "perplexity": 20}
+        cost_estimates = {
+            "claude": 15,
+            "openai": 15,
+            "gemini": 5,
+            "perplexity": 20,
+        }
         total_cost = 0
 
         if answers.get("enable_claude") and answers.get("claude_api_key"):
@@ -1720,10 +1830,14 @@ class ConfigurationProvider:
 
             if template.recommended_providers:
                 config.default_provider = template.recommended_providers[0]
-                messages.append(f"Set default provider to {config.default_provider}")
+                messages.append(
+                    f"Set default provider to {config.default_provider}"
+                )
 
             # Apply MCP configuration (simplified)
-            mcp_config = self.template_manager.create_mcp_config_from_template(template)
+            mcp_config = self.template_manager.create_mcp_config_from_template(
+                template
+            )
             enabled_count = 0
             for server_name, server_config in mcp_config.servers.items():
                 if enabled_count < 2:
@@ -1764,7 +1878,9 @@ class ConfigurationProvider:
             enabled_providers.append("claude-code")
 
         if not enabled_providers:
-            errors.append("At least one AI provider must be enabled and configured")
+            errors.append(
+                "At least one AI provider must be enabled and configured"
+            )
 
         # Validate API key formats
         if answers.get("claude_api_key"):
@@ -1823,7 +1939,9 @@ class ConfigurationProvider:
                     "experience_level": experience_level,
                     "tools_enabled": {
                         "web_search": answers.get("enable_web_search", True),
-                        "file_operations": answers.get("enable_file_operations", True),
+                        "file_operations": answers.get(
+                            "enable_file_operations", True
+                        ),
                         "code_tools": answers.get("enable_code_tools", True),
                     },
                 }
@@ -1853,7 +1971,9 @@ class ConfigurationProvider:
 
             if self.current_mode == ConfigurationMode.SIMPLE:
                 summary["providers"] = []
-                for name, provider_config in list(config.providers.items())[:3]:
+                for name, provider_config in list(config.providers.items())[
+                    :3
+                ]:
                     summary["providers"].append(
                         {
                             "name": name,
@@ -1862,7 +1982,9 @@ class ConfigurationProvider:
                         }
                     )
 
-                summary["tools"] = list(config.mcp.get_enabled_servers().keys())[:3]
+                summary["tools"] = list(
+                    config.mcp.get_enabled_servers().keys()
+                )[:3]
 
             elif self.current_mode == ConfigurationMode.ADVANCED:
                 summary.update(self.config_manager.get_config_summary())
@@ -1887,17 +2009,23 @@ class ConfigurationProvider:
                 with open(preferences_file, "r") as f:
                     data = json.load(f)
 
-                self.current_mode = ConfigurationMode(data.get("mode", "simple"))
+                self.current_mode = ConfigurationMode(
+                    data.get("mode", "simple")
+                )
 
                 context_data = data.get("context", {})
                 self.context = ConfigurationContext(
                     user_level=context_data.get("user_level", "beginner"),
                     use_case=context_data.get("use_case", "general"),
-                    primary_providers=context_data.get("primary_providers", []),
+                    primary_providers=context_data.get(
+                        "primary_providers", []
+                    ),
                     preferred_mode=ConfigurationMode(
                         context_data.get("preferred_mode", "simple")
                     ),
-                    show_experimental=context_data.get("show_experimental", False),
+                    show_experimental=context_data.get(
+                        "show_experimental", False
+                    ),
                 )
 
         except Exception as e:

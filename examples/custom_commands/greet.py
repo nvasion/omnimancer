@@ -60,7 +60,9 @@ def handle_command(args, **kwargs):
     if console:
         greeting_text = Text(greeting, style="bold cyan")
         panel = Panel(
-            greeting_text, title="[bold blue]Greeting[/bold blue]", border_style="blue"
+            greeting_text,
+            title="[bold blue]Greeting[/bold blue]",
+            border_style="blue",
         )
         console.print(panel)
         return None  # Console already printed

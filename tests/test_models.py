@@ -200,7 +200,9 @@ class TestMCPConfig:
     def test_mcp_config_get_enabled_servers(self):
         """Test getting only enabled servers."""
         server1 = MCPServerConfig(name="fs", command="fs-server", enabled=True)
-        server2 = MCPServerConfig(name="git", command="git-server", enabled=False)
+        server2 = MCPServerConfig(
+            name="git", command="git-server", enabled=False
+        )
 
         config = MCPConfig(servers={"filesystem": server1, "git": server2})
 
@@ -243,7 +245,10 @@ class TestChatSettings:
     def test_chat_settings_custom(self):
         """Test ChatSettings with custom values."""
         settings = ChatSettings(
-            max_tokens=2048, temperature=0.7, context_length=8000, save_history=False
+            max_tokens=2048,
+            temperature=0.7,
+            context_length=8000,
+            save_history=False,
         )
 
         assert settings.max_tokens == 2048
@@ -492,5 +497,7 @@ class TestConfigProfile:
 
         with pytest.raises(ValidationError):
             ConfigProfile(
-                name="test", default_provider="", providers={"openai": provider_config}
+                name="test",
+                default_provider="",
+                providers={"openai": provider_config},
             )

@@ -135,7 +135,9 @@ class TerminalStatusListener(StatusStreamListener):
                 if event.agent_id and "new_status" in event.data:
                     try:
                         status_str = event.data["new_status"]
-                        self.agent_statuses[event.agent_id] = AgentStatus(status_str)
+                        self.agent_statuses[event.agent_id] = AgentStatus(
+                            status_str
+                        )
                         self.stats["agents_monitored"] = len(
                             set(self.agent_statuses.keys())
                         )
@@ -150,16 +152,23 @@ class TerminalStatusListener(StatusStreamListener):
                     self.active_operations[event.operation_id] = {
                         "agent_id": event.agent_id,
                         "type": event.data.get("operation_type", "unknown"),
-                        "description": event.data.get("description", "No description"),
+                        "description": event.data.get(
+                            "description", "No description"
+                        ),
                         "start_time": event.timestamp,
                         "progress": 0.0,
                         "status": "running",
                     }
-                    self.stats["operations_tracked"] = len(self.active_operations)
+                    self.stats["operations_tracked"] = len(
+                        self.active_operations
+                    )
 
             elif event.event_type == EventType.OPERATION_PROGRESS:
                 # Update operation progress
-                if event.operation_id and event.operation_id in self.active_operations:
+                if (
+                    event.operation_id
+                    and event.operation_id in self.active_operations
+                ):
                     self.active_operations[event.operation_id].update(
                         {
                             "progress": event.data.get("progress", 0.0),
@@ -178,21 +187,26 @@ class TerminalStatusListener(StatusStreamListener):
                 EventType.OPERATION_CANCELLED,
             ]:
                 # Complete operation
-                if event.operation_id and event.operation_id in self.active_operations:
+                if (
+                    event.operation_id
+                    and event.operation_id in self.active_operations
+                ):
                     self.active_operations[event.operation_id].update(
                         {
                             "status": (
                                 "completed"
-                                if event.event_type == EventType.OPERATION_COMPLETED
+                                if event.event_type
+                                == EventType.OPERATION_COMPLETED
                                 else "failed"
                             ),
                             "end_time": event.timestamp,
                             "progress": (
                                 100.0
-                                if event.event_type == EventType.OPERATION_COMPLETED
-                                else self.active_operations[event.operation_id][
-                                    "progress"
-                                ]
+                                if event.event_type
+                                == EventType.OPERATION_COMPLETED
+                                else self.active_operations[
+                                    event.operation_id
+                                ]["progress"]
                             ),
                         }
                     )
@@ -201,7 +215,9 @@ class TerminalStatusListener(StatusStreamListener):
                     # For now, we'll keep them for display purposes
 
         except Exception as e:
-            logger.error(f"Error handling specific event {event.event_type}: {e}")
+            logger.error(
+                f"Error handling specific event {event.event_type}: {e}"
+            )
 
     async def _update_display(self) -> None:
         """Update the live display with current status."""
@@ -275,7 +291,9 @@ class TerminalStatusListener(StatusStreamListener):
                 color = "yellow"
                 emoji = "🟡"
 
-            content += f"{emoji} [{color}]{agent_id}[/{color}]: {status.value}\n"
+            content += (
+                f"{emoji} [{color}]{agent_id}[/{color}]: {status.value}\n"
+            )
 
         return content.rstrip()
 
@@ -284,7 +302,9 @@ class TerminalStatusListener(StatusStreamListener):
         content = "[bold]Active Operations[/bold]\n"
 
         active_ops = [
-            op for op in self.active_operations.values() if op["status"] == "running"
+            op
+            for op in self.active_operations.values()
+            if op["status"] == "running"
         ]
         if not active_ops:
             content += "[dim]No active operations[/dim]"

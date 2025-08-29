@@ -76,8 +76,12 @@ def inject_env_api_keys(provider_configs: Dict) -> Dict:
             env_key = load_api_key_from_env(provider_name)
             if env_key:
                 config.api_key = env_key
-                logger.info(f"Injected API key for {provider_name} from environment")
+                logger.info(
+                    f"Injected API key for {provider_name} from environment"
+                )
             else:
-                logger.debug(f"No environment API key found for {provider_name}")
+                logger.debug(
+                    f"No environment API key found for {provider_name}"
+                )
 
     return provider_configs

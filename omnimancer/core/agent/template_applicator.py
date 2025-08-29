@@ -13,8 +13,17 @@ from datetime import datetime
 import copy
 import json
 
-from .persona import AgentPersona, PersonaConfiguration, PersonaManager, PersonaStatus
-from .persona_validator import PersonaValidator, ValidationResult, ValidationSeverity
+from .persona import (
+    AgentPersona,
+    PersonaConfiguration,
+    PersonaManager,
+    PersonaStatus,
+)
+from .persona_validator import (
+    PersonaValidator,
+    ValidationResult,
+    ValidationSeverity,
+)
 from .agent_switcher import AgentSwitcher, SessionState
 from .config import AgentConfig, ProviderConfig
 from omnimancer.core.models import ConfigTemplateManager
@@ -167,7 +176,9 @@ class TemplateApplicator:
 
         try:
             # Execute application stages
-            context.result = self._execute_application_pipeline(context, options)
+            context.result = self._execute_application_pipeline(
+                context, options
+            )
 
             # Add to history
             self.application_history.append(context)
@@ -178,7 +189,9 @@ class TemplateApplicator:
             return context.result, context
 
         except Exception as e:
-            logger.error(f"Template application failed for persona {persona_id}: {e}")
+            logger.error(
+                f"Template application failed for persona {persona_id}: {e}"
+            )
             context.error_message = str(e)
             context.result = ApplicationResult.APPLICATION_FAILED
 
@@ -213,7 +226,9 @@ class TemplateApplicator:
                 validation_result.has_blocking_issues()
                 and not options.force_application
             ):
-                context.error_message = "Validation failed with blocking issues"
+                context.error_message = (
+                    "Validation failed with blocking issues"
+                )
                 return ApplicationResult.VALIDATION_FAILED
 
         # Stage 2: Backup
@@ -237,7 +252,9 @@ class TemplateApplicator:
         activation_success = self._activate_persona(context)
 
         if not activation_success:
-            context.error_message = "Failed to activate persona with new configuration"
+            context.error_message = (
+                "Failed to activate persona with new configuration"
+            )
             return ApplicationResult.APPLICATION_FAILED
 
         # Stage 6: Verification
@@ -260,7 +277,9 @@ class TemplateApplicator:
         context.stage = ApplicationStage.COMPLETE
         return ApplicationResult.SUCCESS
 
-    def _validate_application(self, context: ApplicationContext) -> ValidationResult:
+    def _validate_application(
+        self, context: ApplicationContext
+    ) -> ValidationResult:
         """Validate the application before proceeding."""
         # Create a temporary persona with the new configuration for validation
         temp_persona = copy.deepcopy(context.persona)
@@ -315,7 +334,9 @@ class TemplateApplicator:
         if context.persona.metadata:
             context.persona.metadata.updated_at = datetime.now()
 
-        logger.info(f"Applied new configuration to persona {context.persona.id}")
+        logger.info(
+            f"Applied new configuration to persona {context.persona.id}"
+        )
 
     def _activate_persona(self, context: ApplicationContext) -> bool:
         """Activate the persona with new configuration."""
@@ -325,10 +346,14 @@ class TemplateApplicator:
                 if self.agent_switcher:
                     # Use agent switcher for safe switching
                     success, message = self.agent_switcher.switch_persona(
-                        context.persona.id, reason="Template application", force=False
+                        context.persona.id,
+                        reason="Template application",
+                        force=False,
                     )
                     if not success:
-                        logger.error(f"Failed to reactivate persona: {message}")
+                        logger.error(
+                            f"Failed to reactivate persona: {message}"
+                        )
                         return False
                 else:
                     # Fallback to direct activation
@@ -350,7 +375,9 @@ class TemplateApplicator:
                 return False
 
             # Validate the applied configuration
-            validation_result = self.validator.validate_persona(context.persona)
+            validation_result = self.validator.validate_persona(
+                context.persona
+            )
             if validation_result.has_blocking_issues():
                 logger.error("Post-application validation failed")
                 return False
@@ -366,10 +393,14 @@ class TemplateApplicator:
                         self.template_manager
                     )
                     if not template:
-                        logger.error("Cannot access persona template after application")
+                        logger.error(
+                            "Cannot access persona template after application"
+                        )
                         return False
                 except Exception as e:
-                    logger.error(f"Template access failed after application: {e}")
+                    logger.error(
+                        f"Template access failed after application: {e}"
+                    )
                     return False
 
             return True
@@ -401,27 +432,40 @@ class TemplateApplicator:
 
             # Restore capabilities
             if "capabilities" in context.rollback_data:
-                context.persona.capabilities = context.rollback_data["capabilities"]
+                context.persona.capabilities = context.rollback_data[
+                    "capabilities"
+                ]
 
             # Restore session data
             if "session_data" in context.rollback_data:
-                context.persona._session_data = context.rollback_data["session_data"]
+                context.persona._session_data = context.rollback_data[
+                    "session_data"
+                ]
 
             # Restore persona metadata
-            if "persona_metadata" in context.rollback_data and context.persona.metadata:
-                for key, value in context.rollback_data["persona_metadata"].items():
+            if (
+                "persona_metadata" in context.rollback_data
+                and context.persona.metadata
+            ):
+                for key, value in context.rollback_data[
+                    "persona_metadata"
+                ].items():
                     if hasattr(context.persona.metadata, key):
                         setattr(context.persona.metadata, key, value)
 
             # Restore session state if available
             if context.session_backup and self.agent_switcher:
-                self.agent_switcher.current_session_state = context.session_backup
+                self.agent_switcher.current_session_state = (
+                    context.session_backup
+                )
 
             # Reactivate with original configuration if needed
             if self.persona_manager.active_persona == context.persona:
                 context.persona.activate()
 
-            logger.info(f"Successfully rolled back persona {context.persona.id}")
+            logger.info(
+                f"Successfully rolled back persona {context.persona.id}"
+            )
 
         except Exception as e:
             logger.error(f"Rollback operation failed: {e}")
@@ -440,12 +484,18 @@ class TemplateApplicator:
         # Find the most recent application context for this persona
         recent_context = None
         for context in reversed(self.application_history):
-            if context.persona.id == persona_id and context.original_configuration:
+            if (
+                context.persona.id == persona_id
+                and context.original_configuration
+            ):
                 recent_context = context
                 break
 
         if not recent_context:
-            return False, f"No rollback data available for persona {persona_id}"
+            return (
+                False,
+                f"No rollback data available for persona {persona_id}",
+            )
 
         try:
             self._rollback_application(recent_context, self.default_options)
@@ -467,7 +517,9 @@ class TemplateApplicator:
         """
         if persona_id:
             return [
-                ctx for ctx in self.application_history if ctx.persona.id == persona_id
+                ctx
+                for ctx in self.application_history
+                if ctx.persona.id == persona_id
             ]
         return self.application_history.copy()
 
@@ -494,9 +546,13 @@ class TemplateApplicator:
             lines.extend([f"❌ Error: {context.error_message}", ""])
 
         if context.original_configuration:
-            lines.extend(["✅ Backup Created: Yes", f"📁 Rollback Available: Yes", ""])
+            lines.extend(
+                ["✅ Backup Created: Yes", f"📁 Rollback Available: Yes", ""]
+            )
         else:
-            lines.extend(["⚠️ Backup Created: No", "📁 Rollback Available: No", ""])
+            lines.extend(
+                ["⚠️ Backup Created: No", "📁 Rollback Available: No", ""]
+            )
 
         if context.target_configuration:
             lines.extend(

@@ -72,7 +72,10 @@ class TestSecurityValidation:
         config_str = str(config)
 
         # Verify that full API keys are not exposed
-        assert "sk-1234567890abcdef1234567890abcdef1234567890abcdef" not in config_str
+        assert (
+            "sk-1234567890abcdef1234567890abcdef1234567890abcdef"
+            not in config_str
+        )
         assert (
             "sk-ant-api03-1234567890abcdef1234567890abcdef1234567890abcdef"
             not in config_str
@@ -107,7 +110,9 @@ class TestSecurityValidation:
 
             # In a production environment, we would want to ensure files are not world-readable
             # For testing purposes, we just verify we can check permissions
-            assert not world_writable, "Configuration file should not be world-writable"
+            assert (
+                not world_writable
+            ), "Configuration file should not be world-writable"
 
     def test_sensitive_data_not_in_error_messages(self):
         """Test that sensitive data doesn't leak in error messages."""
@@ -125,9 +130,7 @@ class TestSecurityValidation:
 
         for scenario_name, sensitive_value in test_scenarios:
             # Simulate an error message that might contain sensitive data
-            error_message = (
-                f"Authentication failed for provider with key: {sensitive_value[:8]}***"
-            )
+            error_message = f"Authentication failed for provider with key: {sensitive_value[:8]}***"
 
             # Verify that the full sensitive value is not in the error message
             assert (
@@ -135,7 +138,9 @@ class TestSecurityValidation:
             ), f"Sensitive data exposed in {scenario_name}"
 
             # Verify that some masking is present
-            assert "***" in error_message, f"No masking found in {scenario_name}"
+            assert (
+                "***" in error_message
+            ), f"No masking found in {scenario_name}"
 
             print(f"✅ {scenario_name}: Sensitive data properly masked")
 
@@ -184,10 +189,15 @@ class TestSecurityValidation:
             masked_data = data.copy()
 
             if "providers" in masked_data:
-                for provider_name, provider_config in masked_data["providers"].items():
+                for provider_name, provider_config in masked_data[
+                    "providers"
+                ].items():
                     if isinstance(provider_config, dict):
                         # Mask API keys
-                        if "api_key" in provider_config and provider_config["api_key"]:
+                        if (
+                            "api_key" in provider_config
+                            and provider_config["api_key"]
+                        ):
                             key = provider_config["api_key"]
                             provider_config["api_key"] = (
                                 f"{key[:8]}***" if len(key) > 8 else "***"
@@ -216,10 +226,17 @@ class TestSecurityValidation:
 
         # Verify masking worked
         assert "***" in masked_config["providers"]["openai"]["api_key"]
-        assert "***" in masked_config["providers"]["bedrock"]["aws_access_key_id"]
-        assert masked_config["providers"]["bedrock"]["aws_secret_access_key"] == "***"
+        assert (
+            "***" in masked_config["providers"]["bedrock"]["aws_access_key_id"]
+        )
+        assert (
+            masked_config["providers"]["bedrock"]["aws_secret_access_key"]
+            == "***"
+        )
 
-        print("✅ Configuration serialization security: Masking functionality works")
+        print(
+            "✅ Configuration serialization security: Masking functionality works"
+        )
 
     def test_provider_specific_security_measures(self):
         """Test provider-specific security measures."""
@@ -245,7 +262,9 @@ class TestSecurityValidation:
         assert azure_config.azure_endpoint.startswith(
             "https://"
         ), "Azure endpoint should use HTTPS"
-        assert azure_config.api_version, "Azure API version should be specified"
+        assert (
+            azure_config.api_version
+        ), "Azure API version should be specified"
 
         # Test AWS Bedrock provider security
         bedrock_config = config.providers["bedrock"]
@@ -352,7 +371,9 @@ class TestSecurityValidation:
         print("✅ API key format validation implemented")
 
         # 2. Test secure masking function
-        def secure_mask_credential(credential: str, show_chars: int = 4) -> str:
+        def secure_mask_credential(
+            credential: str, show_chars: int = 4
+        ) -> str:
             if not credential:
                 return "***"
             if len(credential) <= show_chars:
@@ -393,7 +414,9 @@ class TestSecurityValidation:
             print(
                 f"✅ Original file permissions: {stat.filemode(original_stat.st_mode)}"
             )
-            print(f"✅ Backup file permissions: {stat.filemode(backup_stat.st_mode)}")
+            print(
+                f"✅ Backup file permissions: {stat.filemode(backup_stat.st_mode)}"
+            )
 
             # Test that backup contains same sensitive data (encrypted in production)
             with open(backup_path, "r") as f:
@@ -438,8 +461,12 @@ class TestSecurityValidation:
 
         # Verify that we don't include sensitive data in headers
         for header_name, header_value in security_headers.items():
-            assert "sk-" not in header_value, f"API key found in header {header_name}"
-            assert "AKIA" not in header_value, f"AWS key found in header {header_name}"
+            assert (
+                "sk-" not in header_value
+            ), f"API key found in header {header_name}"
+            assert (
+                "AKIA" not in header_value
+            ), f"AWS key found in header {header_name}"
             print(f"✅ Header {header_name}: No sensitive data exposed")
 
         print("✅ Network security measures validated")
@@ -472,7 +499,9 @@ class TestSecurityValidation:
             import re
 
             # Remove OpenAI API keys
-            error_message = re.sub(r"sk-[a-zA-Z0-9]{40,}", "sk-***", error_message)
+            error_message = re.sub(
+                r"sk-[a-zA-Z0-9]{40,}", "sk-***", error_message
+            )
 
             # Remove Claude API keys
             error_message = re.sub(
@@ -480,7 +509,9 @@ class TestSecurityValidation:
             )
 
             # Remove AWS access keys
-            error_message = re.sub(r"AKIA[A-Z0-9]{16}", "AKIA***", error_message)
+            error_message = re.sub(
+                r"AKIA[A-Z0-9]{16}", "AKIA***", error_message
+            )
 
             # Remove other potential secrets (long alphanumeric strings)
             error_message = re.sub(r"[a-zA-Z0-9]{32,}", "***", error_message)
@@ -493,7 +524,8 @@ class TestSecurityValidation:
 
             # Verify sensitive data is removed
             assert (
-                "sk-1234567890abcdef1234567890abcdef1234567890abcdef" not in sanitized
+                "sk-1234567890abcdef1234567890abcdef1234567890abcdef"
+                not in sanitized
             )
             assert "AKIA1234567890ABCDEF" not in sanitized
             assert "abcdef1234567890abcdef1234567890abcdef12" not in sanitized
@@ -501,7 +533,9 @@ class TestSecurityValidation:
             # Verify masking is present
             assert "***" in sanitized
 
-            print(f"✅ {scenario['error_type']}: Error message properly sanitized")
+            print(
+                f"✅ {scenario['error_type']}: Error message properly sanitized"
+            )
             print(f"   Original: {scenario['raw_error']}")
             print(f"   Sanitized: {sanitized}")
 

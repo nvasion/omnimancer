@@ -46,7 +46,11 @@ async def mock_security():
             if "rev-parse" in command:
                 return {"success": True, "stdout": ".git", "stderr": ""}
             elif "status" in command:
-                return {"success": True, "stdout": "M test.txt\n", "stderr": ""}
+                return {
+                    "success": True,
+                    "stdout": "M test.txt\n",
+                    "stderr": "",
+                }
             elif "add" in command:
                 return {"success": True, "stdout": "", "stderr": ""}
         return {"success": True, "stdout": "test output", "stderr": ""}
@@ -84,7 +88,9 @@ async def mock_approval_manager():
 
 
 @pytest.fixture
-async def fs_manager_with_approval(mock_security, mock_approval_manager, temp_dir):
+async def fs_manager_with_approval(
+    mock_security, mock_approval_manager, temp_dir
+):
     """Create FileSystemManager with approval enabled for testing."""
     backup_dir = temp_dir / "backups"
     manager = FileSystemManager(
@@ -162,7 +168,9 @@ class TestFileSystemManager:
         test_file.write_text(original_content)
 
         # Write new content with backup
-        result = await fs_manager.write_file(test_file, new_content, backup=True)
+        result = await fs_manager.write_file(
+            test_file, new_content, backup=True
+        )
 
         assert result["success"] == True
         assert result["backup_path"] is not None
@@ -180,7 +188,9 @@ class TestFileSystemManager:
         test_content = "Atomic write test"
 
         # Write with atomic=True (default)
-        result = await fs_manager.write_file(test_file, test_content, atomic=True)
+        result = await fs_manager.write_file(
+            test_file, test_content, atomic=True
+        )
 
         assert result["success"] == True
         assert result["atomic"] == True
@@ -489,7 +499,10 @@ class TestFileSystemManagerErrorHandling:
         mock_security = Mock(spec=SecurityManager)
 
         async def mock_secure_file_access(path, operation, content=None):
-            return {"success": False, "error": "Access denied by security policy"}
+            return {
+                "success": False,
+                "error": "Access denied by security policy",
+            }
 
         mock_security.secure_file_access = mock_secure_file_access
 
@@ -525,7 +538,9 @@ class TestFileSystemManagerErrorHandling:
         """Test backup creation for non-existent file."""
         nonexistent_file = temp_dir / "nonexistent.txt"
 
-        with pytest.raises(FileOperationError, match="Cannot backup non-existent file"):
+        with pytest.raises(
+            FileOperationError, match="Cannot backup non-existent file"
+        ):
             await fs_manager.create_backup(nonexistent_file)
 
     @pytest.mark.asyncio
@@ -542,7 +557,9 @@ class TestFileSystemManagerErrorHandling:
         """Test listing non-existent directory."""
         nonexistent_dir = temp_dir / "nonexistent"
 
-        with pytest.raises(FileOperationError, match="Failed to list directory"):
+        with pytest.raises(
+            FileOperationError, match="Failed to list directory"
+        ):
             await fs_manager.list_directory(nonexistent_dir)
 
 
@@ -606,10 +623,14 @@ class TestFileSystemManagerIntegration:
         await fs_manager.write_file(sub_file, "Sub content")
 
         # List directories
-        main_contents = await fs_manager.list_directory(main_dir, recursive=False)
+        main_contents = await fs_manager.list_directory(
+            main_dir, recursive=False
+        )
         assert len(main_contents) == 2  # 1 file + 1 subdir
 
-        all_contents = await fs_manager.list_directory(main_dir, recursive=True)
+        all_contents = await fs_manager.list_directory(
+            main_dir, recursive=True
+        )
         assert len(all_contents) == 3  # 2 files + 1 subdir
 
         # Test glob patterns
@@ -695,7 +716,9 @@ class TestFileSystemManagerDirectoryAwareness:
         assert isinstance(repo_root, Path)
 
     @pytest.mark.asyncio
-    async def test_get_git_repository_root_not_found(self, fs_manager, temp_dir):
+    async def test_get_git_repository_root_not_found(
+        self, fs_manager, temp_dir
+    ):
         """Test getting git repository root when it doesn't exist."""
         # temp_dir doesn't have .git directory by default
         repo_root = await fs_manager.get_git_repository_root(temp_dir)
@@ -723,7 +746,9 @@ class TestFileSystemManagerDirectoryAwareness:
         assert context["relative_to_repo_root"] is None
 
     @pytest.mark.asyncio
-    async def test_get_directory_context_git_repository(self, fs_manager, temp_dir):
+    async def test_get_directory_context_git_repository(
+        self, fs_manager, temp_dir
+    ):
         """Test getting directory context for git repository."""
         # Create a .git directory to simulate a git repository
         git_dir = temp_dir / ".git"
@@ -786,7 +811,12 @@ class TestFileSystemManagerDirectoryAwareness:
         project_docs = temp_dir / "docs"
         deep_nested = temp_dir / "src" / "components" / "ui" / "forms"
 
-        for dir_path in [project_src, project_tests, project_docs, deep_nested]:
+        for dir_path in [
+            project_src,
+            project_tests,
+            project_docs,
+            deep_nested,
+        ]:
             dir_path.mkdir(parents=True)
 
         # Test from various locations
@@ -817,13 +847,17 @@ class TestFileSystemManagerApprovalFlow:
     """Test approval flow integration in FileSystemManager."""
 
     @pytest.mark.asyncio
-    async def test_write_file_with_approval(self, fs_manager_with_approval, temp_dir):
+    async def test_write_file_with_approval(
+        self, fs_manager_with_approval, temp_dir
+    ):
         """Test file writing with approval system enabled."""
         test_file = temp_dir / "approval_test.txt"
         test_content = "Content requiring approval"
 
         # Write file with approval
-        result = await fs_manager_with_approval.write_file(test_file, test_content)
+        result = await fs_manager_with_approval.write_file(
+            test_file, test_content
+        )
 
         assert result["success"] == True
         assert result["approved"] == True
@@ -838,7 +872,9 @@ class TestFileSystemManagerApprovalFlow:
         """Test file writing when approval is denied."""
         # Create approval manager that denies requests
         denial_approval_manager = Mock(spec=EnhancedApprovalManager)
-        denial_approval_manager.request_single_approval = AsyncMock(return_value=False)
+        denial_approval_manager.request_single_approval = AsyncMock(
+            return_value=False
+        )
 
         # Create file manager with denial approval
         backup_dir = temp_dir / "backups"
@@ -853,7 +889,9 @@ class TestFileSystemManagerApprovalFlow:
         test_content = "This should be denied"
 
         # Should raise error when approval is denied
-        with pytest.raises(FileOperationError, match="denied by approval workflow"):
+        with pytest.raises(
+            FileOperationError, match="denied by approval workflow"
+        ):
             await fs_manager.write_file(test_file, test_content)
 
         # File should not be created
@@ -862,7 +900,9 @@ class TestFileSystemManagerApprovalFlow:
         await fs_manager.cleanup()
 
     @pytest.mark.asyncio
-    async def test_delete_file_with_approval(self, fs_manager_with_approval, temp_dir):
+    async def test_delete_file_with_approval(
+        self, fs_manager_with_approval, temp_dir
+    ):
         """Test file deletion with approval system enabled."""
         test_file = temp_dir / "delete_approval_test.txt"
         test_content = "File to delete with approval"
@@ -901,7 +941,9 @@ class TestFileSystemManagerApprovalFlow:
         fs_manager_with_approval.approval_manager.request_single_approval.assert_called()
 
     @pytest.mark.asyncio
-    async def test_move_file_with_approval(self, fs_manager_with_approval, temp_dir):
+    async def test_move_file_with_approval(
+        self, fs_manager_with_approval, temp_dir
+    ):
         """Test file moving with approval system enabled."""
         src_file = temp_dir / "source_approval.txt"
         dst_file = temp_dir / "destination_approval.txt"
@@ -944,7 +986,9 @@ class TestFileSystemManagerApprovalFlow:
         await fs_manager.cleanup()
 
     @pytest.mark.asyncio
-    async def test_operation_data_structure(self, fs_manager_with_approval, temp_dir):
+    async def test_operation_data_structure(
+        self, fs_manager_with_approval, temp_dir
+    ):
         """Test that operations contain correct data for approval system."""
         test_file = temp_dir / "operation_data_test.txt"
         test_content = "Test content for operation data"
@@ -957,8 +1001,8 @@ class TestFileSystemManagerApprovalFlow:
             captured_operation = operation
             return True
 
-        fs_manager_with_approval.approval_manager.request_single_approval = AsyncMock(
-            side_effect=capture_operation
+        fs_manager_with_approval.approval_manager.request_single_approval = (
+            AsyncMock(side_effect=capture_operation)
         )
 
         # Perform write operation
@@ -966,7 +1010,9 @@ class TestFileSystemManagerApprovalFlow:
 
         # Verify operation structure
         assert captured_operation is not None
-        assert captured_operation.description == f"Create file: {test_file.name}"
+        assert (
+            captured_operation.description == f"Create file: {test_file.name}"
+        )
         assert captured_operation.data["path"] == str(test_file)
         assert captured_operation.data["content"] == test_content
         assert captured_operation.data["content_length"] == len(test_content)

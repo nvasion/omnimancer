@@ -33,7 +33,9 @@ class BaseProvider(ABC):
         self.config = kwargs
 
     @abstractmethod
-    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
+    async def send_message(
+        self, message: str, context: ChatContext
+    ) -> ChatResponse:
         """
         Send a message to the AI provider and get a response.
 
@@ -166,7 +168,10 @@ class BaseProvider(ABC):
         pass
 
     async def send_message_with_tools(
-        self, message: str, context: ChatContext, available_tools: List[ToolDefinition]
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
     ) -> ChatResponse:
         """
         Send a message with available tools for the AI to use.

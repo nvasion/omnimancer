@@ -87,7 +87,9 @@ class TokenUsageMetrics:
     def efficiency_ratio(self) -> float:
         """Calculate token efficiency ratio (output/total)."""
         return (
-            (self.output_tokens / self.total_tokens) if self.total_tokens > 0 else 0.0
+            (self.output_tokens / self.total_tokens)
+            if self.total_tokens > 0
+            else 0.0
         )
 
 
@@ -240,7 +242,9 @@ class PerformanceMetricsCollector:
             self.active_timings[operation_id] = timing
             return timing
 
-    def complete_operation_timing(self, operation_id: str) -> Optional[OperationTiming]:
+    def complete_operation_timing(
+        self, operation_id: str
+    ) -> Optional[OperationTiming]:
         """Complete timing measurement for an operation."""
         with self._lock:
             if operation_id in self.active_timings:
@@ -261,7 +265,9 @@ class PerformanceMetricsCollector:
                 f"Recorded context metrics: {context.efficiency_score:.1f} efficiency score"
             )
 
-    def record_resource_utilization(self, resources: ResourceUtilization) -> None:
+    def record_resource_utilization(
+        self, resources: ResourceUtilization
+    ) -> None:
         """Record resource utilization metrics."""
         with self._lock:
             self.resource_history.append(resources)
@@ -294,8 +300,12 @@ class PerformanceMetricsCollector:
                 lambda: {"tokens": 0, "cost": 0.0, "requests": 0}
             )
             for usage in relevant_usage:
-                provider_stats[usage.provider_name]["tokens"] += usage.total_tokens
-                provider_stats[usage.provider_name]["cost"] += usage.cost_estimate
+                provider_stats[usage.provider_name][
+                    "tokens"
+                ] += usage.total_tokens
+                provider_stats[usage.provider_name][
+                    "cost"
+                ] += usage.cost_estimate
                 provider_stats[usage.provider_name]["requests"] += 1
 
             # Group by operation type
@@ -339,8 +349,12 @@ class PerformanceMetricsCollector:
             # Aggregate token usage
             token_metrics = TokenUsageMetrics()
             if recent_tokens:
-                token_metrics.total_tokens = sum(t.total_tokens for t in recent_tokens)
-                token_metrics.input_tokens = sum(t.input_tokens for t in recent_tokens)
+                token_metrics.total_tokens = sum(
+                    t.total_tokens for t in recent_tokens
+                )
+                token_metrics.input_tokens = sum(
+                    t.input_tokens for t in recent_tokens
+                )
                 token_metrics.output_tokens = sum(
                     t.output_tokens for t in recent_tokens
                 )
@@ -384,7 +398,9 @@ class PerformanceMonitor:
         """Initialize the performance monitor."""
         self.status_manager = status_manager or get_status_manager()
         self.persona_manager = persona_manager or get_persona_manager()
-        self.storage_path = storage_path or Path.home() / ".omnimancer" / "performance"
+        self.storage_path = (
+            storage_path or Path.home() / ".omnimancer" / "performance"
+        )
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         self.metrics_collector = PerformanceMetricsCollector()
@@ -512,7 +528,9 @@ class PerformanceMonitor:
     def get_performance_dashboard_data(self) -> Dict[str, Any]:
         """Get data for performance dashboard."""
         snapshot = self.metrics_collector.get_performance_snapshot()
-        recent_stats = self.metrics_collector.get_token_usage_stats(timedelta(hours=1))
+        recent_stats = self.metrics_collector.get_token_usage_stats(
+            timedelta(hours=1)
+        )
 
         return {
             "current_snapshot": asdict(snapshot),
@@ -523,7 +541,9 @@ class PerformanceMonitor:
             "suggestions": [
                 asdict(suggestion) for suggestion in self.suggestions[-5:]
             ],  # Last 5 suggestions
-            "monitoring_status": "active" if self.is_monitoring else "inactive",
+            "monitoring_status": (
+                "active" if self.is_monitoring else "inactive"
+            ),
         }
 
     def _handle_agent_event(self, event: AgentEvent) -> None:
@@ -536,18 +556,23 @@ class PerformanceMonitor:
                 # Start tracking operation
                 if event.operation:
                     self.start_operation_tracking(
-                        event.operation.operation_id, event.operation.operation_type
+                        event.operation.operation_id,
+                        event.operation.operation_type,
                     )
 
             elif event.event_type == EventType.OPERATION_COMPLETED:
                 # Complete tracking operation
                 if event.operation:
-                    self.complete_operation_tracking(event.operation.operation_id)
+                    self.complete_operation_tracking(
+                        event.operation.operation_id
+                    )
 
             elif event.event_type == EventType.OPERATION_FAILED:
                 # Record failed operation
                 if event.operation:
-                    self.complete_operation_tracking(event.operation.operation_id)
+                    self.complete_operation_tracking(
+                        event.operation.operation_id
+                    )
 
         except Exception as e:
             logger.error(f"Error handling agent event: {e}")
@@ -703,7 +728,9 @@ def set_performance_monitor(monitor: PerformanceMonitor) -> None:
         _performance_monitor = monitor
 
 
-def initialize_performance_monitoring(auto_start: bool = True) -> PerformanceMonitor:
+def initialize_performance_monitoring(
+    auto_start: bool = True,
+) -> PerformanceMonitor:
     """Initialize the performance monitoring system."""
     monitor = get_performance_monitor()
     if auto_start:

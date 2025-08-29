@@ -161,7 +161,9 @@ class ResponseCache:
         self.default_ttl = default_ttl
         self.memory_cache: Dict[str, CacheEntry] = {}
 
-    def _get_cache_key(self, url: str, method: str, headers: Dict[str, str]) -> str:
+    def _get_cache_key(
+        self, url: str, method: str, headers: Dict[str, str]
+    ) -> str:
         """Generate cache key for request."""
         key_data = f"{method}:{url}:{json.dumps(sorted(headers.items()))}"
         return hashlib.md5(key_data.encode()).hexdigest()
@@ -171,7 +173,10 @@ class ResponseCache:
         return self.cache_dir / f"{cache_key}.cache"
 
     async def get(
-        self, url: str, method: str = "GET", headers: Optional[Dict[str, str]] = None
+        self,
+        url: str,
+        method: str = "GET",
+        headers: Optional[Dict[str, str]] = None,
     ) -> Optional[WebResponse]:
         """Get cached response if available and valid."""
 
@@ -249,19 +254,24 @@ class ResponseCache:
         """Clean up cache to stay within size limits."""
         # Remove expired entries from memory
         now = datetime.now()
-        expired_keys = [k for k, v in self.memory_cache.items() if now >= v.expires]
+        expired_keys = [
+            k for k, v in self.memory_cache.items() if now >= v.expires
+        ]
         for key in expired_keys:
             del self.memory_cache[key]
 
         # Check disk cache size
         try:
-            total_size = sum(f.stat().st_size for f in self.cache_dir.glob("*.cache"))
+            total_size = sum(
+                f.stat().st_size for f in self.cache_dir.glob("*.cache")
+            )
             max_size_bytes = self.max_size_mb * 1024 * 1024
 
             if total_size > max_size_bytes:
                 # Remove oldest files
                 cache_files = sorted(
-                    self.cache_dir.glob("*.cache"), key=lambda f: f.stat().st_mtime
+                    self.cache_dir.glob("*.cache"),
+                    key=lambda f: f.stat().st_mtime,
                 )
 
                 for cache_file in cache_files:
@@ -384,7 +394,9 @@ class WebClient:
 
             # Check for private IP patterns
             for blocked_pattern in self.blacklisted_domains:
-                if blocked_pattern.endswith(".") and domain.startswith(blocked_pattern):
+                if blocked_pattern.endswith(".") and domain.startswith(
+                    blocked_pattern
+                ):
                     return False
 
             # Additional security checks
@@ -414,7 +426,9 @@ class WebClient:
         url = url.strip()
         headers = headers or {}
         method_str = (
-            method.value if isinstance(method, RequestMethod) else str(method).upper()
+            method.value
+            if isinstance(method, RequestMethod)
+            else str(method).upper()
         )
 
         # Security validation
@@ -433,7 +447,9 @@ class WebClient:
         validation = await self.security.validate_operation(operation)
         if not validation["allowed"]:
             self.stats["blocked_requests"] += 1
-            raise ValueError(f"Request blocked: {', '.join(validation['reasons'])}")
+            raise ValueError(
+                f"Request blocked: {', '.join(validation['reasons'])}"
+            )
 
         # Check cache for GET requests
         cached_response = None
@@ -450,7 +466,9 @@ class WebClient:
             if domain:
                 start_time = time.time()
                 await self.rate_limiter.wait_if_needed(domain)
-                if time.time() - start_time > 0.1:  # If we waited more than 100ms
+                if (
+                    time.time() - start_time > 0.1
+                ):  # If we waited more than 100ms
                     self.stats["rate_limited"] += 1
 
         # Make request with retries
@@ -525,13 +543,19 @@ class WebClient:
                     content_type = resp.headers.get("content-type", "").lower()
                     is_text = any(
                         t in content_type
-                        for t in ["text/", "application/json", "application/xml"]
+                        for t in [
+                            "text/",
+                            "application/json",
+                            "application/xml",
+                        ]
                     )
 
                     # Convert to text if appropriate
                     if is_text:
                         encoding = resp.charset or "utf-8"
-                        content = content_bytes.decode(encoding, errors="ignore")
+                        content = content_bytes.decode(
+                            encoding, errors="ignore"
+                        )
                     else:
                         content = content_bytes
                         encoding = "binary"
@@ -602,7 +626,9 @@ class WebClient:
         response = await self.get(url)
 
         if not response.is_success:
-            raise ValueError(f"Failed to fetch content: HTTP {response.status}")
+            raise ValueError(
+                f"Failed to fetch content: HTTP {response.status}"
+            )
 
         if not response.is_text:
             raise ValueError("Response is not text content")
@@ -623,7 +649,9 @@ class WebClient:
 
         meta_description = soup.find("meta", attrs={"name": "description"})
         description = (
-            meta_description.get("content", "").strip() if meta_description else ""
+            meta_description.get("content", "").strip()
+            if meta_description
+            else ""
         )
 
         # Extract main content
@@ -639,7 +667,9 @@ class WebClient:
                 main_soup = (
                     soup.find("main")
                     or soup.find("article")
-                    or soup.find("div", class_=re.compile(r"content|main|article"))
+                    or soup.find(
+                        "div", class_=re.compile(r"content|main|article")
+                    )
                 )
                 if not main_soup:
                     main_soup = soup

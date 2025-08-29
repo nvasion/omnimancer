@@ -100,20 +100,28 @@ class AgentManager:
                     try:
                         cat_filter = PersonaCategory(category.lower())
                         filtered_agents = [
-                            a for a in filtered_agents if a.category == cat_filter
+                            a
+                            for a in filtered_agents
+                            if a.category == cat_filter
                         ]
                     except ValueError:
-                        self.console.print(f"[red]Invalid category: {category}[/red]")
+                        self.console.print(
+                            f"[red]Invalid category: {category}[/red]"
+                        )
                         return []
 
                 if status:
                     try:
                         status_filter = CustomAgentStatus(status.lower())
                         filtered_agents = [
-                            a for a in filtered_agents if a.status == status_filter
+                            a
+                            for a in filtered_agents
+                            if a.status == status_filter
                         ]
                     except ValueError:
-                        self.console.print(f"[red]Invalid status: {status}[/red]")
+                        self.console.print(
+                            f"[red]Invalid status: {status}[/red]"
+                        )
                         return []
 
                 # Sort agents
@@ -157,7 +165,9 @@ class AgentManager:
                 agent = self.repository.get_by_name(identifier)
 
             if not agent:
-                self.console.print(f"[red]Agent '{identifier}' not found.[/red]")
+                self.console.print(
+                    f"[red]Agent '{identifier}' not found.[/red]"
+                )
                 return None
 
             self._show_agent_details(agent)
@@ -192,7 +202,9 @@ class AgentManager:
                 console=self.console,
                 transient=True,
             ) as progress:
-                task = progress.add_task(f"Searching for '{query}'...", total=None)
+                task = progress.add_task(
+                    f"Searching for '{query}'...", total=None
+                )
 
                 results = self.repository.search(query, fields)
 
@@ -236,11 +248,16 @@ class AgentManager:
                 agent = self.repository.get_by_name(identifier)
 
             if not agent:
-                self.console.print(f"[red]Agent '{identifier}' not found.[/red]")
+                self.console.print(
+                    f"[red]Agent '{identifier}' not found.[/red]"
+                )
                 return None
 
             # Check if agent is in usable state
-            if agent.status not in [CustomAgentStatus.ACTIVE, CustomAgentStatus.DRAFT]:
+            if agent.status not in [
+                CustomAgentStatus.ACTIVE,
+                CustomAgentStatus.DRAFT,
+            ]:
                 self.console.print(
                     f"[yellow]Warning: Agent status is '{agent.status.value}'.[/yellow]"
                 )
@@ -254,7 +271,9 @@ class AgentManager:
                 console=self.console,
                 transient=True,
             ) as progress:
-                task = progress.add_task(f"Loading agent '{agent.name}'...", total=None)
+                task = progress.add_task(
+                    f"Loading agent '{agent.name}'...", total=None
+                )
 
                 # Update usage statistics
                 agent.increment_usage()
@@ -285,7 +304,9 @@ class AgentManager:
             logger.error(f"Agent loading error: {e}", exc_info=True)
             return None
 
-    async def delete_agent(self, identifier: str, confirm: bool = True) -> bool:
+    async def delete_agent(
+        self, identifier: str, confirm: bool = True
+    ) -> bool:
         """
         Delete an agent configuration.
 
@@ -303,7 +324,9 @@ class AgentManager:
                 agent = self.repository.get_by_name(identifier)
 
             if not agent:
-                self.console.print(f"[red]Agent '{identifier}' not found.[/red]")
+                self.console.print(
+                    f"[red]Agent '{identifier}' not found.[/red]"
+                )
                 return False
 
             # Show agent info before deletion
@@ -395,7 +418,9 @@ class AgentManager:
                 source_agent = self.repository.get_by_name(identifier)
 
             if not source_agent:
-                self.console.print(f"[red]Source agent '{identifier}' not found.[/red]")
+                self.console.print(
+                    f"[red]Source agent '{identifier}' not found.[/red]"
+                )
                 return None
 
             # Check name availability
@@ -459,7 +484,9 @@ class AgentManager:
                 agent = self.repository.get_by_name(identifier)
 
             if not agent:
-                self.console.print(f"[red]Agent '{identifier}' not found.[/red]")
+                self.console.print(
+                    f"[red]Agent '{identifier}' not found.[/red]"
+                )
                 return False
 
             # Determine export path
@@ -503,11 +530,15 @@ class AgentManager:
         """
         try:
             if not import_path.exists():
-                self.console.print(f"[red]Import file not found: {import_path}[/red]")
+                self.console.print(
+                    f"[red]Import file not found: {import_path}[/red]"
+                )
                 return None
 
             # Import the agent
-            imported_agent = self.repository.import_config(import_path, new_id=True)
+            imported_agent = self.repository.import_config(
+                import_path, new_id=True
+            )
 
             if not imported_agent:
                 self.console.print(
@@ -548,7 +579,9 @@ class AgentManager:
             stats_table.add_column("Value", style="white")
 
             # Repository stats
-            stats_table.add_row("Total Agents", str(repo_stats["total_agents"]))
+            stats_table.add_row(
+                "Total Agents", str(repo_stats["total_agents"])
+            )
 
             if repo_stats["status_distribution"]:
                 for status, count in repo_stats["status_distribution"].items():
@@ -562,13 +595,16 @@ class AgentManager:
             stats_table.add_row("", "")  # Separator
             stats_table.add_row(
                 "Session Started",
-                self._session_stats["session_start"].strftime("%Y-%m-%d %H:%M"),
+                self._session_stats["session_start"].strftime(
+                    "%Y-%m-%d %H:%M"
+                ),
             )
             stats_table.add_row(
                 "Agents Loaded", str(self._session_stats["agents_loaded"])
             )
             stats_table.add_row(
-                "Agents Activated", str(self._session_stats["agents_activated"])
+                "Agents Activated",
+                str(self._session_stats["agents_activated"]),
             )
 
             if self._active_agent:
@@ -656,7 +692,9 @@ class AgentManager:
         info_table.add_row("ID", agent.id)
         info_table.add_row("Category", agent.category.value.title())
         info_table.add_row("Status", f"{agent.status.value.title()}")
-        info_table.add_row("Created", agent.created_at.strftime("%Y-%m-%d %H:%M:%S"))
+        info_table.add_row(
+            "Created", agent.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        )
         info_table.add_row(
             "Last Modified", agent.updated_at.strftime("%Y-%m-%d %H:%M:%S")
         )
@@ -664,25 +702,34 @@ class AgentManager:
 
         if agent.metadata.last_used:
             info_table.add_row(
-                "Last Used", agent.metadata.last_used.strftime("%Y-%m-%d %H:%M:%S")
+                "Last Used",
+                agent.metadata.last_used.strftime("%Y-%m-%d %H:%M:%S"),
             )
 
         if agent.base_template_id:
             info_table.add_row("Base Template", agent.base_template_id)
 
-        self.console.print(Panel(info_table, title="📋 Basic Information", box=ROUNDED))
+        self.console.print(
+            Panel(info_table, title="📋 Basic Information", box=ROUNDED)
+        )
 
         # Model configuration
         model_table = Table(show_header=False, box=None)
         model_table.add_column("Field", style="cyan", width=20)
         model_table.add_column("Value", style="white")
 
-        model_table.add_row("Provider", agent.model_settings.provider_type.value)
+        model_table.add_row(
+            "Provider", agent.model_settings.provider_type.value
+        )
         model_table.add_row("Model", agent.model_settings.model_name)
-        model_table.add_row("Temperature", str(agent.model_settings.temperature))
+        model_table.add_row(
+            "Temperature", str(agent.model_settings.temperature)
+        )
 
         if agent.model_settings.max_tokens:
-            model_table.add_row("Max Tokens", str(agent.model_settings.max_tokens))
+            model_table.add_row(
+                "Max Tokens", str(agent.model_settings.max_tokens)
+            )
 
         self.console.print(
             Panel(model_table, title="🧠 Model Configuration", box=ROUNDED)
@@ -696,14 +743,21 @@ class AgentManager:
             ]
         )
         caps_text = "\\n".join(
-            [f"• {cap.value.replace('_', ' ').title()}" for cap in agent.capabilities]
+            [
+                f"• {cap.value.replace('_', ' ').title()}"
+                for cap in agent.capabilities
+            ]
         )
 
         tools_panel = Panel(
-            tools_text or "[dim]None[/dim]", title="🔧 Enabled Tools", box=ROUNDED
+            tools_text or "[dim]None[/dim]",
+            title="🔧 Enabled Tools",
+            box=ROUNDED,
         )
         caps_panel = Panel(
-            caps_text or "[dim]None[/dim]", title="⭐ Capabilities", box=ROUNDED
+            caps_text or "[dim]None[/dim]",
+            title="⭐ Capabilities",
+            box=ROUNDED,
         )
 
         self.console.print(Columns([tools_panel, caps_panel], equal=True))
@@ -714,7 +768,8 @@ class AgentManager:
         context_table.add_column("Value", style="white")
 
         context_table.add_row(
-            "Context Window", f"{agent.context_parameters.context_window_size:,} tokens"
+            "Context Window",
+            f"{agent.context_parameters.context_window_size:,} tokens",
         )
         context_table.add_row(
             "Memory Enabled",
@@ -723,13 +778,16 @@ class AgentManager:
 
         if agent.context_parameters.conversation_memory:
             context_table.add_row(
-                "Memory Limit", f"{agent.context_parameters.memory_limit} messages"
+                "Memory Limit",
+                f"{agent.context_parameters.memory_limit} messages",
             )
 
         context_table.add_row(
             "Response Format", agent.context_parameters.response_format
         )
-        context_table.add_row("Safety Level", agent.behavior_rules.safety_level.title())
+        context_table.add_row(
+            "Safety Level", agent.behavior_rules.safety_level.title()
+        )
         context_table.add_row(
             "Reasoning Style",
             agent.behavior_rules.reasoning_style.replace("_", " ").title(),
@@ -749,7 +807,11 @@ class AgentManager:
                 prompt_preview += "\\n\\n[dim]... (truncated)[/dim]"
 
             self.console.print(
-                Panel(prompt_preview, title="📝 System Prompt (Preview)", box=ROUNDED)
+                Panel(
+                    prompt_preview,
+                    title="📝 System Prompt (Preview)",
+                    box=ROUNDED,
+                )
             )
 
     def _show_agent_summary(self, agent: CustomAgentConfig):

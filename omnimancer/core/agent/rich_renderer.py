@@ -240,7 +240,9 @@ class RichTextRenderer:
 
         return Theme(theme_dict)
 
-    def get_risk_color(self, risk_level: Union[RiskLevel, str, int, None]) -> str:
+    def get_risk_color(
+        self, risk_level: Union[RiskLevel, str, int, None]
+    ) -> str:
         """
         Get color style for risk level.
 
@@ -279,7 +281,9 @@ class RichTextRenderer:
 
         return risk_styles.get(risk_level, "risk.none")
 
-    def get_operation_color(self, operation_type: Union[OperationType, str]) -> str:
+    def get_operation_color(
+        self, operation_type: Union[OperationType, str]
+    ) -> str:
         """
         Get color style for operation type.
 
@@ -391,7 +395,9 @@ class RichTextRenderer:
             header_style=header_style,
             show_footer=show_footer,
             width=(
-                None if self.capabilities.width > 120 else self.capabilities.width - 2
+                None
+                if self.capabilities.width > 120
+                else self.capabilities.width - 2
             ),
         )
 
@@ -406,7 +412,8 @@ class RichTextRenderer:
             for i, value in enumerate(row):
                 if isinstance(value, bool):
                     styled_value = Text(
-                        "✓" if value else "✗", style="success" if value else "error"
+                        "✓" if value else "✗",
+                        style="success" if value else "error",
                     )
                 elif (
                     isinstance(value, (int, float)) and i > 0
@@ -604,7 +611,9 @@ class RichTextRenderer:
                 columns.append(content)
             return Columns(columns, equal=True, padding=1)
 
-    def format_shortcut(self, key: str, description: str, enabled: bool = True) -> Text:
+    def format_shortcut(
+        self, key: str, description: str, enabled: bool = True
+    ) -> Text:
         """
         Format a keyboard shortcut with description.
 
@@ -713,7 +722,10 @@ class RichTextRenderer:
             rich_content: Rich formatted content
             plain_text: Plain text fallback
         """
-        if self.capabilities.supports_color and self.capabilities.supports_unicode:
+        if (
+            self.capabilities.supports_color
+            and self.capabilities.supports_unicode
+        ):
             self.console.print(rich_content)
         else:
             # Fallback to plain text

@@ -34,8 +34,12 @@ class SecurityManager:
         self.sandbox = (
             SandboxManager(default_resource_limits) if enable_sandbox else None
         )
-        self.approval = ApprovalWorkflow() if enable_approval_workflow else None
-        self.audit = AuditLogger(audit_log_file) if enable_audit_logging else None
+        self.approval = (
+            ApprovalWorkflow() if enable_approval_workflow else None
+        )
+        self.audit = (
+            AuditLogger(audit_log_file) if enable_audit_logging else None
+        )
 
         # Configuration
         self.enable_sandbox = enable_sandbox
@@ -109,7 +113,9 @@ class SecurityManager:
                 )
 
             if not permission_allowed:
-                result["reasons"].append("Permission denied by security policy")
+                result["reasons"].append(
+                    "Permission denied by security policy"
+                )
                 return result
 
             # Step 2: Risk assessment and approval workflow
@@ -259,7 +265,9 @@ class SecurityManager:
                         "stderr": sandbox_result["stderr"],
                     }
                 )
-                result["security_info"]["sandbox_dir"] = sandbox_result["sandbox_dir"]
+                result["security_info"]["sandbox_dir"] = sandbox_result[
+                    "sandbox_dir"
+                ]
 
             else:
                 # Execute directly (not recommended for production)
@@ -272,7 +280,9 @@ class SecurityManager:
                         env=env_vars,
                         capture_output=True,
                         text=True,
-                        timeout=self.security_policies.get("max_command_timeout", 300),
+                        timeout=self.security_policies.get(
+                            "max_command_timeout", 300
+                        ),
                     )
 
                     result.update(
@@ -337,7 +347,9 @@ class SecurityManager:
         try:
             # Create operation for validation
             op = PermissionOperation(
-                operation_type=f"file_{operation}", path=file_path, content=content
+                operation_type=f"file_{operation}",
+                path=file_path,
+                content=content,
             )
 
             # Validate operation
@@ -383,8 +395,13 @@ class SecurityManager:
                     result["error"] = "No content provided for write operation"
                 else:
                     # Check file size limits
-                    max_size_mb = self.security_policies.get("max_file_size_mb", 100)
-                    if len(content.encode("utf-8")) > max_size_mb * 1024 * 1024:
+                    max_size_mb = self.security_policies.get(
+                        "max_file_size_mb", 100
+                    )
+                    if (
+                        len(content.encode("utf-8"))
+                        > max_size_mb * 1024 * 1024
+                    ):
                         result["error"] = (
                             f"Content exceeds maximum file size ({max_size_mb}MB)"
                         )
@@ -412,7 +429,9 @@ class SecurityManager:
                     file_path,
                     operation,
                     allowed=result["success"],
-                    file_size=len(content.encode("utf-8")) if content else None,
+                    file_size=(
+                        len(content.encode("utf-8")) if content else None
+                    ),
                     operation_id=operation_id,
                     session_id=self.session_id,
                     metadata={"validation_result": validation_result},

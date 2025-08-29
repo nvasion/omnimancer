@@ -112,9 +112,15 @@ class InteractiveInputHandler:
             "h": KeyBinding("h", KeyAction.NAVIGATE_LEFT, "Navigate left"),
             "l": KeyBinding("l", KeyAction.NAVIGATE_RIGHT, "Navigate right"),
             "\x1b[A": KeyBinding("\x1b[A", KeyAction.NAVIGATE_UP, "Up arrow"),
-            "\x1b[B": KeyBinding("\x1b[B", KeyAction.NAVIGATE_DOWN, "Down arrow"),
-            "\x1b[C": KeyBinding("\x1b[C", KeyAction.NAVIGATE_RIGHT, "Right arrow"),
-            "\x1b[D": KeyBinding("\x1b[D", KeyAction.NAVIGATE_LEFT, "Left arrow"),
+            "\x1b[B": KeyBinding(
+                "\x1b[B", KeyAction.NAVIGATE_DOWN, "Down arrow"
+            ),
+            "\x1b[C": KeyBinding(
+                "\x1b[C", KeyAction.NAVIGATE_RIGHT, "Right arrow"
+            ),
+            "\x1b[D": KeyBinding(
+                "\x1b[D", KeyAction.NAVIGATE_LEFT, "Left arrow"
+            ),
             # Page navigation
             "\x1b[5~": KeyBinding("\x1b[5~", KeyAction.PAGE_UP, "Page up"),
             "\x1b[6~": KeyBinding("\x1b[6~", KeyAction.PAGE_DOWN, "Page down"),
@@ -122,7 +128,9 @@ class InteractiveInputHandler:
             "\x1b[F": KeyBinding("\x1b[F", KeyAction.END, "End"),
             # Display controls
             "d": KeyBinding("d", KeyAction.TOGGLE_DIFF, "Toggle diff view"),
-            "D": KeyBinding("D", KeyAction.TOGGLE_DETAILS, "Toggle details view"),
+            "D": KeyBinding(
+                "D", KeyAction.TOGGLE_DETAILS, "Toggle details view"
+            ),
             "+": KeyBinding("+", KeyAction.ZOOM_IN, "Zoom in"),
             "=": KeyBinding("=", KeyAction.ZOOM_IN, "Zoom in"),
             "-": KeyBinding("-", KeyAction.ZOOM_OUT, "Zoom out"),
@@ -199,7 +207,9 @@ class InteractiveInputHandler:
         if key in self.key_bindings:
             del self.key_bindings[key]
 
-    def get_key_bindings_by_mode(self, mode: InputMode) -> Dict[str, KeyBinding]:
+    def get_key_bindings_by_mode(
+        self, mode: InputMode
+    ) -> Dict[str, KeyBinding]:
         """Get key bindings for a specific mode."""
         return {k: v for k, v in self.key_bindings.items() if v.mode == mode}
 
@@ -247,7 +257,9 @@ class InteractiveInputHandler:
                 if self.timeout_seconds:
                     try:
                         line = await asyncio.wait_for(
-                            asyncio.get_event_loop().run_in_executor(None, input),
+                            asyncio.get_event_loop().run_in_executor(
+                                None, input
+                            ),
                             timeout=self.timeout_seconds,
                         )
                         return line.strip().lower()
@@ -261,7 +273,9 @@ class InteractiveInputHandler:
                 char = sys.stdin.read(1)
                 # Handle escape sequences
                 if char == "\x1b":
-                    char += sys.stdin.read(2)  # Read next 2 chars for arrow keys
+                    char += sys.stdin.read(
+                        2
+                    )  # Read next 2 chars for arrow keys
                     if char.endswith("["):
                         char += sys.stdin.read(1)  # Read the final character
                 return char
@@ -269,14 +283,18 @@ class InteractiveInputHandler:
             if self.timeout_seconds:
                 try:
                     key = await asyncio.wait_for(
-                        asyncio.get_event_loop().run_in_executor(None, _read_char),
+                        asyncio.get_event_loop().run_in_executor(
+                            None, _read_char
+                        ),
                         timeout=self.timeout_seconds,
                     )
                     return key
                 except asyncio.TimeoutError:
                     return None
             else:
-                return await asyncio.get_event_loop().run_in_executor(None, _read_char)
+                return await asyncio.get_event_loop().run_in_executor(
+                    None, _read_char
+                )
 
         except (KeyboardInterrupt, EOFError):
             return "q"  # Treat as quit
@@ -305,7 +323,11 @@ class InteractiveInputHandler:
                 action = await self.handle_key(key)
 
                 # Check if this action should terminate the loop
-                if action in [KeyAction.APPROVE, KeyAction.DENY, KeyAction.QUIT]:
+                if action in [
+                    KeyAction.APPROVE,
+                    KeyAction.DENY,
+                    KeyAction.QUIT,
+                ]:
                     return action
 
                 # Update display if callback is available
@@ -343,7 +365,10 @@ class InteractiveInputHandler:
             return None
 
         # Check if binding is valid for current mode
-        if binding.mode != InputMode.NORMAL and binding.mode != self.state.mode:
+        if (
+            binding.mode != InputMode.NORMAL
+            and binding.mode != self.state.mode
+        ):
             return None
 
         # Get the action handler
@@ -484,11 +509,18 @@ class InteractiveInputHandler:
         """Generate help text for current mode."""
         mode_bindings = self.get_key_bindings_by_mode(self.state.mode)
 
-        help_lines = [f"=== Help - {self.state.mode.value.title()} Mode ===", ""]
+        help_lines = [
+            f"=== Help - {self.state.mode.value.title()} Mode ===",
+            "",
+        ]
 
         # Group bindings by category
         categories = {
-            "Approval Actions": [KeyAction.APPROVE, KeyAction.DENY, KeyAction.QUIT],
+            "Approval Actions": [
+                KeyAction.APPROVE,
+                KeyAction.DENY,
+                KeyAction.QUIT,
+            ],
             "Navigation": [
                 KeyAction.NAVIGATE_UP,
                 KeyAction.NAVIGATE_DOWN,

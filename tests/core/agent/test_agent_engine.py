@@ -51,7 +51,9 @@ class TestOperation:
     def test_operation_result_creation(self):
         """Test creating operation results."""
         result = OperationResult(
-            success=True, data="File content", rollback_data={"backup": "old content"}
+            success=True,
+            data="File content",
+            rollback_data={"backup": "old content"},
         )
 
         assert result.success is True
@@ -60,7 +62,9 @@ class TestOperation:
         assert result.rollback_data["backup"] == "old content"
 
 
-@pytest.mark.skip(reason="Outdated tests - use test_file_system_manager.py instead")
+@pytest.mark.skip(
+    reason="Outdated tests - use test_file_system_manager.py instead"
+)
 class TestFileSystemManager:
     """Test FileSystemManager functionality."""
 
@@ -241,7 +245,10 @@ class TestFileSystemManager:
         operation = Operation(
             type=OperationType.FILE_WRITE,
             description="Write test file",
-            data={"path": str(temp_dir / "test.txt"), "content": "Hello World"},
+            data={
+                "path": str(temp_dir / "test.txt"),
+                "content": "Hello World",
+            },
         )
 
         preview = await fs_manager.preview_operation(operation)
@@ -401,7 +408,9 @@ class TestWebClient:
             mock_response.url = "https://httpbin.org/get"
 
             mock_client.request.return_value = mock_response
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_client
+            )
 
             result = await web_client._make_request(
                 "https://httpbin.org/get", "GET", {}, None
@@ -424,7 +433,9 @@ class TestWebClient:
             mock_response.url = "https://httpbin.org/status/404"
 
             mock_client.request.return_value = mock_response
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_client
+            )
 
             result = await web_client._make_request(
                 "https://httpbin.org/status/404", "GET", {}, None
@@ -501,7 +512,9 @@ class TestMCPIntegrator:
         )
 
         with patch.object(mcp_integrator, "_call_tool") as mock_call:
-            mock_call.return_value = OperationResult(success=True, data="Tool result")
+            mock_call.return_value = OperationResult(
+                success=True, data="Tool result"
+            )
 
             result = await mcp_integrator.execute_operation(operation)
 
@@ -526,7 +539,9 @@ class TestMCPIntegrator:
     @pytest.mark.asyncio
     async def test_call_tool(self, mcp_integrator):
         """Test MCP tool calling."""
-        result = await mcp_integrator._call_tool("test_tool", {"param": "value"})
+        result = await mcp_integrator._call_tool(
+            "test_tool", {"param": "value"}
+        )
 
         assert result.success is True
         assert "Called tool test_tool" in result.data
@@ -623,7 +638,9 @@ class TestApprovalManager:
         assert OperationType.FILE_READ in approval_manager.auto_approve_types
 
         approval_manager.remove_auto_approve_type(OperationType.FILE_READ)
-        assert OperationType.FILE_READ not in approval_manager.auto_approve_types
+        assert (
+            OperationType.FILE_READ not in approval_manager.auto_approve_types
+        )
 
 
 class TestProviderFallback:
@@ -697,10 +714,14 @@ class TestProviderFallback:
             result = await provider_fallback.execute_with_fallback(test_func)
 
         assert result == "fallback success"
-        assert core_engine.switch_model.call_count == 1  # Called for first fallback
+        assert (
+            core_engine.switch_model.call_count == 1
+        )  # Called for first fallback
 
     @pytest.mark.asyncio
-    async def test_execute_with_fallback_all_fail(self, provider_fallback, core_engine):
+    async def test_execute_with_fallback_all_fail(
+        self, provider_fallback, core_engine
+    ):
         """Test execution when all providers fail."""
         provider_fallback.set_fallback_providers(["provider1"])
 
@@ -790,21 +811,32 @@ class TestAgentEngine:
         # File operations
         file_op = Operation(OperationType.FILE_READ, "Read", {"path": "/test"})
         assert (
-            agent_engine._get_manager_for_operation(file_op) == agent_engine.file_system
+            agent_engine._get_manager_for_operation(file_op)
+            == agent_engine.file_system
         )
 
         # Command operations
-        cmd_op = Operation(OperationType.COMMAND_EXECUTE, "Command", {"command": "ls"})
-        assert agent_engine._get_manager_for_operation(cmd_op) == agent_engine.executor
+        cmd_op = Operation(
+            OperationType.COMMAND_EXECUTE, "Command", {"command": "ls"}
+        )
+        assert (
+            agent_engine._get_manager_for_operation(cmd_op)
+            == agent_engine.executor
+        )
 
         # Web operations
-        web_op = Operation(OperationType.WEB_REQUEST, "Web", {"url": "http://test.com"})
+        web_op = Operation(
+            OperationType.WEB_REQUEST, "Web", {"url": "http://test.com"}
+        )
         assert (
-            agent_engine._get_manager_for_operation(web_op) == agent_engine.web_client
+            agent_engine._get_manager_for_operation(web_op)
+            == agent_engine.web_client
         )
 
         # MCP operations
-        mcp_op = Operation(OperationType.MCP_TOOL_CALL, "MCP", {"tool_name": "test"})
+        mcp_op = Operation(
+            OperationType.MCP_TOOL_CALL, "MCP", {"tool_name": "test"}
+        )
         assert (
             agent_engine._get_manager_for_operation(mcp_op)
             == agent_engine.mcp_integrator
@@ -867,7 +899,9 @@ class TestAgentEngine:
         ) as mock_execute:
 
             mock_preview.return_value = "Preview: Read file"
-            mock_execute.return_value = OperationResult(success=True, data="content")
+            mock_execute.return_value = OperationResult(
+                success=True, data="content"
+            )
 
             result = await agent_engine.execute_with_approval(operation)
 
@@ -897,7 +931,9 @@ class TestAgentEngine:
             assert len(agent_engine.operation_history) == 0
 
     @pytest.mark.asyncio
-    async def test_execute_with_approval_no_approval_needed(self, agent_engine):
+    async def test_execute_with_approval_no_approval_needed(
+        self, agent_engine
+    ):
         """Test operation execution without approval requirement."""
         operation = Operation(
             OperationType.FILE_READ,
@@ -913,7 +949,9 @@ class TestAgentEngine:
         ) as mock_execute:
 
             mock_preview.return_value = "Preview: Read file"
-            mock_execute.return_value = OperationResult(success=True, data="content")
+            mock_execute.return_value = OperationResult(
+                success=True, data="content"
+            )
 
             result = await agent_engine.execute_with_approval(operation)
 
@@ -967,7 +1005,9 @@ class TestAgentEngine:
         ]
 
         # Mock execute_with_approval for rollback
-        with patch.object(agent_engine, "execute_with_approval") as mock_execute:
+        with patch.object(
+            agent_engine, "execute_with_approval"
+        ) as mock_execute:
             mock_execute.return_value = OperationResult(success=True)
 
             success = await agent_engine.rollback_operation(0)
@@ -982,7 +1022,9 @@ class TestAgentEngine:
             assert rollback_op.requires_approval is False
 
     @pytest.mark.asyncio
-    async def test_rollback_operation_file_delete(self, agent_engine, temp_dir):
+    async def test_rollback_operation_file_delete(
+        self, agent_engine, temp_dir
+    ):
         """Test rolling back a file delete operation."""
         # Create mock history entry
         deleted_content = "deleted content"
@@ -992,7 +1034,10 @@ class TestAgentEngine:
         )
         result = OperationResult(
             success=True,
-            rollback_data={"backup_content": deleted_content, "path": file_path},
+            rollback_data={
+                "backup_content": deleted_content,
+                "path": file_path,
+            },
         )
 
         agent_engine.operation_history = [
@@ -1000,7 +1045,9 @@ class TestAgentEngine:
         ]
 
         # Mock execute_with_approval for rollback
-        with patch.object(agent_engine, "execute_with_approval") as mock_execute:
+        with patch.object(
+            agent_engine, "execute_with_approval"
+        ) as mock_execute:
             mock_execute.return_value = OperationResult(success=True)
 
             success = await agent_engine.rollback_operation(0)
@@ -1017,8 +1064,12 @@ class TestAgentEngine:
     @pytest.mark.asyncio
     async def test_rollback_operation_no_rollback_data(self, agent_engine):
         """Test rollback with no rollback data available."""
-        operation = Operation(OperationType.FILE_READ, "Read", {"path": "/test"})
-        result = OperationResult(success=True, data="content")  # No rollback_data
+        operation = Operation(
+            OperationType.FILE_READ, "Read", {"path": "/test"}
+        )
+        result = OperationResult(
+            success=True, data="content"
+        )  # No rollback_data
 
         agent_engine.operation_history = [
             {"operation": operation, "result": result, "timestamp": 123}

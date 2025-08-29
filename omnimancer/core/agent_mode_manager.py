@@ -108,7 +108,9 @@ class AgentModeManager:
 
         # Event handlers
         self.operation_callbacks: List[Callable[[AgentOperation], None]] = []
-        self.mode_change_callbacks: List[Callable[[AgentMode, AgentMode], None]] = []
+        self.mode_change_callbacks: List[
+            Callable[[AgentMode, AgentMode], None]
+        ] = []
 
         # Execution control
         self._execution_task: Optional[asyncio.Task] = None
@@ -143,7 +145,9 @@ class AgentModeManager:
             # Start execution loop
             if not self._execution_task or self._execution_task.done():
                 self._shutdown_event.clear()
-                self._execution_task = asyncio.create_task(self._execution_loop())
+                self._execution_task = asyncio.create_task(
+                    self._execution_loop()
+                )
 
             # Save state
             self._save_state()
@@ -159,7 +163,9 @@ class AgentModeManager:
             self.mode = AgentMode.OFF
             return False
 
-    async def disable_agent_mode(self, wait_for_completion: bool = True) -> bool:
+    async def disable_agent_mode(
+        self, wait_for_completion: bool = True
+    ) -> bool:
         """
         Disable agent mode.
 
@@ -182,7 +188,9 @@ class AgentModeManager:
                 )
                 # Wait with timeout
                 try:
-                    await asyncio.wait_for(self._wait_for_operations(), timeout=30)
+                    await asyncio.wait_for(
+                        self._wait_for_operations(), timeout=30
+                    )
                 except asyncio.TimeoutError:
                     logger.warning(
                         "Timeout waiting for operations to complete, forcing shutdown"
@@ -222,7 +230,9 @@ class AgentModeManager:
                 not self._execution_task or self._execution_task.done()
             ):
                 self._shutdown_event.clear()
-                self._execution_task = asyncio.create_task(self._execution_loop())
+                self._execution_task = asyncio.create_task(
+                    self._execution_loop()
+                )
                 logger.info("Agent execution loop started automatically")
         except Exception as e:
             logger.error(f"Failed to start agent execution loop: {e}")
@@ -325,7 +335,9 @@ class AgentModeManager:
         Returns:
             Operation ID
         """
-        op_id = f"agent_op_{int(time.time() * 1000)}_{len(self.operation_queue)}"
+        op_id = (
+            f"agent_op_{int(time.time() * 1000)}_{len(self.operation_queue)}"
+        )
         agent_operation = AgentOperation(
             id=op_id, operation=operation, priority=priority
         )
@@ -371,7 +383,9 @@ class AgentModeManager:
             op = self.active_operations[operation_id]
             op.status = AgentOperationStatus.CANCELLED
             # Note: Actual cancellation of running operation depends on implementation
-            logger.info(f"Marked active operation {operation_id} for cancellation")
+            logger.info(
+                f"Marked active operation {operation_id} for cancellation"
+            )
             return True
 
         return False
@@ -404,7 +418,11 @@ class AgentModeManager:
             history.append(
                 {
                     "id": op.id,
-                    "type": op.operation.type.value if op.operation.type else "unknown",
+                    "type": (
+                        op.operation.type.value
+                        if op.operation.type
+                        else "unknown"
+                    ),
                     "description": op.operation.description,
                     "status": op.status.value,
                     "created_at": op.created_at.isoformat(),
@@ -416,7 +434,9 @@ class AgentModeManager:
 
         return history
 
-    def add_operation_callback(self, callback: Callable[[AgentOperation], None]):
+    def add_operation_callback(
+        self, callback: Callable[[AgentOperation], None]
+    ):
         """Add callback for operation state changes."""
         self.operation_callbacks.append(callback)
 
@@ -444,7 +464,9 @@ class AgentModeManager:
 
                 # Wait briefly before next iteration
                 try:
-                    await asyncio.wait_for(self._shutdown_event.wait(), timeout=1.0)
+                    await asyncio.wait_for(
+                        self._shutdown_event.wait(), timeout=1.0
+                    )
                     break  # Shutdown requested
                 except asyncio.TimeoutError:
                     continue  # Normal timeout, continue loop
@@ -516,7 +538,9 @@ class AgentModeManager:
         # Notify callbacks
         self._notify_operation_change(agent_operation)
 
-        logger.info(f"Starting operation {agent_operation.id}: {operation.description}")
+        logger.info(
+            f"Starting operation {agent_operation.id}: {operation.description}"
+        )
 
         # Execute operation asynchronously
         asyncio.create_task(self._execute_operation(agent_operation))

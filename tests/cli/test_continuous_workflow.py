@@ -74,10 +74,16 @@ class TestContinuousWorkflow:
         cli_interface.engine.send_message.side_effect = [second_response]
 
         # Mock operation parsing
-        with patch.object(cli_interface, "_parse_and_execute_operations") as mock_parse:
-            mock_parse.return_value = "✅ Command executed successfully: `ls -la`"
+        with patch.object(
+            cli_interface, "_parse_and_execute_operations"
+        ) as mock_parse:
+            mock_parse.return_value = (
+                "✅ Command executed successfully: `ls -la`"
+            )
 
-            with patch.object(cli_interface, "_show_assistant_message") as mock_show:
+            with patch.object(
+                cli_interface, "_show_assistant_message"
+            ) as mock_show:
                 await cli_interface._execute_continuous_workflow(
                     "analyze workspace", first_response
                 )
@@ -96,13 +102,19 @@ class TestContinuousWorkflow:
 
         # Mock response without operations
         response = Mock()
-        response.content = "Here's my analysis of the workspace without any operations."
+        response.content = (
+            "Here's my analysis of the workspace without any operations."
+        )
         response.model_used = "test-model"
 
-        with patch.object(cli_interface, "_parse_and_execute_operations") as mock_parse:
+        with patch.object(
+            cli_interface, "_parse_and_execute_operations"
+        ) as mock_parse:
             mock_parse.return_value = response.content
 
-            with patch.object(cli_interface, "_show_assistant_message") as mock_show:
+            with patch.object(
+                cli_interface, "_show_assistant_message"
+            ) as mock_show:
                 await cli_interface._execute_continuous_workflow(
                     "analyze workspace", response
                 )
@@ -129,11 +141,15 @@ class TestContinuousWorkflow:
         # Engine always returns a response with operations
         cli_interface.engine.send_message.return_value = response_with_ops
 
-        with patch.object(cli_interface, "_parse_and_execute_operations") as mock_parse:
+        with patch.object(
+            cli_interface, "_parse_and_execute_operations"
+        ) as mock_parse:
             mock_parse.return_value = "✅ Command executed"
 
             with patch.object(cli_interface, "_show_assistant_message"):
-                with patch.object(cli_interface, "_show_warning") as mock_warning:
+                with patch.object(
+                    cli_interface, "_show_warning"
+                ) as mock_warning:
                     await cli_interface._execute_continuous_workflow(
                         "test task", response_with_ops
                     )
@@ -152,7 +168,9 @@ class TestContinuousWorkflow:
 
         # First response with operations
         first_response = Mock()
-        first_response.content = "Starting analysis. [COMMAND_EXEC] ls [/COMMAND_EXEC]"
+        first_response.content = (
+            "Starting analysis. [COMMAND_EXEC] ls [/COMMAND_EXEC]"
+        )
         first_response.model_used = "test-model"
 
         # Second response indicating completion
@@ -165,10 +183,14 @@ class TestContinuousWorkflow:
 
         cli_interface.engine.send_message.return_value = completion_response
 
-        with patch.object(cli_interface, "_parse_and_execute_operations") as mock_parse:
+        with patch.object(
+            cli_interface, "_parse_and_execute_operations"
+        ) as mock_parse:
             mock_parse.return_value = "✅ Command executed"
 
-            with patch.object(cli_interface, "_show_assistant_message") as mock_show:
+            with patch.object(
+                cli_interface, "_show_assistant_message"
+            ) as mock_show:
                 await cli_interface._execute_continuous_workflow(
                     "test task", first_response
                 )
@@ -187,7 +209,9 @@ class TestContinuousWorkflow:
 
         # First response with operations
         first_response = Mock()
-        first_response.content = "Starting work. [COMMAND_EXEC] test [/COMMAND_EXEC]"
+        first_response.content = (
+            "Starting work. [COMMAND_EXEC] test [/COMMAND_EXEC]"
+        )
         first_response.model_used = "test-model"
 
         # Engine fails on continuation
@@ -197,7 +221,9 @@ class TestContinuousWorkflow:
 
         cli_interface.engine.send_message.return_value = failed_response
 
-        with patch.object(cli_interface, "_parse_and_execute_operations") as mock_parse:
+        with patch.object(
+            cli_interface, "_parse_and_execute_operations"
+        ) as mock_parse:
             mock_parse.return_value = "✅ Command executed"
 
             with patch.object(cli_interface, "_show_assistant_message"):
@@ -234,9 +260,12 @@ class TestContinuousWorkflow:
 
         for content, expected_has_ops in test_cases:
             has_operations = any(
-                re.search(pattern, content, re.DOTALL) for pattern in operation_patterns
+                re.search(pattern, content, re.DOTALL)
+                for pattern in operation_patterns
             )
-            assert has_operations == expected_has_ops, f"Failed for content: {content}"
+            assert (
+                has_operations == expected_has_ops
+            ), f"Failed for content: {content}"
 
 
 class TestWorkflowEdgeCases:
@@ -261,7 +290,9 @@ class TestWorkflowEdgeCases:
         return cli
 
     @pytest.mark.asyncio
-    async def test_workflow_stops_on_completion_keywords(self, cli_interface_edge):
+    async def test_workflow_stops_on_completion_keywords(
+        self, cli_interface_edge
+    ):
         """Test that workflow stops when AI indicates completion."""
         completion_phrases = [
             "The task is complete.",
@@ -277,16 +308,22 @@ class TestWorkflowEdgeCases:
 
             # First response with operations
             first_response = Mock()
-            first_response.content = "Starting work. [COMMAND_EXEC] ls [/COMMAND_EXEC]"
+            first_response.content = (
+                "Starting work. [COMMAND_EXEC] ls [/COMMAND_EXEC]"
+            )
             first_response.model_used = "test-model"
 
             # Second response with completion phrase
             completion_response = Mock()
-            completion_response.content = f"Great! {phrase} Everything looks good."
+            completion_response.content = (
+                f"Great! {phrase} Everything looks good."
+            )
             completion_response.model_used = "test-model"
             completion_response.is_success = True
 
-            cli_interface_edge.engine.send_message.return_value = completion_response
+            cli_interface_edge.engine.send_message.return_value = (
+                completion_response
+            )
 
             with patch.object(
                 cli_interface_edge,
@@ -307,13 +344,17 @@ class TestWorkflowEdgeCases:
                     ), f"Completion phrase '{phrase}' was not shown"
 
                     # Should only make one continuation call
-                    assert cli_interface_edge.engine.send_message.call_count == 1
+                    assert (
+                        cli_interface_edge.engine.send_message.call_count == 1
+                    )
 
     @pytest.mark.asyncio
     async def test_workflow_handles_empty_responses(self, cli_interface_edge):
         """Test workflow behavior with empty or None responses."""
         first_response = Mock()
-        first_response.content = "Starting. [COMMAND_EXEC] test [/COMMAND_EXEC]"
+        first_response.content = (
+            "Starting. [COMMAND_EXEC] test [/COMMAND_EXEC]"
+        )
         first_response.model_used = "test-model"
 
         # Empty response
@@ -338,7 +379,9 @@ class TestWorkflowEdgeCases:
                 assert cli_interface_edge.engine.send_message.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_workflow_handles_malformed_operations(self, cli_interface_edge):
+    async def test_workflow_handles_malformed_operations(
+        self, cli_interface_edge
+    ):
         """Test workflow with malformed operation markers."""
         malformed_cases = [
             "No operations here, just text",  # No operation markers at all
@@ -359,14 +402,18 @@ class TestWorkflowEdgeCases:
 
             # Reset mock and set return value
             cli_interface_edge.engine.send_message.reset_mock()
-            cli_interface_edge.engine.send_message.return_value = continuation_response
+            cli_interface_edge.engine.send_message.return_value = (
+                continuation_response
+            )
 
             with patch.object(
                 cli_interface_edge,
                 "_parse_and_execute_operations",
                 new=AsyncMock(return_value=malformed_content),
             ) as mock_parse:
-                with patch.object(cli_interface_edge, "_show_assistant_message"):
+                with patch.object(
+                    cli_interface_edge, "_show_assistant_message"
+                ):
                     await cli_interface_edge._execute_continuous_workflow(
                         "test", response
                     )

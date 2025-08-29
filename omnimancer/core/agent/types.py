@@ -49,7 +49,9 @@ class OperationResult:
     success: bool
     data: Any = None
     error: Optional[str] = None
-    details: Optional[str] = None  # Additional context for errors or operation info
+    details: Optional[str] = (
+        None  # Additional context for errors or operation info
+    )
     rollback_data: Optional[Dict[str, Any]] = None
     operation: Optional[Operation] = None
     execution_time: Optional[float] = None

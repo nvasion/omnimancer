@@ -83,7 +83,9 @@ class ChangePreview:
 
         return "".join(diff_lines)
 
-    def format_preview(self, format_type: PreviewFormat = PreviewFormat.TEXT) -> str:
+    def format_preview(
+        self, format_type: PreviewFormat = PreviewFormat.TEXT
+    ) -> str:
         """Format the preview for display."""
         if format_type == PreviewFormat.DIFF:
             if not self.diff:
@@ -284,7 +286,9 @@ class EnhancedApprovalManager:
 
             # If auto-approved (low risk), return immediately
             if approval_request.status == ApprovalStatus.APPROVED:
-                self._record_approval_history(operation, approval_request, preview)
+                self._record_approval_history(
+                    operation, approval_request, preview
+                )
                 return True
 
             # Request user approval through callback
@@ -302,7 +306,9 @@ class EnhancedApprovalManager:
                     self.approval_workflow.approve_request(
                         approval_request.id, "user", "User approved through UI"
                     )
-                    self._record_approval_history(operation, approval_request, preview)
+                    self._record_approval_history(
+                        operation, approval_request, preview
+                    )
                     return True
                 else:
                     self.approval_workflow.deny_request(
@@ -314,7 +320,9 @@ class EnhancedApprovalManager:
                     return False
 
             # No callback available, default to deny
-            logger.warning(f"No approval callback set for operation: {operation.type}")
+            logger.warning(
+                f"No approval callback set for operation: {operation.type}"
+            )
             return False
 
         except Exception as e:
@@ -348,7 +356,9 @@ class EnhancedApprovalManager:
                 preview = await self.generate_operation_preview(operation)
                 previews.append(preview)
             except Exception as e:
-                logger.error(f"Error generating preview for {operation.type}: {e}")
+                logger.error(
+                    f"Error generating preview for {operation.type}: {e}"
+                )
                 # Create basic preview on error
                 previews.append(
                     ChangePreview(
@@ -362,7 +372,8 @@ class EnhancedApprovalManager:
         batch_request = BatchApprovalRequest(
             operations=operations,
             previews=previews,
-            expires_at=datetime.now() + timedelta(minutes=self.default_timeout_minutes),
+            expires_at=datetime.now()
+            + timedelta(minutes=self.default_timeout_minutes),
         )
 
         self.pending_batches[batch_request.id] = batch_request
@@ -370,16 +381,22 @@ class EnhancedApprovalManager:
         # Request user approval through batch callback
         if self.batch_approval_callback:
             try:
-                approval_result = await self.batch_approval_callback(batch_request)
+                approval_result = await self.batch_approval_callback(
+                    batch_request
+                )
                 if approval_result:
-                    self._process_batch_approval_result(batch_request, approval_result)
+                    self._process_batch_approval_result(
+                        batch_request, approval_result
+                    )
             except Exception as e:
                 logger.error(f"Error in batch approval callback: {e}")
 
         return batch_request
 
     def _process_batch_approval_result(
-        self, batch_request: BatchApprovalRequest, approval_result: Dict[str, Any]
+        self,
+        batch_request: BatchApprovalRequest,
+        approval_result: Dict[str, Any],
     ):
         """Process the result of batch approval from user."""
         if approval_result.get("approve_all"):
@@ -393,8 +410,12 @@ class EnhancedApprovalManager:
                 "reason", "User denied all operations"
             )
         elif "approved_indices" in approval_result:
-            batch_request.approved_operations = set(approval_result["approved_indices"])
-            if len(batch_request.approved_operations) == len(batch_request.operations):
+            batch_request.approved_operations = set(
+                approval_result["approved_indices"]
+            )
+            if len(batch_request.approved_operations) == len(
+                batch_request.operations
+            ):
                 batch_request.status = ApprovalStatus.APPROVED
             elif len(batch_request.approved_operations) > 0:
                 batch_request.status = (
@@ -409,7 +430,9 @@ class EnhancedApprovalManager:
         if batch_request.id in self.pending_batches:
             del self.pending_batches[batch_request.id]
 
-    async def generate_operation_preview(self, operation: Operation) -> ChangePreview:
+    async def generate_operation_preview(
+        self, operation: Operation
+    ) -> ChangePreview:
         """
         Generate a comprehensive preview for an operation.
 
@@ -431,7 +454,9 @@ class EnhancedApprovalManager:
                 reversible=operation.reversible,
             )
 
-    async def _generate_file_read_preview(self, operation: Operation) -> ChangePreview:
+    async def _generate_file_read_preview(
+        self, operation: Operation
+    ) -> ChangePreview:
         """Generate preview for file read operation."""
         file_path = operation.data.get("path", "unknown")
         return ChangePreview(
@@ -442,7 +467,9 @@ class EnhancedApprovalManager:
             reversible=False,
         )
 
-    async def _generate_file_write_preview(self, operation: Operation) -> ChangePreview:
+    async def _generate_file_write_preview(
+        self, operation: Operation
+    ) -> ChangePreview:
         """Generate preview for file write operation."""
         file_path = operation.data.get("path", "unknown")
         new_content = operation.data.get("content", "")
@@ -470,8 +497,12 @@ class EnhancedApprovalManager:
                 "content_length": len(new_content),
                 "operation": "write",
             },
-            risk_assessment=self._assess_file_write_risk(file_path, new_content),
-            reversible=bool(current_content),  # Reversible if we have backup content
+            risk_assessment=self._assess_file_write_risk(
+                file_path, new_content
+            ),
+            reversible=bool(
+                current_content
+            ),  # Reversible if we have backup content
         )
 
         # Generate diff if we have both states
@@ -548,11 +579,15 @@ class EnhancedApprovalManager:
                 "item_count": len(contents),
                 "operation": "rmdir",
             },
-            risk_assessment=self._assess_directory_delete_risk(dir_path, contents),
+            risk_assessment=self._assess_directory_delete_risk(
+                dir_path, contents
+            ),
             reversible=len(contents) == 0,  # Only reversible if empty
         )
 
-    async def _generate_command_preview(self, operation: Operation) -> ChangePreview:
+    async def _generate_command_preview(
+        self, operation: Operation
+    ) -> ChangePreview:
         """Generate preview for command execution."""
         command = operation.data.get("command", "unknown")
         args = operation.data.get("args", [])
@@ -592,7 +627,9 @@ class EnhancedApprovalManager:
             reversible=method.upper() == "GET",
         )
 
-    async def _generate_mcp_tool_preview(self, operation: Operation) -> ChangePreview:
+    async def _generate_mcp_tool_preview(
+        self, operation: Operation
+    ) -> ChangePreview:
         """Generate preview for MCP tool call."""
         tool_name = operation.data.get("tool_name", "unknown")
         arguments = operation.data.get("arguments", {})
@@ -621,7 +658,8 @@ class EnhancedApprovalManager:
             risk_factors.append("sensitive file")
 
         if any(
-            pattern in path_lower for pattern in ["config", "settings", ".ssh", "/etc"]
+            pattern in path_lower
+            for pattern in ["config", "settings", ".ssh", "/etc"]
         ):
             risk_factors.append("configuration file")
 
@@ -644,7 +682,9 @@ class EnhancedApprovalManager:
             return "High - Deleting important file"
         return "Medium - File deletion"
 
-    def _assess_directory_delete_risk(self, dir_path: str, contents: List[str]) -> str:
+    def _assess_directory_delete_risk(
+        self, dir_path: str, contents: List[str]
+    ) -> str:
         """Assess risk level for directory deletion."""
         if len(contents) > 10:
             return "High - Deleting directory with many files"
@@ -658,14 +698,19 @@ class EnhancedApprovalManager:
         command_lower = command.lower()
 
         if any(
-            dangerous in command_lower for dangerous in ["rm -rf", "sudo", "chmod 777"]
+            dangerous in command_lower
+            for dangerous in ["rm -rf", "sudo", "chmod 777"]
         ):
             return "Critical - Dangerous command"
         elif any(
-            risky in command_lower for risky in ["rm", "mv", "cp", "chmod", "chown"]
+            risky in command_lower
+            for risky in ["rm", "mv", "cp", "chmod", "chown"]
         ):
             return "High - File system modification"
-        elif any(network in command_lower for network in ["curl", "wget", "nc", "ssh"]):
+        elif any(
+            network in command_lower
+            for network in ["curl", "wget", "nc", "ssh"]
+        ):
             return "Medium - Network operation"
         else:
             return "Low - Safe command"
@@ -679,7 +724,9 @@ class EnhancedApprovalManager:
         else:
             return "Low - External GET request"
 
-    def _assess_mcp_tool_risk(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+    def _assess_mcp_tool_risk(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> str:
         """Assess risk level for MCP tool calls."""
         if "write" in tool_name.lower() or "delete" in tool_name.lower():
             return "Medium - Potentially modifying tool"
@@ -723,7 +770,9 @@ class EnhancedApprovalManager:
             return {"total_requests": 0}
 
         total = len(self.approval_history)
-        approved = sum(1 for entry in self.approval_history if entry["approved"])
+        approved = sum(
+            1 for entry in self.approval_history if entry["approved"]
+        )
 
         risk_levels = {}
         operation_types = {}

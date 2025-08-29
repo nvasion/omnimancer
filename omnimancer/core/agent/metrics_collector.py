@@ -32,7 +32,11 @@ from .status_manager import (
     UnifiedStatusManager as AgentStatusManager,
     get_status_manager,
 )
-from .token_tracker import TokenUsageTracker, DetailedTokenUsage, get_token_tracker
+from .token_tracker import (
+    TokenUsageTracker,
+    DetailedTokenUsage,
+    get_token_tracker,
+)
 from .persona import AgentPersona, PersonaManager, get_persona_manager
 
 logger = logging.getLogger(__name__)
@@ -186,7 +190,9 @@ class MetricsBuffer:
 
             # Filter by time window
             cutoff_time = datetime.now() - time_window
-            relevant_values = [v for v in self.values if v.timestamp >= cutoff_time]
+            relevant_values = [
+                v for v in self.values if v.timestamp >= cutoff_time
+            ]
 
             # Filter by labels if provided
             if labels:
@@ -217,7 +223,9 @@ class MetricsBuffer:
                 agg_value = len(numeric_values)
             elif method == AggregationMethod.RATE:
                 # Calculate rate per minute
-                agg_value = len(numeric_values) / (time_window.total_seconds() / 60)
+                agg_value = len(numeric_values) / (
+                    time_window.total_seconds() / 60
+                )
             else:
                 agg_value = statistics.mean(numeric_values)
 
@@ -225,7 +233,9 @@ class MetricsBuffer:
             min_value = min(numeric_values)
             max_value = max(numeric_values)
             std_dev = (
-                statistics.stdev(numeric_values) if len(numeric_values) > 1 else 0.0
+                statistics.stdev(numeric_values)
+                if len(numeric_values) > 1
+                else 0.0
             )
 
             # Get unit from first value (assuming all have same unit)
@@ -260,7 +270,9 @@ class PerformanceMetricsCollector:
         max_buffer_size: int = 50000,
     ):
         """Initialize the metrics collector."""
-        self.storage_path = storage_path or Path.home() / ".omnimancer" / "metrics"
+        self.storage_path = (
+            storage_path or Path.home() / ".omnimancer" / "metrics"
+        )
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         self.collection_interval = collection_interval
@@ -343,14 +355,22 @@ class PerformanceMetricsCollector:
                 self.resource_snapshots.append(snapshot)
 
             # Convert to individual metrics
-            self.record_metric("system.cpu_percent", snapshot.cpu_percent, "percent")
+            self.record_metric(
+                "system.cpu_percent", snapshot.cpu_percent, "percent"
+            )
             self.record_metric("system.memory_mb", snapshot.memory_mb, "MB")
             self.record_metric(
                 "system.memory_percent", snapshot.memory_percent, "percent"
             )
-            self.record_metric("system.disk_usage_gb", snapshot.disk_usage_gb, "GB")
-            self.record_metric("system.process_count", snapshot.process_count, "count")
-            self.record_metric("system.thread_count", snapshot.thread_count, "count")
+            self.record_metric(
+                "system.disk_usage_gb", snapshot.disk_usage_gb, "GB"
+            )
+            self.record_metric(
+                "system.process_count", snapshot.process_count, "count"
+            )
+            self.record_metric(
+                "system.thread_count", snapshot.thread_count, "count"
+            )
 
         except Exception as e:
             logger.debug(f"Failed to collect system metrics: {e}")
@@ -424,7 +444,9 @@ class PerformanceMetricsCollector:
 
         # Ensure metric buffer exists
         if name not in self.metric_buffers:
-            self.metric_buffers[name] = MetricsBuffer(name, self.max_buffer_size)
+            self.metric_buffers[name] = MetricsBuffer(
+                name, self.max_buffer_size
+            )
 
         # Add to buffer
         self.metric_buffers[name].add_value(metric)
@@ -484,9 +506,9 @@ class PerformanceMetricsCollector:
             if event.event_type == EventType.OPERATION_STARTED:
                 if event.operation:
                     with self.lock:
-                        self.operation_start_times[event.operation.operation_id] = (
-                            datetime.now()
-                        )
+                        self.operation_start_times[
+                            event.operation.operation_id
+                        ] = datetime.now()
 
             elif event.event_type in [
                 EventType.OPERATION_COMPLETED,
@@ -502,7 +524,9 @@ class PerformanceMetricsCollector:
                         duration_ms = (
                             datetime.now() - start_time
                         ).total_seconds() * 1000
-                        success = event.event_type == EventType.OPERATION_COMPLETED
+                        success = (
+                            event.event_type == EventType.OPERATION_COMPLETED
+                        )
 
                         self.record_operation_timing(
                             event.operation.operation_id,
@@ -539,17 +563,27 @@ class PerformanceMetricsCollector:
             "operation.duration_ms", timedelta(minutes=10)
         )
         success_rate = self.get_metric_summary(
-            "operation.success", timedelta(minutes=10), AggregationMethod.AVERAGE
+            "operation.success",
+            timedelta(minutes=10),
+            AggregationMethod.AVERAGE,
         )
 
         metrics["performance"] = {
-            "avg_response_time_ms": response_time.value if response_time else 0,
-            "success_rate_percent": (success_rate.value * 100) if success_rate else 100,
+            "avg_response_time_ms": (
+                response_time.value if response_time else 0
+            ),
+            "success_rate_percent": (
+                (success_rate.value * 100) if success_rate else 100
+            ),
         }
 
         # Resource metrics
-        cpu_usage = self.get_metric_summary("system.cpu_percent", timedelta(minutes=5))
-        memory_usage = self.get_metric_summary("system.memory_mb", timedelta(minutes=5))
+        cpu_usage = self.get_metric_summary(
+            "system.cpu_percent", timedelta(minutes=5)
+        )
+        memory_usage = self.get_metric_summary(
+            "system.memory_mb", timedelta(minutes=5)
+        )
 
         metrics["resources"] = {
             "cpu_percent": cpu_usage.value if cpu_usage else 0,
@@ -621,17 +655,23 @@ class PerformanceMetricsCollector:
         )
 
         # Store baseline
-        baseline_key = f"{metric_name}:{hash(str(sorted((labels or {}).items())))}"
+        baseline_key = (
+            f"{metric_name}:{hash(str(sorted((labels or {}).items())))}"
+        )
         self.baselines[baseline_key] = baseline
 
-        logger.info(f"Established baseline for {metric_name}: {mean_value:.2f}")
+        logger.info(
+            f"Established baseline for {metric_name}: {mean_value:.2f}"
+        )
         return baseline
 
     def detect_anomalies(
         self, metric_name: str, labels: Optional[Dict[str, str]] = None
     ) -> List[Dict[str, Any]]:
         """Detect anomalies in metrics compared to baseline."""
-        baseline_key = f"{metric_name}:{hash(str(sorted((labels or {}).items())))}"
+        baseline_key = (
+            f"{metric_name}:{hash(str(sorted((labels or {}).items())))}"
+        )
         baseline = self.baselines.get(baseline_key)
 
         if not baseline:
@@ -639,7 +679,10 @@ class PerformanceMetricsCollector:
 
         # Get recent values
         recent_values = self.get_metric_summary(
-            metric_name, timedelta(minutes=10), AggregationMethod.AVERAGE, labels
+            metric_name,
+            timedelta(minutes=10),
+            AggregationMethod.AVERAGE,
+            labels,
         )
 
         if not recent_values:
@@ -660,7 +703,9 @@ class PerformanceMetricsCollector:
                     "baseline_value": baseline.baseline_value,
                     "deviation": baseline.baseline_value - current_value,
                     "severity": (
-                        "high" if current_value < (lower_bound * 0.5) else "medium"
+                        "high"
+                        if current_value < (lower_bound * 0.5)
+                        else "medium"
                     ),
                 }
             )
@@ -673,7 +718,9 @@ class PerformanceMetricsCollector:
                     "baseline_value": baseline.baseline_value,
                     "deviation": current_value - baseline.baseline_value,
                     "severity": (
-                        "high" if current_value > (upper_bound * 1.5) else "medium"
+                        "high"
+                        if current_value > (upper_bound * 1.5)
+                        else "medium"
                     ),
                 }
             )
@@ -681,7 +728,9 @@ class PerformanceMetricsCollector:
         return anomalies
 
     def export_metrics(
-        self, time_window: Optional[timedelta] = None, filename: Optional[str] = None
+        self,
+        time_window: Optional[timedelta] = None,
+        filename: Optional[str] = None,
     ) -> Path:
         """Export metrics to JSON file."""
         if not filename:

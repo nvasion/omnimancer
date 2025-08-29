@@ -15,7 +15,9 @@ from rich.text import Text
 class SetupWizardUI:
     """UI components for the setup wizard."""
 
-    def __init__(self, console: Console, provider_info: Dict[str, Dict[str, Any]]):
+    def __init__(
+        self, console: Console, provider_info: Dict[str, Dict[str, Any]]
+    ):
         """
         Initialize the UI component.
 
@@ -29,7 +31,9 @@ class SetupWizardUI:
     def show_welcome(self) -> None:
         """Show welcome message and setup introduction."""
         welcome_text = Text()
-        welcome_text.append("Welcome to Omnimancer Setup!\n\n", style="bold blue")
+        welcome_text.append(
+            "Welcome to Omnimancer Setup!\n\n", style="bold blue"
+        )
         welcome_text.append(
             "This wizard will help you add AI providers to your configuration.\n"
         )
@@ -63,7 +67,8 @@ class SetupWizardUI:
         for strength in info["strengths"]:
             details.append(f"  • {strength}\n", style="green")
         details.append(
-            f"\nAvailable Models: {', '.join(info['models'][:3])}\n", style="dim"
+            f"\nAvailable Models: {', '.join(info['models'][:3])}\n",
+            style="dim",
         )
 
         panel = Panel(
@@ -86,7 +91,9 @@ class SetupWizardUI:
 
         completion_text = Text()
         completion_text.append("🎉 Setup Complete!\n\n", style="bold green")
-        completion_text.append(f"You've successfully configured {info['name']}.\n\n")
+        completion_text.append(
+            f"You've successfully configured {info['name']}.\n\n"
+        )
         completion_text.append("Next Steps:\n", style="bold")
         completion_text.append("  • Start chatting by typing your message\n")
         completion_text.append("  • Use /help to see available commands\n")
@@ -103,7 +110,9 @@ class SetupWizardUI:
 
         self.console.print(panel)
 
-    def show_troubleshooting_guidance(self, provider_name: str, error: str) -> None:
+    def show_troubleshooting_guidance(
+        self, provider_name: str, error: str
+    ) -> None:
         """
         Show provider-specific troubleshooting guidance.
 
@@ -123,7 +132,9 @@ class SetupWizardUI:
             or "format" in error.lower()
         ):
             guidance.append("🔑 API Key Issues:\n", style="bold red")
-            guidance.append(f"  • Get your API key from: {info['api_key_url']}\n")
+            guidance.append(
+                f"  • Get your API key from: {info['api_key_url']}\n"
+            )
             if info["api_key_prefix"]:
                 guidance.append(
                     f"  • Ensure the key starts with '{info['api_key_prefix']}'\n"
@@ -141,14 +152,22 @@ class SetupWizardUI:
             guidance.append("🌐 Connection Issues:\n", style="bold blue")
             guidance.append("  • Check your internet connection\n")
             guidance.append("  • Verify firewall/proxy settings\n")
-            guidance.append("  • Try again in a few moments (temporary outage)\n")
-            guidance.append("  • Check provider status page for known issues\n\n")
+            guidance.append(
+                "  • Try again in a few moments (temporary outage)\n"
+            )
+            guidance.append(
+                "  • Check provider status page for known issues\n\n"
+            )
 
         if "model" in error.lower():
             guidance.append("🤖 Model Issues:\n", style="bold green")
             guidance.append("  • Verify the model name is spelled correctly\n")
-            guidance.append("  • Check if you have access to the requested model\n")
-            guidance.append("  • Try a different model from the same provider\n\n")
+            guidance.append(
+                "  • Check if you have access to the requested model\n"
+            )
+            guidance.append(
+                "  • Try a different model from the same provider\n\n"
+            )
 
         # Provider-specific guidance
         self._add_provider_specific_guidance(guidance, provider_name, error)
@@ -177,7 +196,9 @@ class SetupWizardUI:
             guidance.append("  • Status Page: https://status.openai.com/\n")
             guidance.append("  • Support: https://help.openai.com/\n")
         elif provider_name == "gemini":
-            guidance.append("  • Status Page: https://status.cloud.google.com/\n")
+            guidance.append(
+                "  • Status Page: https://status.cloud.google.com/\n"
+            )
             guidance.append("  • Support: https://support.google.com/\n")
         elif provider_name == "ollama":
             guidance.append("  • Documentation: https://ollama.ai/docs\n")
@@ -214,27 +235,37 @@ class SetupWizardUI:
             guidance.append(
                 "  • Verify your account tier supports the selected model\n"
             )
-            guidance.append("  • Try reducing max_tokens if getting context errors\n\n")
+            guidance.append(
+                "  • Try reducing max_tokens if getting context errors\n\n"
+            )
 
         elif provider_name == "openai":
             guidance.append("🤖 OpenAI-Specific:\n", style="bold")
             guidance.append(
                 "  • Check if you have access to GPT-4 models (requires separate approval)\n"
             )
-            guidance.append("  • Verify your organization ID if using team accounts\n")
+            guidance.append(
+                "  • Verify your organization ID if using team accounts\n"
+            )
             guidance.append("  • Ensure billing is set up for API usage\n")
-            guidance.append("  • Try gpt-3.5-turbo if GPT-4 access is limited\n\n")
+            guidance.append(
+                "  • Try gpt-3.5-turbo if GPT-4 access is limited\n\n"
+            )
 
         elif provider_name == "gemini":
             guidance.append("🔮 Gemini-Specific:\n", style="bold")
             guidance.append(
                 "  • Enable the Generative AI API in Google Cloud Console\n"
             )
-            guidance.append("  • Check safety settings if requests are being blocked\n")
+            guidance.append(
+                "  • Check safety settings if requests are being blocked\n"
+            )
             guidance.append(
                 "  • Verify your Google Cloud project has billing enabled\n"
             )
-            guidance.append("  • Try gemini-1.5-flash for faster/cheaper responses\n\n")
+            guidance.append(
+                "  • Try gemini-1.5-flash for faster/cheaper responses\n\n"
+            )
 
         elif provider_name == "perplexity":
             guidance.append("🔍 Perplexity-Specific:\n", style="bold")
@@ -255,7 +286,9 @@ class SetupWizardUI:
                 "  • Ensure you have access to the xAI API (currently in beta)\n"
             )
             guidance.append("  • Check your account status and API limits\n")
-            guidance.append("  • Verify you're using the correct endpoint URL\n")
+            guidance.append(
+                "  • Verify you're using the correct endpoint URL\n"
+            )
             guidance.append("  • Try 'grok-3-fast' for quicker responses\n\n")
 
         elif provider_name == "mistral":
@@ -265,23 +298,35 @@ class SetupWizardUI:
             )
             guidance.append("  • Check your usage quotas and billing status\n")
             guidance.append("  • Verify the model name matches exactly\n")
-            guidance.append("  • Try 'mistral-small-3.1' for cost-effective usage\n\n")
+            guidance.append(
+                "  • Try 'mistral-small-3.1' for cost-effective usage\n\n"
+            )
 
         elif provider_name == "cohere":
             guidance.append("🧠 Cohere-Specific:\n", style="bold")
-            guidance.append("  • Ensure you have a Cohere account with API access\n")
-            guidance.append("  • Check your trial credits or subscription status\n")
+            guidance.append(
+                "  • Ensure you have a Cohere account with API access\n"
+            )
+            guidance.append(
+                "  • Check your trial credits or subscription status\n"
+            )
             guidance.append("  • Verify the model supports your use case\n")
             guidance.append("  • Try 'command-light' for faster responses\n\n")
 
         elif provider_name == "ollama":
             guidance.append("🏠 Ollama-Specific:\n", style="bold")
             guidance.append("  • Start Ollama server: 'ollama serve'\n")
-            guidance.append("  • Install required model: 'ollama pull <model-name>'\n")
-            guidance.append("  • Check server URL (default: http://localhost:11434)\n")
+            guidance.append(
+                "  • Install required model: 'ollama pull <model-name>'\n"
+            )
+            guidance.append(
+                "  • Check server URL (default: http://localhost:11434)\n"
+            )
             guidance.append("  • Ensure sufficient RAM for the model size\n")
             guidance.append("  • List available models: 'ollama list'\n")
-            guidance.append("  • Check Ollama logs for detailed error messages\n\n")
+            guidance.append(
+                "  • Check Ollama logs for detailed error messages\n\n"
+            )
 
     def show_provider_help(self, provider_name: str) -> None:
         """

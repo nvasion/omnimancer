@@ -13,7 +13,9 @@ from rich.console import Console
 class SetupWizardGuideGenerator:
     """Documentation generation methods for the setup wizard."""
 
-    def __init__(self, console: Console, provider_info: Dict[str, Dict[str, Any]]):
+    def __init__(
+        self, console: Console, provider_info: Dict[str, Dict[str, Any]]
+    ):
         """
         Initialize the guide generator component.
 
@@ -134,7 +136,9 @@ omnimancer --test-provider {provider_name}
 
         return guide_content
 
-    def _generate_model_table(self, provider_name: str, info: Dict[str, Any]) -> str:
+    def _generate_model_table(
+        self, provider_name: str, info: Dict[str, Any]
+    ) -> str:
         """Generate markdown table of available models."""
         models = info["models"]
 
@@ -167,9 +171,7 @@ omnimancer --test-provider {provider_name}
             "phi3": "Microsoft's efficient small language model",
         }
 
-        table = (
-            "| Model | Description | Best For |\n|-------|-------------|----------|\n"
-        )
+        table = "| Model | Description | Best For |\n|-------|-------------|----------|\n"
 
         for model in models:
             description = descriptions.get(model, "High-quality AI model")

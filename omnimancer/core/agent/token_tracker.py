@@ -52,7 +52,9 @@ class TokenCost:
     model_name: str
     input_cost_per_1k: float  # Cost per 1,000 input tokens
     output_cost_per_1k: float  # Cost per 1,000 output tokens
-    cached_cost_per_1k: float = 0.0  # Cost per 1,000 cached tokens (if different)
+    cached_cost_per_1k: float = (
+        0.0  # Cost per 1,000 cached tokens (if different)
+    )
     currency: str = "USD"
     last_updated: datetime = field(default_factory=datetime.now)
 
@@ -194,7 +196,9 @@ class CostCalculator:
     ) -> float:
         """Calculate cost for token usage."""
         cost_info = self.get_cost_info(provider_name, model_name)
-        return cost_info.calculate_cost(input_tokens, output_tokens, cached_tokens)
+        return cost_info.calculate_cost(
+            input_tokens, output_tokens, cached_tokens
+        )
 
     def update_cost_data(
         self, provider_name: str, model_name: str, cost_info: TokenCost
@@ -265,10 +269,14 @@ class TokenUsageTracker:
     """Advanced token usage tracking with pattern analysis."""
 
     def __init__(
-        self, storage_path: Optional[Path] = None, max_history_size: int = 50000
+        self,
+        storage_path: Optional[Path] = None,
+        max_history_size: int = 50000,
     ):
         """Initialize the token usage tracker."""
-        self.storage_path = storage_path or Path.home() / ".omnimancer" / "token_usage"
+        self.storage_path = (
+            storage_path or Path.home() / ".omnimancer" / "token_usage"
+        )
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         self.max_history_size = max_history_size
@@ -300,7 +308,11 @@ class TokenUsageTracker:
         with self._lock:
             # Calculate cost
             estimated_cost = self.cost_calculator.calculate_cost(
-                provider_name, model_name, input_tokens, output_tokens, cached_tokens
+                provider_name,
+                model_name,
+                input_tokens,
+                output_tokens,
+                cached_tokens,
             )
 
             # Create detailed usage record
@@ -367,7 +379,11 @@ class TokenUsageTracker:
         """Get comprehensive usage summary."""
         with self._lock:
             if not self.usage_history:
-                return {"total_tokens": 0, "total_cost": 0.0, "total_requests": 0}
+                return {
+                    "total_tokens": 0,
+                    "total_cost": 0.0,
+                    "total_requests": 0,
+                }
 
             # Filter by time window
             cutoff_time = datetime.now() - time_window if time_window else None
@@ -378,7 +394,11 @@ class TokenUsageTracker:
             ]
 
             if not relevant_usage:
-                return {"total_tokens": 0, "total_cost": 0.0, "total_requests": 0}
+                return {
+                    "total_tokens": 0,
+                    "total_cost": 0.0,
+                    "total_requests": 0,
+                }
 
             # Calculate totals
             total_tokens = sum(u.total_tokens for u in relevant_usage)
@@ -387,7 +407,12 @@ class TokenUsageTracker:
 
             # Provider breakdown
             provider_stats = defaultdict(
-                lambda: {"tokens": 0, "cost": 0.0, "requests": 0, "models": set()}
+                lambda: {
+                    "tokens": 0,
+                    "cost": 0.0,
+                    "requests": 0,
+                    "models": set(),
+                }
             )
             for usage in relevant_usage:
                 key = usage.provider_name
@@ -406,8 +431,12 @@ class TokenUsageTracker:
             )
             for usage in relevant_usage:
                 if usage.persona_name:
-                    persona_stats[usage.persona_name]["tokens"] += usage.total_tokens
-                    persona_stats[usage.persona_name]["cost"] += usage.estimated_cost
+                    persona_stats[usage.persona_name][
+                        "tokens"
+                    ] += usage.total_tokens
+                    persona_stats[usage.persona_name][
+                        "cost"
+                    ] += usage.estimated_cost
                     persona_stats[usage.persona_name]["requests"] += 1
 
             # Efficiency metrics
@@ -435,7 +464,9 @@ class TokenUsageTracker:
                 "provider_breakdown": dict(provider_stats),
                 "persona_breakdown": dict(persona_stats),
                 "average_context_utilization": (
-                    statistics.mean(efficiency_scores) if efficiency_scores else 0
+                    statistics.mean(efficiency_scores)
+                    if efficiency_scores
+                    else 0
                 ),
                 "average_response_efficiency": (
                     statistics.mean(response_scores) if response_scores else 0
@@ -445,7 +476,9 @@ class TokenUsageTracker:
                     if time_window
                     else "all time"
                 ),
-                "period_start": cutoff_time.isoformat() if cutoff_time else None,
+                "period_start": (
+                    cutoff_time.isoformat() if cutoff_time else None
+                ),
                 "period_end": datetime.now().isoformat(),
             }
 
@@ -456,7 +489,9 @@ class TokenUsageTracker:
             cutoff_time = datetime.now() - time_period
 
             relevant_usage = [
-                usage for usage in self.usage_history if usage.timestamp >= cutoff_time
+                usage
+                for usage in self.usage_history
+                if usage.timestamp >= cutoff_time
             ]
 
             if not relevant_usage:
@@ -480,7 +515,9 @@ class TokenUsageTracker:
             # Group by hour and find the hour with most tokens
             hourly_usage = defaultdict(int)
             for usage in relevant_usage:
-                hour_key = usage.timestamp.replace(minute=0, second=0, microsecond=0)
+                hour_key = usage.timestamp.replace(
+                    minute=0, second=0, microsecond=0
+                )
                 hourly_usage[hour_key] += usage.total_tokens
 
             peak_hour = (
@@ -488,7 +525,9 @@ class TokenUsageTracker:
                 if hourly_usage
                 else datetime.now()
             )
-            peak_tokens_per_hour = hourly_usage[peak_hour] if hourly_usage else 0
+            peak_tokens_per_hour = (
+                hourly_usage[peak_hour] if hourly_usage else 0
+            )
 
             # Provider breakdown
             provider_breakdown = defaultdict(
@@ -521,7 +560,9 @@ class TokenUsageTracker:
                 for u in relevant_usage
                 if u.response_efficiency > 0
             ]
-            cached_requests = len([u for u in relevant_usage if u.cached_tokens > 0])
+            cached_requests = len(
+                [u for u in relevant_usage if u.cached_tokens > 0]
+            )
 
             return UsagePattern(
                 time_period=time_period,
@@ -537,7 +578,9 @@ class TokenUsageTracker:
                 peak_usage_time=peak_hour,
                 peak_tokens_per_minute=int(peak_tokens_per_hour / 60),
                 average_context_utilization=(
-                    statistics.mean(efficiency_scores) if efficiency_scores else 0
+                    statistics.mean(efficiency_scores)
+                    if efficiency_scores
+                    else 0
                 ),
                 average_response_efficiency=(
                     statistics.mean(response_scores) if response_scores else 0
@@ -591,7 +634,9 @@ class TokenUsageTracker:
     def save_usage_history(self, filename: Optional[str] = None) -> None:
         """Save usage history to disk."""
         if not filename:
-            filename = f"token_usage_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            filename = (
+                f"token_usage_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            )
 
         filepath = self.storage_path / filename
 

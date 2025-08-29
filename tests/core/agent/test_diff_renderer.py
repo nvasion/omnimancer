@@ -25,7 +25,10 @@ from omnimancer.core.agent.diff_renderer import (
     render_git_diff,
     compare_files,
 )
-from omnimancer.core.agent.rich_renderer import RichTextRenderer, create_renderer
+from omnimancer.core.agent.rich_renderer import (
+    RichTextRenderer,
+    create_renderer,
+)
 
 
 class TestFileChange:
@@ -33,7 +36,9 @@ class TestFileChange:
 
     def test_file_change_creation(self):
         """Test FileChange creation with default values."""
-        change = FileChange(file_path="test.py", change_type=FileChangeType.MODIFIED)
+        change = FileChange(
+            file_path="test.py", change_type=FileChangeType.MODIFIED
+        )
 
         assert change.file_path == "test.py"
         assert change.change_type == FileChangeType.MODIFIED
@@ -110,7 +115,9 @@ class TestEnhancedDiffRenderer:
         rich_renderer = create_renderer()
         console = Console()
 
-        diff_renderer = EnhancedDiffRenderer(renderer=rich_renderer, console=console)
+        diff_renderer = EnhancedDiffRenderer(
+            renderer=rich_renderer, console=console
+        )
 
         assert diff_renderer.renderer == rich_renderer
         assert diff_renderer.console == console
@@ -276,7 +283,10 @@ index 0000000..1234567
 
         changes = [
             FileChange(
-                "src/main.py", FileChangeType.MODIFIED, lines_added=5, lines_removed=2
+                "src/main.py",
+                FileChangeType.MODIFIED,
+                lines_added=5,
+                lines_removed=2,
             ),
             FileChange(
                 "tests/test_main.py",
@@ -285,10 +295,16 @@ index 0000000..1234567
                 lines_removed=0,
             ),
             FileChange(
-                "README.md", FileChangeType.MODIFIED, lines_added=1, lines_removed=1
+                "README.md",
+                FileChangeType.MODIFIED,
+                lines_added=1,
+                lines_removed=1,
             ),
             FileChange(
-                "old_file.py", FileChangeType.DELETED, lines_added=0, lines_removed=20
+                "old_file.py",
+                FileChangeType.DELETED,
+                lines_added=0,
+                lines_removed=20,
             ),
         ]
 
@@ -322,7 +338,9 @@ index 0000000..1234567
         renderer = EnhancedDiffRenderer()
 
         change = FileChange(
-            file_path="empty.py", change_type=FileChangeType.MODIFIED, diff_text=None
+            file_path="empty.py",
+            change_type=FileChangeType.MODIFIED,
+            diff_text=None,
         )
 
         panel = renderer.render_unified_diff(change)
@@ -373,7 +391,9 @@ index 0000000..1234567
         old_line = "Hello world how are you"
         new_line = "Hello beautiful world how are you today"
 
-        old_formatted, new_formatted = renderer.render_word_diff(old_line, new_line)
+        old_formatted, new_formatted = renderer.render_word_diff(
+            old_line, new_line
+        )
 
         assert isinstance(old_formatted, Text)
         assert isinstance(new_formatted, Text)
@@ -388,7 +408,9 @@ index 0000000..1234567
         old_line = "Hello world"
         new_line = "Hello beautiful world"
 
-        old_formatted, new_formatted = renderer.render_word_diff(old_line, new_line)
+        old_formatted, new_formatted = renderer.render_word_diff(
+            old_line, new_line
+        )
 
         assert isinstance(old_formatted, Text)
         assert isinstance(new_formatted, Text)
@@ -528,7 +550,9 @@ index 1234567..abcdefg 100644
         new_content = "console.log('hello');\nconsole.log('world');"
 
         panel = renderer.render_file_content_comparison(
-            old_content, new_content, "test.js"  # Should auto-detect JavaScript
+            old_content,
+            new_content,
+            "test.js",  # Should auto-detect JavaScript
         )
 
         assert isinstance(panel, Panel)
@@ -574,7 +598,9 @@ class TestUtilityFunctions:
 
     @patch("omnimancer.core.agent.diff_renderer.Path")
     @patch("omnimancer.core.agent.diff_renderer.EnhancedDiffRenderer")
-    def test_compare_files_with_paths(self, mock_renderer_class, mock_path_class):
+    def test_compare_files_with_paths(
+        self, mock_renderer_class, mock_path_class
+    ):
         """Test file comparison utility with file paths."""
         # Mock Path constructor to return mock objects
         mock_old_path = Mock()
@@ -597,7 +623,9 @@ class TestUtilityFunctions:
         # Mock renderer
         mock_renderer = Mock()
         mock_renderer.console = Mock()
-        mock_renderer.render_file_content_comparison.return_value = Panel("Comparison")
+        mock_renderer.render_file_content_comparison.return_value = Panel(
+            "Comparison"
+        )
         mock_renderer_class.return_value = mock_renderer
 
         compare_files("old.py", "new.py", "test.py")
@@ -619,7 +647,9 @@ class TestUtilityFunctions:
         # Mock renderer
         mock_renderer = Mock()
         mock_renderer.console = Mock()
-        mock_renderer.render_file_content_comparison.return_value = Panel("Comparison")
+        mock_renderer.render_file_content_comparison.return_value = Panel(
+            "Comparison"
+        )
         mock_renderer_class.return_value = mock_renderer
 
         old_content = "old content"

@@ -17,9 +17,19 @@ from omnimancer.core.agent.approval_manager import (
     ChangeType,
     PreviewFormat,
 )
-from omnimancer.core.agent.approval_interface import ApprovalInterface, ApprovalChoice
-from omnimancer.core.agent_engine import Operation, OperationResult, OperationType
-from omnimancer.core.security.approval_workflow import ApprovalWorkflow, RiskLevel
+from omnimancer.core.agent.approval_interface import (
+    ApprovalInterface,
+    ApprovalChoice,
+)
+from omnimancer.core.agent_engine import (
+    Operation,
+    OperationResult,
+    OperationType,
+)
+from omnimancer.core.security.approval_workflow import (
+    ApprovalWorkflow,
+    RiskLevel,
+)
 
 
 @pytest.fixture
@@ -32,7 +42,9 @@ def temp_dir():
 @pytest.fixture
 def approval_workflow():
     """Create approval workflow instance."""
-    return ApprovalWorkflow(default_expiry_minutes=30, auto_approve_low_risk=True)
+    return ApprovalWorkflow(
+        default_expiry_minutes=30, auto_approve_low_risk=True
+    )
 
 
 @pytest.fixture
@@ -144,7 +156,9 @@ class TestEnhancedApprovalManager:
         assert len(approval_manager.preview_generators) == 8
 
     @pytest.mark.asyncio
-    async def test_generate_file_write_preview(self, approval_manager, temp_dir):
+    async def test_generate_file_write_preview(
+        self, approval_manager, temp_dir
+    ):
         """Test file write preview generation."""
         # Create test file
         test_file = temp_dir / "test.txt"
@@ -167,7 +181,9 @@ class TestEnhancedApprovalManager:
         assert "new content" in preview.diff
 
     @pytest.mark.asyncio
-    async def test_generate_file_create_preview(self, approval_manager, temp_dir):
+    async def test_generate_file_create_preview(
+        self, approval_manager, temp_dir
+    ):
         """Test file creation preview generation."""
         new_file = temp_dir / "new_file.txt"
 
@@ -185,7 +201,9 @@ class TestEnhancedApprovalManager:
         assert preview.reversible is False
 
     @pytest.mark.asyncio
-    async def test_generate_file_delete_preview(self, approval_manager, temp_dir):
+    async def test_generate_file_delete_preview(
+        self, approval_manager, temp_dir
+    ):
         """Test file deletion preview generation."""
         # Create test file
         test_file = temp_dir / "delete_me.txt"
@@ -203,7 +221,10 @@ class TestEnhancedApprovalManager:
         assert preview.current_state == "content to be deleted"
         assert preview.proposed_state == ""
         assert preview.reversible is True
-        assert "Medium" in preview.risk_assessment or "High" in preview.risk_assessment
+        assert (
+            "Medium" in preview.risk_assessment
+            or "High" in preview.risk_assessment
+        )
 
     @pytest.mark.asyncio
     async def test_generate_command_preview(self, approval_manager):
@@ -243,7 +264,10 @@ class TestEnhancedApprovalManager:
         preview = await approval_manager.generate_operation_preview(operation)
 
         assert preview.change_type == ChangeType.WEB_REQUEST
-        assert preview.description == "GET request to: https://api.example.com/data"
+        assert (
+            preview.description
+            == "GET request to: https://api.example.com/data"
+        )
         assert preview.metadata["url"] == "https://api.example.com/data"
         assert preview.metadata["method"] == "GET"
         assert preview.reversible is True  # GET requests are reversible
@@ -254,7 +278,10 @@ class TestEnhancedApprovalManager:
         operation = Operation(
             type=OperationType.MCP_TOOL_CALL,
             description="Call file reading tool",
-            data={"tool_name": "file_read", "arguments": {"path": "/test/file.txt"}},
+            data={
+                "tool_name": "file_read",
+                "arguments": {"path": "/test/file.txt"},
+            },
         )
 
         preview = await approval_manager.generate_operation_preview(operation)
@@ -269,11 +296,13 @@ class TestEnhancedApprovalManager:
     async def test_risk_assessment_file_operations(self, approval_manager):
         """Test risk assessment for file operations."""
         # Test sensitive file
-        sensitive_preview = await approval_manager._generate_file_write_preview(
-            Operation(
-                type=OperationType.FILE_WRITE,
-                description="Write to .env file",
-                data={"path": "/app/.env", "content": "SECRET=value"},
+        sensitive_preview = (
+            await approval_manager._generate_file_write_preview(
+                Operation(
+                    type=OperationType.FILE_WRITE,
+                    description="Write to .env file",
+                    data={"path": "/app/.env", "content": "SECRET=value"},
+                )
             )
         )
         assert (
@@ -386,8 +415,16 @@ class TestBatchApprovalRequest:
     def test_create_batch_request(self):
         """Test creating batch approval request."""
         operations = [
-            Operation(type=OperationType.FILE_READ, description="Read file 1", data={}),
-            Operation(type=OperationType.FILE_READ, description="Read file 2", data={}),
+            Operation(
+                type=OperationType.FILE_READ,
+                description="Read file 1",
+                data={},
+            ),
+            Operation(
+                type=OperationType.FILE_READ,
+                description="Read file 2",
+                data={},
+            ),
         ]
 
         batch = BatchApprovalRequest(operations=operations)
@@ -400,9 +437,15 @@ class TestBatchApprovalRequest:
     def test_batch_approval_summary(self):
         """Test batch approval summary."""
         operations = [
-            Operation(type=OperationType.FILE_READ, description="Op 1", data={}),
-            Operation(type=OperationType.FILE_WRITE, description="Op 2", data={}),
-            Operation(type=OperationType.FILE_DELETE, description="Op 3", data={}),
+            Operation(
+                type=OperationType.FILE_READ, description="Op 1", data={}
+            ),
+            Operation(
+                type=OperationType.FILE_WRITE, description="Op 2", data={}
+            ),
+            Operation(
+                type=OperationType.FILE_DELETE, description="Op 3", data={}
+            ),
         ]
 
         batch = BatchApprovalRequest(operations=operations)
@@ -420,8 +463,12 @@ class TestBatchApprovalRequest:
     def test_batch_all_approved(self):
         """Test batch with all operations approved."""
         operations = [
-            Operation(type=OperationType.FILE_READ, description="Op 1", data={}),
-            Operation(type=OperationType.FILE_READ, description="Op 2", data={}),
+            Operation(
+                type=OperationType.FILE_READ, description="Op 1", data={}
+            ),
+            Operation(
+                type=OperationType.FILE_READ, description="Op 2", data={}
+            ),
         ]
 
         batch = BatchApprovalRequest(operations=operations)
@@ -511,12 +558,20 @@ class TestApprovalIntegration:
     async def test_batch_approval_workflow(self, approval_manager):
         """Test complete batch approval workflow."""
         operations = [
-            Operation(type=OperationType.FILE_READ, description="Read file 1", data={}),
             Operation(
-                type=OperationType.FILE_WRITE, description="Write file 2", data={}
+                type=OperationType.FILE_READ,
+                description="Read file 1",
+                data={},
             ),
             Operation(
-                type=OperationType.FILE_DELETE, description="Delete file 3", data={}
+                type=OperationType.FILE_WRITE,
+                description="Write file 2",
+                data={},
+            ),
+            Operation(
+                type=OperationType.FILE_DELETE,
+                description="Delete file 3",
+                data={},
             ),
         ]
 
@@ -528,7 +583,9 @@ class TestApprovalIntegration:
         approval_manager.set_batch_approval_callback(mock_batch_callback)
 
         # Test batch approval
-        batch_request = await approval_manager.request_batch_approval(operations)
+        batch_request = await approval_manager.request_batch_approval(
+            operations
+        )
 
         assert batch_request.id is not None
         assert len(batch_request.operations) == 3
@@ -602,7 +659,9 @@ class TestApprovalInterface:
         assert approval_interface._get_risk_color(RiskLevel.LOW) == "green"
         assert approval_interface._get_risk_color(RiskLevel.MEDIUM) == "yellow"
         assert approval_interface._get_risk_color(RiskLevel.HIGH) == "red"
-        assert approval_interface._get_risk_color(RiskLevel.CRITICAL) == "magenta"
+        assert (
+            approval_interface._get_risk_color(RiskLevel.CRITICAL) == "magenta"
+        )
 
 
 @pytest.mark.asyncio

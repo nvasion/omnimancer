@@ -51,9 +51,13 @@ class MistralProvider(BaseProvider):
         self.top_p = kwargs.get("top_p", 1.0)
         self.safe_prompt = kwargs.get("safe_prompt", False)
         self.random_seed = kwargs.get("random_seed", None)
-        self.response_format = kwargs.get("response_format", None)  # For JSON mode
+        self.response_format = kwargs.get(
+            "response_format", None
+        )  # For JSON mode
 
-    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
+    async def send_message(
+        self, message: str, context: ChatContext
+    ) -> ChatResponse:
         """
         Send a message to Mistral API.
 
@@ -105,14 +109,22 @@ class MistralProvider(BaseProvider):
             raise NetworkError("Request to Mistral API timed out")
         except httpx.RequestError as e:
             raise NetworkError(f"Network error: {e}")
-        except (AuthenticationError, RateLimitError, ModelNotFoundError, ProviderError):
+        except (
+            AuthenticationError,
+            RateLimitError,
+            ModelNotFoundError,
+            ProviderError,
+        ):
             # Re-raise provider-specific errors without wrapping
             raise
         except Exception as e:
             raise ProviderError(f"Unexpected error: {e}")
 
     async def send_message_with_tools(
-        self, message: str, context: ChatContext, available_tools: List[ToolDefinition]
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
     ) -> ChatResponse:
         """
         Send a message with available tools for Mistral to use.
@@ -290,13 +302,17 @@ class MistralProvider(BaseProvider):
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get("message", "Unknown error")
+                error_msg = error_data.get("error", {}).get(
+                    "message", "Unknown error"
+                )
             except:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Mistral API error: {error_msg}")
 
-    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
+    def _handle_response_with_tools(
+        self, response: httpx.Response
+    ) -> ChatResponse:
         """
         Handle Mistral API response with tool calls.
 

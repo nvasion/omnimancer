@@ -51,8 +51,12 @@ class ApprovalInterface:
             approval_manager: Enhanced approval manager instance
         """
         self.approval_manager = approval_manager
-        self.approval_manager.set_approval_callback(self.handle_single_approval)
-        self.approval_manager.set_batch_approval_callback(self.handle_batch_approval)
+        self.approval_manager.set_approval_callback(
+            self.handle_single_approval
+        )
+        self.approval_manager.set_batch_approval_callback(
+            self.handle_batch_approval
+        )
 
         # Interface configuration
         self.show_colors = True
@@ -60,7 +64,9 @@ class ApprovalInterface:
         self.max_diff_lines = 50
         self.page_size = 10
 
-    async def handle_single_approval(self, approval_data: Dict[str, Any]) -> bool:
+    async def handle_single_approval(
+        self, approval_data: Dict[str, Any]
+    ) -> bool:
         """
         Handle approval request for a single operation.
 
@@ -104,7 +110,9 @@ class ApprovalInterface:
                 self._print_warning("✗ Operation denied")
                 return False
             elif choice == ApprovalChoice.VIEW_DETAILS:
-                await self._show_detailed_view(operation, preview, approval_request)
+                await self._show_detailed_view(
+                    operation, preview, approval_request
+                )
             elif choice == ApprovalChoice.QUIT:
                 self._print_info("Approval cancelled by user")
                 return False
@@ -138,7 +146,10 @@ class ApprovalInterface:
         elif approval_mode == "filtered":
             return await self._handle_filtered_approval(batch_request)
         else:
-            return {"deny_all": True, "reason": "User cancelled batch approval"}
+            return {
+                "deny_all": True,
+                "reason": "User cancelled batch approval",
+            }
 
     async def _handle_bulk_approval(
         self, batch_request: BatchApprovalRequest
@@ -147,7 +158,11 @@ class ApprovalInterface:
         self._print_info("Choose action for all operations:")
 
         choice = await self._get_user_choice(
-            [ApprovalChoice.APPROVE_ALL, ApprovalChoice.DENY_ALL, ApprovalChoice.QUIT]
+            [
+                ApprovalChoice.APPROVE_ALL,
+                ApprovalChoice.DENY_ALL,
+                ApprovalChoice.QUIT,
+            ]
         )
 
         if choice == ApprovalChoice.APPROVE_ALL:
@@ -160,7 +175,10 @@ class ApprovalInterface:
             self._print_warning(
                 f"✗ All {len(batch_request.operations)} operations denied"
             )
-            return {"deny_all": True, "reason": reason or "User denied all operations"}
+            return {
+                "deny_all": True,
+                "reason": reason or "User denied all operations",
+            }
         else:
             return {"deny_all": True, "reason": "User cancelled"}
 
@@ -174,7 +192,9 @@ class ApprovalInterface:
             zip(batch_request.operations, batch_request.previews)
         ):
             self._print_separator()
-            self._print_info(f"Operation {i + 1} of {len(batch_request.operations)}")
+            self._print_info(
+                f"Operation {i + 1} of {len(batch_request.operations)}"
+            )
 
             # Show operation details
             self._print_operation_info(operation)
@@ -208,7 +228,9 @@ class ApprovalInterface:
                     await self._show_detailed_view(operation, preview)
                 elif choice == ApprovalChoice.APPROVE_ALL:
                     # Approve remaining operations
-                    approved_indices.extend(range(i, len(batch_request.operations)))
+                    approved_indices.extend(
+                        range(i, len(batch_request.operations))
+                    )
                     self._print_success(f"✓ Approved all remaining operations")
                     return {"approved_indices": approved_indices}
                 elif choice == ApprovalChoice.DENY_ALL:
@@ -236,7 +258,10 @@ class ApprovalInterface:
         if choice == "1":
             # Approve low-risk operations
             for i, preview in enumerate(batch_request.previews):
-                if preview.risk_assessment and "low" in preview.risk_assessment.lower():
+                if (
+                    preview.risk_assessment
+                    and "low" in preview.risk_assessment.lower()
+                ):
                     approved_indices.append(i)
             self._print_success(
                 f"✓ Approved {len(approved_indices)} low-risk operations"
@@ -253,7 +278,9 @@ class ApprovalInterface:
 
         elif choice == "3":
             # Approve by operation type
-            operation_types = list(set(op.type for op in batch_request.operations))
+            operation_types = list(
+                set(op.type for op in batch_request.operations)
+            )
             print("Available operation types:")
             for idx, op_type in enumerate(operation_types, 1):
                 print(f"{idx}. {op_type.value}")
@@ -262,7 +289,9 @@ class ApprovalInterface:
                 "Select operation types to approve (comma-separated numbers): "
             ).strip()
             try:
-                selected_indices = [int(x.strip()) - 1 for x in type_choice.split(",")]
+                selected_indices = [
+                    int(x.strip()) - 1 for x in type_choice.split(",")
+                ]
                 selected_types = [
                     operation_types[i]
                     for i in selected_indices
@@ -282,7 +311,9 @@ class ApprovalInterface:
 
         elif choice == "4":
             # Custom selection
-            print("Enter operation indices to approve (comma-separated, 1-based):")
+            print(
+                "Enter operation indices to approve (comma-separated, 1-based):"
+            )
             indices_input = input(
                 f"Operations 1-{len(batch_request.operations)}: "
             ).strip()
@@ -434,7 +465,9 @@ class ApprovalInterface:
                 print(f"Showing first {self.max_diff_lines} lines of diff:")
                 for line in diff_lines[: self.max_diff_lines]:
                     self._print_diff_line(line)
-                print(f"... ({len(diff_lines) - self.max_diff_lines} more lines)")
+                print(
+                    f"... ({len(diff_lines) - self.max_diff_lines} more lines)"
+                )
             else:
                 for line in diff_lines:
                     self._print_diff_line(line)
@@ -461,7 +494,9 @@ class ApprovalInterface:
 
         if risk_level:
             risk_color = self._get_risk_color(risk_level)
-            print(f"Risk Level: {self._colorize(risk_level.value.upper(), risk_color)}")
+            print(
+                f"Risk Level: {self._colorize(risk_level.value.upper(), risk_color)}"
+            )
 
         print(f"Reversible: {'Yes' if operation.reversible else 'No'}")
         print()
@@ -489,15 +524,21 @@ class ApprovalInterface:
     def _print_batch_summary(self, batch_request: BatchApprovalRequest):
         """Print summary of batch request."""
         print(f"Total Operations: {len(batch_request.operations)}")
-        print(f"Created: {batch_request.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(
+            f"Created: {batch_request.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
 
         if batch_request.expires_at:
-            print(f"Expires: {batch_request.expires_at.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(
+                f"Expires: {batch_request.expires_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
 
         # Operation type breakdown
         type_counts = {}
         for operation in batch_request.operations:
-            type_counts[operation.type] = type_counts.get(operation.type, 0) + 1
+            type_counts[operation.type] = (
+                type_counts.get(operation.type, 0) + 1
+            )
 
         print("\\nOperation Types:")
         for op_type, count in type_counts.items():

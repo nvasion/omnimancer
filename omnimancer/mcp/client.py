@@ -19,7 +19,11 @@ from ..core.models import (
     MCPServerError,
     MCPToolError,
 )
-from ..utils.errors import MCPConnectionError, MCPTimeoutError, MCPConfigurationError
+from ..utils.errors import (
+    MCPConnectionError,
+    MCPTimeoutError,
+    MCPConfigurationError,
+)
 from ..utils.error_handler import handle_mcp_error
 
 logger = logging.getLogger(__name__)
@@ -46,7 +50,9 @@ class MCPClient:
         self.tools: Dict[str, ToolDefinition] = {}
         self._request_id = 0
 
-    async def connect(self, retry_count: int = 0, max_retries: int = 3) -> None:
+    async def connect(
+        self, retry_count: int = 0, max_retries: int = 3
+    ) -> None:
         """
         Connect to the MCP server with retry logic and comprehensive error handling.
 
@@ -110,7 +116,9 @@ class MCPClient:
                         stderr_output = "Unable to read stderr"
 
                 # Analyze stderr for specific error types
-                error_msg = f"MCP server '{self.server_config.name}' failed to start"
+                error_msg = (
+                    f"MCP server '{self.server_config.name}' failed to start"
+                )
                 if stderr_output:
                     error_msg += f": {stderr_output}"
 
@@ -152,7 +160,9 @@ class MCPClient:
                         f"Connection timeout for {self.server_config.name}, retrying..."
                     )
                     await self.disconnect()
-                    await asyncio.sleep(1.0 * (retry_count + 1))  # Progressive delay
+                    await asyncio.sleep(
+                        1.0 * (retry_count + 1)
+                    )  # Progressive delay
                     return await self.connect(retry_count + 1, max_retries)
                 else:
                     raise MCPTimeoutError(
@@ -184,8 +194,12 @@ class MCPClient:
 
             # Retry logic for transient errors
             if retry_count < max_retries and self._is_retryable_error(e):
-                logger.warning(f"Retryable error for {self.server_config.name}: {e}")
-                await asyncio.sleep(2.0 * (retry_count + 1))  # Progressive delay
+                logger.warning(
+                    f"Retryable error for {self.server_config.name}: {e}"
+                )
+                await asyncio.sleep(
+                    2.0 * (retry_count + 1)
+                )  # Progressive delay
                 return await self.connect(retry_count + 1, max_retries)
 
             raise MCPConnectionError(
@@ -231,7 +245,9 @@ class MCPClient:
 
         return list(self.tools.values())
 
-    async def call_tool(self, name: str, arguments: Dict[str, Any]) -> ToolResult:
+    async def call_tool(
+        self, name: str, arguments: Dict[str, Any]
+    ) -> ToolResult:
         """
         Execute a tool call on the MCP server.
 
@@ -314,7 +330,9 @@ class MCPClient:
         response = await self._send_request(init_request)
 
         if "error" in response:
-            raise MCPServerError(f"Server initialization failed: {response['error']}")
+            raise MCPServerError(
+                f"Server initialization failed: {response['error']}"
+            )
 
         # Check protocol version
         result = response.get("result", {})
@@ -378,7 +396,11 @@ class MCPClient:
         Raises:
             MCPServerError: If communication fails
         """
-        if not self.process or not self.process.stdin or not self.process.stdout:
+        if (
+            not self.process
+            or not self.process.stdin
+            or not self.process.stdout
+        ):
             raise MCPServerError("MCP server process not available")
 
         try:
@@ -404,7 +426,9 @@ class MCPClient:
 
                         # Increment request ID to match test expectations
                         if "id" in request:
-                            self._request_id = max(self._request_id, request["id"])
+                            self._request_id = max(
+                                self._request_id, request["id"]
+                            )
 
                         return response
                 await asyncio.sleep(0.01)
@@ -521,7 +545,9 @@ class MCPClient:
         import shutil
 
         if not shutil.which(self.server_config.command):
-            logger.warning(f"Command '{self.server_config.command}' not found in PATH")
+            logger.warning(
+                f"Command '{self.server_config.command}' not found in PATH"
+            )
 
     def _is_retryable_error(self, error: Exception) -> bool:
         """
@@ -555,7 +581,9 @@ class MCPClient:
             "broken pipe",
         ]
 
-        return any(indicator in error_str for indicator in transient_indicators)
+        return any(
+            indicator in error_str for indicator in transient_indicators
+        )
 
     async def reconnect(self) -> bool:
         """
@@ -581,7 +609,9 @@ class MCPClient:
             return self.is_connected
 
         except Exception as e:
-            logger.error(f"Reconnection failed for {self.server_config.name}: {e}")
+            logger.error(
+                f"Reconnection failed for {self.server_config.name}: {e}"
+            )
             return False
 
     async def _perform_handshake(self) -> bool:
@@ -649,7 +679,9 @@ class MCPClient:
                         raise MCPToolError(
                             f"Invalid parameter type for '{param_name}': expected number, got {type(param_value).__name__}"
                         )
-                    elif expected_type == "string" and not isinstance(param_value, str):
+                    elif expected_type == "string" and not isinstance(
+                        param_value, str
+                    ):
                         raise MCPToolError(
                             f"Invalid parameter type for '{param_name}': expected string, got {type(param_value).__name__}"
                         )
@@ -697,7 +729,9 @@ class MCPClient:
                     logger.warning(
                         f"Tool call failed (attempt {attempt + 1}), retrying: {e}"
                     )
-                    await asyncio.sleep(1.0 * (attempt + 1))  # Progressive delay
+                    await asyncio.sleep(
+                        1.0 * (attempt + 1)
+                    )  # Progressive delay
 
                     # Try to reconnect if connection seems broken
                     if not self.is_connected:
@@ -710,7 +744,9 @@ class MCPClient:
                     logger.warning(
                         f"Server error (attempt {attempt + 1}), retrying: {e}"
                     )
-                    await asyncio.sleep(2.0 * (attempt + 1))  # Progressive delay
+                    await asyncio.sleep(
+                        2.0 * (attempt + 1)
+                    )  # Progressive delay
 
                     # Try to reconnect
                     await self.reconnect()

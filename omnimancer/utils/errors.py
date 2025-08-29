@@ -85,7 +85,9 @@ class ProviderError(OmnimancerError):
     communicating with AI provider APIs.
     """
 
-    def __init__(self, message: str, provider: str = None, details: str = None):
+    def __init__(
+        self, message: str, provider: str = None, details: str = None
+    ):
         """
         Initialize the provider error.
 
@@ -223,7 +225,10 @@ class ModelNotFoundError(ProviderError):
             if (
                 model_lower in model_lower_check
                 or model_lower_check in model_lower
-                or any(part in model_lower_check for part in model_lower.split("-"))
+                or any(
+                    part in model_lower_check
+                    for part in model_lower.split("-")
+                )
             ):
                 suggestions.append(model)
 
@@ -238,9 +243,7 @@ class ModelNotFoundError(ProviderError):
             suggestion_text = ", ".join(suggestions)
             return f"{base_msg}\nSuggested alternatives: {suggestion_text}"
         elif self.available_models:
-            return (
-                f"{base_msg}\nAvailable models: {', '.join(self.available_models[:5])}"
-            )
+            return f"{base_msg}\nAvailable models: {', '.join(self.available_models[:5])}"
 
         return base_msg
 
@@ -275,7 +278,9 @@ class MCPServerError(MCPError):
     and communication protocol errors.
     """
 
-    def __init__(self, message: str, server_name: str = None, details: str = None):
+    def __init__(
+        self, message: str, server_name: str = None, details: str = None
+    ):
         """
         Initialize the MCP server error.
 
@@ -303,7 +308,9 @@ class MCPToolError(MCPError):
     and invalid tool parameters.
     """
 
-    def __init__(self, message: str, tool_name: str = None, details: str = None):
+    def __init__(
+        self, message: str, tool_name: str = None, details: str = None
+    ):
         """
         Initialize the MCP tool error.
 

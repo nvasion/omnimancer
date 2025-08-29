@@ -142,7 +142,9 @@ class StatusIntegratedAgentEngine(AgentEngine):
         except Exception as e:
             logger.error(f"Error during status system shutdown: {e}")
 
-    async def execute_with_approval(self, operation: Operation) -> OperationResult:
+    async def execute_with_approval(
+        self, operation: Operation
+    ) -> OperationResult:
         """
         Execute operation with approval workflow and status tracking.
 
@@ -157,7 +159,9 @@ class StatusIntegratedAgentEngine(AgentEngine):
         try:
             # Create status operation for tracking
             if self.enable_status_display:
-                status_operation = await self._create_status_operation(operation)
+                status_operation = await self._create_status_operation(
+                    operation
+                )
 
             # Set agent to running state
             if self.enable_status_display:
@@ -189,7 +193,8 @@ class StatusIntegratedAgentEngine(AgentEngine):
                 else:
                     await self.status_manager.fail_operation(
                         status_operation.operation_id,
-                        result.error or "Operation failed without specific error",
+                        result.error
+                        or "Operation failed without specific error",
                         {
                             "error_details": result.details,
                             "failure_context": result.error,
@@ -216,7 +221,10 @@ class StatusIntegratedAgentEngine(AgentEngine):
                 await self.status_manager.fail_operation(
                     status_operation.operation_id,
                     f"Exception during execution: {e}",
-                    {"exception_type": type(e).__name__, "exception_details": str(e)},
+                    {
+                        "exception_type": type(e).__name__,
+                        "exception_details": str(e),
+                    },
                 )
 
             # Set agent to error state
@@ -231,10 +239,15 @@ class StatusIntegratedAgentEngine(AgentEngine):
             raise
         finally:
             # Clean up operation tracking
-            if status_operation and operation.id in self.active_status_operations:
+            if (
+                status_operation
+                and operation.id in self.active_status_operations
+            ):
                 del self.active_status_operations[operation.id]
 
-    async def _create_status_operation(self, operation: Operation) -> AgentOperation:
+    async def _create_status_operation(
+        self, operation: Operation
+    ) -> AgentOperation:
         """
         Create a status operation for tracking.
 
@@ -274,7 +287,9 @@ class StatusIntegratedAgentEngine(AgentEngine):
         await self.status_manager.start_operation(status_operation)
 
         # Keep reference for updates
-        self.active_status_operations[operation.id] = status_operation.operation_id
+        self.active_status_operations[operation.id] = (
+            status_operation.operation_id
+        )
 
         return status_operation
 
@@ -324,7 +339,10 @@ class StatusIntegratedAgentEngine(AgentEngine):
             return f"Executing {type_str.lower().replace('_', ' ') if type_str else 'operation'}"
 
     async def update_operation_progress(
-        self, operation_id: str, progress: float, description: Optional[str] = None
+        self,
+        operation_id: str,
+        progress: float,
+        description: Optional[str] = None,
     ) -> None:
         """
         Update progress of an operation.
@@ -361,8 +379,12 @@ class StatusIntegratedAgentEngine(AgentEngine):
 
         try:
             agent_status = self.status_manager.get_agent_status(self.agent_id)
-            agent_metadata = self.status_manager.get_agent_metadata(self.agent_id)
-            active_operations = self.status_manager.get_active_operations(self.agent_id)
+            agent_metadata = self.status_manager.get_agent_metadata(
+                self.agent_id
+            )
+            active_operations = self.status_manager.get_active_operations(
+                self.agent_id
+            )
             system_stats = self.status_manager.get_stats()
 
             return {
@@ -376,7 +398,9 @@ class StatusIntegratedAgentEngine(AgentEngine):
                         "type": op.operation_type.value,
                         "description": op.description,
                         "progress": op.progress_percentage,
-                        "duration": op.duration.total_seconds() if op.duration else 0,
+                        "duration": (
+                            op.duration.total_seconds() if op.duration else 0
+                        ),
                     }
                     for op in active_operations
                 ],
@@ -487,7 +511,9 @@ async def create_status_integrated_engine(
 class StatusTrackingContext:
     """Context manager for temporary status tracking within operations."""
 
-    def __init__(self, engine: StatusIntegratedAgentEngine, operation_name: str):
+    def __init__(
+        self, engine: StatusIntegratedAgentEngine, operation_name: str
+    ):
         self.engine = engine
         self.operation_name = operation_name
         self.operation_id = None
@@ -535,7 +561,9 @@ class StatusTrackingContext:
             if self.operation_id in self.engine.active_status_operations:
                 del self.engine.active_status_operations[self.operation_id]
 
-    async def update_progress(self, progress: float, description: Optional[str] = None):
+    async def update_progress(
+        self, progress: float, description: Optional[str] = None
+    ):
         """Update progress of the tracked operation."""
         if self.operation_id:
             await self.engine.update_operation_progress(

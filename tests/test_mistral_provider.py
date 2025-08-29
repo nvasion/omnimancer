@@ -97,7 +97,10 @@ def sample_tools():
             parameters={
                 "type": "object",
                 "properties": {
-                    "code": {"type": "string", "description": "Python code to execute"}
+                    "code": {
+                        "type": "string",
+                        "description": "Python code to execute",
+                    }
                 },
                 "required": ["code"],
             },
@@ -131,7 +134,11 @@ def mock_successful_response():
                 }
             }
         ],
-        "usage": {"total_tokens": 45, "prompt_tokens": 20, "completion_tokens": 25},
+        "usage": {
+            "total_tokens": 45,
+            "prompt_tokens": 20,
+            "completion_tokens": 25,
+        },
     }
 
 
@@ -156,7 +163,11 @@ def mock_tool_response():
                 }
             }
         ],
-        "usage": {"total_tokens": 35, "prompt_tokens": 15, "completion_tokens": 20},
+        "usage": {
+            "total_tokens": 35,
+            "prompt_tokens": 15,
+            "completion_tokens": 20,
+        },
     }
 
 
@@ -232,7 +243,9 @@ class TestMistralProviderMessageSending:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Safe response"}}],
+            "choices": [
+                {"message": {"role": "assistant", "content": "Safe response"}}
+            ],
             "usage": {"total_tokens": 10},
         }
 
@@ -274,7 +287,9 @@ class TestMistralProviderMessageSending:
             mock_post = AsyncMock(return_value=mock_response)
             mock_client.return_value.__aenter__.return_value.post = mock_post
 
-            await mistral_provider_json.send_message("Return JSON", sample_chat_context)
+            await mistral_provider_json.send_message(
+                "Return JSON", sample_chat_context
+            )
 
             # Check that response format is included
             call_args = mock_post.call_args
@@ -283,15 +298,21 @@ class TestMistralProviderMessageSending:
             assert payload["response_format"] == {"type": "json_object"}
 
     @pytest.mark.asyncio
-    async def test_send_message_timeout(self, mistral_provider, sample_chat_context):
+    async def test_send_message_timeout(
+        self, mistral_provider, sample_chat_context
+    ):
         """Test message sending with timeout."""
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
                 side_effect=httpx.TimeoutException("Request timed out")
             )
 
-            with pytest.raises(NetworkError, match="Request to Mistral API timed out"):
-                await mistral_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                NetworkError, match="Request to Mistral API timed out"
+            ):
+                await mistral_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
     async def test_send_message_network_error(
@@ -304,7 +325,9 @@ class TestMistralProviderMessageSending:
             )
 
             with pytest.raises(NetworkError, match="Network error"):
-                await mistral_provider.send_message("Test message", sample_chat_context)
+                await mistral_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
     async def test_send_message_authentication_error(
@@ -319,8 +342,12 @@ class TestMistralProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(AuthenticationError, match="Invalid Mistral API key"):
-                await mistral_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                AuthenticationError, match="Invalid Mistral API key"
+            ):
+                await mistral_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
     async def test_send_message_rate_limit_error(
@@ -335,8 +362,12 @@ class TestMistralProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(RateLimitError, match="Mistral API rate limit exceeded"):
-                await mistral_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                RateLimitError, match="Mistral API rate limit exceeded"
+            ):
+                await mistral_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
     async def test_send_message_model_not_found(
@@ -351,8 +382,12 @@ class TestMistralProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(ModelNotFoundError, match="Mistral model .* not found"):
-                await mistral_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                ModelNotFoundError, match="Mistral model .* not found"
+            ):
+                await mistral_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
     @pytest.mark.asyncio
     async def test_send_message_empty_response(
@@ -368,8 +403,12 @@ class TestMistralProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(ProviderError, match="Empty response from Mistral API"):
-                await mistral_provider.send_message("Test message", sample_chat_context)
+            with pytest.raises(
+                ProviderError, match="Empty response from Mistral API"
+            ):
+                await mistral_provider.send_message(
+                    "Test message", sample_chat_context
+                )
 
 
 class TestMistralProviderToolCalling:
@@ -377,7 +416,11 @@ class TestMistralProviderToolCalling:
 
     @pytest.mark.asyncio
     async def test_send_message_with_tools_success(
-        self, mistral_provider, sample_chat_context, sample_tools, mock_tool_response
+        self,
+        mistral_provider,
+        sample_chat_context,
+        sample_tools,
+        mock_tool_response,
     ):
         """Test successful message sending with tools."""
         mock_response = MagicMock()
@@ -408,7 +451,9 @@ class TestMistralProviderToolCalling:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Test response"}}],
+            "choices": [
+                {"message": {"role": "assistant", "content": "Test response"}}
+            ],
             "usage": {"total_tokens": 10},
         }
 
@@ -452,7 +497,12 @@ class TestMistralProviderToolCalling:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [
-                {"message": {"role": "assistant", "content": "Safe tool response"}}
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "Safe tool response",
+                    }
+                }
             ],
             "usage": {"total_tokens": 15},
         }
@@ -478,7 +528,9 @@ class TestMistralProviderToolCalling:
         self, mistral_provider, sample_tools
     ):
         """Test tool conversion to Mistral format."""
-        mistral_tools = mistral_provider._convert_tools_to_mistral_format(sample_tools)
+        mistral_tools = mistral_provider._convert_tools_to_mistral_format(
+            sample_tools
+        )
 
         assert len(mistral_tools) == 2
 
@@ -487,7 +539,8 @@ class TestMistralProviderToolCalling:
         assert tool1["type"] == "function"
         assert tool1["function"]["name"] == "code_interpreter"
         assert (
-            tool1["function"]["description"] == "Execute Python code and return results"
+            tool1["function"]["description"]
+            == "Execute Python code and return results"
         )
         assert "parameters" in tool1["function"]
 
@@ -495,7 +548,10 @@ class TestMistralProviderToolCalling:
         tool2 = mistral_tools[1]
         assert tool2["type"] == "function"
         assert tool2["function"]["name"] == "file_search"
-        assert tool2["function"]["description"] == "Search for files in the codebase"
+        assert (
+            tool2["function"]["description"]
+            == "Search for files in the codebase"
+        )
 
 
 class TestMistralProviderCredentialValidation:
@@ -566,7 +622,9 @@ class TestMistralProviderModelInfo:
 
     def test_get_model_info_codestral(self):
         """Test getting model info for Codestral."""
-        provider = MistralProvider(api_key="test-key", model="codestral-latest")
+        provider = MistralProvider(
+            api_key="test-key", model="codestral-latest"
+        )
         model_info = provider.get_model_info()
 
         assert model_info.name == "codestral-latest"
@@ -583,7 +641,10 @@ class TestMistralProviderModelInfo:
         model_info = provider.get_model_info()
 
         assert model_info.name == "mistral-tiny"
-        assert model_info.description == "Mistral Tiny - Ultra-fast for simple tasks"
+        assert (
+            model_info.description
+            == "Mistral Tiny - Ultra-fast for simple tasks"
+        )
         assert model_info.swe_score == 35.1
         assert model_info.supports_tools is False  # Tiny doesn't support tools
 
@@ -609,9 +670,13 @@ class TestMistralProviderModelInfo:
             assert model.provider == "mistral"
 
         # Check specific models
-        large_model = next(m for m in models if m.name == "mistral-large-latest")
+        large_model = next(
+            m for m in models if m.name == "mistral-large-latest"
+        )
         tiny_model = next(m for m in models if m.name == "mistral-tiny")
-        codestral_model = next(m for m in models if m.name == "codestral-latest")
+        codestral_model = next(
+            m for m in models if m.name == "codestral-latest"
+        )
 
         assert large_model.latest_version is True
         assert large_model.supports_tools is True
@@ -643,7 +708,9 @@ class TestMistralProviderCapabilities:
 class TestMistralProviderMessagePreparation:
     """Test message preparation for API requests."""
 
-    def test_prepare_messages_with_context(self, mistral_provider, sample_chat_context):
+    def test_prepare_messages_with_context(
+        self, mistral_provider, sample_chat_context
+    ):
         """Test preparing messages with conversation context."""
         messages = mistral_provider._prepare_messages(
             "New message", sample_chat_context
@@ -667,7 +734,9 @@ class TestMistralProviderMessagePreparation:
     def test_prepare_messages_empty_context(self, mistral_provider):
         """Test preparing messages with empty context."""
         empty_context = ChatContext(
-            messages=[], current_model="mistral-large-latest", session_id="test-session"
+            messages=[],
+            current_model="mistral-large-latest",
+            session_id="test-session",
         )
 
         messages = mistral_provider._prepare_messages("Hello", empty_context)
@@ -680,7 +749,9 @@ class TestMistralProviderMessagePreparation:
 class TestMistralProviderResponseHandling:
     """Test response handling functionality."""
 
-    def test_handle_response_success(self, mistral_provider, mock_successful_response):
+    def test_handle_response_success(
+        self, mistral_provider, mock_successful_response
+    ):
         """Test handling successful response."""
         mock_response = MagicMock()
         mock_response.status_code = 200

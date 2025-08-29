@@ -78,8 +78,10 @@ class CoreEngine:
             config = self.config_manager.get_config()
 
             # Use the optimized provider initializer with config_manager for API key decryption
-            self.providers = await self.provider_initializer.initialize_providers(
-                config.providers, self.config_manager
+            self.providers = (
+                await self.provider_initializer.initialize_providers(
+                    config.providers, self.config_manager
+                )
             )
 
             # Register providers with the provider registry for catalog management
@@ -92,12 +94,19 @@ class CoreEngine:
             for provider_name in available_providers:
                 try:
                     # Just register the provider name, the registry will handle class loading
-                    self.provider_registry.register_provider(provider_name, None)
+                    self.provider_registry.register_provider(
+                        provider_name, None
+                    )
                 except Exception as e:
-                    logger.warning(f"Failed to register provider {provider_name}: {e}")
+                    logger.warning(
+                        f"Failed to register provider {provider_name}: {e}"
+                    )
 
             # Set default provider
-            if config.default_provider and config.default_provider in self.providers:
+            if (
+                config.default_provider
+                and config.default_provider in self.providers
+            ):
                 self.current_provider = self.providers[config.default_provider]
             elif self.providers:
                 # Use first available provider as default
@@ -128,7 +137,9 @@ class CoreEngine:
         """
         try:
             if provider_name not in self.providers:
-                raise ConfigurationError(f"Provider '{provider_name}' is not available")
+                raise ConfigurationError(
+                    f"Provider '{provider_name}' is not available"
+                )
 
             provider = self.providers[provider_name]
 
@@ -141,7 +152,9 @@ class CoreEngine:
                 # Also check custom models for this provider
                 custom_models = self.config_manager.get_custom_models()
                 custom_model_names = [
-                    m.name for m in custom_models if m.provider == provider_name
+                    m.name
+                    for m in custom_models
+                    if m.provider == provider_name
                 ]
 
                 # Combine both lists
@@ -194,7 +207,9 @@ class CoreEngine:
             # Get current chat context
             if progress and progress.enabled:
                 progress.start_operation(
-                    "engine_context", OperationType.ANALYZE, "Getting chat context"
+                    "engine_context",
+                    OperationType.ANALYZE,
+                    "Getting chat context",
                 )
             context = self.chat_manager.get_current_context()
             if progress and progress.enabled:
@@ -207,10 +222,13 @@ class CoreEngine:
                     OperationType.NETWORK,
                     f"Sending to {self.current_provider.get_provider_name()}",
                 )
-            response = await self.current_provider.send_message(message, context)
+            response = await self.current_provider.send_message(
+                message, context
+            )
             if progress and progress.enabled:
                 progress.complete_operation(
-                    "engine_provider", "completed" if response.is_success else "failed"
+                    "engine_provider",
+                    "completed" if response.is_success else "failed",
                 )
 
             # Always add user message to chat history
@@ -220,7 +238,9 @@ class CoreEngine:
             if response.is_success:
                 if progress and progress.enabled:
                     progress.start_operation(
-                        "engine_history", OperationType.WRITE, "Updating chat history"
+                        "engine_history",
+                        OperationType.WRITE,
+                        "Updating chat history",
                     )
                 self.chat_manager.add_assistant_message(
                     response.content, self.current_provider.model
@@ -272,7 +292,9 @@ class CoreEngine:
                     model_dict = {
                         "name": model.name,
                         "provider": model.provider,
-                        "supports_tools": getattr(model, "supports_tools", False),
+                        "supports_tools": getattr(
+                            model, "supports_tools", False
+                        ),
                         "supports_multimodal": getattr(
                             model, "supports_multimodal", False
                         ),
@@ -322,7 +344,9 @@ class CoreEngine:
                     else None
                 ),
                 "current_model": (
-                    self.current_provider.model if self.current_provider else None
+                    self.current_provider.model
+                    if self.current_provider
+                    else None
                 ),
             }
         except Exception as e:
@@ -356,7 +380,9 @@ class CoreEngine:
             return {
                 "message_count": len(context.messages),
                 "current_model": (
-                    self.current_provider.model if self.current_provider else None
+                    self.current_provider.model
+                    if self.current_provider
+                    else None
                 ),
                 "session_id": context.session_id,
             }
@@ -462,7 +488,9 @@ class CoreEngine:
                 await self.mcp_manager.initialize_servers()
                 logger.info("MCP servers initialized successfully")
             else:
-                logger.info("MCP manager not configured - skipping MCP initialization")
+                logger.info(
+                    "MCP manager not configured - skipping MCP initialization"
+                )
         except Exception as e:
             logger.error(f"Failed to initialize MCP: {e}")
             raise
@@ -474,7 +502,9 @@ class CoreEngine:
                 await self.mcp_manager.shutdown()
                 logger.info("MCP servers shutdown successfully")
             else:
-                logger.info("MCP manager not configured - skipping MCP shutdown")
+                logger.info(
+                    "MCP manager not configured - skipping MCP shutdown"
+                )
         except Exception as e:
             logger.error(f"Failed to shutdown MCP: {e}")
             # Don't raise during shutdown
@@ -522,7 +552,9 @@ class CoreEngine:
 
                 for tool in server_tools:
                     name = getattr(tool, "name", "Unknown")
-                    description = getattr(tool, "description", "No description")
+                    description = getattr(
+                        tool, "description", "No description"
+                    )
                     lines.append(f"  🔧 {name}")
                     if description and description != "No description":
                         lines.append(f"     {description}")
@@ -562,17 +594,23 @@ class CoreEngine:
             elif command == "reload":
                 return await self._mcp_reload()
             elif command == "connect":
-                server_name = command_parts[1] if len(command_parts) > 1 else None
+                server_name = (
+                    command_parts[1] if len(command_parts) > 1 else None
+                )
                 return await self._mcp_connect(server_name)
             elif command == "disconnect":
-                server_name = command_parts[1] if len(command_parts) > 1 else None
+                server_name = (
+                    command_parts[1] if len(command_parts) > 1 else None
+                )
                 return await self._mcp_disconnect(server_name)
             elif command == "health":
                 return await self._mcp_health()
             elif command == "servers":
                 return self._mcp_servers()
             elif command == "tools":
-                server_name = command_parts[1] if len(command_parts) > 1 else None
+                server_name = (
+                    command_parts[1] if len(command_parts) > 1 else None
+                )
                 return await self._mcp_tools(server_name)
             else:
                 return self._mcp_help()
@@ -591,7 +629,9 @@ class CoreEngine:
         status_info.append("=" * 40)
 
         # Basic status
-        status_info.append(f"Enabled: {'Yes' if self.mcp_manager.is_enabled else 'No'}")
+        status_info.append(
+            f"Enabled: {'Yes' if self.mcp_manager.is_enabled else 'No'}"
+        )
         status_info.append(
             f"Initialized: {'Yes' if self.mcp_manager.initialized else 'No'}"
         )
@@ -602,7 +642,9 @@ class CoreEngine:
 
         # Degradation status
         degradation = self.mcp_manager.get_degradation_status()
-        status_info.append(f"Degradation Level: {degradation['degradation_level']}")
+        status_info.append(
+            f"Degradation Level: {degradation['degradation_level']}"
+        )
 
         if degradation["functionality_impact"]:
             status_info.append("\nFunctionality Impact:")
@@ -648,9 +690,7 @@ class CoreEngine:
                 if success:
                     return f"Disconnected from server '{server_name}'."
                 else:
-                    return (
-                        f"Server '{server_name}' was not connected or does not exist."
-                    )
+                    return f"Server '{server_name}' was not connected or does not exist."
             else:
                 await self.mcp_manager.shutdown()
                 return "Disconnected from all MCP servers."
@@ -682,7 +722,9 @@ class CoreEngine:
                 health_info.append(
                     f"   Connected: {'Yes' if status['connected'] else 'No'}"
                 )
-                health_info.append(f"   Healthy: {'Yes' if health_check else 'No'}")
+                health_info.append(
+                    f"   Healthy: {'Yes' if health_check else 'No'}"
+                )
                 health_info.append(f"   Tools: {status['tool_count']}")
                 health_info.append(f"   Command: {status['command']}")
 
@@ -737,7 +779,9 @@ class CoreEngine:
 
                 for tool in tools:
                     name = getattr(tool, "name", "Unknown")
-                    description = getattr(tool, "description", "No description")
+                    description = getattr(
+                        tool, "description", "No description"
+                    )
                     tools_info.append(f"🔧 {name}")
                     if description:
                         tools_info.append(f"   {description}")
