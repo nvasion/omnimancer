@@ -1,0 +1,558 @@
+# GitLab CI/CD Pipeline for Omnimancer CLI
+# 
+# Features:
+# - Multi-Python version testing (3.8 - 3.12)
+# - Automated versioning with scripts/version_manager.py
+# - Security scanning (SAST, dependency scanning)
+# - Code quality checks (black, isort, flake8, mypy)
+# - Test coverage with reports
+# - PyPI deployment (test and production)
+# - Efficient caching and parallel execution
+
+default:
+  image: python:3.11-slim
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  SECURE_LOG_LEVEL: "debug"
+  # Performance optimization
+  PIP_NO_COMPILE: "1"
+  PIP_PREFER_BINARY: "1"
+
+# Cache configuration for faster builds
+cache:
+  key:
+    files:
+      - pyproject.toml
+      - .gitlab-ci.yml
+  paths:
+    - .cache/pip
+    - .venv/
+  policy: pull-push
+
+stages:
+  - version
+  - lint
+  - test
+  - security
+  - build
+  - deploy
+  - release
+
+# ============================================================================
+# Shared Configuration Templates
+# ============================================================================
+
+.default_setup:
+  before_script:
+    - apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+    - python --version
+    - pip install --upgrade pip setuptools wheel
+    - pip install -e ".[dev]"
+
+.python_matrix:
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["3.10", "3.11", "3.12"]
+  image: python:${PYTHON_VERSION}-slim
+
+# ============================================================================
+# Version Management Stage
+# ============================================================================
+
+# Extract current version for use in downstream jobs
+extract_version:
+  stage: version
+  extends: .default_setup
+  script:
+    - |
+      python - <<'PY' > version.env
+      from scripts.version_manager import get_current_version
+      v = get_current_version()
+      print(f"VERSION={v}")
+      print(f"PACKAGE_VERSION={v}")
+      PY
+    - echo "Resolved version:"
+    - cat version.env
+  artifacts:
+    reports:
+      dotenv: version.env
+    paths:
+      - version.env
+    expire_in: 1 day
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "tag"
+
+# Automatic version bump on main branch
+auto_bump_version:
+  stage: version
+  image: python:3.11-slim
+  variables:
+    BUMP: "patch"
+    GIT_STRATEGY: clone
+    GIT_DEPTH: "0"
+  before_script:
+    - apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+    - pip install --upgrade pip
+    - git config user.name "GitLab CI Bot"
+    - git config user.email "ci@gitlab.com"
+    - |
+      if [ -n "$GITLAB_TOKEN" ]; then
+        git remote set-url origin "https://gitlab-ci-token:${GITLAB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      elif [ -n "$GIT_AUTH_TOKEN" ]; then
+        git remote set-url origin "https://${GIT_AUTH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      fi
+    - git fetch --tags
+    - git checkout "${CI_COMMIT_REF_NAME}"
+  script:
+    - |
+      # Check if this is already a version bump commit
+      if git log -1 --pretty=%B | grep -q "chore(release): bump version"; then
+        echo "This is already a version bump commit, skipping..."
+        exit 0
+      fi
+      
+      # Determine bump type based on commit message
+      COMMIT_MSG=$(git log -1 --pretty=%B)
+      if echo "$COMMIT_MSG" | grep -q "BREAKING CHANGE\|feat!:"; then
+        BUMP="major"
+      elif echo "$COMMIT_MSG" | grep -q "feat:"; then
+        BUMP="minor"
+      else
+        BUMP="patch"
+      fi
+      
+      echo "Bump type determined: $BUMP"
+      
+      python - <<'PY'
+      import os
+      from scripts.version_manager import (
+          get_current_version, bump_version, update_version,
+          generate_changelog, update_changelog_file
+      )
+      bump = os.environ.get("BUMP", "patch").lower()
+      curr = get_current_version()
+      new = bump_version(curr, bump)
+      update_version(new)
+      ch = generate_changelog(new)
+      update_changelog_file(ch)
+      print(f"Bumped {curr} -> {new}")
+      PY
+    - |
+      NEW_VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
+      echo "New version: ${NEW_VERSION}"
+      git add pyproject.toml CHANGELOG.md || true
+      git commit -m "chore(release): bump version to ${NEW_VERSION} [skip ci]" || echo "No changes to commit"
+      git tag "v${NEW_VERSION}"
+      git push origin "${CI_COMMIT_REF_NAME}"
+      git push origin "v${NEW_VERSION}"
+      echo "VERSION=${NEW_VERSION}" > version.env
+  artifacts:
+    reports:
+      dotenv: version.env
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+      when: on_success
+    - when: never
+
+# Manual version bump for specific version changes
+manual_bump_version:
+  stage: version
+  extends: auto_bump_version
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+      allow_failure: true
+
+# ============================================================================
+# Code Quality Stage
+# ============================================================================
+
+lint:black:
+  stage: lint
+  extends: .default_setup
+  needs: ["extract_version"]
+  script:
+    - black --check omnimancer tests scripts
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+lint:isort:
+  stage: lint
+  extends: .default_setup
+  needs: ["extract_version"]
+  script:
+    - isort --check-only omnimancer tests scripts
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+lint:flake8:
+  stage: lint
+  extends: .default_setup
+  needs: ["extract_version"]
+  script:
+    - flake8 omnimancer tests --max-line-length=88 --extend-ignore=E203,W503
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+lint:mypy:
+  stage: lint
+  extends: .default_setup
+  needs: ["extract_version"]
+  script:
+    - mypy omnimancer --ignore-missing-imports
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+# ============================================================================
+# Testing Stage
+# ============================================================================
+
+test:python:
+  stage: test
+  extends: [.default_setup, .python_matrix]
+  needs: ["extract_version"]
+  script:
+    - |
+      pytest tests/ \
+        --cov=omnimancer \
+        --cov-report=term-missing \
+        --cov-report=html \
+        --cov-report=xml \
+        --junitxml=junit-${PYTHON_VERSION}.xml \
+        -v
+  artifacts:
+    when: always
+    paths:
+      - htmlcov/
+      - coverage.xml
+      - junit-*.xml
+    reports:
+      junit: junit-${PYTHON_VERSION}.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    expire_in: 1 week
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "tag"
+
+test:integration:
+  stage: test
+  extends: .default_setup
+  needs: ["extract_version"]
+  script:
+    - |
+      # Run integration tests separately
+      pytest tests/integration/ \
+        --tb=short \
+        -v \
+        --junitxml=junit-integration.xml
+  artifacts:
+    when: always
+    reports:
+      junit: junit-integration.xml
+    expire_in: 1 week
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# ============================================================================
+# Security Scanning Stage
+# ============================================================================
+
+# Static Application Security Testing
+sast:
+  stage: security
+  image: python:3.11-slim
+  before_script:
+    - pip install --upgrade pip
+  script:
+    - pip install bandit safety
+    - bandit -r omnimancer -f json -o bandit-report.json || true
+    - safety check --json > safety-report.json || true
+  artifacts:
+    when: always
+    paths:
+      - bandit-report.json
+      - safety-report.json
+    expire_in: 1 month
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# Dependency Scanning
+dependency_scanning:
+  stage: security
+  image: python:3.11-slim
+  before_script:
+    - pip install --upgrade pip
+  script:
+    - pip install pip-audit
+    - pip-audit --desc --format json > dependency-scan.json || true
+  artifacts:
+    when: always
+    paths:
+      - dependency-scan.json
+    expire_in: 1 month
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# License Scanning
+license_scanning:
+  stage: security
+  image: python:3.11-slim
+  before_script:
+    - pip install --upgrade pip
+  script:
+    - pip install pip-licenses
+    - pip-licenses --format=json --with-urls --with-description > licenses.json
+  artifacts:
+    paths:
+      - licenses.json
+    expire_in: 1 month
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: $CI_PIPELINE_SOURCE == "tag"
+
+# ============================================================================
+# Build Stage
+# ============================================================================
+
+build:package:
+  stage: build
+  extends: .default_setup
+  needs: 
+    - extract_version
+    - job: test:python
+      artifacts: false
+  script:
+    - pip install build twine
+    - python -m build
+    - ls -la dist/
+    - twine check dist/*
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 month
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "tag"
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# ============================================================================
+# Deployment Stage
+# ============================================================================
+
+# Deploy to Test PyPI
+deploy:test_pypi:
+  stage: deploy
+  extends: .default_setup
+  needs: 
+    - build:package
+    - extract_version
+  script:
+    - pip install twine
+    - |
+      if [ -z "$TEST_PYPI_TOKEN" ]; then
+        echo "TEST_PYPI_TOKEN not set, skipping test deployment"
+        exit 0
+      fi
+    - |
+      twine upload \
+        --repository-url https://test.pypi.org/legacy/ \
+        --username __token__ \
+        --password $TEST_PYPI_TOKEN \
+        --skip-existing \
+        dist/*
+  environment:
+    name: test-pypi
+    url: https://test.pypi.org/project/omnimancer-cli/
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+      allow_failure: true
+
+# Deploy to Production PyPI
+deploy:pypi:
+  stage: deploy
+  extends: .default_setup
+  needs: 
+    - build:package
+    - extract_version
+  script:
+    - pip install twine
+    - |
+      if [ -z "$PYPI_TOKEN" ]; then
+        echo "PYPI_TOKEN not set, cannot deploy to PyPI"
+        exit 1
+      fi
+    - |
+      twine upload \
+        --username __token__ \
+        --password $PYPI_TOKEN \
+        --skip-existing \
+        dist/*
+  environment:
+    name: production-pypi
+    url: https://pypi.org/project/omnimancer-cli/
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: true
+
+# Deploy to GitLab Package Registry
+deploy:gitlab_registry:
+  stage: deploy
+  extends: .default_setup
+  needs: 
+    - build:package
+    - extract_version
+  script:
+    - pip install twine
+    - |
+      TWINE_PASSWORD=${CI_JOB_TOKEN} \
+      TWINE_USERNAME=gitlab-ci-token \
+      python -m twine upload \
+        --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi \
+        dist/*
+  environment:
+    name: gitlab-registry
+    url: $CI_PROJECT_URL/-/packages
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: true
+
+# ============================================================================
+# Release Stage
+# ============================================================================
+
+create_release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs: 
+    - extract_version
+    - deploy:pypi
+  script:
+    - echo "Creating release for version ${VERSION}"
+  release:
+    name: "Release v${VERSION}"
+    description: |
+      ## Omnimancer CLI v${VERSION}
+      
+      ### Installation
+      ```bash
+      pip install omnimancer-cli==${VERSION}
+      ```
+      
+      ### Changelog
+      See [CHANGELOG.md](${CI_PROJECT_URL}/-/blob/main/CHANGELOG.md) for details.
+      
+      ### Assets
+      - [Source Distribution](${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/dist/omnimancer-cli-${VERSION}.tar.gz)
+      - [Wheel](${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/dist/omnimancer_cli-${VERSION}-py3-none-any.whl)
+    tag_name: "v${VERSION}"
+    assets:
+      links:
+        - name: "PyPI Package"
+          url: "https://pypi.org/project/omnimancer-cli/${VERSION}/"
+        - name: "Documentation"
+          url: "${CI_PROJECT_URL}/-/blob/v${VERSION}/README.md"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
+
+# ============================================================================
+# Additional Jobs
+# ============================================================================
+
+# Generate and publish documentation
+pages:
+  stage: deploy
+  extends: .default_setup
+  needs: 
+    - job: test:python
+      artifacts: false
+  script:
+    - pip install sphinx sphinx-rtd-theme
+    - cd docs || mkdir docs
+    - sphinx-quickstart -q -p "Omnimancer CLI" -a "Kellan Strong" -v "${VERSION}" --ext-autodoc --ext-viewcode --makefile
+    - make html
+    - mv _build/html ../public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  allow_failure: true
+
+# Code quality report for GitLab
+code_quality:
+  stage: test
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - |
+      docker run --rm \
+        -v "$PWD":/code \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        codeclimate/codeclimate analyze -f json > codeclimate.json || true
+  artifacts:
+    reports:
+      codequality: codeclimate.json
+    expire_in: 1 week
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Performance testing (optional)
+performance:
+  stage: test
+  extends: .default_setup
+  needs: ["extract_version"]
+  script:
+    - pip install pytest-benchmark
+    - pytest tests/ -v --benchmark-only --benchmark-json=benchmark.json || true
+  artifacts:
+    paths:
+      - benchmark.json
+    expire_in: 1 week
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual

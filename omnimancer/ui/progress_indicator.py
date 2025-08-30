@@ -7,20 +7,19 @@ and tool usage during AI interactions.
 
 import asyncio
 import time
-from enum import Enum
-from typing import Optional, Dict, List, Callable
 from dataclasses import dataclass, field
+from enum import Enum
+from typing import Dict, List, Optional
+
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.live import Live
-from rich.layout import Layout
+from rich.panel import Panel
+from rich.table import Table
 
 
 class OperationType(Enum):
     """Types of operations that can be tracked."""
+
     THINKING = "thinking"
     READ = "read"
     WRITE = "write"
@@ -38,6 +37,7 @@ class OperationType(Enum):
 @dataclass
 class OperationInfo:
     """Information about a current operation."""
+
     operation_type: OperationType
     description: str
     start_time: float = field(default_factory=time.time)
@@ -49,11 +49,11 @@ class OperationInfo:
 class ProgressIndicator:
     """
     Real-time progress indicator for Omnimancer operations.
-    
+
     Shows current operations, tool usage, and progress information
     in a live-updating display.
     """
-    
+
     # Operation type icons and colors
     OPERATION_ICONS = {
         OperationType.THINKING: ("🤔", "yellow"),
@@ -69,11 +69,11 @@ class ProgressIndicator:
         OperationType.NETWORK: ("🌐", "cyan"),
         OperationType.OTHER: ("⚡", "white"),
     }
-    
+
     def __init__(self, console: Console):
         """
         Initialize the progress indicator.
-        
+
         Args:
             console: Rich Console instance
         """
@@ -84,12 +84,17 @@ class ProgressIndicator:
         self.display_task: Optional[asyncio.Task] = None
         self.enabled = True
         self.max_history = 5
-        
-    def start_operation(self, operation_id: str, operation_type: OperationType, 
-                       description: str, details: Optional[str] = None) -> None:
+
+    def start_operation(
+        self,
+        operation_id: str,
+        operation_type: OperationType,
+        description: str,
+        details: Optional[str] = None,
+    ) -> None:
         """
         Start tracking a new operation.
-        
+
         Args:
             operation_id: Unique identifier for the operation
             operation_type: Type of operation
@@ -98,25 +103,30 @@ class ProgressIndicator:
         """
         if not self.enabled:
             return
-            
+
         operation = OperationInfo(
             operation_type=operation_type,
             description=description,
-            details=details
+            details=details,
         )
         self.current_operations[operation_id] = operation
-        
+
         # Start live display if this is the first operation
         if len(self.current_operations) == 1 and self.live_display is None:
             self.start_live_display()
         else:
             self._update_display()
-    
-    def update_operation(self, operation_id: str, progress: Optional[float] = None,
-                        details: Optional[str] = None, status: Optional[str] = None) -> None:
+
+    def update_operation(
+        self,
+        operation_id: str,
+        progress: Optional[float] = None,
+        details: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> None:
         """
         Update an existing operation.
-        
+
         Args:
             operation_id: Operation identifier
             progress: Progress as float 0.0 to 1.0
@@ -125,7 +135,7 @@ class ProgressIndicator:
         """
         if not self.enabled or operation_id not in self.current_operations:
             return
-            
+
         operation = self.current_operations[operation_id]
         if progress is not None:
             operation.progress = progress
@@ -133,132 +143,132 @@ class ProgressIndicator:
             operation.details = details
         if status is not None:
             operation.status = status
-            
+
         self._update_display()
-    
+
     def complete_operation(self, operation_id: str, status: str = "completed") -> None:
         """
         Complete an operation and move it to history.
-        
+
         Args:
             operation_id: Operation identifier
             status: Final status ("completed" or "failed")
         """
         if not self.enabled or operation_id not in self.current_operations:
             return
-            
+
         operation = self.current_operations.pop(operation_id)
         operation.status = status
-        
+
         # Add to history (keep only recent ones)
         self.operation_history.append(operation)
         if len(self.operation_history) > self.max_history:
             self.operation_history.pop(0)
-        
+
         # Stop live display if no more operations
         if len(self.current_operations) == 0:
             self.stop_live_display()
         else:
             self._update_display()
-    
+
     def clear_all_operations(self) -> None:
         """Clear all current operations."""
         if not self.enabled:
             return
-            
+
         # Move all current operations to history as completed
         for operation_id, operation in self.current_operations.items():
             operation.status = "completed"
             self.operation_history.append(operation)
-            
+
         self.current_operations.clear()
-        
+
         # Trim history
         if len(self.operation_history) > self.max_history:
-            self.operation_history = self.operation_history[-self.max_history:]
-        
+            self.operation_history = self.operation_history[-self.max_history :]
+
         # Always stop live display when clearing all operations
         self.stop_live_display()
-    
+
     def start_live_display(self) -> None:
         """Start the live updating display."""
         if not self.enabled or self.live_display is not None:
             return
-            
+
         layout = self._create_layout()
         self.live_display = Live(
-            layout, 
-            console=self.console, 
+            layout,
+            console=self.console,
             auto_refresh=False,  # Disable auto-refresh to prevent runaway updates
-            refresh_per_second=2  # Limit refresh rate
+            refresh_per_second=2,  # Limit refresh rate
         )
         self.live_display.start()
-    
+
     def stop_live_display(self) -> None:
         """Stop the live updating display."""
         if self.live_display:
             self.live_display.stop()
             self.live_display = None
-    
+
     def _create_layout(self) -> Panel:
-        """Create the display layout."""        
+        """Create the display layout."""
         # Create table for current operations
         current_table = Table(show_header=False, box=None, padding=(0, 1))
         current_table.add_column("", style="bold")
-        current_table.add_column("", style="dim")  
+        current_table.add_column("", style="dim")
         current_table.add_column("", style="")
-        
+
         for operation_id, operation in self.current_operations.items():
             icon, color = self.OPERATION_ICONS[operation.operation_type]
             elapsed = time.time() - operation.start_time
-            
+
             # Format time
             if elapsed < 60:
                 time_str = f"{elapsed:.1f}s"
             else:
                 time_str = f"{elapsed/60:.1f}m"
-            
+
             # Progress indicator
             if operation.progress is not None:
                 progress_str = f" ({operation.progress:.0%})"
             else:
                 progress_str = ""
-            
+
             # Operation details
             details_str = f" - {operation.details}" if operation.details else ""
-            
+
             current_table.add_row(
                 f"[{color}]{icon}[/{color}]",
                 f"[{color}]{operation.operation_type.value.title()}[/{color}]",
-                f"{operation.description}{progress_str}{details_str} [{time_str}]"
+                f"{operation.description}{progress_str}{details_str} [{time_str}]",
             )
-        
+
         return Panel(
             current_table,
             title="🤖 Omnimancer Progress",
-            border_style="blue", 
-            padding=(0, 1)
+            border_style="blue",
+            padding=(0, 1),
         )
-    
+
     def _update_display(self) -> None:
         """Update the live display."""
         if self.live_display:
             self.live_display.update(self._create_layout())
-    
+
     def enable(self) -> None:
         """Enable progress tracking."""
         self.enabled = True
-    
+
     def disable(self) -> None:
         """Disable progress tracking."""
         self.enabled = False
         self.stop_live_display()
-    
+
     def show_simple_status(self, message: str) -> None:
         """Show a simple status message without full progress tracking."""
         if not self.enabled:
             return
-            
+
         self.console.print(f"🤖 {message}", style="blue")
 
 
@@ -277,16 +287,24 @@ def set_progress_indicator(indicator: ProgressIndicator) -> None:
     _global_progress_indicator = indicator
 
 
-def start_operation(operation_id: str, operation_type: OperationType, 
-                   description: str, details: Optional[str] = None) -> None:
+def start_operation(
+    operation_id: str,
+    operation_type: OperationType,
+    description: str,
+    details: Optional[str] = None,
+) -> None:
     """Global function to start tracking an operation."""
     indicator = get_progress_indicator()
     if indicator:
         indicator.start_operation(operation_id, operation_type, description, details)
 
 
-def update_operation(operation_id: str, progress: Optional[float] = None,
-                    details: Optional[str] = None, status: Optional[str] = None) -> None:
+def update_operation(
+    operation_id: str,
+    progress: Optional[float] = None,
+    details: Optional[str] = None,
+    status: Optional[str] = None,
+) -> None:
     """Global function to update an operation."""
     indicator = get_progress_indicator()
     if indicator:
