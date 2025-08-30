@@ -2,27 +2,26 @@
 Tests for Agent Persona system.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import patch
 
+import pytest
+
+from omnimancer.core.agent.config import ProviderConfig, ProviderType
 from omnimancer.core.agent.persona import (
-    AgentPersona,
+    CodingPersona,
+    CreativePersona,
+    GeneralPersona,
+    PerformancePersona,
     PersonaCapability,
     PersonaCategory,
-    PersonaStatus,
     PersonaConfiguration,
-    PersonaMetadata,
     PersonaManager,
-    CodingPersona,
+    PersonaMetadata,
+    PersonaStatus,
     ResearchPersona,
-    CreativePersona,
-    PerformancePersona,
-    GeneralPersona,
     get_persona_manager,
     set_persona_manager,
 )
-from omnimancer.core.agent.config import ProviderType, ProviderConfig
 from omnimancer.core.models import ConfigTemplateManager
 
 
@@ -46,9 +45,7 @@ class TestPersonaConfiguration:
     def test_get_template(self):
         """Test getting template from configuration."""
         template_manager = ConfigTemplateManager()
-        config = PersonaConfiguration(
-            template_id="coding", primary_provider="claude"
-        )
+        config = PersonaConfiguration(template_id="coding", primary_provider="claude")
 
         template = config.get_template(template_manager)
         assert template is not None
@@ -74,21 +71,15 @@ class TestPersonaConfiguration:
             template_id="coding", primary_provider="invalid_provider"
         )
 
-        with pytest.raises(
-            ValueError, match="Provider invalid_provider not found"
-        ):
+        with pytest.raises(ValueError, match="Provider invalid_provider not found"):
             config.get_primary_provider_config(template_manager)
 
     def test_to_provider_config(self):
         """Test converting to ProviderConfig."""
         template_manager = ConfigTemplateManager()
-        config = PersonaConfiguration(
-            template_id="coding", primary_provider="claude"
-        )
+        config = PersonaConfiguration(template_id="coding", primary_provider="claude")
 
-        provider_config = config.to_provider_config(
-            "test_persona", template_manager
-        )
+        provider_config = config.to_provider_config("test_persona", template_manager)
         assert isinstance(provider_config, ProviderConfig)
         assert provider_config.provider_type == ProviderType.ANTHROPIC
         assert provider_config.enabled is True
@@ -293,15 +284,11 @@ class TestPersonaManager:
         """Test filtering personas by category."""
         manager = PersonaManager()
 
-        dev_personas = manager.get_personas_by_category(
-            PersonaCategory.DEVELOPMENT
-        )
+        dev_personas = manager.get_personas_by_category(PersonaCategory.DEVELOPMENT)
         assert len(dev_personas) == 1
         assert dev_personas[0].id == "coding"
 
-        research_personas = manager.get_personas_by_category(
-            PersonaCategory.RESEARCH
-        )
+        research_personas = manager.get_personas_by_category(PersonaCategory.RESEARCH)
         assert len(research_personas) == 1
         assert research_personas[0].id == "research"
 
@@ -381,16 +368,12 @@ class TestPersonaManager:
         assert any(p.id == "research" for p in research_recs)
 
         # Test creative context
-        creative_recs = manager.get_persona_recommendations(
-            "Help me write a story"
-        )
+        creative_recs = manager.get_persona_recommendations("Help me write a story")
         assert len(creative_recs) >= 1
         assert any(p.id == "creative" for p in creative_recs)
 
         # Test performance context
-        performance_recs = manager.get_persona_recommendations(
-            "I need fast responses"
-        )
+        performance_recs = manager.get_persona_recommendations("I need fast responses")
         assert len(performance_recs) >= 1
         assert any(p.id == "performance" for p in performance_recs)
 
@@ -453,9 +436,7 @@ class TestPersonaManager:
 
         # Should have received persona_activated event
         assert len(events_received) > 0
-        assert any(
-            event[0] == "persona_activated" for event in events_received
-        )
+        assert any(event[0] == "persona_activated" for event in events_received)
 
         # Remove listener
         manager.remove_event_listener(test_listener)

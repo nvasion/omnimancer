@@ -5,24 +5,25 @@ This module tests the AzureProvider class functionality including
 message sending, Azure-specific configuration, and error handling.
 """
 
-import pytest
-import httpx
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from omnimancer.providers.azure import AzureProvider
+import httpx
+import pytest
+
 from omnimancer.core.models import (
     ChatContext,
     ChatMessage,
-    MessageRole,
     EnhancedModelInfo,
+    MessageRole,
 )
+from omnimancer.providers.azure import AzureProvider
 from omnimancer.utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
+    RateLimitError,
 )
 
 
@@ -102,10 +103,7 @@ class TestAzureProviderInitialization:
         """Test provider initialization with full Azure configuration."""
         assert azure_provider.api_key == "test-azure-key"
         assert azure_provider.model == "gpt-4"
-        assert (
-            azure_provider.azure_endpoint
-            == "https://test-resource.openai.azure.com"
-        )
+        assert azure_provider.azure_endpoint == "https://test-resource.openai.azure.com"
         assert azure_provider.azure_deployment == "gpt-4-deployment"
         assert azure_provider.api_version == "2024-02-15-preview"
         assert azure_provider.max_tokens == 4096
@@ -172,9 +170,7 @@ class TestAzureProviderMessageSending:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [
-                {"message": {"role": "assistant", "content": "Test response"}}
-            ],
+            "choices": [{"message": {"role": "assistant", "content": "Test response"}}],
             "usage": {"total_tokens": 10},
         }
 
@@ -182,9 +178,7 @@ class TestAzureProviderMessageSending:
             mock_post = AsyncMock(return_value=mock_response)
             mock_client.return_value.__aenter__.return_value.post = mock_post
 
-            await azure_provider.send_message(
-                "Test message", sample_chat_context
-            )
+            await azure_provider.send_message("Test message", sample_chat_context)
 
             # Check that the correct Azure URL was called
             call_args = mock_post.call_args
@@ -195,16 +189,12 @@ class TestAzureProviderMessageSending:
             assert call_args[0][0] == expected_url
 
     @pytest.mark.asyncio
-    async def test_send_message_headers(
-        self, azure_provider, sample_chat_context
-    ):
+    async def test_send_message_headers(self, azure_provider, sample_chat_context):
         """Test that Azure-specific headers are set correctly."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [
-                {"message": {"role": "assistant", "content": "Test response"}}
-            ],
+            "choices": [{"message": {"role": "assistant", "content": "Test response"}}],
             "usage": {"total_tokens": 10},
         }
 
@@ -212,9 +202,7 @@ class TestAzureProviderMessageSending:
             mock_post = AsyncMock(return_value=mock_response)
             mock_client.return_value.__aenter__.return_value.post = mock_post
 
-            await azure_provider.send_message(
-                "Test message", sample_chat_context
-            )
+            await azure_provider.send_message("Test message", sample_chat_context)
 
             # Check that Azure-specific headers are set
             call_args = mock_post.call_args
@@ -232,9 +220,7 @@ class TestAzureProviderMessageSending:
             AzureProvider(api_key="test-key", model="gpt-4")
 
     @pytest.mark.asyncio
-    async def test_send_message_timeout(
-        self, azure_provider, sample_chat_context
-    ):
+    async def test_send_message_timeout(self, azure_provider, sample_chat_context):
         """Test message sending with timeout."""
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
@@ -244,9 +230,7 @@ class TestAzureProviderMessageSending:
             with pytest.raises(
                 NetworkError, match="Request to Azure OpenAI API timed out"
             ):
-                await azure_provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await azure_provider.send_message("Test message", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_network_error(
@@ -259,9 +243,7 @@ class TestAzureProviderMessageSending:
             )
 
             with pytest.raises(NetworkError, match="Network error"):
-                await azure_provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await azure_provider.send_message("Test message", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_authentication_error(
@@ -279,9 +261,7 @@ class TestAzureProviderMessageSending:
             with pytest.raises(
                 AuthenticationError, match="Invalid Azure OpenAI API key"
             ):
-                await azure_provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await azure_provider.send_message("Test message", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_rate_limit_error(
@@ -299,9 +279,7 @@ class TestAzureProviderMessageSending:
             with pytest.raises(
                 RateLimitError, match="Azure OpenAI API rate limit exceeded"
             ):
-                await azure_provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await azure_provider.send_message("Test message", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_deployment_not_found(
@@ -319,9 +297,7 @@ class TestAzureProviderMessageSending:
             with pytest.raises(
                 ModelNotFoundError, match="Azure deployment .* not found"
             ):
-                await azure_provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await azure_provider.send_message("Test message", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_empty_response(
@@ -340,9 +316,7 @@ class TestAzureProviderMessageSending:
             with pytest.raises(
                 ProviderError, match="Empty response from Azure OpenAI API"
             ):
-                await azure_provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await azure_provider.send_message("Test message", sample_chat_context)
 
 
 class TestAzureProviderCredentialValidation:
@@ -420,9 +394,7 @@ class TestAzureProviderModelInfo:
         model_info = azure_provider_minimal.get_model_info()
 
         assert model_info.name == "gpt-35-turbo"
-        assert (
-            model_info.description == "GPT-3.5 Turbo via Azure OpenAI Service"
-        )
+        assert model_info.description == "GPT-3.5 Turbo via Azure OpenAI Service"
         assert model_info.max_tokens == 4096
         assert model_info.cost_per_million_input == 0.5
         assert model_info.cost_per_million_output == 1.5
@@ -497,13 +469,9 @@ class TestAzureProviderCapabilities:
 class TestAzureProviderMessagePreparation:
     """Test message preparation for API requests."""
 
-    def test_prepare_messages_with_context(
-        self, azure_provider, sample_chat_context
-    ):
+    def test_prepare_messages_with_context(self, azure_provider, sample_chat_context):
         """Test preparing messages with conversation context."""
-        messages = azure_provider._prepare_messages(
-            "New message", sample_chat_context
-        )
+        messages = azure_provider._prepare_messages("New message", sample_chat_context)
 
         assert len(messages) == 3  # 2 from context + 1 new
 
@@ -536,9 +504,7 @@ class TestAzureProviderMessagePreparation:
 class TestAzureProviderResponseHandling:
     """Test response handling functionality."""
 
-    def test_handle_response_success(
-        self, azure_provider, mock_successful_response
-    ):
+    def test_handle_response_success(self, azure_provider, mock_successful_response):
         """Test handling successful response."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -574,9 +540,7 @@ class TestAzureProviderResponseHandling:
         mock_response.status_code = 500
         mock_response.json.side_effect = ValueError("Invalid JSON")
 
-        with pytest.raises(
-            ProviderError, match="Azure OpenAI API error: HTTP 500"
-        ):
+        with pytest.raises(ProviderError, match="Azure OpenAI API error: HTTP 500"):
             azure_provider._handle_response(mock_response)
 
 

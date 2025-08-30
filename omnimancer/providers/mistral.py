@@ -5,23 +5,24 @@ This module provides the Mistral AI provider implementation using Mistral's API
 with support for safety settings and advanced parameters.
 """
 
-import httpx
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+import httpx
 
 from ..core.models import (
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
-    ToolDefinition,
     ToolCall,
+    ToolDefinition,
 )
 from ..utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
+    RateLimitError,
 )
 from .base import BaseProvider
 
@@ -51,13 +52,9 @@ class MistralProvider(BaseProvider):
         self.top_p = kwargs.get("top_p", 1.0)
         self.safe_prompt = kwargs.get("safe_prompt", False)
         self.random_seed = kwargs.get("random_seed", None)
-        self.response_format = kwargs.get(
-            "response_format", None
-        )  # For JSON mode
+        self.response_format = kwargs.get("response_format", None)  # For JSON mode
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to Mistral API.
 
@@ -302,17 +299,13 @@ class MistralProvider(BaseProvider):
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get(
-                    "message", "Unknown error"
-                )
+                error_msg = error_data.get("error", {}).get("message", "Unknown error")
             except:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Mistral API error: {error_msg}")
 
-    def _handle_response_with_tools(
-        self, response: httpx.Response
-    ) -> ChatResponse:
+    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
         """
         Handle Mistral API response with tool calls.
 

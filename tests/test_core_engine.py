@@ -2,26 +2,24 @@
 Tests for the core engine module.
 """
 
-import pytest
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
-from omnimancer.core.engine import CoreEngine
-from omnimancer.core.config_manager import ConfigManager
+import pytest
+
 from omnimancer.core.chat_manager import ChatManager
-from omnimancer.core.conversation_manager import ConversationManager
-from omnimancer.core.health_monitor import HealthMonitor
-from omnimancer.core.provider_initializer import ProviderInitializer
+from omnimancer.core.config_manager import ConfigManager
+from omnimancer.core.engine import CoreEngine
 from omnimancer.core.models import (
     ChatResponse,
-    ModelInfo,
     EnhancedModelInfo,
-    ChatContext,
+    ModelInfo,
     ProviderConfig,
 )
+from omnimancer.core.provider_initializer import ProviderInitializer
 from omnimancer.providers.base import BaseProvider
-from omnimancer.utils.errors import ConfigurationError, ProviderError
+from omnimancer.utils.errors import ConfigurationError
 
 
 @pytest.fixture
@@ -32,15 +30,11 @@ def mock_config_manager():
     mock_config.default_provider = "openai"
     mock_config.providers = {
         "openai": ProviderConfig(api_key="sk-test123", model="gpt-4"),
-        "claude": ProviderConfig(
-            api_key="sk-ant-test123", model="claude-3-sonnet"
-        ),
+        "claude": ProviderConfig(api_key="sk-ant-test123", model="claude-3-sonnet"),
     }
     mock_config.storage_path = Path("~/.omnimancer")
     mock.get_config.return_value = mock_config
-    mock.get_custom_models.return_value = (
-        []
-    )  # Return empty list instead of Mock
+    mock.get_custom_models.return_value = []  # Return empty list instead of Mock
     return mock
 
 
@@ -132,11 +126,10 @@ def mock_providers(mock_provider):
 @pytest.fixture
 def core_engine(mock_config_manager):
     """Create CoreEngine instance for testing."""
-    with patch(
-        "omnimancer.core.engine.HealthMonitor"
-    ) as mock_health_monitor_class, patch(
-        "omnimancer.core.engine.ConversationManager"
-    ) as mock_conv_manager_class:
+    with (
+        patch("omnimancer.core.engine.HealthMonitor") as mock_health_monitor_class,
+        patch("omnimancer.core.engine.ConversationManager") as mock_conv_manager_class,
+    ):
 
         # Mock the HealthMonitor class to return a mock instance
         mock_health_monitor = Mock()
@@ -160,11 +153,12 @@ class TestCoreEngineInitialization:
 
     def test_init(self, mock_config_manager):
         """Test CoreEngine initialization."""
-        with patch(
-            "omnimancer.core.engine.HealthMonitor"
-        ) as mock_health_monitor_class, patch(
-            "omnimancer.core.engine.ConversationManager"
-        ) as mock_conv_manager_class:
+        with (
+            patch("omnimancer.core.engine.HealthMonitor"),
+            patch(
+                "omnimancer.core.engine.ConversationManager"
+            ),
+        ):
 
             engine = CoreEngine(mock_config_manager)
 
@@ -177,37 +171,32 @@ class TestCoreEngineInitialization:
             assert engine.current_provider is None
             assert engine._initialized is False
 
-    def test_init_with_custom_storage_path(
-        self, mock_config_manager, tmp_path
-    ):
+    def test_init_with_custom_storage_path(self, mock_config_manager, tmp_path):
         """Test initialization with custom storage path."""
         mock_config = mock_config_manager.get_config.return_value
         # Use tmp_path instead of a root directory that requires permissions
         mock_config.storage_path = tmp_path / "custom_storage"
 
-        with patch(
-            "omnimancer.core.engine.HealthMonitor"
-        ) as mock_health_monitor_class, patch(
-            "omnimancer.core.engine.ConversationManager"
-        ) as mock_conv_manager_class:
+        with (
+            patch("omnimancer.core.engine.HealthMonitor"),
+            patch(
+                "omnimancer.core.engine.ConversationManager"
+            ) as mock_conv_manager_class,
+        ):
 
             engine = CoreEngine(mock_config_manager)
 
             # Verify conversation manager was initialized with custom path
             assert engine.conversation_manager is not None
             # Verify ConversationManager was called with the custom path
-            mock_conv_manager_class.assert_called_once_with(
-                tmp_path / "custom_storage"
-            )
+            mock_conv_manager_class.assert_called_once_with(tmp_path / "custom_storage")
 
 
 class TestProviderInitialization:
     """Test provider initialization functionality."""
 
     @pytest.mark.asyncio
-    async def test_initialize_providers_success(
-        self, core_engine, mock_providers
-    ):
+    async def test_initialize_providers_success(self, core_engine, mock_providers):
         """Test successful provider initialization."""
         with patch.object(
             core_engine.provider_initializer,
@@ -296,9 +285,7 @@ class TestModelSwitching:
         assert core_engine.current_provider.model == "claude-3-haiku"
 
     @pytest.mark.asyncio
-    async def test_switch_model_provider_only(
-        self, core_engine, mock_providers
-    ):
+    async def test_switch_model_provider_only(self, core_engine, mock_providers):
         """Test switching provider without specifying model."""
         core_engine.providers = mock_providers
         core_engine.current_provider = mock_providers["openai"]
@@ -323,9 +310,7 @@ class TestModelSwitching:
         assert core_engine.current_provider is None
 
     @pytest.mark.asyncio
-    async def test_switch_model_invalid_model(
-        self, core_engine, mock_providers
-    ):
+    async def test_switch_model_invalid_model(self, core_engine, mock_providers):
         """Test switching to invalid model."""
         core_engine.providers = mock_providers
 
@@ -354,13 +339,15 @@ class TestMessageSending:
         """Test successful message sending."""
         core_engine.current_provider = mock_provider
 
-        with patch.object(
-            core_engine.chat_manager, "get_current_context"
-        ) as mock_context, patch.object(
-            core_engine.chat_manager, "add_user_message"
-        ) as mock_add_user, patch.object(
-            core_engine.chat_manager, "add_assistant_message"
-        ) as mock_add_assistant:
+        with (
+            patch.object(
+                core_engine.chat_manager, "get_current_context"
+            ) as mock_context,
+            patch.object(core_engine.chat_manager, "add_user_message") as mock_add_user,
+            patch.object(
+                core_engine.chat_manager, "add_assistant_message"
+            ) as mock_add_assistant,
+        ):
 
             mock_context.return_value = Mock()
 
@@ -381,9 +368,7 @@ class TestMessageSending:
         assert "No provider available" in response.error
 
     @pytest.mark.asyncio
-    async def test_send_message_provider_failure(
-        self, core_engine, mock_provider
-    ):
+    async def test_send_message_provider_failure(self, core_engine, mock_provider):
         """Test message sending with provider failure."""
         core_engine.current_provider = mock_provider
         mock_provider.send_message.side_effect = Exception("Provider error")
@@ -399,24 +384,24 @@ class TestMessageSending:
             assert "Failed to send message" in response.error
 
     @pytest.mark.asyncio
-    async def test_send_message_unsuccessful_response(
-        self, core_engine, mock_provider
-    ):
+    async def test_send_message_unsuccessful_response(self, core_engine, mock_provider):
         """Test handling unsuccessful provider response."""
         core_engine.current_provider = mock_provider
         mock_provider.send_message.return_value = ChatResponse(
             content="", model_used="gpt-4", tokens_used=0, error="API error"
         )
 
-        with patch.object(
-            core_engine.chat_manager,
-            "get_current_context",
-            return_value=Mock(),
-        ), patch.object(
-            core_engine.chat_manager, "add_user_message"
-        ) as mock_add_user, patch.object(
-            core_engine.chat_manager, "add_assistant_message"
-        ) as mock_add_assistant:
+        with (
+            patch.object(
+                core_engine.chat_manager,
+                "get_current_context",
+                return_value=Mock(),
+            ),
+            patch.object(core_engine.chat_manager, "add_user_message") as mock_add_user,
+            patch.object(
+                core_engine.chat_manager, "add_assistant_message"
+            ) as mock_add_assistant,
+        ):
 
             response = await core_engine.send_message("Hello")
 
@@ -441,9 +426,7 @@ class TestModelInformation:
         assert "gpt-4" in model_names
         assert "claude-3-sonnet" in model_names
 
-    def test_get_available_models_with_enhanced_info(
-        self, core_engine, mock_providers
-    ):
+    def test_get_available_models_with_enhanced_info(self, core_engine, mock_providers):
         """Test getting models with enhanced model info."""
         # Mock one provider to return EnhancedModelInfo
         enhanced_model = EnhancedModelInfo(
@@ -455,9 +438,7 @@ class TestModelInformation:
             cost_per_million_output=30.0,
             swe_score=85.5,
         )
-        mock_providers["openai"].get_available_models.return_value = [
-            enhanced_model
-        ]
+        mock_providers["openai"].get_available_models.return_value = [enhanced_model]
         core_engine.providers = mock_providers
 
         models = core_engine.get_available_models()
@@ -466,9 +447,7 @@ class TestModelInformation:
         assert len(models) >= 1
         assert any(m.name == "gpt-4" for m in models)
 
-    def test_get_available_models_provider_error(
-        self, core_engine, mock_providers
-    ):
+    def test_get_available_models_provider_error(self, core_engine, mock_providers):
         """Test handling provider errors when getting models."""
         mock_providers["openai"].get_available_models.side_effect = Exception(
             "Provider error"
@@ -499,9 +478,7 @@ class TestModelInformation:
         assert "provider" in openai_model
         assert "supports_tools" in openai_model
 
-    def test_get_all_models_with_enhanced_info(
-        self, core_engine, mock_providers
-    ):
+    def test_get_all_models_with_enhanced_info(self, core_engine, mock_providers):
         """Test getting all models with enhanced information."""
         enhanced_model = EnhancedModelInfo(
             name="gpt-4",
@@ -512,9 +489,7 @@ class TestModelInformation:
             cost_per_million_output=30.0,
             swe_score=85.5,
         )
-        mock_providers["openai"].get_available_models.return_value = [
-            enhanced_model
-        ]
+        mock_providers["openai"].get_available_models.return_value = [enhanced_model]
         core_engine.providers = mock_providers
 
         result = core_engine.get_all_models()
@@ -543,9 +518,7 @@ class TestModelInformation:
     def test_get_current_model_info_error(self, core_engine, mock_provider):
         """Test handling error when getting model info."""
         core_engine.current_provider = mock_provider
-        mock_provider.get_model_info.side_effect = Exception(
-            "Model info error"
-        )
+        mock_provider.get_model_info.side_effect = Exception("Model info error")
 
         info = core_engine.get_current_model_info()
         assert info is None
@@ -578,9 +551,7 @@ class TestConfigurationInfo:
 
     def test_get_current_config_error(self, core_engine):
         """Test handling error when getting configuration."""
-        core_engine.config_manager.get_config.side_effect = Exception(
-            "Config error"
-        )
+        core_engine.config_manager.get_config.side_effect = Exception("Config error")
 
         config = core_engine.get_current_config()
 
@@ -621,9 +592,7 @@ class TestProviderValidation:
     """Test provider validation functionality."""
 
     @pytest.mark.asyncio
-    async def test_validate_current_provider_success(
-        self, core_engine, mock_provider
-    ):
+    async def test_validate_current_provider_success(self, core_engine, mock_provider):
         """Test successful provider validation."""
         core_engine.current_provider = mock_provider
 
@@ -639,9 +608,7 @@ class TestProviderValidation:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_validate_current_provider_failure(
-        self, core_engine, mock_provider
-    ):
+    async def test_validate_current_provider_failure(self, core_engine, mock_provider):
         """Test provider validation failure."""
         core_engine.current_provider = mock_provider
         mock_provider.validate_credentials.return_value = False
@@ -656,9 +623,7 @@ class TestProviderValidation:
     ):
         """Test provider validation with exception."""
         core_engine.current_provider = mock_provider
-        mock_provider.validate_credentials.side_effect = Exception(
-            "Validation error"
-        )
+        mock_provider.validate_credentials.side_effect = Exception("Validation error")
 
         result = await core_engine.validate_current_provider()
 
@@ -739,13 +704,16 @@ class TestConversationManagement:
 
     def test_save_conversation(self, core_engine):
         """Test saving conversation."""
-        with patch.object(
-            core_engine.chat_manager, "get_current_context"
-        ) as mock_context, patch.object(
-            core_engine.conversation_manager,
-            "save_conversation",
-            return_value="conversation_123.json",
-        ) as mock_save:
+        with (
+            patch.object(
+                core_engine.chat_manager, "get_current_context"
+            ) as mock_context,
+            patch.object(
+                core_engine.conversation_manager,
+                "save_conversation",
+                return_value="conversation_123.json",
+            ) as mock_save,
+        ):
 
             mock_context.return_value = Mock()
 
@@ -874,9 +842,7 @@ class TestEdgeCases:
     """Test edge cases and error conditions."""
 
     @pytest.mark.asyncio
-    async def test_multiple_operations_without_initialization(
-        self, core_engine
-    ):
+    async def test_multiple_operations_without_initialization(self, core_engine):
         """Test operations before provider initialization."""
         # Test various operations without initializing providers
 
@@ -895,9 +861,7 @@ class TestEdgeCases:
 
     def test_config_manager_error_handling(self, core_engine):
         """Test handling of config manager errors."""
-        core_engine.config_manager.get_config.side_effect = Exception(
-            "Config error"
-        )
+        core_engine.config_manager.get_config.side_effect = Exception("Config error")
 
         # Should handle config errors gracefully
         config = core_engine.get_current_config()

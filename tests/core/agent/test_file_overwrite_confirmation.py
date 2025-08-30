@@ -5,13 +5,13 @@ This module tests the user confirmation prompts when files already exist,
 including the UI components and callback functions.
 """
 
-import pytest
 import asyncio
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
-from typing import Dict, Any
+from unittest.mock import Mock, patch
+
+import pytest
 
 from omnimancer.core.agent.read_before_write_ui import (
     ReadBeforeWriteUI,
@@ -68,13 +68,16 @@ class TestFileOverwriteConfirmation:
         }
 
         # Mock user input to overwrite
-        with patch(
-            "omnimancer.core.agent.read_before_write_ui.Prompt.ask",
-            return_value="1",
-        ) as mock_prompt, patch(
-            "omnimancer.core.agent.read_before_write_ui.Confirm.ask",
-            return_value=True,
-        ) as mock_confirm:
+        with (
+            patch(
+                "omnimancer.core.agent.read_before_write_ui.Prompt.ask",
+                return_value="1",
+            ) as mock_prompt,
+            patch(
+                "omnimancer.core.agent.read_before_write_ui.Confirm.ask",
+                return_value=True,
+            ) as mock_confirm,
+        ):
 
             result = await ui.confirm_file_overwrite(file_info)
 
@@ -153,7 +156,7 @@ class TestFileOverwriteConfirmation:
         with patch(
             "omnimancer.core.agent.read_before_write_ui.Prompt.ask",
             return_value="3",
-        ) as mock_prompt:
+        ):
 
             result = await ui.confirm_file_overwrite(file_info)
 
@@ -249,12 +252,15 @@ class TestFileOverwriteConfirmation:
         }
 
         # Mock user input: first tries overwrite but hesitates, then chooses backup
-        with patch(
-            "omnimancer.core.agent.read_before_write_ui.Prompt.ask"
-        ) as mock_prompt, patch(
-            "omnimancer.core.agent.read_before_write_ui.Confirm.ask",
-            return_value=False,
-        ) as mock_confirm:
+        with (
+            patch(
+                "omnimancer.core.agent.read_before_write_ui.Prompt.ask"
+            ) as mock_prompt,
+            patch(
+                "omnimancer.core.agent.read_before_write_ui.Confirm.ask",
+                return_value=False,
+            ) as mock_confirm,
+        ):
 
             # User chooses overwrite, but then says no to confirmation, then chooses backup
             mock_prompt.side_effect = ["1", "2"]
@@ -267,9 +273,7 @@ class TestFileOverwriteConfirmation:
 
             # Should have prompted for overwrite, then backup
             assert mock_prompt.call_count == 2
-            assert (
-                mock_confirm.call_count == 1
-            )  # Asked for overwrite confirmation
+            assert mock_confirm.call_count == 1  # Asked for overwrite confirmation
 
     @pytest.mark.asyncio
     async def test_confirm_file_overwrite_error_handling(self, ui):

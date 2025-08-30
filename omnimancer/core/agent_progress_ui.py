@@ -6,33 +6,32 @@ progress, operation status, and real-time updates.
 """
 
 import asyncio
-import time
-from typing import Dict, List, Optional, Any, Callable
-from datetime import datetime, timedelta
-from dataclasses import dataclass
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Dict, Optional
 
+from rich.align import Align
 from rich.console import Console
+from rich.layout import Layout
+from rich.live import Live
 from rich.panel import Panel
-from rich.table import Table
 from rich.progress import (
-    Progress,
-    TaskID,
     BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskID,
     TextColumn,
     TimeRemainingColumn,
-    SpinnerColumn,
 )
-from rich.live import Live
-from rich.layout import Layout
+from rich.table import Table
 from rich.text import Text
-from rich.align import Align
 
 from .agent_mode_manager import (
+    AgentMode,
     AgentModeManager,
     AgentOperation,
     AgentOperationStatus,
-    AgentMode,
 )
 
 
@@ -140,9 +139,7 @@ class AgentProgressUI:
         )
 
         mode_text = Text(f"Agent Mode: ", style="bold")
-        mode_text.append(
-            status_info["mode"].upper(), style=f"bold {mode_color}"
-        )
+        mode_text.append(status_info["mode"].upper(), style=f"bold {mode_color}")
 
         # Operation counts
         ops = status_info["operations"]
@@ -210,9 +207,7 @@ Batch Approval: {'Enabled' if settings['enable_batch_approval'] else 'Disabled'}
                 "requires_approval": "magenta",
             }.get(status, "white")
 
-            status_text = Text(
-                status.replace("_", " ").title(), style=status_color
-            )
+            status_text = Text(status.replace("_", " ").title(), style=status_color)
 
             # Format duration
             duration = op.get("duration")
@@ -256,9 +251,7 @@ Batch Approval: {'Enabled' if settings['enable_batch_approval'] else 'Disabled'}
         active_ops = list(self.agent_manager.active_operations.values())
 
         if not active_ops:
-            content = Text(
-                "No operations currently running", style="dim italic"
-            )
+            content = Text("No operations currently running", style="dim italic")
             return Panel(
                 Align.center(content),
                 title="Active Operations",
@@ -270,11 +263,7 @@ Batch Approval: {'Enabled' if settings['enable_batch_approval'] else 'Disabled'}
         progress_text = []
         for op in active_ops:
             # Calculate elapsed time
-            elapsed = (
-                datetime.now() - op.started_at
-                if op.started_at
-                else timedelta(0)
-            )
+            elapsed = datetime.now() - op.started_at if op.started_at else timedelta(0)
             elapsed_str = f"{elapsed.total_seconds():.1f}s"
 
             # Get progress if available
@@ -286,9 +275,7 @@ Batch Approval: {'Enabled' if settings['enable_batch_approval'] else 'Disabled'}
                 progress_str = "[---]"
                 status = op.status.value.replace("_", " ").title()
 
-            line = (
-                f"• {op.operation.type.value}: {op.operation.description[:30]}"
-            )
+            line = f"• {op.operation.type.value}: {op.operation.description[:30]}"
             if len(op.operation.description) > 30:
                 line += "..."
             line += f" {progress_str} ({elapsed_str}) - {status}"
@@ -318,9 +305,7 @@ Batch Approval: {'Enabled' if settings['enable_batch_approval'] else 'Disabled'}
         ]
 
         if not approval_ops:
-            content = Text(
-                "No operations waiting for approval", style="dim italic"
-            )
+            content = Text("No operations waiting for approval", style="dim italic")
             return Panel(
                 Align.center(content),
                 title="Approval Queue",
@@ -345,9 +330,7 @@ Batch Approval: {'Enabled' if settings['enable_batch_approval'] else 'Disabled'}
 
             # Create colored text
             text = Text(line)
-            text.stylize(
-                risk_color, len(line) - len(f"[Risk: {risk}]"), len(line)
-            )
+            text.stylize(risk_color, len(line) - len(f"[Risk: {risk}]"), len(line))
             approval_text.append(text)
 
         if len(approval_ops) > 5:
@@ -425,9 +408,7 @@ Batch Approval: {'Enabled' if settings['enable_batch_approval'] else 'Disabled'}
         # Update Rich progress bar if exists
         if operation_id in self.operation_task_ids:
             task_id = self.operation_task_ids[operation_id]
-            self.progress.update(
-                task_id, completed=progress, description=status_text
-            )
+            self.progress.update(task_id, completed=progress, description=status_text)
 
     def _create_status_layout(self) -> Layout:
         """Create the main status layout for live display."""
@@ -476,9 +457,7 @@ Batch Approval: {'Enabled' if settings['enable_batch_approval'] else 'Disabled'}
             if operation.id in self.operation_progress:
                 op_progress = self.operation_progress[operation.id]
                 op_progress.progress = (
-                    100.0
-                    if operation.status == AgentOperationStatus.COMPLETED
-                    else 0.0
+                    100.0 if operation.status == AgentOperationStatus.COMPLETED else 0.0
                 )
                 op_progress.status_text = operation.status.value.replace(
                     "_", " "
@@ -497,9 +476,7 @@ Batch Approval: {'Enabled' if settings['enable_batch_approval'] else 'Disabled'}
             # Stop monitoring
             self.stop_monitoring()
 
-    async def _cleanup_operation_progress(
-        self, operation_id: str, delay: float = 5.0
-    ):
+    async def _cleanup_operation_progress(self, operation_id: str, delay: float = 5.0):
         """Clean up operation progress tracking after delay."""
         await asyncio.sleep(delay)
 

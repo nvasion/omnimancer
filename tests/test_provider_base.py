@@ -25,11 +25,12 @@ Usage Example:
     message sending, error handling, and credential validation.
 """
 
-import pytest
-import httpx
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
 from abc import ABC, abstractmethod
+from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import httpx
+import pytest
 
 from omnimancer.core.models import (
     ChatContext,
@@ -38,11 +39,10 @@ from omnimancer.core.models import (
     ModelInfo,
 )
 from omnimancer.utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    RateLimitError,
 )
 
 
@@ -171,9 +171,7 @@ class ProviderTestBase(ABC):
         with patch(
             "httpx.AsyncClient.post", return_value=mock_successful_response
         ) as mock_post:
-            result = await provider.send_message(
-                "Test message", sample_chat_context
-            )
+            result = await provider.send_message("Test message", sample_chat_context)
 
             assert result is not None
             assert isinstance(result, str)
@@ -186,13 +184,9 @@ class ProviderTestBase(ABC):
         """Test handling of authentication errors."""
         provider = self.get_provider_instance()
 
-        with patch(
-            "httpx.AsyncClient.post", return_value=mock_auth_error_response
-        ):
+        with patch("httpx.AsyncClient.post", return_value=mock_auth_error_response):
             with pytest.raises(AuthenticationError):
-                await provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await provider.send_message("Test message", sample_chat_context)
 
     async def test_send_message_rate_limit_error(
         self, sample_chat_context, mock_rate_limit_response
@@ -200,13 +194,9 @@ class ProviderTestBase(ABC):
         """Test handling of rate limit errors."""
         provider = self.get_provider_instance()
 
-        with patch(
-            "httpx.AsyncClient.post", return_value=mock_rate_limit_response
-        ):
+        with patch("httpx.AsyncClient.post", return_value=mock_rate_limit_response):
             with pytest.raises(RateLimitError):
-                await provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await provider.send_message("Test message", sample_chat_context)
 
     async def test_send_message_model_not_found(
         self, sample_chat_context, mock_model_not_found_response
@@ -219,9 +209,7 @@ class ProviderTestBase(ABC):
             return_value=mock_model_not_found_response,
         ):
             with pytest.raises(ModelNotFoundError):
-                await provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await provider.send_message("Test message", sample_chat_context)
 
     async def test_send_message_network_error(self, sample_chat_context):
         """Test handling of network errors."""
@@ -232,9 +220,7 @@ class ProviderTestBase(ABC):
             side_effect=httpx.ConnectError("Connection failed"),
         ):
             with pytest.raises(NetworkError):
-                await provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await provider.send_message("Test message", sample_chat_context)
 
     async def test_send_message_timeout(self, sample_chat_context):
         """Test handling of request timeouts."""
@@ -245,31 +231,21 @@ class ProviderTestBase(ABC):
             side_effect=httpx.TimeoutException("Request timeout"),
         ):
             with pytest.raises(NetworkError):
-                await provider.send_message(
-                    "Test message", sample_chat_context
-                )
+                await provider.send_message("Test message", sample_chat_context)
 
-    async def test_validate_credentials_success(
-        self, mock_successful_response
-    ):
+    async def test_validate_credentials_success(self, mock_successful_response):
         """Test successful credential validation."""
         provider = self.get_provider_instance()
 
-        with patch(
-            "httpx.AsyncClient.post", return_value=mock_successful_response
-        ):
+        with patch("httpx.AsyncClient.post", return_value=mock_successful_response):
             result = await provider.validate_credentials()
             assert result is True
 
-    async def test_validate_credentials_failure(
-        self, mock_auth_error_response
-    ):
+    async def test_validate_credentials_failure(self, mock_auth_error_response):
         """Test credential validation failure."""
         provider = self.get_provider_instance()
 
-        with patch(
-            "httpx.AsyncClient.post", return_value=mock_auth_error_response
-        ):
+        with patch("httpx.AsyncClient.post", return_value=mock_auth_error_response):
             result = await provider.validate_credentials()
             assert result is False
 

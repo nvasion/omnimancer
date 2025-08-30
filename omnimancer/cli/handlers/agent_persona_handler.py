@@ -5,28 +5,20 @@ This module provides the command handling logic for managing agent personas
 through the CLI interface.
 """
 
-import asyncio
-from typing import Optional, List, Dict, Any
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
-from rich.columns import Columns
-from rich.box import ROUNDED
-from rich import print as rprint
+from typing import Optional
 
-from ...core.agent.persona import (
-    PersonaManager,
-    AgentPersona,
-    PersonaStatus,
-    PersonaCategory,
-    get_persona_manager,
-)
+from rich.box import ROUNDED
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
 from ...core.agent.agent_switcher import (
-    AgentSwitcher,
-    SessionState,
     SwitchState,
     get_agent_switcher,
+)
+from ...core.agent.persona import (
+    PersonaStatus,
+    get_persona_manager,
 )
 from ..commands import Command
 
@@ -284,9 +276,7 @@ class AgentPersonaHandler:
             "",
             f"{persona.description}",
         ]
-        info_sections.append(
-            Panel("\n".join(basic_info), title="Basic Information")
-        )
+        info_sections.append(Panel("\n".join(basic_info), title="Basic Information"))
 
         # Capabilities section
         if persona.capabilities:
@@ -295,9 +285,7 @@ class AgentPersonaHandler:
                 cap_name = cap.value.replace("_", " ").title()
                 cap_list.append(f"• {cap_name}")
 
-            info_sections.append(
-                Panel("\n".join(cap_list), title="Capabilities")
-            )
+            info_sections.append(Panel("\n".join(cap_list), title="Capabilities"))
 
         # Configuration section
         if persona.configuration:
@@ -324,9 +312,7 @@ class AgentPersonaHandler:
                         f"[yellow]Fallback Providers:[/yellow] {str(fallback_list)}"
                     )
 
-            info_sections.append(
-                Panel("\n".join(config_info), title="Configuration")
-            )
+            info_sections.append(Panel("\n".join(config_info), title="Configuration"))
 
         # Metadata section
         if persona.metadata:
@@ -407,9 +393,7 @@ class AgentPersonaHandler:
             status_lines.append(
                 f"  History Items: {len(session_state.conversation_history)}"
             )
-            status_lines.append(
-                f"  Active Tools: {len(session_state.active_tools)}"
-            )
+            status_lines.append(f"  Active Tools: {len(session_state.active_tools)}")
             status_lines.append(
                 f"  Active Operations: {len(session_state.active_operations)}"
             )
@@ -461,13 +445,9 @@ class AgentPersonaHandler:
         table.add_column("Reason", style="dim")
         table.add_column("Status", justify="center")
 
-        for idx, context in enumerate(
-            history[-10:], 1
-        ):  # Show last 10 switches
+        for idx, context in enumerate(history[-10:], 1):  # Show last 10 switches
             from_name = (
-                context.from_persona.name
-                if context.from_persona
-                else "[dim]None[/dim]"
+                context.from_persona.name if context.from_persona else "[dim]None[/dim]"
             )
             to_name = context.to_persona.name
             time_str = context.timestamp.strftime("%H:%M:%S")
@@ -590,18 +570,14 @@ class AgentPersonaHandler:
         """Show error message."""
         self.console.print(f"[red]✗ {message}[/red]")
 
-    async def handle_recommend_persona(
-        self, user_query: Optional[str] = None
-    ) -> None:
+    async def handle_recommend_persona(self, user_query: Optional[str] = None) -> None:
         """
         Recommend a persona based on user query or task.
 
         Args:
             user_query: Optional user query to base recommendations on
         """
-        self.console.print(
-            "\n[bold cyan]🎯 Persona Recommendations[/bold cyan]"
-        )
+        self.console.print("\n[bold cyan]🎯 Persona Recommendations[/bold cyan]")
 
         personas = self.persona_manager.get_all_personas()
         if not personas:
@@ -634,9 +610,7 @@ class AgentPersonaHandler:
 
         else:
             # Analyze query and recommend appropriate persona
-            self.console.print(
-                f'[dim]Based on your query: "{user_query}"[/dim]\n'
-            )
+            self.console.print(f'[dim]Based on your query: "{user_query}"[/dim]\n')
 
             query_lower = user_query.lower()
             recommendations = []
@@ -723,9 +697,7 @@ class AgentPersonaHandler:
                         f"[green]✓[/green] [bold]{persona.icon} {persona.name}[/bold]"
                     )
                     self.console.print(f"  {reason}")
-                    self.console.print(
-                        f"  Use: [cyan]/agent use {persona.id}[/cyan]"
-                    )
+                    self.console.print(f"  Use: [cyan]/agent use {persona.id}[/cyan]")
                     self.console.print("")
             else:
                 self.console.print(
@@ -779,10 +751,7 @@ class AgentPersonaHandler:
             )
             file_ops = (
                 "✅"
-                if (
-                    config
-                    and getattr(config, "file_operations_enabled", False)
-                )
+                if (config and getattr(config, "file_operations_enabled", False))
                 else "❌"
             )
 
@@ -877,14 +846,9 @@ class AgentPersonaHandler:
         # Show capabilities preview
         if persona.capabilities:
             caps_text = ", ".join(
-                [
-                    cap.value.replace("_", " ").title()
-                    for cap in persona.capabilities
-                ]
+                [cap.value.replace("_", " ").title() for cap in persona.capabilities]
             )
-            caps_panel = Panel(
-                caps_text, title="Capabilities", border_style="green"
-            )
+            caps_panel = Panel(caps_text, title="Capabilities", border_style="green")
         else:
             caps_panel = Panel(
                 "[dim]No specific capabilities defined[/dim]",
@@ -1003,9 +967,7 @@ class AgentPersonaHandler:
         # Show personas by category
         for category, persona_list in categories.items():
             category_title = f"📂 {category.title()} Personas"
-            self.console.print(
-                f"\n[bold yellow]{category_title}[/bold yellow]"
-            )
+            self.console.print(f"\n[bold yellow]{category_title}[/bold yellow]")
 
             for persona in sorted(persona_list, key=lambda p: p.name):
                 # Create persona card
@@ -1020,13 +982,9 @@ class AgentPersonaHandler:
                 if persona.configuration:
                     if persona.configuration.tools_enabled:
                         features.append("🛠️ Tools enabled")
-                    if getattr(
-                        persona.configuration, "web_search_enabled", False
-                    ):
+                    if getattr(persona.configuration, "web_search_enabled", False):
                         features.append("🌐 Web search")
-                    if getattr(
-                        persona.configuration, "file_operations_enabled", False
-                    ):
+                    if getattr(persona.configuration, "file_operations_enabled", False):
                         features.append("📁 File operations")
 
                 if features:

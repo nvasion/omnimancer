@@ -8,30 +8,25 @@ with proper formatting for action context, impact assessment, and risk scores.
 
 import json
 import logging
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, Optional
 
 from rich.console import Console, Group
 from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TextColumn
+from rich.rule import Rule
+from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
-from rich.syntax import Syntax
-from rich.progress import BarColumn, Progress, TaskID, TextColumn
-from rich.rule import Rule
-from rich.columns import Columns
-from rich.align import Align
 
 from ..core.agent.approval_manager import (
+    BatchApprovalRequest,
     ChangePreview,
     ChangeType,
-    BatchApprovalRequest,
-    PreviewFormat,
 )
 from ..core.security.approval_workflow import (
     ApprovalRequest,
     RiskLevel,
-    ApprovalStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -177,9 +172,7 @@ class CLIApprovalFormatter:
             )
 
             operation_panel = Panel(
-                self._format_single_batch_operation(
-                    mini_request, preview, i + 1
-                ),
+                self._format_single_batch_operation(mini_request, preview, i + 1),
                 title=f"Operation {i + 1}",
                 border_style="dim",
             )
@@ -282,9 +275,7 @@ class CLIApprovalFormatter:
         attrs_table.add_column("Attribute", style="cyan", min_width=12)
         attrs_table.add_column("Value", style="white")
 
-        attrs_table.add_row(
-            "Reversible", "✅ Yes" if preview.reversible else "❌ No"
-        )
+        attrs_table.add_row("Reversible", "✅ Yes" if preview.reversible else "❌ No")
 
         if preview.risk_assessment:
             attrs_table.add_row("Risk", preview.risk_assessment)
@@ -327,10 +318,9 @@ class CLIApprovalFormatter:
             )
 
         # Try to detect file type for syntax highlighting
-        file_extension = None
         if "path" in preview.metadata:
             path = Path(preview.metadata["path"])
-            file_extension = path.suffix.lstrip(".")
+            path.suffix.lstrip(".")
 
         # Limit diff length to prevent terminal overflow
         diff_text = preview.diff
@@ -364,9 +354,7 @@ class CLIApprovalFormatter:
             border_style="magenta",
         )
 
-    def _format_risk_assessment(
-        self, approval_request: ApprovalRequest
-    ) -> Panel:
+    def _format_risk_assessment(self, approval_request: ApprovalRequest) -> Panel:
         """Format risk assessment with visual indicators."""
         risk_level = approval_request.risk_level
         risk_color = self.risk_colors[risk_level]
@@ -388,7 +376,7 @@ class CLIApprovalFormatter:
             expand=False,
         )
 
-        task = progress.add_task("risk", total=100, completed=risk_value)
+        progress.add_task("risk", total=100, completed=risk_value)
 
         # Risk description
         risk_descriptions = {
@@ -430,9 +418,7 @@ class CLIApprovalFormatter:
             if "path" in preview.metadata:
                 path = preview.metadata["path"]
                 item_count = preview.metadata.get("item_count", 0)
-                impact_items.append(
-                    f"• Directory: {path} ({item_count} items)"
-                )
+                impact_items.append(f"• Directory: {path} ({item_count} items)")
 
         # Command execution impact
         if preview.change_type == ChangeType.COMMAND_EXECUTE:
@@ -448,9 +434,7 @@ class CLIApprovalFormatter:
                 impact_items.append(f"• Network {method}: {url}")
 
         # Reversibility impact
-        reversible_text = (
-            "✅ Reversible" if preview.reversible else "❌ Not reversible"
-        )
+        reversible_text = "✅ Reversible" if preview.reversible else "❌ Not reversible"
         impact_items.append(f"• Recovery: {reversible_text}")
 
         if not impact_items:
@@ -488,12 +472,8 @@ class CLIApprovalFormatter:
 
         try:
             # Pretty print metadata as JSON
-            metadata_json = json.dumps(
-                filtered_metadata, indent=2, default=str
-            )
-            syntax = Syntax(
-                metadata_json, "json", theme="monokai", line_numbers=False
-            )
+            metadata_json = json.dumps(filtered_metadata, indent=2, default=str)
+            syntax = Syntax(metadata_json, "json", theme="monokai", line_numbers=False)
         except Exception:
             # Fallback to simple text display
             lines = [f"{k}: {v}" for k, v in filtered_metadata.items()]
@@ -511,16 +491,12 @@ class CLIApprovalFormatter:
         time_content = []
 
         # Request time
-        request_time = approval_request.requested_at.strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        request_time = approval_request.requested_at.strftime("%Y-%m-%d %H:%M:%S")
         time_content.append(Text(f"Requested: {request_time}", style="white"))
 
         # Expiration time
         if approval_request.expires_at:
-            expires_time = approval_request.expires_at.strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+            expires_time = approval_request.expires_at.strftime("%Y-%m-%d %H:%M:%S")
             time_remaining = approval_request.time_remaining()
 
             if time_remaining and time_remaining.total_seconds() > 0:
@@ -575,9 +551,7 @@ class CLIApprovalFormatter:
             border_style="white",
         )
 
-    def _format_batch_header(
-        self, batch_request: BatchApprovalRequest
-    ) -> Panel:
+    def _format_batch_header(self, batch_request: BatchApprovalRequest) -> Panel:
         """Format batch approval header."""
         summary = batch_request.get_approval_summary()
 
@@ -588,9 +562,7 @@ class CLIApprovalFormatter:
                 style="dim white",
             ),
             Text(),
-            Text(
-                f"🔢 Operations: {summary['total_operations']}", style="blue"
-            ),
+            Text(f"🔢 Operations: {summary['total_operations']}", style="blue"),
             Text(
                 f"⏰ Created: {batch_request.created_at.strftime('%H:%M:%S')}",
                 style="white",
@@ -604,9 +576,7 @@ class CLIApprovalFormatter:
             border_style="blue",
         )
 
-    def _format_batch_summary(
-        self, batch_request: BatchApprovalRequest
-    ) -> Panel:
+    def _format_batch_summary(self, batch_request: BatchApprovalRequest) -> Panel:
         """Format batch operations summary table."""
         table = Table(show_header=True, header_style="bold cyan")
         table.add_column("Op", width=3)
@@ -673,9 +643,7 @@ class CLIApprovalFormatter:
             details_text.append(f"Risk: {preview.risk_assessment}")
 
         if details_text:
-            components.append(
-                Text(" | ".join(details_text), style="dim white")
-            )
+            components.append(Text(" | ".join(details_text), style="dim white"))
 
         return Group(*components)
 

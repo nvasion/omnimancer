@@ -5,30 +5,30 @@ This module provides common test fixtures, mock factories, and configuration
 for all Omnimancer test modules.
 """
 
-import pytest
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
+from omnimancer.cli.interface import CommandLineInterface
+from omnimancer.core.chat_manager import ChatManager
+from omnimancer.core.config_manager import ConfigManager
+from omnimancer.core.conversation_manager import ConversationManager
+from omnimancer.core.engine import CoreEngine
 from omnimancer.core.models import (
     ChatContext,
     ChatMessage,
     ChatResponse,
+    ChatSettings,
     Config,
+    MessageRole,
     ModelInfo,
     ProviderConfig,
-    ChatSettings,
-    MessageRole,
 )
-from omnimancer.core.engine import CoreEngine
-from omnimancer.core.config_manager import ConfigManager
-from omnimancer.core.chat_manager import ChatManager
-from omnimancer.core.conversation_manager import ConversationManager
 from omnimancer.providers.base import BaseProvider
-from omnimancer.cli.interface import CommandLineInterface
-
 
 # Test Configuration Fixtures
 
@@ -255,9 +255,7 @@ def mock_chat_manager(sample_chat_context):
 def mock_conversation_manager(temp_dir):
     """Create a mock conversation manager."""
     conv_manager = MagicMock(spec=ConversationManager)
-    conv_manager.save_conversation.return_value = (
-        "conversation_20240101_120000.json"
-    )
+    conv_manager.save_conversation.return_value = "conversation_20240101_120000.json"
     conv_manager.load_conversation.return_value = MagicMock()
     conv_manager.list_conversations.return_value = [
         {
@@ -347,9 +345,7 @@ def mock_engine(
         "session_id": "test-session",
     }
     engine.clear_conversation = MagicMock()
-    engine.save_conversation = MagicMock(
-        return_value="saved_conversation.json"
-    )
+    engine.save_conversation = MagicMock(return_value="saved_conversation.json")
     engine.load_conversation = MagicMock()
     engine.list_conversations = MagicMock(return_value=[])
     engine.delete_conversation = MagicMock(return_value=True)
@@ -548,13 +544,9 @@ def mock_provider_factory():
 
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "integration: mark test as integration test"
-    )
+    config.addinivalue_line("markers", "integration: mark test as integration test")
     config.addinivalue_line("markers", "slow: mark test as slow running")
-    config.addinivalue_line(
-        "markers", "network: mark test as requiring network access"
-    )
+    config.addinivalue_line("markers", "network: mark test as requiring network access")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -614,9 +606,7 @@ def generate_model_list(provider_count: int = 2) -> List[ModelInfo]:
         if provider == "openai":
             models.extend(
                 [
-                    create_model_info(
-                        "gpt-4", provider, "GPT-4 model", 8192, 0.00003
-                    ),
+                    create_model_info("gpt-4", provider, "GPT-4 model", 8192, 0.00003),
                     create_model_info(
                         "gpt-3.5-turbo",
                         provider,

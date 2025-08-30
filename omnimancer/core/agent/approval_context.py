@@ -5,13 +5,13 @@ This module defines the data structures and context objects used
 throughout the approval workflow system.
 """
 
-from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
-from .rich_renderer import RiskLevel, OperationType
+from .rich_renderer import RiskLevel
 
 
 class OperationStatus(Enum):
@@ -127,15 +127,12 @@ class OperationDetails:
     def __post_init__(self):
         """Post-initialization processing."""
         # Auto-populate risk factors from security flags
-        if not self.risk_factors and hasattr(
-            self.security_flags, "get_risk_factors"
-        ):
+        if not self.risk_factors and hasattr(self.security_flags, "get_risk_factors"):
             self.risk_factors = self.security_flags.get_risk_factors()
 
         # Ensure paths are Path objects
         self.files_affected = [
-            Path(f) if not isinstance(f, Path) else f
-            for f in self.files_affected
+            Path(f) if not isinstance(f, Path) else f for f in self.files_affected
         ]
 
     def add_file_change(
@@ -158,9 +155,7 @@ class OperationDetails:
 
     def get_total_files_affected(self) -> int:
         """Get total number of files affected."""
-        return len(
-            set(self.files_affected + [fc.path for fc in self.file_changes])
-        )
+        return len(set(self.files_affected + [fc.path for fc in self.file_changes]))
 
     def get_operation_summary(self) -> str:
         """Get a brief summary of the operation."""
@@ -284,9 +279,7 @@ class ApprovalContext:
         """Set the approval decision and update status."""
         self.decision = decision
         self.status = (
-            OperationStatus.APPROVED
-            if decision.approved
-            else OperationStatus.DENIED
+            OperationStatus.APPROVED if decision.approved else OperationStatus.DENIED
         )
 
     def get_context_summary(self) -> Dict[str, Any]:
@@ -349,9 +342,7 @@ def create_file_operation_context(
     agent_name: str = "Omnimancer Agent",
 ) -> ApprovalContext:
     """Create approval context for file operations."""
-    file_path = (
-        Path(file_path) if not isinstance(file_path, Path) else file_path
-    )
+    file_path = Path(file_path) if not isinstance(file_path, Path) else file_path
 
     # Determine file operation type
     file_op_type = FileOperationType.MODIFY
@@ -415,8 +406,7 @@ def create_command_execution_context(
         security_flags.accesses_network = True
 
     if any(
-        exec_cmd in command
-        for exec_cmd in ["eval", "exec", "python", "bash", "sh"]
+        exec_cmd in command for exec_cmd in ["eval", "exec", "python", "bash", "sh"]
     ):
         security_flags.executes_code = True
 
@@ -450,10 +440,7 @@ def create_web_request_context(
     security_flags = SecurityFlags(accesses_network=True)
 
     # Additional assessment based on URL
-    if any(
-        sensitive in url.lower()
-        for sensitive in ["admin", "api", "auth", "login"]
-    ):
+    if any(sensitive in url.lower() for sensitive in ["admin", "api", "auth", "login"]):
         security_flags.accesses_sensitive_data = True
 
     # Create operation details

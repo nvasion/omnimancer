@@ -5,24 +5,25 @@ This module provides the OpenRouter provider implementation using OpenRouter's A
 with support for model aggregation, cost optimization, and access to multiple models.
 """
 
-import httpx
-import certifi
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+import certifi
+import httpx
 
 from ..core.models import (
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
-    ToolDefinition,
     ToolCall,
+    ToolDefinition,
 )
 from ..utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
+    RateLimitError,
 )
 from .base import BaseProvider
 
@@ -46,17 +47,13 @@ class OpenRouterProvider(BaseProvider):
             model: OpenRouter model ID to use (e.g., 'anthropic/claude-3.5-sonnet', 'openai/gpt-4', 'meta-llama/llama-3.1-70b-instruct')
             **kwargs: Additional configuration including OpenRouter-specific settings
         """
-        super().__init__(
-            api_key, model or "anthropic/claude-3.5-sonnet", **kwargs
-        )
+        super().__init__(api_key, model or "anthropic/claude-3.5-sonnet", **kwargs)
 
         # OpenRouter-specific configuration
         self.openrouter_referrer = kwargs.get(
             "openrouter_referrer", "https://github.com/omnimancer-cli"
         )
-        self.openrouter_title = kwargs.get(
-            "openrouter_title", "Omnimancer CLI"
-        )
+        self.openrouter_title = kwargs.get("openrouter_title", "Omnimancer CLI")
 
         # Standard parameters
         self.max_tokens = kwargs.get("max_tokens", 4096)
@@ -71,13 +68,9 @@ class OpenRouterProvider(BaseProvider):
         self.prefer_cheaper_models = kwargs.get("prefer_cheaper_models", False)
 
         # Fallback notification settings
-        self.show_fallback_warnings = kwargs.get(
-            "show_fallback_warnings", True
-        )
+        self.show_fallback_warnings = kwargs.get("show_fallback_warnings", True)
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to OpenRouter API.
 
@@ -141,7 +134,7 @@ class OpenRouterProvider(BaseProvider):
                 RateLimitError,
                 ModelNotFoundError,
                 ProviderError,
-            ) as e:
+            ):
                 # Known provider errors, don't retry
                 raise
             except Exception as e:
@@ -149,9 +142,7 @@ class OpenRouterProvider(BaseProvider):
                 raise ProviderError(f"Unexpected error: {e}")
 
         # If we get here, all SSL methods failed
-        raise NetworkError(
-            "Failed to establish SSL connection to OpenRouter API"
-        )
+        raise NetworkError("Failed to establish SSL connection to OpenRouter API")
 
     async def send_message_with_tools(
         self,
@@ -228,7 +219,7 @@ class OpenRouterProvider(BaseProvider):
                 RateLimitError,
                 ModelNotFoundError,
                 ProviderError,
-            ) as e:
+            ):
                 # Known provider errors, don't retry
                 raise
             except Exception as e:
@@ -236,9 +227,7 @@ class OpenRouterProvider(BaseProvider):
                 raise ProviderError(f"Unexpected error: {e}")
 
         # If we get here, all SSL methods failed
-        raise NetworkError(
-            "Failed to establish SSL connection to OpenRouter API"
-        )
+        raise NetworkError("Failed to establish SSL connection to OpenRouter API")
 
     async def validate_credentials(self) -> bool:
         """
@@ -408,23 +397,17 @@ class OpenRouterProvider(BaseProvider):
         elif response.status_code == 429:
             raise RateLimitError("OpenRouter API rate limit exceeded")
         elif response.status_code == 404:
-            raise ModelNotFoundError(
-                f"OpenRouter model '{self.model}' not found"
-            )
+            raise ModelNotFoundError(f"OpenRouter model '{self.model}' not found")
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get(
-                    "message", "Unknown error"
-                )
+                error_msg = error_data.get("error", {}).get("message", "Unknown error")
             except:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"OpenRouter API error: {error_msg}")
 
-    def _handle_response_with_tools(
-        self, response: httpx.Response
-    ) -> ChatResponse:
+    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
         """
         Handle OpenRouter API response with tool calls.
 
@@ -574,9 +557,7 @@ class OpenRouterProvider(BaseProvider):
             latest_version="claude-3.5-sonnet" in self.model,
             context_window=config["max_tokens"],
             is_free=False,
-            release_date=datetime(
-                2024, 6, 1
-            ),  # Approximate OpenRouter availability
+            release_date=datetime(2024, 6, 1),  # Approximate OpenRouter availability
         )
 
         # Update SWE rating based on score

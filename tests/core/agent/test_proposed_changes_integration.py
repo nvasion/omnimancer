@@ -2,19 +2,18 @@
 Tests for the Proposed Changes Display Integration module.
 """
 
-import asyncio
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
-from datetime import datetime
 from rich.console import Console
 
-from omnimancer.core.agent.proposed_changes_integration import (
-    ProposedChangesIntegration,
-    ProposedChange,
-    ChangeSet,
-    ChangeDisplayMode,
-)
 from omnimancer.core.agent.approval_manager import ChangeType
+from omnimancer.core.agent.proposed_changes_integration import (
+    ChangeDisplayMode,
+    ChangeSet,
+    ProposedChange,
+    ProposedChangesIntegration,
+)
 from omnimancer.core.security.approval_workflow import RiskLevel
 
 
@@ -49,8 +48,7 @@ class TestProposedChangesIntegration:
     def create_test_change_set(self, num_changes=3):
         """Create a test ChangeSet."""
         changes = [
-            self.create_test_change(f"/test/file{i}.py")
-            for i in range(num_changes)
+            self.create_test_change(f"/test/file{i}.py") for i in range(num_changes)
         ]
         return ChangeSet(
             id="test-changeset-001",
@@ -132,9 +130,7 @@ class TestProposedChangesIntegration:
         """Test interactive display of proposed changes."""
         change_set = self.create_test_change_set(2)
 
-        with patch.object(
-            self.integration, "_get_change_approval"
-        ) as mock_approval:
+        with patch.object(self.integration, "_get_change_approval") as mock_approval:
             mock_approval.return_value = {
                 "approved": True,
                 "all_changes": True,
@@ -156,9 +152,7 @@ class TestProposedChangesIntegration:
         original = "line 1\nline 2\nline 3"
         modified = "line 1\nmodified line 2\nline 3\nnew line 4"
 
-        await self.integration.display_inline_changes(
-            file_path, original, modified
-        )
+        await self.integration.display_inline_changes(file_path, original, modified)
 
         assert self.console.print.called
         # Verify that a panel was printed
@@ -193,9 +187,7 @@ class TestProposedChangesIntegration:
         self.integration.pending_changes["test-id"] = change_set
 
         # Mock file system operations
-        self.file_system_manager.modify_file = AsyncMock(
-            return_value={"success": True}
-        )
+        self.file_system_manager.modify_file = AsyncMock(return_value={"success": True})
 
         result = await self.integration.apply_proposed_changes("test-id")
 
@@ -245,9 +237,7 @@ class TestProposedChangesIntegration:
         change_set.approved = True
         self.integration.pending_changes["test-id"] = change_set
 
-        self.file_system_manager.modify_file = AsyncMock(
-            return_value={"success": True}
-        )
+        self.file_system_manager.modify_file = AsyncMock(return_value={"success": True})
 
         # Apply only changes at indices 0 and 2
         result = await self.integration.apply_proposed_changes(
@@ -376,9 +366,7 @@ class TestProposedChangesIntegration:
             "_display_change_set_header",
             side_effect=Exception("Display error"),
         ):
-            result = await self.integration.display_proposed_changes(
-                change_set
-            )
+            result = await self.integration.display_proposed_changes(change_set)
 
             assert result["displayed"] is False
             assert "error" in result

@@ -7,30 +7,27 @@ permission systems.
 """
 
 import logging
-from typing import Dict, List, Optional, Any, Set
-from dataclasses import asdict
-from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+from omnimancer.core.models import ConfigTemplateManager
+
+from ..security.audit_logger import AuditEventType, AuditLevel, AuditLogger
+from ..security.permission_controller import PermissionController
 from .agent_config import (
-    CustomAgentConfig,
     AgentRepository,
-    CustomAgentStatus,
     AgentTool,
+    CustomAgentConfig,
 )
+from .approval_manager import EnhancedApprovalManager
 from .config import (
     AgentConfig,
-    SecuritySettings,
     AgentSettings,
     FileSystemSettings,
-    WebClientSettings,
     ProviderConfig,
+    SecuritySettings,
+    WebClientSettings,
 )
 from .persona import PersonaCapability
-from ..security.permission_controller import PermissionController
-from ..security.security_manager import SecurityManager
-from ..security.audit_logger import AuditLogger, AuditEventType, AuditLevel
-from .approval_manager import EnhancedApprovalManager
-from omnimancer.core.models import ConfigTemplateManager
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +53,7 @@ class CustomAgentIntegration:
         """
         self.repository = repository or AgentRepository()
         self.template_manager = template_manager or ConfigTemplateManager()
-        self.permission_controller = (
-            permission_controller or PermissionController()
-        )
+        self.permission_controller = permission_controller or PermissionController()
         self.audit_logger = audit_logger or AuditLogger()
 
         # Cache for converted configurations
@@ -104,9 +99,7 @@ class CustomAgentIntegration:
             agent_config.add_provider_config(provider_id, provider_config)
 
             # Apply tool-specific settings
-            file_system_settings = self._build_filesystem_settings(
-                custom_config
-            )
+            file_system_settings = self._build_filesystem_settings(custom_config)
             agent_config.filesystem = file_system_settings
 
             web_client_settings = self._build_webclient_settings(custom_config)
@@ -132,9 +125,7 @@ class CustomAgentIntegration:
             return agent_config
 
         except Exception as e:
-            logger.error(
-                f"Failed to convert custom agent config: {e}", exc_info=True
-            )
+            logger.error(f"Failed to convert custom agent config: {e}", exc_info=True)
             self.audit_logger.log_event(
                 AuditEventType.SYSTEM_EVENT,
                 AuditLevel.ERROR,
@@ -184,18 +175,14 @@ class CustomAgentIntegration:
             security.allowed_commands = []
 
         # Apply confirmation requirements
-        confirmation_patterns = (
-            custom_config.behavior_rules.require_confirmation_for
-        )
+        confirmation_patterns = custom_config.behavior_rules.require_confirmation_for
         if "file_delete" in confirmation_patterns:
             # This would be handled by approval workflow
             pass
 
         return security
 
-    def _build_agent_settings(
-        self, custom_config: CustomAgentConfig
-    ) -> AgentSettings:
+    def _build_agent_settings(self, custom_config: CustomAgentConfig) -> AgentSettings:
         """Build agent settings from custom agent configuration."""
         agent_settings = AgentSettings()
 
@@ -303,9 +290,7 @@ class CustomAgentIntegration:
 
         return web_settings
 
-    def apply_permission_overrides(
-        self, custom_config: CustomAgentConfig
-    ) -> None:
+    def apply_permission_overrides(self, custom_config: CustomAgentConfig) -> None:
         """
         Apply custom agent permission rules to the permission controller.
 
@@ -332,9 +317,7 @@ class CustomAgentIntegration:
                 self.permission_controller.allowed_commands.clear()
 
             # Apply custom restrictions
-            for (
-                restriction
-            ) in custom_config.behavior_rules.custom_restrictions:
+            for restriction in custom_config.behavior_rules.custom_restrictions:
                 # Parse and apply restriction
                 self._apply_custom_restriction(restriction)
 
@@ -362,9 +345,7 @@ class CustomAgentIntegration:
             )
 
         except Exception as e:
-            logger.error(
-                f"Failed to apply permission overrides: {e}", exc_info=True
-            )
+            logger.error(f"Failed to apply permission overrides: {e}", exc_info=True)
             self.audit_logger.log_event(
                 AuditEventType.SECURITY_ALERT,
                 AuditLevel.ERROR,
@@ -465,9 +446,7 @@ class CustomAgentIntegration:
             )
 
         except Exception as e:
-            logger.error(
-                f"Failed to setup approval integration: {e}", exc_info=True
-            )
+            logger.error(f"Failed to setup approval integration: {e}", exc_info=True)
             self.audit_logger.log_event(
                 AuditEventType.SECURITY_ALERT,
                 AuditLevel.ERROR,
@@ -475,9 +454,7 @@ class CustomAgentIntegration:
                 metadata={"agent_id": custom_config.id, "error": str(e)},
             )
 
-    def activate_custom_agent(
-        self, custom_config: CustomAgentConfig
-    ) -> AgentConfig:
+    def activate_custom_agent(self, custom_config: CustomAgentConfig) -> AgentConfig:
         """
         Activate a custom agent by converting and applying its configuration.
 
@@ -489,9 +466,7 @@ class CustomAgentIntegration:
         """
         try:
             # Convert to standard configuration
-            agent_config = self.convert_custom_to_standard_config(
-                custom_config
-            )
+            agent_config = self.convert_custom_to_standard_config(custom_config)
 
             # Apply permission overrides
             self.apply_permission_overrides(custom_config)
@@ -523,9 +498,7 @@ class CustomAgentIntegration:
             return agent_config
 
         except Exception as e:
-            logger.error(
-                f"Failed to activate custom agent: {e}", exc_info=True
-            )
+            logger.error(f"Failed to activate custom agent: {e}", exc_info=True)
             self.audit_logger.log_event(
                 AuditEventType.SECURITY_ALERT,
                 AuditLevel.ERROR,
@@ -594,9 +567,7 @@ class CustomAgentIntegration:
                 )
 
             # Check system prompt for potentially dangerous instructions
-            system_prompt = (
-                custom_config.context_parameters.system_prompt.lower()
-            )
+            system_prompt = custom_config.context_parameters.system_prompt.lower()
             dangerous_phrases = [
                 "ignore safety",
                 "bypass security",

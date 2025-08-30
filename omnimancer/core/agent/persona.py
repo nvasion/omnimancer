@@ -5,23 +5,21 @@ This module provides the architectural design for mapping configuration template
 to agent personas with clear interfaces and data models.
 """
 
-import json
 import logging
-from dataclasses import dataclass, field, asdict
+from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Set, Callable, Union
-from abc import ABC, abstractmethod
-import uuid
+from typing import Any, Callable, Dict, List, Optional, Set
+
+from omnimancer.core.models import ConfigTemplate, ConfigTemplateManager
 
 from .config import AgentConfig, ProviderConfig, ProviderType
 from .status_core import AgentStatus
+from .status_manager import UnifiedStatusManager as AgentStatusManager
 from .status_manager import (
-    UnifiedStatusManager as AgentStatusManager,
     get_status_manager,
 )
-from omnimancer.core.models import ConfigTemplateManager, ConfigTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +97,7 @@ class PersonaConfiguration:
 
     template_id: str  # Maps to ConfigTemplate
     primary_provider: str  # Primary provider from template
-    fallback_providers: List[str] = field(
-        default_factory=list
-    )  # Fallback providers
+    fallback_providers: List[str] = field(default_factory=list)  # Fallback providers
 
     # Override settings (optional)
     temperature_override: Optional[float] = None
@@ -115,9 +111,7 @@ class PersonaConfiguration:
     approval_required: bool = True
     auto_approve_safe_operations: bool = False
 
-    def get_template(
-        self, template_manager: ConfigTemplateManager
-    ) -> ConfigTemplate:
+    def get_template(self, template_manager: ConfigTemplateManager) -> ConfigTemplate:
         """Get the underlying configuration template."""
         return template_manager.get_template(self.template_id)
 
@@ -166,9 +160,7 @@ class PersonaConfiguration:
         provider_type = provider_type_mapping.get(
             self.primary_provider, ProviderType.ANTHROPIC
         )
-        model_id = template.recommended_models.get(
-            self.primary_provider, "default"
-        )
+        model_id = template.recommended_models.get(self.primary_provider, "default")
 
         return ProviderConfig(
             provider_type=provider_type,
@@ -250,9 +242,7 @@ class AgentPersona(ABC):
         """Get provider configuration for the primary provider."""
         if not self.configuration:
             return None
-        return self.configuration.get_primary_provider_config(
-            self.template_manager
-        )
+        return self.configuration.get_primary_provider_config(self.template_manager)
 
     def initialize(self) -> None:
         """Initialize the persona with capabilities and configuration."""
@@ -357,9 +347,7 @@ class AgentPersona(ABC):
 class CodingPersona(AgentPersona):
     """Agent persona optimized for software development."""
 
-    def __init__(
-        self, template_manager: Optional[ConfigTemplateManager] = None
-    ):
+    def __init__(self, template_manager: Optional[ConfigTemplateManager] = None):
         super().__init__(
             persona_id="coding",
             name="Coding Agent",
@@ -402,9 +390,7 @@ class CodingPersona(AgentPersona):
 class ResearchPersona(AgentPersona):
     """Agent persona configured for research with web search capabilities."""
 
-    def __init__(
-        self, template_manager: Optional[ConfigTemplateManager] = None
-    ):
+    def __init__(self, template_manager: Optional[ConfigTemplateManager] = None):
         super().__init__(
             persona_id="research",
             name="Research Agent",
@@ -441,9 +427,7 @@ class ResearchPersona(AgentPersona):
 class CreativePersona(AgentPersona):
     """Agent persona set up for creative writing."""
 
-    def __init__(
-        self, template_manager: Optional[ConfigTemplateManager] = None
-    ):
+    def __init__(self, template_manager: Optional[ConfigTemplateManager] = None):
         super().__init__(
             persona_id="creative",
             name="Creative Agent",
@@ -478,9 +462,7 @@ class CreativePersona(AgentPersona):
 class PerformancePersona(AgentPersona):
     """Agent persona optimized for speed and cost efficiency."""
 
-    def __init__(
-        self, template_manager: Optional[ConfigTemplateManager] = None
-    ):
+    def __init__(self, template_manager: Optional[ConfigTemplateManager] = None):
         super().__init__(
             persona_id="performance",
             name="Performance Agent",
@@ -517,9 +499,7 @@ class PerformancePersona(AgentPersona):
 class GeneralPersona(AgentPersona):
     """Agent persona with balanced configuration for general-purpose use."""
 
-    def __init__(
-        self, template_manager: Optional[ConfigTemplateManager] = None
-    ):
+    def __init__(self, template_manager: Optional[ConfigTemplateManager] = None):
         super().__init__(
             persona_id="general",
             name="General Agent",
@@ -611,9 +591,7 @@ class PersonaManager:
             except Exception as e:
                 logger.error(f"Failed to initialize persona {persona_id}: {e}")
 
-    def _handle_persona_event(
-        self, event_type: str, data: Dict[str, Any]
-    ) -> None:
+    def _handle_persona_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Handle persona events."""
         for listener in self._event_listeners:
             try:
@@ -629,9 +607,7 @@ class PersonaManager:
         """Get all registered personas."""
         return self.personas.copy()
 
-    def get_personas_by_category(
-        self, category: PersonaCategory
-    ) -> List[AgentPersona]:
+    def get_personas_by_category(self, category: PersonaCategory) -> List[AgentPersona]:
         """Get personas filtered by category."""
         return [p for p in self.personas.values() if p.category == category]
 
@@ -692,9 +668,7 @@ class PersonaManager:
                         )
                         pass
 
-                logger.info(
-                    f"Activated persona: {persona_id} ({persona.name})"
-                )
+                logger.info(f"Activated persona: {persona_id} ({persona.name})")
                 return True
 
             return False
@@ -843,8 +817,7 @@ class PersonaManager:
 
         # Performance-related keywords
         if any(
-            word in context_lower
-            for word in ["fast", "quick", "speed", "efficient"]
+            word in context_lower for word in ["fast", "quick", "speed", "efficient"]
         ):
             performance_persona = self.get_persona("performance")
             if performance_persona:
@@ -864,13 +837,9 @@ class PersonaManager:
             "total_personas": len(self.personas),
             "builtin_personas": len(self._builtin_personas),
             "custom_personas": len(self.custom_personas),
-            "active_persona": (
-                self.active_persona.id if self.active_persona else None
-            ),
+            "active_persona": (self.active_persona.id if self.active_persona else None),
             "available_personas": len(self.get_available_personas()),
-            "categories": list(
-                set(p.category.value for p in self.personas.values())
-            ),
+            "categories": list(set(p.category.value for p in self.personas.values())),
         }
 
     def add_event_listener(self, listener: Callable) -> None:

@@ -5,23 +5,24 @@ This module provides the xAI provider implementation using xAI's API
 with support for Grok models, multimodal capabilities, and tool calling.
 """
 
-import httpx
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+import httpx
 
 from ..core.models import (
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
-    ToolDefinition,
     ToolCall,
+    ToolDefinition,
 )
 from ..utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
+    RateLimitError,
 )
 from .base import BaseProvider
 
@@ -55,9 +56,7 @@ class XAIProvider(BaseProvider):
         self.enable_web_search = kwargs.get("enable_web_search", True)
         self.enable_real_time = kwargs.get("enable_real_time", True)
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to xAI API.
 
@@ -238,9 +237,7 @@ class XAIProvider(BaseProvider):
         mode_temperatures = {"precise": 0.1, "balanced": 0.7, "creative": 1.0}
         return mode_temperatures.get(self.grok_mode, self.temperature)
 
-    def _convert_tools_to_xai_format(
-        self, tools: List[ToolDefinition]
-    ) -> List[Dict]:
+    def _convert_tools_to_xai_format(self, tools: List[ToolDefinition]) -> List[Dict]:
         """
         Convert tool definitions to xAI API format.
 
@@ -305,17 +302,13 @@ class XAIProvider(BaseProvider):
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get(
-                    "message", "Unknown error"
-                )
+                error_msg = error_data.get("error", {}).get("message", "Unknown error")
             except:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"xAI API error: {error_msg}")
 
-    def _handle_response_with_tools(
-        self, response: httpx.Response
-    ) -> ChatResponse:
+    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
         """
         Handle xAI API response with tool calls.
 

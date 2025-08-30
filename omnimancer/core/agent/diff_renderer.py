@@ -8,23 +8,20 @@ approval workflow.
 
 import difflib
 import re
-from typing import Dict, List, Optional, Tuple, Union, Any
-from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
+from rich.box import ROUNDED, SIMPLE
 from rich.console import Console, RenderableType
-from rich.syntax import Syntax
-from rich.text import Text
-from rich.table import Table
 from rich.panel import Panel
-from rich.columns import Columns
-from rich.align import Align
 from rich.rule import Rule
+from rich.table import Table
+from rich.text import Text
 from rich.tree import Tree
-from rich.box import ROUNDED, SIMPLE, MINIMAL
 
-from .rich_renderer import RichTextRenderer, ColorScheme, create_renderer
+from .rich_renderer import RichTextRenderer, create_renderer
 
 
 class DiffType(Enum):
@@ -194,9 +191,7 @@ class EnhancedDiffRenderer:
             elif line.startswith("rename from"):
                 if current_change:
                     current_change.change_type = FileChangeType.RENAMED
-                    current_change.old_path = line[
-                        12:
-                    ]  # Remove 'rename from '
+                    current_change.old_path = line[12:]  # Remove 'rename from '
 
             elif line.startswith("rename to"):
                 if current_change:
@@ -219,13 +214,13 @@ class EnhancedDiffRenderer:
                         diff_lines.append(diff_line)
 
                         # Count additions and deletions
-                        if diff_line.startswith(
-                            "+"
-                        ) and not diff_line.startswith("+++"):
+                        if diff_line.startswith("+") and not diff_line.startswith(
+                            "+++"
+                        ):
                             current_change.lines_added += 1
-                        elif diff_line.startswith(
-                            "-"
-                        ) and not diff_line.startswith("---"):
+                        elif diff_line.startswith("-") and not diff_line.startswith(
+                            "---"
+                        ):
                             current_change.lines_removed += 1
 
                         i += 1
@@ -234,9 +229,7 @@ class EnhancedDiffRenderer:
                     if current_change.diff_text is None:
                         current_change.diff_text = "\n".join(diff_lines)
                     else:
-                        current_change.diff_text += "\n" + "\n".join(
-                            diff_lines
-                        )
+                        current_change.diff_text += "\n" + "\n".join(diff_lines)
 
                     i -= 1  # Back up one line since we'll increment at end of loop
 
@@ -348,9 +341,7 @@ class EnhancedDiffRenderer:
         title.append(file_change.file_path, style=f"bold {title_color}")
         title.append(f" {stats}", style="dim")
 
-        return Panel(
-            diff_content, title=title, border_style=title_color, expand=False
-        )
+        return Panel(diff_content, title=title, border_style=title_color, expand=False)
 
     def render_side_by_side_diff(self, file_change: FileChange) -> Panel:
         """
@@ -388,12 +379,8 @@ class EnhancedDiffRenderer:
             if tag == "equal":
                 # Lines are identical
                 for i in range(i2 - i1):
-                    old_line = (
-                        old_lines[i1 + i] if i1 + i < len(old_lines) else ""
-                    )
-                    new_line = (
-                        new_lines[j1 + i] if j1 + i < len(new_lines) else ""
-                    )
+                    old_line = old_lines[i1 + i] if i1 + i < len(old_lines) else ""
+                    new_line = new_lines[j1 + i] if j1 + i < len(new_lines) else ""
 
                     table.add_row(
                         Text(old_line, style="dim"),
@@ -442,9 +429,7 @@ class EnhancedDiffRenderer:
 
         return Panel(table, title=title, border_style="yellow", expand=False)
 
-    def render_word_diff(
-        self, old_line: str, new_line: str
-    ) -> Tuple[Text, Text]:
+    def render_word_diff(self, old_line: str, new_line: str) -> Tuple[Text, Text]:
         """
         Generate word-level diff highlighting for two lines.
 
@@ -545,9 +530,7 @@ class EnhancedDiffRenderer:
             total_removed += change.lines_removed
 
         # Add totals row
-        table.add_row(
-            "—" * 20, "—" * 10, "—" * 5, "—" * 5, "—" * 8, style="dim"
-        )
+        table.add_row("—" * 20, "—" * 10, "—" * 5, "—" * 5, "—" * 8, style="dim")
 
         table.add_row(
             Text("TOTALS", style="bold"),

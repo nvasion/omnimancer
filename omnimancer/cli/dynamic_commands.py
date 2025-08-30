@@ -6,13 +6,11 @@ custom slash commands from external files, similar to Claude Code's
 command system.
 """
 
-import os
 import json
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +35,9 @@ class DynamicCommand:
 
     def get_argument_names(self) -> List[str]:
         """Get list of argument names for autocomplete."""
-        return [
-            arg.get("name", "") for arg in self.arguments if arg.get("name")
-        ]
+        return [arg.get("name", "") for arg in self.arguments if arg.get("name")]
 
-    def get_argument_at_position(
-        self, position: int
-    ) -> Optional[Dict[str, Any]]:
+    def get_argument_at_position(self, position: int) -> Optional[Dict[str, Any]]:
         """Get argument definition at a specific position."""
         if 0 <= position < len(self.arguments):
             return self.arguments[position]
@@ -82,9 +76,7 @@ class CommandRegistry:
         try:
             # Check for conflicts with built-in commands
             if command.name in self._builtin_commands:
-                logger.warning(
-                    f"Cannot override built-in command: {command.name}"
-                )
+                logger.warning(f"Cannot override built-in command: {command.name}")
                 return False
 
             self.commands[command.name] = command
@@ -135,9 +127,7 @@ class CommandRegistry:
         """
         return [f"/{name}" for name in self.commands.keys()]
 
-    def load_commands_from_directory(
-        self, directory: Optional[Path] = None
-    ) -> int:
+    def load_commands_from_directory(self, directory: Optional[Path] = None) -> int:
         """
         Load commands from a directory.
 
@@ -217,17 +207,13 @@ class CommandRegistry:
             logger.error(f"Error loading JSON command from {file_path}: {e}")
             return None
 
-    def _load_python_command(
-        self, file_path: Path
-    ) -> Optional[DynamicCommand]:
+    def _load_python_command(self, file_path: Path) -> Optional[DynamicCommand]:
         """Load a command from a Python module."""
         try:
             import importlib.util
 
             # Load the module
-            spec = importlib.util.spec_from_file_location(
-                file_path.stem, file_path
-            )
+            spec = importlib.util.spec_from_file_location(file_path.stem, file_path)
             if not spec or not spec.loader:
                 return None
 
@@ -261,9 +247,7 @@ class CommandRegistry:
             logger.error(f"Error loading Python command from {file_path}: {e}")
             return None
 
-    def _load_script_command(
-        self, file_path: Path
-    ) -> Optional[DynamicCommand]:
+    def _load_script_command(self, file_path: Path) -> Optional[DynamicCommand]:
         """Load a command from a shell script."""
         try:
             # Look for metadata in script comments
@@ -370,9 +354,7 @@ class CommandRegistry:
                 prefix = path.name
                 if parent.exists():
                     return [
-                        str(p)
-                        for p in parent.iterdir()
-                        if p.name.startswith(prefix)
+                        str(p) for p in parent.iterdir() if p.name.startswith(prefix)
                     ]
         except Exception:
             pass

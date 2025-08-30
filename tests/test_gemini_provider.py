@@ -5,26 +5,25 @@ This module tests the GeminiProvider class functionality including
 message sending, credential validation, model information, and tool calling.
 """
 
-import pytest
-import httpx
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from omnimancer.providers.gemini import GeminiProvider
+import httpx
+import pytest
+
 from omnimancer.core.models import (
     ChatContext,
     ChatMessage,
     MessageRole,
-    ModelInfo,
     ToolDefinition,
-    ToolCall,
 )
+from omnimancer.providers.gemini import GeminiProvider
 from omnimancer.utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
+    RateLimitError,
 )
 
 
@@ -69,11 +68,7 @@ def mock_successful_response():
     """Create a mock successful API response."""
     return {
         "candidates": [
-            {
-                "content": {
-                    "parts": [{"text": "Hello! How can I help you today?"}]
-                }
-            }
+            {"content": {"parts": [{"text": "Hello! How can I help you today?"}]}}
         ],
         "usageMetadata": {"totalTokenCount": 25},
     }
@@ -131,10 +126,7 @@ class TestGeminiProviderInitialization:
     def test_base_url_configuration(self):
         """Test that the base URL is correctly configured."""
         provider = GeminiProvider(api_key="AIzaSyTest123456789")
-        assert (
-            provider.BASE_URL
-            == "https://generativelanguage.googleapis.com/v1beta"
-        )
+        assert provider.BASE_URL == "https://generativelanguage.googleapis.com/v1beta"
 
 
 class TestGeminiProviderCredentialValidation:
@@ -145,9 +137,7 @@ class TestGeminiProviderCredentialValidation:
         """Test validation with missing API key."""
         provider = GeminiProvider(api_key="")
 
-        with pytest.raises(
-            AuthenticationError, match="Gemini API key is required"
-        ):
+        with pytest.raises(AuthenticationError, match="Gemini API key is required"):
             await provider.validate_credentials()
 
     @pytest.mark.asyncio
@@ -155,9 +145,7 @@ class TestGeminiProviderCredentialValidation:
         """Test validation with invalid API key format."""
         provider = GeminiProvider(api_key="invalid-key-format")
 
-        with pytest.raises(
-            AuthenticationError, match="Invalid Gemini API key format"
-        ):
+        with pytest.raises(AuthenticationError, match="Invalid Gemini API key format"):
             await provider.validate_credentials()
 
     @pytest.mark.asyncio
@@ -179,18 +167,14 @@ class TestGeminiProviderCredentialValidation:
         """Test validation with invalid API key."""
         mock_response = MagicMock()
         mock_response.status_code = 400
-        mock_response.json.return_value = {
-            "error": {"message": "API_KEY_INVALID"}
-        }
+        mock_response.json.return_value = {"error": {"message": "API_KEY_INVALID"}}
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
                 return_value=mock_response
             )
 
-            with pytest.raises(
-                AuthenticationError, match="Invalid Gemini API key"
-            ):
+            with pytest.raises(AuthenticationError, match="Invalid Gemini API key"):
                 await gemini_provider.validate_credentials()
 
     @pytest.mark.asyncio
@@ -254,9 +238,7 @@ class TestGeminiProviderCredentialValidation:
                 await gemini_provider.validate_credentials()
 
     @pytest.mark.asyncio
-    async def test_validate_credentials_malformed_json_response(
-        self, gemini_provider
-    ):
+    async def test_validate_credentials_malformed_json_response(self, gemini_provider):
         """Test validation with malformed JSON response."""
         mock_response = MagicMock()
         mock_response.status_code = 400
@@ -274,9 +256,7 @@ class TestGeminiProviderCredentialValidation:
                 await gemini_provider.validate_credentials()
 
     @pytest.mark.asyncio
-    async def test_validate_credentials_unexpected_error(
-        self, gemini_provider
-    ):
+    async def test_validate_credentials_unexpected_error(self, gemini_provider):
         """Test validation with unexpected error."""
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
@@ -290,9 +270,7 @@ class TestGeminiProviderCredentialValidation:
                 await gemini_provider.validate_credentials()
 
     @pytest.mark.asyncio
-    async def test_validate_credentials_generic_400_error(
-        self, gemini_provider
-    ):
+    async def test_validate_credentials_generic_400_error(self, gemini_provider):
         """Test validation with generic 400 error without API key message."""
         mock_response = MagicMock()
         mock_response.status_code = 400
@@ -317,16 +295,13 @@ class TestGeminiProviderModelInfo:
 
     def test_get_model_info_gemini_1_5_pro(self):
         """Test getting model info for Gemini 1.5 Pro."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
         model_info = provider.get_model_info()
 
         assert model_info.name == "gemini-1.5-pro"
         assert model_info.provider == "gemini"
         assert (
-            model_info.description
-            == "Gemini 1.5 Pro - Most capable multimodal model"
+            model_info.description == "Gemini 1.5 Pro - Most capable multimodal model"
         )
         assert model_info.max_tokens == 2097152
         assert model_info.cost_per_token == 0.0000035
@@ -357,16 +332,13 @@ class TestGeminiProviderModelInfo:
 
     def test_get_model_info_gemini_1_0_pro(self):
         """Test getting model info for Gemini 1.0 Pro."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.0-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.0-pro")
         model_info = provider.get_model_info()
 
         assert model_info.name == "gemini-1.0-pro"
         assert model_info.provider == "gemini"
         assert (
-            model_info.description
-            == "Gemini 1.0 Pro - Reliable text generation model"
+            model_info.description == "Gemini 1.0 Pro - Reliable text generation model"
         )
         assert model_info.max_tokens == 32768
         assert model_info.cost_per_token == 0.0000005
@@ -377,9 +349,7 @@ class TestGeminiProviderModelInfo:
 
     def test_get_model_info_unknown_model(self):
         """Test getting model info for unknown model."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="unknown-model"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="unknown-model")
         model_info = provider.get_model_info()
 
         assert model_info.name == "unknown-model"
@@ -447,15 +417,10 @@ class TestGeminiProviderModelInfo:
         assert current_model_info.provider == matching_model.provider
         assert current_model_info.description == matching_model.description
         assert current_model_info.max_tokens == matching_model.max_tokens
+        assert current_model_info.cost_per_token == matching_model.cost_per_token
+        assert current_model_info.supports_tools == matching_model.supports_tools
         assert (
-            current_model_info.cost_per_token == matching_model.cost_per_token
-        )
-        assert (
-            current_model_info.supports_tools == matching_model.supports_tools
-        )
-        assert (
-            current_model_info.supports_multimodal
-            == matching_model.supports_multimodal
+            current_model_info.supports_multimodal == matching_model.supports_multimodal
         )
 
 
@@ -464,9 +429,7 @@ class TestGeminiProviderCapabilities:
 
     def test_supports_tools_gemini_1_5_pro(self):
         """Test tool support for Gemini 1.5 Pro."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
         assert provider.supports_tools() is True
 
     def test_supports_tools_gemini_1_5_flash(self):
@@ -478,16 +441,12 @@ class TestGeminiProviderCapabilities:
 
     def test_supports_tools_gemini_1_0_pro(self):
         """Test tool support for Gemini 1.0 Pro."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.0-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.0-pro")
         assert provider.supports_tools() is False
 
     def test_supports_multimodal_gemini_1_5_pro(self):
         """Test multimodal support for Gemini 1.5 Pro."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
         assert provider.supports_multimodal() is True
 
     def test_supports_multimodal_gemini_1_5_flash(self):
@@ -499,9 +458,7 @@ class TestGeminiProviderCapabilities:
 
     def test_supports_multimodal_gemini_1_0_pro(self):
         """Test multimodal support for Gemini 1.0 Pro."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.0-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.0-pro")
         assert provider.supports_multimodal() is False
 
 
@@ -522,9 +479,7 @@ class TestGeminiProviderMessageSending:
                 return_value=mock_response
             )
 
-            response = await gemini_provider.send_message(
-                "Hello", sample_chat_context
-            )
+            response = await gemini_provider.send_message("Hello", sample_chat_context)
 
             assert response.content == "Hello! How can I help you today?"
             assert response.model_used == "gemini-1.5-pro"
@@ -548,20 +503,14 @@ class TestGeminiProviderMessageSending:
             with pytest.raises(
                 ProviderError, match="Empty candidates in Gemini API response"
             ):
-                await gemini_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+                await gemini_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
-    async def test_send_message_empty_parts(
-        self, gemini_provider, sample_chat_context
-    ):
+    async def test_send_message_empty_parts(self, gemini_provider, sample_chat_context):
         """Test handling of empty parts in response."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "candidates": [{"content": {"parts": []}}]
-        }
+        mock_response.json.return_value = {"candidates": [{"content": {"parts": []}}]}
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
@@ -571,9 +520,7 @@ class TestGeminiProviderMessageSending:
             with pytest.raises(
                 ProviderError, match="Empty parts in Gemini API response"
             ):
-                await gemini_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+                await gemini_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_authentication_error(
@@ -582,21 +529,15 @@ class TestGeminiProviderMessageSending:
         """Test handling of authentication errors."""
         mock_response = MagicMock()
         mock_response.status_code = 400
-        mock_response.json.return_value = {
-            "error": {"message": "API_KEY_INVALID"}
-        }
+        mock_response.json.return_value = {"error": {"message": "API_KEY_INVALID"}}
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
                 return_value=mock_response
             )
 
-            with pytest.raises(
-                AuthenticationError, match="Invalid Gemini API key"
-            ):
-                await gemini_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+            with pytest.raises(AuthenticationError, match="Invalid Gemini API key"):
+                await gemini_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_rate_limit_error(
@@ -611,12 +552,8 @@ class TestGeminiProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(
-                RateLimitError, match="Gemini API rate limit exceeded"
-            ):
-                await gemini_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+            with pytest.raises(RateLimitError, match="Gemini API rate limit exceeded"):
+                await gemini_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_model_not_found(
@@ -635,9 +572,7 @@ class TestGeminiProviderMessageSending:
                 ModelNotFoundError,
                 match="Gemini model 'gemini-1.5-pro' not found",
             ):
-                await gemini_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+                await gemini_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_network_timeout(
@@ -649,12 +584,8 @@ class TestGeminiProviderMessageSending:
                 side_effect=httpx.TimeoutException("Request timed out")
             )
 
-            with pytest.raises(
-                NetworkError, match="Request to Gemini API timed out"
-            ):
-                await gemini_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+            with pytest.raises(NetworkError, match="Request to Gemini API timed out"):
+                await gemini_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_network_error(
@@ -667,9 +598,7 @@ class TestGeminiProviderMessageSending:
             )
 
             with pytest.raises(NetworkError, match="Network error"):
-                await gemini_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+                await gemini_provider.send_message("Hello", sample_chat_context)
 
 
 class TestGeminiProviderToolCalling:
@@ -746,9 +675,7 @@ class TestGeminiProviderToolCalling:
         self, sample_chat_context, sample_tools
     ):
         """Test tool calling with model that doesn't support tools."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.0-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.0-pro")
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -757,9 +684,7 @@ class TestGeminiProviderToolCalling:
                 {
                     "content": {
                         "parts": [
-                            {
-                                "text": "I can't use tools, but I can help with math."
-                            }
+                            {"text": "I can't use tools, but I can help with math."}
                         ]
                     }
                 }
@@ -776,10 +701,7 @@ class TestGeminiProviderToolCalling:
                 "Calculate 2 + 2", sample_chat_context, sample_tools
             )
 
-            assert (
-                response.content
-                == "I can't use tools, but I can help with math."
-            )
+            assert response.content == "I can't use tools, but I can help with math."
             assert response.tool_calls is None
 
     @pytest.mark.asyncio
@@ -791,11 +713,7 @@ class TestGeminiProviderToolCalling:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "candidates": [
-                {
-                    "content": {
-                        "parts": [{"text": "Hello! How can I help you?"}]
-                    }
-                }
+                {"content": {"parts": [{"text": "Hello! How can I help you?"}]}}
             ],
             "usageMetadata": {"totalTokenCount": 20},
         }
@@ -812,13 +730,9 @@ class TestGeminiProviderToolCalling:
             assert response.content == "Hello! How can I help you?"
             assert response.tool_calls is None
 
-    def test_convert_tools_to_gemini_format(
-        self, gemini_provider, sample_tools
-    ):
+    def test_convert_tools_to_gemini_format(self, gemini_provider, sample_tools):
         """Test conversion of tools to Gemini format."""
-        gemini_tools = gemini_provider._convert_tools_to_gemini_format(
-            sample_tools
-        )
+        gemini_tools = gemini_provider._convert_tools_to_gemini_format(sample_tools)
 
         assert len(gemini_tools) == 1
         assert "function_declarations" in gemini_tools[0]
@@ -827,16 +741,12 @@ class TestGeminiProviderToolCalling:
         assert len(function_declarations) == 2
 
         # Check calculate function
-        calc_func = next(
-            f for f in function_declarations if f["name"] == "calculate"
-        )
+        calc_func = next(f for f in function_declarations if f["name"] == "calculate")
         assert calc_func["description"] == "Perform mathematical calculations"
         assert "expression" in calc_func["parameters"]["properties"]
 
         # Check search function
-        search_func = next(
-            f for f in function_declarations if f["name"] == "search"
-        )
+        search_func = next(f for f in function_declarations if f["name"] == "search")
         assert search_func["description"] == "Search for information"
         assert "query" in search_func["parameters"]["properties"]
 
@@ -849,13 +759,9 @@ class TestGeminiProviderToolCalling:
 class TestGeminiProviderContentPreparation:
     """Test content preparation for API requests."""
 
-    def test_prepare_contents_with_context(
-        self, gemini_provider, sample_chat_context
-    ):
+    def test_prepare_contents_with_context(self, gemini_provider, sample_chat_context):
         """Test preparing contents with conversation context."""
-        contents = gemini_provider._prepare_contents(
-            "New message", sample_chat_context
-        )
+        contents = gemini_provider._prepare_contents("New message", sample_chat_context)
 
         assert len(contents) == 3  # 2 from context + 1 new message
 
@@ -865,9 +771,7 @@ class TestGeminiProviderContentPreparation:
 
         # Check second message (assistant -> model)
         assert contents[1]["role"] == "model"
-        assert (
-            contents[1]["parts"][0]["text"] == "Hi there! How can I help you?"
-        )
+        assert contents[1]["parts"][0]["text"] == "Hi there! How can I help you?"
 
         # Check new message
         assert contents[2]["role"] == "user"
@@ -892,9 +796,7 @@ class TestGeminiProviderContentPreparation:
 class TestGeminiProviderResponseHandling:
     """Test response handling functionality."""
 
-    def test_handle_response_success(
-        self, gemini_provider, mock_successful_response
-    ):
+    def test_handle_response_success(self, gemini_provider, mock_successful_response):
         """Test handling successful response."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -915,9 +817,7 @@ class TestGeminiProviderResponseHandling:
         mock_response.status_code = 200
         mock_response.json.return_value = mock_tool_response
 
-        chat_response = gemini_provider._handle_response_with_tools(
-            mock_response
-        )
+        chat_response = gemini_provider._handle_response_with_tools(mock_response)
 
         assert chat_response.content == "I'll help you with that calculation."
         assert chat_response.model_used == "gemini-1.5-pro"
@@ -932,15 +832,11 @@ class TestGeminiProviderResponseHandling:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "candidates": [
-                {"content": {"parts": [{"text": "Here's your answer: 4"}]}}
-            ],
+            "candidates": [{"content": {"parts": [{"text": "Here's your answer: 4"}]}}],
             "usageMetadata": {"totalTokenCount": 15},
         }
 
-        chat_response = gemini_provider._handle_response_with_tools(
-            mock_response
-        )
+        chat_response = gemini_provider._handle_response_with_tools(mock_response)
 
         assert chat_response.content == "Here's your answer: 4"
         assert chat_response.tool_calls is None
@@ -953,9 +849,7 @@ class TestGeminiProviderResponseHandling:
             "error": {"message": "Internal server error"}
         }
 
-        with pytest.raises(
-            ProviderError, match=r".*Gemini API server error.*"
-        ):
+        with pytest.raises(ProviderError, match=r".*Gemini API server error.*"):
             gemini_provider._handle_response(mock_response)
 
 
@@ -969,21 +863,13 @@ class TestGeminiProviderIntegration:
         responses = [
             {
                 "candidates": [
-                    {
-                        "content": {
-                            "parts": [{"text": "Hello! How can I help?"}]
-                        }
-                    }
+                    {"content": {"parts": [{"text": "Hello! How can I help?"}]}}
                 ],
                 "usageMetadata": {"totalTokenCount": 10},
             },
             {
                 "candidates": [
-                    {
-                        "content": {
-                            "parts": [{"text": "Sure, I can help with math."}]
-                        }
-                    }
+                    {"content": {"parts": [{"text": "Sure, I can help with math."}]}}
                 ],
                 "usageMetadata": {"totalTokenCount": 15},
             },
@@ -1048,11 +934,7 @@ class TestGeminiProviderIntegration:
                 mock_response.status_code = 200
                 mock_response.json.return_value = {
                     "candidates": [
-                        {
-                            "content": {
-                                "parts": [{"text": "Success after retry"}]
-                            }
-                        }
+                        {"content": {"parts": [{"text": "Success after retry"}]}}
                     ],
                     "usageMetadata": {"totalTokenCount": 20},
                 }
@@ -1065,14 +947,10 @@ class TestGeminiProviderIntegration:
 
             # First call should fail
             with pytest.raises(NetworkError):
-                await gemini_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+                await gemini_provider.send_message("Hello", sample_chat_context)
 
             # Second call should succeed
-            response = await gemini_provider.send_message(
-                "Hello", sample_chat_context
-            )
+            response = await gemini_provider.send_message("Hello", sample_chat_context)
             assert response.content == "Success after retry"
             assert call_count == 2
 
@@ -1082,18 +960,14 @@ class TestGeminiProviderEdgeCases:
 
     def test_model_info_data_consistency(self):
         """Test that model info data is consistent across different access methods."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
 
         # Get model info directly
         model_info = provider.get_model_info()
 
         # Get from available models list
         available_models = provider.get_available_models()
-        matching_model = next(
-            m for m in available_models if m.name == "gemini-1.5-pro"
-        )
+        matching_model = next(m for m in available_models if m.name == "gemini-1.5-pro")
 
         # Verify all key attributes match
         assert model_info.name == matching_model.name
@@ -1102,10 +976,7 @@ class TestGeminiProviderEdgeCases:
         assert model_info.max_tokens == matching_model.max_tokens
         assert model_info.cost_per_token == matching_model.cost_per_token
         assert model_info.supports_tools == matching_model.supports_tools
-        assert (
-            model_info.supports_multimodal
-            == matching_model.supports_multimodal
-        )
+        assert model_info.supports_multimodal == matching_model.supports_multimodal
         assert model_info.latest_version == matching_model.latest_version
 
     def test_all_models_have_required_attributes(self):
@@ -1116,15 +987,10 @@ class TestGeminiProviderEdgeCases:
         for model in models:
             # Check required attributes exist and have valid values
             assert isinstance(model.name, str) and model.name
-            assert (
-                isinstance(model.provider, str) and model.provider == "gemini"
-            )
+            assert isinstance(model.provider, str) and model.provider == "gemini"
             assert isinstance(model.description, str) and model.description
             assert isinstance(model.max_tokens, int) and model.max_tokens > 0
-            assert (
-                isinstance(model.cost_per_token, float)
-                and model.cost_per_token >= 0
-            )
+            assert isinstance(model.cost_per_token, float) and model.cost_per_token >= 0
             assert isinstance(model.available, bool)
             assert isinstance(model.supports_tools, bool)
             assert isinstance(model.supports_multimodal, bool)
@@ -1154,9 +1020,7 @@ class TestGeminiProviderEdgeCases:
             expected_multimodal,
             expected_latest,
         ) in test_cases:
-            provider = GeminiProvider(
-                api_key="AIzaSyTest123456789", model=model_name
-            )
+            provider = GeminiProvider(api_key="AIzaSyTest123456789", model=model_name)
 
             # Test provider methods
             assert provider.supports_tools() == expected_tools
@@ -1173,32 +1037,22 @@ class TestGeminiProviderEdgeCases:
         """Test credential validation with various edge cases."""
         # Test with None API key
         provider = GeminiProvider(api_key=None, model="gemini-1.5-pro")
-        with pytest.raises(
-            AuthenticationError, match="Gemini API key is required"
-        ):
+        with pytest.raises(AuthenticationError, match="Gemini API key is required"):
             await provider.validate_credentials()
 
         # Test with empty string API key
         provider = GeminiProvider(api_key="", model="gemini-1.5-pro")
-        with pytest.raises(
-            AuthenticationError, match="Gemini API key is required"
-        ):
+        with pytest.raises(AuthenticationError, match="Gemini API key is required"):
             await provider.validate_credentials()
 
         # Test with whitespace-only API key
         provider = GeminiProvider(api_key="   ", model="gemini-1.5-pro")
-        with pytest.raises(
-            AuthenticationError, match="Invalid Gemini API key format"
-        ):
+        with pytest.raises(AuthenticationError, match="Invalid Gemini API key format"):
             await provider.validate_credentials()
 
         # Test with API key that doesn't start with AIza
-        provider = GeminiProvider(
-            api_key="sk-1234567890", model="gemini-1.5-pro"
-        )
-        with pytest.raises(
-            AuthenticationError, match="Invalid Gemini API key format"
-        ):
+        provider = GeminiProvider(api_key="sk-1234567890", model="gemini-1.5-pro")
+        with pytest.raises(AuthenticationError, match="Invalid Gemini API key format"):
             await provider.validate_credentials()
 
     @pytest.mark.asyncio
@@ -1206,9 +1060,7 @@ class TestGeminiProviderEdgeCases:
         self, sample_chat_context
     ):
         """Test handling of various API response formats."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
 
         # Test response with multiple text parts (Gemini only uses first text part)
         mock_response = MagicMock()
@@ -1238,9 +1090,7 @@ class TestGeminiProviderEdgeCases:
 
     def test_provider_string_representations(self):
         """Test string representations of the provider."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
 
         # Test __str__ method (inherited from BaseProvider)
         str_repr = str(provider)
@@ -1254,16 +1104,12 @@ class TestGeminiProviderEdgeCases:
 
     def test_provider_name_method(self):
         """Test the get_provider_name method."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
         assert provider.get_provider_name() == "gemini"
 
     def test_max_tokens_method(self):
         """Test the get_max_tokens method."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
         max_tokens = provider.get_max_tokens()
         assert max_tokens == 2097152  # Should match model info
 
@@ -1276,9 +1122,7 @@ class TestGeminiProviderEdgeCases:
 
     def test_cost_estimation(self):
         """Test cost estimation functionality."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
 
         # Test cost estimation
         cost = provider.estimate_cost(input_tokens=1000, output_tokens=500)
@@ -1291,9 +1135,7 @@ class TestGeminiProviderEdgeCases:
         provider_old = GeminiProvider(
             api_key="AIzaSyTest123456789", model="gemini-1.0-pro"
         )
-        cost_old = provider_old.estimate_cost(
-            input_tokens=1000, output_tokens=500
-        )
+        cost_old = provider_old.estimate_cost(input_tokens=1000, output_tokens=500)
         expected_cost_old = 1500 * 0.0000005
         assert abs(cost_old - expected_cost_old) < 0.0000001
 
@@ -1304,9 +1146,7 @@ class TestGeminiProviderComprehensiveValidation:
     @pytest.mark.asyncio
     async def test_validate_credentials_comprehensive_error_scenarios(self):
         """Test comprehensive error scenarios for credential validation."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
 
         # Test various HTTP status codes
         error_scenarios = [
@@ -1320,13 +1160,11 @@ class TestGeminiProviderComprehensiveValidation:
         for status_code, expected_exception, description in error_scenarios:
             mock_response = MagicMock()
             mock_response.status_code = status_code
-            mock_response.json.return_value = {
-                "error": {"message": description}
-            }
+            mock_response.json.return_value = {"error": {"message": description}}
 
             with patch("httpx.AsyncClient") as mock_client:
-                mock_client.return_value.__aenter__.return_value.post = (
-                    AsyncMock(return_value=mock_response)
+                mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                    return_value=mock_response
                 )
 
                 with pytest.raises(expected_exception):
@@ -1341,9 +1179,7 @@ class TestGeminiProviderComprehensiveValidation:
         ]
 
         for model_name in supported_models:
-            provider = GeminiProvider(
-                api_key="AIzaSyTest123456789", model=model_name
-            )
+            provider = GeminiProvider(api_key="AIzaSyTest123456789", model=model_name)
             model_info = provider.get_model_info()
 
             # Verify all required fields are present and valid
@@ -1353,10 +1189,7 @@ class TestGeminiProviderComprehensiveValidation:
                 isinstance(model_info.description, str)
                 and len(model_info.description) > 0
             )
-            assert (
-                isinstance(model_info.max_tokens, int)
-                and model_info.max_tokens > 0
-            )
+            assert isinstance(model_info.max_tokens, int) and model_info.max_tokens > 0
             assert (
                 isinstance(model_info.cost_per_token, float)
                 and model_info.cost_per_token >= 0
@@ -1395,13 +1228,9 @@ class TestGeminiProviderComprehensiveValidation:
         assert all(model.provider == "gemini" for model in models)
 
     @pytest.mark.asyncio
-    async def test_tool_calling_comprehensive_scenarios(
-        self, sample_chat_context
-    ):
+    async def test_tool_calling_comprehensive_scenarios(self, sample_chat_context):
         """Test comprehensive tool calling scenarios."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
 
         # Test with complex tool definitions
         complex_tools = [
@@ -1480,13 +1309,9 @@ class TestGeminiProviderComprehensiveValidation:
             assert tool_call.arguments["format"] == "decimal"
 
     @pytest.mark.asyncio
-    async def test_error_handling_comprehensive_coverage(
-        self, sample_chat_context
-    ):
+    async def test_error_handling_comprehensive_coverage(self, sample_chat_context):
         """Test comprehensive error handling coverage."""
-        provider = GeminiProvider(
-            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
-        )
+        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
 
         # Test various network-related errors
         network_errors = [
@@ -1502,8 +1327,8 @@ class TestGeminiProviderComprehensiveValidation:
 
         for error, expected_exception, expected_message in network_errors:
             with patch("httpx.AsyncClient") as mock_client:
-                mock_client.return_value.__aenter__.return_value.post = (
-                    AsyncMock(side_effect=error)
+                mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                    side_effect=error
                 )
 
                 with pytest.raises(expected_exception, match=expected_message):

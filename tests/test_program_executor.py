@@ -3,36 +3,32 @@ Comprehensive tests for the Enhanced Program Executor.
 """
 
 import asyncio
-import pytest
-import tempfile
-import os
 import sys
 from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any, List
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Add project root to path for testing
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from omnimancer.core.agent.program_executor import (
-    EnhancedProgramExecutor,
-    CommandValidator,
-    StreamingExecutor,
     CommandCategory,
-    ExecutionMode,
     CommandResult,
+    CommandValidator,
+    EnhancedProgramExecutor,
     ExecutionConfig,
+    ExecutionMode,
     SecurityError,
-    TimeoutError,
-)
-from omnimancer.core.security.sandbox_manager import (
-    SandboxManager,
-    ResourceLimits,
+    StreamingExecutor,
 )
 from omnimancer.core.security.approval_workflow import (
     ApprovalWorkflow,
     RiskLevel,
+)
+from omnimancer.core.security.sandbox_manager import (
+    SandboxManager,
 )
 
 
@@ -80,27 +76,20 @@ class TestCommandValidator:
     def test_command_categories(self, command_validator):
         """Test command categorization."""
         # Safe read commands
+        assert command_validator.get_command_category("ls") == CommandCategory.SAFE_READ
         assert (
-            command_validator.get_command_category("ls")
-            == CommandCategory.SAFE_READ
+            command_validator.get_command_category("cat") == CommandCategory.SAFE_READ
         )
         assert (
-            command_validator.get_command_category("cat")
-            == CommandCategory.SAFE_READ
-        )
-        assert (
-            command_validator.get_command_category("grep")
-            == CommandCategory.SAFE_READ
+            command_validator.get_command_category("grep") == CommandCategory.SAFE_READ
         )
 
         # Development commands
         assert (
-            command_validator.get_command_category("git")
-            == CommandCategory.DEVELOPMENT
+            command_validator.get_command_category("git") == CommandCategory.DEVELOPMENT
         )
         assert (
-            command_validator.get_command_category("npm")
-            == CommandCategory.DEVELOPMENT
+            command_validator.get_command_category("npm") == CommandCategory.DEVELOPMENT
         )
         assert (
             command_validator.get_command_category("python")
@@ -108,67 +97,36 @@ class TestCommandValidator:
         )
 
         # Dangerous commands
+        assert command_validator.get_command_category("rm") == CommandCategory.DANGEROUS
         assert (
-            command_validator.get_command_category("rm")
-            == CommandCategory.DANGEROUS
+            command_validator.get_command_category("sudo") == CommandCategory.DANGEROUS
         )
         assert (
-            command_validator.get_command_category("sudo")
-            == CommandCategory.DANGEROUS
-        )
-        assert (
-            command_validator.get_command_category("chmod")
-            == CommandCategory.DANGEROUS
+            command_validator.get_command_category("chmod") == CommandCategory.DANGEROUS
         )
 
         # Unknown command
-        assert (
-            command_validator.get_command_category("unknown_command") is None
-        )
+        assert command_validator.get_command_category("unknown_command") is None
 
     def test_execution_mode_permissions(self, command_validator):
         """Test command permissions by execution mode."""
         # Restricted mode - only safe read
-        assert command_validator.is_command_allowed(
-            "ls", ExecutionMode.RESTRICTED
-        )
-        assert command_validator.is_command_allowed(
-            "cat", ExecutionMode.RESTRICTED
-        )
-        assert not command_validator.is_command_allowed(
-            "git", ExecutionMode.RESTRICTED
-        )
-        assert not command_validator.is_command_allowed(
-            "rm", ExecutionMode.RESTRICTED
-        )
+        assert command_validator.is_command_allowed("ls", ExecutionMode.RESTRICTED)
+        assert command_validator.is_command_allowed("cat", ExecutionMode.RESTRICTED)
+        assert not command_validator.is_command_allowed("git", ExecutionMode.RESTRICTED)
+        assert not command_validator.is_command_allowed("rm", ExecutionMode.RESTRICTED)
 
         # Development mode - safe read + development + system info
-        assert command_validator.is_command_allowed(
-            "ls", ExecutionMode.DEVELOPMENT
-        )
-        assert command_validator.is_command_allowed(
-            "git", ExecutionMode.DEVELOPMENT
-        )
-        assert command_validator.is_command_allowed(
-            "ps", ExecutionMode.DEVELOPMENT
-        )
-        assert not command_validator.is_command_allowed(
-            "rm", ExecutionMode.DEVELOPMENT
-        )
+        assert command_validator.is_command_allowed("ls", ExecutionMode.DEVELOPMENT)
+        assert command_validator.is_command_allowed("git", ExecutionMode.DEVELOPMENT)
+        assert command_validator.is_command_allowed("ps", ExecutionMode.DEVELOPMENT)
+        assert not command_validator.is_command_allowed("rm", ExecutionMode.DEVELOPMENT)
 
         # Full access mode - includes network and build tools
-        assert command_validator.is_command_allowed(
-            "ls", ExecutionMode.FULL_ACCESS
-        )
-        assert command_validator.is_command_allowed(
-            "git", ExecutionMode.FULL_ACCESS
-        )
-        assert command_validator.is_command_allowed(
-            "docker", ExecutionMode.FULL_ACCESS
-        )
-        assert command_validator.is_command_allowed(
-            "curl", ExecutionMode.FULL_ACCESS
-        )
+        assert command_validator.is_command_allowed("ls", ExecutionMode.FULL_ACCESS)
+        assert command_validator.is_command_allowed("git", ExecutionMode.FULL_ACCESS)
+        assert command_validator.is_command_allowed("docker", ExecutionMode.FULL_ACCESS)
+        assert command_validator.is_command_allowed("curl", ExecutionMode.FULL_ACCESS)
         assert not command_validator.is_command_allowed(
             "rm", ExecutionMode.FULL_ACCESS
         )  # Still blocked
@@ -176,13 +134,9 @@ class TestCommandValidator:
     def test_risk_assessment(self, command_validator):
         """Test command risk assessment."""
         # Low risk commands
+        assert command_validator.assess_command_risk("ls", ["-la"]) == RiskLevel.LOW
         assert (
-            command_validator.assess_command_risk("ls", ["-la"])
-            == RiskLevel.LOW
-        )
-        assert (
-            command_validator.assess_command_risk("cat", ["file.txt"])
-            == RiskLevel.LOW
+            command_validator.assess_command_risk("cat", ["file.txt"]) == RiskLevel.LOW
         )
 
         # Medium risk commands
@@ -197,15 +151,11 @@ class TestCommandValidator:
 
         # High risk commands
         assert (
-            command_validator.assess_command_risk(
-                "curl", ["http://example.com"]
-            )
+            command_validator.assess_command_risk("curl", ["http://example.com"])
             == RiskLevel.HIGH
         )
         assert (
-            command_validator.assess_command_risk(
-                "apt", ["install", "package"]
-            )
+            command_validator.assess_command_risk("apt", ["install", "package"])
             == RiskLevel.HIGH
         )
 
@@ -243,9 +193,7 @@ class TestCommandValidator:
 
         # Dangerous arguments with shell metacharacters
         with pytest.raises(SecurityError):
-            command_validator.validate_command_args(
-                "ls", ["file.txt; rm -rf /"]
-            )
+            command_validator.validate_command_args("ls", ["file.txt; rm -rf /"])
 
         with pytest.raises(SecurityError):
             command_validator.validate_command_args(
@@ -309,9 +257,7 @@ class TestEnhancedProgramExecutor:
     """Test the enhanced program executor."""
 
     @pytest.mark.asyncio
-    async def test_simple_command_execution(
-        self, program_executor, execution_config
-    ):
+    async def test_simple_command_execution(self, program_executor, execution_config):
         """Test basic command execution."""
         # Disable streaming to avoid mock complexity
         execution_config.enable_streaming = False
@@ -336,9 +282,7 @@ class TestEnhancedProgramExecutor:
             assert result.args == ["hello", "world"]
 
     @pytest.mark.asyncio
-    async def test_command_validation_failure(
-        self, program_executor, execution_config
-    ):
+    async def test_command_validation_failure(self, program_executor, execution_config):
         """Test command validation failure."""
         # Try to execute a dangerous command
         result = await program_executor.execute_command(
@@ -365,9 +309,7 @@ class TestEnhancedProgramExecutor:
             mock_process.wait.return_value = None
             mock_subprocess.return_value = mock_process
 
-            result = await program_executor.execute_command(
-                "sleep", ["10"], config
-            )
+            result = await program_executor.execute_command("sleep", ["10"], config)
 
             assert result.success is False
             assert result.was_terminated is True
@@ -386,9 +328,7 @@ class TestEnhancedProgramExecutor:
             return_value=mock_request
         )
 
-        result = await program_executor.execute_command(
-            "git", ["status"], config
-        )
+        result = await program_executor.execute_command("git", ["status"], config)
 
         assert result.success is False
         assert "denied" in result.error_message.lower()
@@ -407,9 +347,7 @@ class TestEnhancedProgramExecutor:
             mock_subprocess.return_value = mock_process
 
             # Execute a few commands
-            await program_executor.execute_command(
-                "ls", ["-la"], execution_config
-            )
+            await program_executor.execute_command("ls", ["-la"], execution_config)
             await program_executor.execute_command("pwd", [], execution_config)
 
             history = program_executor.get_execution_history()
@@ -442,34 +380,20 @@ class TestEnhancedProgramExecutor:
     def test_execution_modes(self, command_validator):
         """Test different execution modes."""
         # Restricted mode
-        assert command_validator.is_command_allowed(
-            "ls", ExecutionMode.RESTRICTED
-        )
-        assert not command_validator.is_command_allowed(
-            "git", ExecutionMode.RESTRICTED
-        )
+        assert command_validator.is_command_allowed("ls", ExecutionMode.RESTRICTED)
+        assert not command_validator.is_command_allowed("git", ExecutionMode.RESTRICTED)
 
         # Development mode
-        assert command_validator.is_command_allowed(
-            "ls", ExecutionMode.DEVELOPMENT
-        )
-        assert command_validator.is_command_allowed(
-            "git", ExecutionMode.DEVELOPMENT
-        )
+        assert command_validator.is_command_allowed("ls", ExecutionMode.DEVELOPMENT)
+        assert command_validator.is_command_allowed("git", ExecutionMode.DEVELOPMENT)
         assert not command_validator.is_command_allowed(
             "docker", ExecutionMode.DEVELOPMENT
         )
 
         # Full access mode
-        assert command_validator.is_command_allowed(
-            "ls", ExecutionMode.FULL_ACCESS
-        )
-        assert command_validator.is_command_allowed(
-            "git", ExecutionMode.FULL_ACCESS
-        )
-        assert command_validator.is_command_allowed(
-            "docker", ExecutionMode.FULL_ACCESS
-        )
+        assert command_validator.is_command_allowed("ls", ExecutionMode.FULL_ACCESS)
+        assert command_validator.is_command_allowed("git", ExecutionMode.FULL_ACCESS)
+        assert command_validator.is_command_allowed("docker", ExecutionMode.FULL_ACCESS)
 
 
 class TestCommandResult:
@@ -588,9 +512,7 @@ async def test_integration_with_real_commands():
 
     # Test echo command (universally available and safe)
     try:
-        result = await executor.execute_command(
-            "echo", ["hello", "world"], config
-        )
+        result = await executor.execute_command("echo", ["hello", "world"], config)
 
         if result.success:
             assert "hello world" in result.stdout

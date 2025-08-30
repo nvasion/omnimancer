@@ -6,13 +6,11 @@ including serialization, file management, and conversation organization.
 """
 
 import json
-import os
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Optional
 
-from .models import ChatContext, ChatMessage, MessageRole
 from ..utils.errors import ConversationError
+from .models import ChatContext, ChatMessage, MessageRole
 
 
 class ConversationManager:
@@ -124,9 +122,7 @@ class ConversationManager:
             file_path = self.conversations_dir / filename
 
             if not file_path.exists():
-                raise ConversationError(
-                    f"Conversation file not found: {filename}"
-                )
+                raise ConversationError(f"Conversation file not found: {filename}")
 
             # Load conversation data
             with open(file_path, "r", encoding="utf-8") as f:
@@ -155,9 +151,7 @@ class ConversationManager:
                 messages=messages,
                 current_model=conversation_data.get("current_model", ""),
                 session_id=conversation_data.get("session_id", ""),
-                max_context_length=conversation_data.get(
-                    "max_context_length", 4000
-                ),
+                max_context_length=conversation_data.get("max_context_length", 4000),
             )
 
             return context
@@ -205,9 +199,7 @@ class ConversationManager:
                     continue
 
             # Sort by creation date (newest first)
-            conversations.sort(
-                key=lambda x: x.get("created_at", ""), reverse=True
-            )
+            conversations.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
         except Exception:
             # Return empty list if directory can't be read
@@ -273,9 +265,7 @@ class ConversationManager:
                 "current_model": data.get("current_model", ""),
                 "message_count": len(data.get("messages", [])),
                 "file_size": stat.st_size,
-                "modified_at": datetime.fromtimestamp(
-                    stat.st_mtime
-                ).isoformat(),
+                "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                 "metadata": data.get("metadata", {}),
             }
 
@@ -308,9 +298,7 @@ class ConversationManager:
                 # Already in JSON format
                 return str(self.conversations_dir / filename)
             else:
-                raise ConversationError(
-                    f"Unsupported export format: {export_format}"
-                )
+                raise ConversationError(f"Unsupported export format: {export_format}")
 
         except Exception as e:
             raise ConversationError(f"Failed to export conversation: {e}")
@@ -354,9 +342,7 @@ class ConversationManager:
                 if msg.role == MessageRole.USER:
                     f.write(f"## 👤 {role} ({timestamp})\n\n")
                 elif msg.role == MessageRole.ASSISTANT:
-                    model_info = (
-                        f" - {msg.model_used}" if msg.model_used else ""
-                    )
+                    model_info = f" - {msg.model_used}" if msg.model_used else ""
                     f.write(f"## 🤖 {role}{model_info} ({timestamp})\n\n")
                 else:
                     f.write(f"## ⚙️ {role} ({timestamp})\n\n")

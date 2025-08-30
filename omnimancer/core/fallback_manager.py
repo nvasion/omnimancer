@@ -9,18 +9,16 @@ import asyncio
 import logging
 import random
 import time
-from typing import Dict, List, Optional, Any, Callable, Tuple, Set
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from .health_monitor import HealthMonitor, HealthResult
-from .models import ProviderConfig
 from ..utils.errors import (
+    NetworkError,
     ProviderError,
     ProviderUnavailableError,
-    NetworkError,
 )
+from .health_monitor import HealthMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -103,9 +101,7 @@ class EnhancedProviderFallback:
     health monitoring, and context preservation.
     """
 
-    def __init__(
-        self, core_engine, health_monitor: Optional[HealthMonitor] = None
-    ):
+    def __init__(self, core_engine, health_monitor: Optional[HealthMonitor] = None):
         """
         Initialize the enhanced fallback manager.
 
@@ -199,9 +195,7 @@ class EnhancedProviderFallback:
         """
         original_provider = self.core_engine.current_provider
         original_provider_name = (
-            original_provider.get_provider_name()
-            if original_provider
-            else None
+            original_provider.get_provider_name() if original_provider else None
         )
 
         # Preserve context if enabled
@@ -221,13 +215,8 @@ class EnhancedProviderFallback:
 
             try:
                 # Switch to provider if needed
-                if (
-                    not original_provider
-                    or original_provider_name != provider_name
-                ):
-                    switch_success = await self.core_engine.switch_model(
-                        provider_name
-                    )
+                if not original_provider or original_provider_name != provider_name:
+                    switch_success = await self.core_engine.switch_model(provider_name)
                     if not switch_success:
                         continue
 
@@ -282,9 +271,7 @@ class EnhancedProviderFallback:
         if last_error:
             raise ProviderUnavailableError(
                 f"All providers failed. Last error: {last_error}",
-                fallback_providers=[
-                    a.provider_name for a in fallback_attempts
-                ],
+                fallback_providers=[a.provider_name for a in fallback_attempts],
             )
         else:
             raise ProviderError("No providers available for fallback")
@@ -320,9 +307,7 @@ class EnhancedProviderFallback:
                         self.max_retry_delay,
                     )
                     # Add jitter
-                    jitter = (
-                        delay * self.jitter_factor * (random.random() - 0.5)
-                    )
+                    jitter = delay * self.jitter_factor * (random.random() - 0.5)
                     delay += jitter
 
                     logger.debug(
@@ -344,9 +329,7 @@ class EnhancedProviderFallback:
 
         # Start with current provider if available
         if self.core_engine.current_provider:
-            current_name = (
-                self.core_engine.current_provider.get_provider_name()
-            )
+            current_name = self.core_engine.current_provider.get_provider_name()
             if current_name not in self.excluded_providers:
                 available_providers.append(current_name)
 
@@ -361,9 +344,7 @@ class EnhancedProviderFallback:
         # Sort by reliability score and ranking
         def sort_key(provider_name: str) -> Tuple[float, int]:
             stats = self.provider_stats.get(provider_name, ProviderStats())
-            ranking = self.provider_rankings.get(
-                provider_name, ProviderRank.SECONDARY
-            )
+            ranking = self.provider_rankings.get(provider_name, ProviderRank.SECONDARY)
             return (-stats.reliability_score, ranking.value)
 
         available_providers.sort(key=sort_key)
@@ -374,7 +355,7 @@ class EnhancedProviderFallback:
     def _classify_error(self, error: Exception) -> FallbackReason:
         """Classify error to determine appropriate fallback strategy."""
         error_str = str(error).lower()
-        error_type = type(error).__name__
+        type(error).__name__
 
         if "rate limit" in error_str or "429" in error_str:
             return FallbackReason.RATE_LIMIT
@@ -494,9 +475,7 @@ class EnhancedProviderFallback:
                 context = self.core_engine.chat_manager.get_current_context()
                 self.preserved_context = {
                     "messages": (
-                        context.messages.copy()
-                        if hasattr(context, "messages")
-                        else []
+                        context.messages.copy() if hasattr(context, "messages") else []
                     ),
                     "session_id": getattr(context, "session_id", None),
                     "metadata": getattr(context, "metadata", {}),
@@ -508,9 +487,7 @@ class EnhancedProviderFallback:
     async def _restore_context(self):
         """Restore preserved conversation context."""
         try:
-            if self.preserved_context and hasattr(
-                self.core_engine, "chat_manager"
-            ):
+            if self.preserved_context and hasattr(self.core_engine, "chat_manager"):
                 # This would require implementation in ChatManager
                 # For now, just log the attempt
                 logger.debug("Context restoration would be implemented here")
@@ -523,9 +500,7 @@ class EnhancedProviderFallback:
 
         # Trim history if too large
         if len(self.fallback_history) > self.max_history_size:
-            self.fallback_history = self.fallback_history[
-                -self.max_history_size :
-            ]
+            self.fallback_history = self.fallback_history[-self.max_history_size :]
 
     def get_provider_stats(self) -> Dict[str, Dict[str, Any]]:
         """Get statistics for all providers."""
@@ -566,10 +541,8 @@ class EnhancedProviderFallback:
 
         try:
             config = self.core_engine.config_manager.get_config()
-            health_result = (
-                await self.health_monitor.check_all_providers_health(
-                    config.providers, force=True
-                )
+            health_result = await self.health_monitor.check_all_providers_health(
+                config.providers, force=True
             )
             return health_result
         except Exception as e:
@@ -586,9 +559,7 @@ class EnhancedProviderFallback:
             self.provider_stats.clear()
             logger.info("Reset stats for all providers")
 
-    def configure_circuit_breaker(
-        self, threshold: int = 5, recovery_time: int = 600
-    ):
+    def configure_circuit_breaker(self, threshold: int = 5, recovery_time: int = 600):
         """Configure circuit breaker settings."""
         self.circuit_breaker_threshold = threshold
         self.circuit_breaker_recovery_time = recovery_time

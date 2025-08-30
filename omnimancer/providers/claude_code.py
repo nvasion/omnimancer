@@ -5,20 +5,18 @@ This module provides the Claude-code provider implementation for local Claude-co
 with support for opus and sonnet modes with free access.
 """
 
-import httpx
-import subprocess
-import json
 import os
+import subprocess
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List
+
 
 from ..core.models import ChatContext, ChatResponse, EnhancedModelInfo
 from ..utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    ProviderError,
+    RateLimitError,
 )
 from .base import BaseProvider
 
@@ -40,9 +38,7 @@ class ClaudeCodeProvider(BaseProvider):
             model: Claude-code model mode (e.g., 'claude-code-sonnet', 'claude-code-opus', 'claude-code-haiku')
             **kwargs: Additional configuration including Claude-code specific settings
         """
-        super().__init__(
-            api_key or "local", model or "claude-code-sonnet", **kwargs
-        )
+        super().__init__(api_key or "local", model or "claude-code-sonnet", **kwargs)
 
         # Claude-code specific configuration
         self.claude_code_mode = kwargs.get(
@@ -105,15 +101,11 @@ class ClaudeCodeProvider(BaseProvider):
         except subprocess.TimeoutExpired:
             raise ProviderError("Claude command timed out")
         except FileNotFoundError:
-            raise ProviderError(
-                f"Claude executable not found: {self.claude_code_path}"
-            )
+            raise ProviderError(f"Claude executable not found: {self.claude_code_path}")
         except Exception as e:
             raise ProviderError(f"Error validating Claude installation: {e}")
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to Claude-code.
 
@@ -145,10 +137,7 @@ class ClaudeCodeProvider(BaseProvider):
         try:
             # Test with a simple message
             test_result = await self._execute_claude_code("Hi")
-            return (
-                test_result.returncode == 0
-                and test_result.stdout.strip() != ""
-            )
+            return test_result.returncode == 0 and test_result.stdout.strip() != ""
         except Exception:
             return False
 
@@ -263,24 +252,17 @@ class ClaudeCodeProvider(BaseProvider):
             )
         else:
             # Error occurred
-            error_msg = (
-                result.stderr.strip() if result.stderr else "Unknown error"
-            )
+            error_msg = result.stderr.strip() if result.stderr else "Unknown error"
 
             # Check for common error patterns
-            if (
-                "authentication" in error_msg.lower()
-                or "api key" in error_msg.lower()
-            ):
+            if "authentication" in error_msg.lower() or "api key" in error_msg.lower():
                 raise AuthenticationError(
                     f"Claude-code authentication error: {error_msg}"
                 )
             elif "rate limit" in error_msg.lower():
                 raise RateLimitError(f"Claude-code rate limit: {error_msg}")
             elif "not found" in error_msg.lower():
-                raise ModelNotFoundError(
-                    f"Claude-code model not found: {error_msg}"
-                )
+                raise ModelNotFoundError(f"Claude-code model not found: {error_msg}")
             else:
                 raise ProviderError(f"Claude-code error: {error_msg}")
 

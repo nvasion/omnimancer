@@ -5,41 +5,36 @@ This module integrates the display of proposed changes with the file system mana
 and approval workflow, providing a seamless interface for showing file modifications.
 """
 
-import asyncio
-import logging
 import difflib
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple, Union
+import logging
 from dataclasses import dataclass, field
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.text import Text
 from rich.table import Table
-from rich.columns import Columns
-from rich.syntax import Syntax
+from rich.text import Text
 
-from .file_content_display import (
-    UnifiedFileContentDisplay,
-    FileDisplayConfig,
-    DisplayMode,
+from ..security.approval_workflow import RiskLevel
+from .approval_manager import (
+    ChangeType,
+    EnhancedApprovalManager,
 )
 from .diff_renderer import (
-    EnhancedDiffRenderer,
     DiffType,
+    EnhancedDiffRenderer,
     FileChange,
     FileChangeType,
 )
-from .approval_manager import (
-    EnhancedApprovalManager,
-    ChangePreview,
-    ChangeType,
-    PreviewFormat,
+from .file_content_display import (
+    DisplayMode,
+    FileDisplayConfig,
+    UnifiedFileContentDisplay,
 )
 from .file_system_manager import FileSystemManager
-from ..security.approval_workflow import RiskLevel
 
 logger = logging.getLogger(__name__)
 
@@ -153,10 +148,8 @@ class ProposedChangesIntegration:
 
             # Get operations from approval manager
             if hasattr(self.approval_manager, "get_pending_operations"):
-                operations = (
-                    await self.approval_manager.get_pending_operations(
-                        operation_id
-                    )
+                operations = await self.approval_manager.get_pending_operations(
+                    operation_id
                 )
             else:
                 operations = []
@@ -261,17 +254,11 @@ class ProposedChangesIntegration:
             elif line.startswith("@@"):
                 annotated_text.append(f"\n{line}\n", style="bold cyan")
             elif line.startswith("+"):
-                annotated_text.append(
-                    f"{line_num:4d} + {line[1:]}", style="green"
-                )
+                annotated_text.append(f"{line_num:4d} + {line[1:]}", style="green")
             elif line.startswith("-"):
-                annotated_text.append(
-                    f"{line_num:4d} - {line[1:]}", style="red"
-                )
+                annotated_text.append(f"{line_num:4d} - {line[1:]}", style="red")
             else:
-                annotated_text.append(
-                    f"{line_num:4d}   {line}", style="dim white"
-                )
+                annotated_text.append(f"{line_num:4d}   {line}", style="dim white")
 
         # Display in panel
         panel = Panel(
@@ -377,9 +364,7 @@ class ProposedChangesIntegration:
         """
         stats = {
             "total_changes": len(change_set.changes),
-            "files_affected": len(
-                set(c.file_path for c in change_set.changes)
-            ),
+            "files_affected": len(set(c.file_path for c in change_set.changes)),
             "operations": {},
             "risk_distribution": {},
             "total_lines_added": 0,
@@ -389,13 +374,9 @@ class ProposedChangesIntegration:
         for change in change_set.changes:
             # Count operations
             op_type = (
-                change.operation_type.value
-                if change.operation_type
-                else "unknown"
+                change.operation_type.value if change.operation_type else "unknown"
             )
-            stats["operations"][op_type] = (
-                stats["operations"].get(op_type, 0) + 1
-            )
+            stats["operations"][op_type] = stats["operations"].get(op_type, 0) + 1
 
             # Count risk levels
             risk = change.risk_level.value if change.risk_level else "unknown"
@@ -405,12 +386,8 @@ class ProposedChangesIntegration:
 
             # Count line changes
             if change.line_changes:
-                stats["total_lines_added"] += change.line_changes.get(
-                    "added", 0
-                )
-                stats["total_lines_removed"] += change.line_changes.get(
-                    "removed", 0
-                )
+                stats["total_lines_added"] += change.line_changes.get("added", 0)
+                stats["total_lines_removed"] += change.line_changes.get("removed", 0)
 
         return stats
 
@@ -454,9 +431,7 @@ class ProposedChangesIntegration:
             line_changes=line_changes,
         )
 
-    def _calculate_line_changes(
-        self, original: str, modified: str
-    ) -> Dict[str, Any]:
+    def _calculate_line_changes(self, original: str, modified: str) -> Dict[str, Any]:
         """Calculate line changes between two contents."""
         original_lines = original.splitlines()
         modified_lines = modified.splitlines()
@@ -490,9 +465,7 @@ class ProposedChangesIntegration:
             RiskLevel.CRITICAL: 10.0,
         }
 
-        total = sum(
-            risk_scores.get(change.risk_level, 1.0) for change in changes
-        )
+        total = sum(risk_scores.get(change.risk_level, 1.0) for change in changes)
         return total / len(changes) if changes else 0.0
 
     def _display_change_set_header(self, change_set: ChangeSet):
@@ -508,14 +481,10 @@ class ProposedChangesIntegration:
         header_table.add_row("Description:", change_set.description)
         header_table.add_row("Total Changes:", str(stats["total_changes"]))
         header_table.add_row("Files Affected:", str(stats["files_affected"]))
-        header_table.add_row(
-            "Risk Score:", f"{change_set.total_risk_score:.1f}"
-        )
+        header_table.add_row("Risk Score:", f"{change_set.total_risk_score:.1f}")
 
         # Create risk distribution bar
-        risk_bar = self._create_risk_distribution_bar(
-            stats["risk_distribution"]
-        )
+        risk_bar = self._create_risk_distribution_bar(stats["risk_distribution"])
         header_table.add_row("Risk Distribution:", risk_bar)
 
         panel = Panel(
@@ -542,11 +511,7 @@ class ProposedChangesIntegration:
             summary_table.add_row(
                 str(i),
                 change.file_path,
-                (
-                    change.operation_type.value
-                    if change.operation_type
-                    else "unknown"
-                ),
+                (change.operation_type.value if change.operation_type else "unknown"),
                 f"[{risk_color}]{change.risk_level.value if change.risk_level else 'unknown'}[/{risk_color}]",
                 summary[:50] + "..." if len(summary) > 50 else summary,
             )
@@ -580,11 +545,9 @@ class ProposedChangesIntegration:
                     {"interactive": False},
                 )
 
-    async def _get_change_approval(
-        self, change_set: ChangeSet
-    ) -> Dict[str, Any]:
+    async def _get_change_approval(self, change_set: ChangeSet) -> Dict[str, Any]:
         """Get user approval for changes."""
-        from rich.prompt import Confirm, Prompt
+        from rich.prompt import Prompt
 
         # Show options
         self.console.print("\n[bold]Options:[/bold]")
@@ -593,9 +556,7 @@ class ProposedChangesIntegration:
         self.console.print("  [red]D[/red] - Deny all changes")
         self.console.print("  [cyan]V[/cyan] - View detailed changes")
 
-        choice = Prompt.ask(
-            "Your choice", choices=["A", "S", "D", "V"], default="V"
-        )
+        choice = Prompt.ask("Your choice", choices=["A", "S", "D", "V"], default="V")
 
         if choice == "A":
             change_set.approved = True
@@ -612,14 +573,10 @@ class ProposedChangesIntegration:
         else:  # V
             # Show detailed view and ask again
             for change in change_set.changes:
-                await self._display_single_change(
-                    change, ChangeDisplayMode.UNIFIED
-                )
+                await self._display_single_change(change, ChangeDisplayMode.UNIFIED)
             return await self._get_change_approval(change_set)
 
-    async def _select_specific_changes(
-        self, change_set: ChangeSet
-    ) -> List[int]:
+    async def _select_specific_changes(self, change_set: ChangeSet) -> List[int]:
         """Let user select specific changes to apply."""
         from rich.prompt import Prompt
 
@@ -639,9 +596,7 @@ class ProposedChangesIntegration:
             self.console.print("[red]Invalid selection[/red]")
             return []
 
-    async def _apply_single_change(
-        self, change: ProposedChange
-    ) -> Dict[str, Any]:
+    async def _apply_single_change(self, change: ProposedChange) -> Dict[str, Any]:
         """Apply a single change to the file system."""
         try:
             if change.operation_type == ChangeType.FILE_CREATE:
@@ -653,9 +608,7 @@ class ProposedChangesIntegration:
                     change.file_path, change.modified_content or ""
                 )
             elif change.operation_type == ChangeType.FILE_DELETE:
-                return await self.file_system_manager.delete_file(
-                    change.file_path
-                )
+                return await self.file_system_manager.delete_file(change.file_path)
             else:
                 return {
                     "success": False,
@@ -664,9 +617,7 @@ class ProposedChangesIntegration:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _create_risk_distribution_bar(
-        self, risk_distribution: Dict[str, int]
-    ) -> str:
+    def _create_risk_distribution_bar(self, risk_distribution: Dict[str, int]) -> str:
         """Create a visual risk distribution bar."""
         total = sum(risk_distribution.values())
         if total == 0:

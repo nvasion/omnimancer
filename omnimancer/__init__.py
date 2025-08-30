@@ -9,6 +9,11 @@ __version__ = "0.1.0"
 __author__ = "Omnimancer Team"
 __description__ = "Unified CLI for multiple AI language models"
 
+from .cli.commands import (
+    Command,
+    CommandType,
+    SlashCommand,
+)
 from .core.models import (
     ChatContext,
     ChatMessage,
@@ -16,16 +21,11 @@ from .core.models import (
     Config,
     ModelInfo,
 )
+from .providers.base import BaseProvider
 from .utils.errors import (
     OmnimancerError,
     ProviderError,
 )
-from .cli.commands import (
-    Command,
-    CommandType,
-    SlashCommand,
-)
-from .providers.base import BaseProvider
 
 __all__ = [
     "BaseProvider",

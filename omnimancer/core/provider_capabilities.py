@@ -5,9 +5,9 @@ This module defines the inherent capabilities and default settings for each prov
 eliminating the need to store null values in configuration files.
 """
 
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class ProviderType(str, Enum):
@@ -375,9 +375,7 @@ def get_essential_config_fields() -> List[str]:
     ]
 
 
-def should_store_in_config(
-    field_name: str, value: Any, provider_type: str
-) -> bool:
+def should_store_in_config(field_name: str, value: Any, provider_type: str) -> bool:
     """
     Determine if a configuration field should be stored in the config file.
 

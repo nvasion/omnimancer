@@ -7,19 +7,15 @@ and error recovery patterns.
 """
 
 import unittest
-import sys
-import io
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import Mock, patch
 
 from omnimancer.utils.errors import (
-    OmnimancerError,
     AgentError,
-    SecurityError,
-    PermissionError,
     ExecutionError,
+    OmnimancerError,
+    PermissionError,
+    SecurityError,
     TimeoutError,
-    ConfigurationError,
 )
 
 
@@ -103,9 +99,9 @@ class TestAgentErrorHandling(unittest.TestCase):
 
     def test_agent_engine_path_validation_errors(self):
         """Test agent engine handles path validation errors gracefully."""
+
         from omnimancer.core.agent_engine import AgentEngine
         from omnimancer.core.config_manager import ConfigManager
-        from pathlib import Path
 
         # Create agent with properly mocked config manager
         mock_config_manager = Mock(spec=ConfigManager)
@@ -114,22 +110,18 @@ class TestAgentErrorHandling(unittest.TestCase):
         mock_config_manager.get_config.return_value = mock_config
 
         # Patch ConversationManager import and other CoreEngine dependencies
-        with patch("omnimancer.core.engine.ConversationManager"), patch(
-            "omnimancer.core.agent_engine.ProgramExecutor"
-        ), patch("omnimancer.core.agent_engine.WebClient"), patch(
-            "omnimancer.core.agent_engine.MCPIntegrator"
-        ), patch(
-            "omnimancer.core.agent_engine.ApprovalWorkflow"
-        ), patch(
-            "omnimancer.core.agent_engine.EnhancedApprovalManager"
-        ), patch(
-            "omnimancer.core.agent_engine.ApprovalInterface"
-        ), patch(
-            "omnimancer.core.agent_engine.ApprovalManager"
-        ), patch(
-            "omnimancer.core.agent_engine.ProviderFallback"
+        with (
+            patch("omnimancer.core.engine.ConversationManager"),
+            patch("omnimancer.core.agent_engine.ProgramExecutor"),
+            patch("omnimancer.core.agent_engine.WebClient"),
+            patch("omnimancer.core.agent_engine.MCPIntegrator"),
+            patch("omnimancer.core.agent_engine.ApprovalWorkflow"),
+            patch("omnimancer.core.agent_engine.EnhancedApprovalManager"),
+            patch("omnimancer.core.agent_engine.ApprovalInterface"),
+            patch("omnimancer.core.agent_engine.ApprovalManager"),
+            patch("omnimancer.core.agent_engine.ProviderFallback"),
         ):
-            agent = AgentEngine(mock_config_manager)
+            AgentEngine(mock_config_manager)
 
             # Skip this test as the FileSystemManager doesn't currently have path validation
             self.skipTest(
@@ -139,9 +131,7 @@ class TestAgentErrorHandling(unittest.TestCase):
     def test_agent_engine_forbidden_path_detection(self):
         """Test agent engine detects forbidden paths."""
         # Skip this test as the FileSystemManager doesn't currently have path validation
-        self.skipTest(
-            "Path validation not implemented in current FileSystemManager"
-        )
+        self.skipTest("Path validation not implemented in current FileSystemManager")
 
     def test_agent_file_operations_error_handling(self):
         """Test agent file operations handle errors gracefully."""
@@ -154,30 +144,23 @@ class TestAgentErrorHandling(unittest.TestCase):
         mock_config_manager.get_config.return_value = mock_config
 
         # Patch all AgentEngine dependencies
-        with patch("omnimancer.core.engine.ConversationManager"), patch(
-            "omnimancer.core.agent_engine.EnhancedFileSystemManager"
-        ), patch("omnimancer.core.agent_engine.ProgramExecutor"), patch(
-            "omnimancer.core.agent_engine.WebClient"
-        ), patch(
-            "omnimancer.core.agent_engine.MCPIntegrator"
-        ), patch(
-            "omnimancer.core.agent_engine.ApprovalWorkflow"
-        ), patch(
-            "omnimancer.core.agent_engine.EnhancedApprovalManager"
-        ), patch(
-            "omnimancer.core.agent_engine.ApprovalInterface"
-        ), patch(
-            "omnimancer.core.agent_engine.ApprovalManager"
-        ), patch(
-            "omnimancer.core.agent_engine.ProviderFallback"
+        with (
+            patch("omnimancer.core.engine.ConversationManager"),
+            patch("omnimancer.core.agent_engine.EnhancedFileSystemManager"),
+            patch("omnimancer.core.agent_engine.ProgramExecutor"),
+            patch("omnimancer.core.agent_engine.WebClient"),
+            patch("omnimancer.core.agent_engine.MCPIntegrator"),
+            patch("omnimancer.core.agent_engine.ApprovalWorkflow"),
+            patch("omnimancer.core.agent_engine.EnhancedApprovalManager"),
+            patch("omnimancer.core.agent_engine.ApprovalInterface"),
+            patch("omnimancer.core.agent_engine.ApprovalManager"),
+            patch("omnimancer.core.agent_engine.ProviderFallback"),
         ):
             agent = AgentEngine(mock_config_manager)
 
             # Test file manager error handling pattern
             agent.file_manager = Mock()
-            agent.file_manager.read_file.side_effect = PermissionError(
-                "Access denied"
-            )
+            agent.file_manager.read_file.side_effect = PermissionError("Access denied")
 
             with self.assertRaises(PermissionError):
                 # This would be called through agent operations
@@ -194,22 +177,17 @@ class TestAgentErrorHandling(unittest.TestCase):
         mock_config_manager.get_config.return_value = mock_config
 
         # Patch all AgentEngine dependencies
-        with patch("omnimancer.core.engine.ConversationManager"), patch(
-            "omnimancer.core.agent_engine.EnhancedFileSystemManager"
-        ), patch("omnimancer.core.agent_engine.ProgramExecutor"), patch(
-            "omnimancer.core.agent_engine.WebClient"
-        ), patch(
-            "omnimancer.core.agent_engine.MCPIntegrator"
-        ), patch(
-            "omnimancer.core.agent_engine.ApprovalWorkflow"
-        ), patch(
-            "omnimancer.core.agent_engine.EnhancedApprovalManager"
-        ), patch(
-            "omnimancer.core.agent_engine.ApprovalInterface"
-        ), patch(
-            "omnimancer.core.agent_engine.ApprovalManager"
-        ), patch(
-            "omnimancer.core.agent_engine.ProviderFallback"
+        with (
+            patch("omnimancer.core.engine.ConversationManager"),
+            patch("omnimancer.core.agent_engine.EnhancedFileSystemManager"),
+            patch("omnimancer.core.agent_engine.ProgramExecutor"),
+            patch("omnimancer.core.agent_engine.WebClient"),
+            patch("omnimancer.core.agent_engine.MCPIntegrator"),
+            patch("omnimancer.core.agent_engine.ApprovalWorkflow"),
+            patch("omnimancer.core.agent_engine.EnhancedApprovalManager"),
+            patch("omnimancer.core.agent_engine.ApprovalInterface"),
+            patch("omnimancer.core.agent_engine.ApprovalManager"),
+            patch("omnimancer.core.agent_engine.ProviderFallback"),
         ):
             agent = AgentEngine(mock_config_manager)
 
@@ -415,7 +393,7 @@ class TestResourceCleanupOnErrors(unittest.TestCase):
             # Test that file operations clean up properly on error
             def read_with_error():
                 with open(temp_path, "r") as f:
-                    content = f.read()
+                    f.read()
                     # Simulate an error after opening file
                     raise AgentError("Simulated error")
 
@@ -502,9 +480,7 @@ class TestErrorReportingAndLogging(unittest.TestCase):
         """Test that error context is preserved in tracebacks."""
 
         def level_3():
-            raise ExecutionError(
-                "Deep execution error", details="From level 3"
-            )
+            raise ExecutionError("Deep execution error", details="From level 3")
 
         def level_2():
             try:

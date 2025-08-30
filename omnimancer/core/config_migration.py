@@ -9,15 +9,12 @@ import json
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from ..utils.errors import ConfigurationError
 from .models import (
     Config,
     ProviderConfig,
-    MCPConfig,
-    MCPServerConfig,
-    ChatSettings,
 )
 
 
@@ -33,9 +30,7 @@ class ConfigMigration:
         """
         if isinstance(config_path, str):
             self.config_path = Path(config_path)
-        elif hasattr(config_path, "__fspath__") or isinstance(
-            config_path, Path
-        ):
+        elif hasattr(config_path, "__fspath__") or isinstance(config_path, Path):
             self.config_path = Path(config_path)
         else:
             # Handle other path-like objects
@@ -99,9 +94,7 @@ class ConfigMigration:
             else:
                 # Future migrations would go here
                 new_config = old_config
-                messages.append(
-                    f"No migration needed for version {old_version}"
-                )
+                messages.append(f"No migration needed for version {old_version}")
 
             # Validate migrated configuration
             try:
@@ -111,9 +104,7 @@ class ConfigMigration:
                     messages.append(
                         "Warning: Migrated configuration has validation errors:"
                     )
-                    messages.extend(
-                        [f"  - {error}" for error in validation_errors]
-                    )
+                    messages.extend([f"  - {error}" for error in validation_errors])
             except Exception as e:
                 messages.append(
                     f"Warning: Could not validate migrated configuration: {e}"
@@ -314,15 +305,9 @@ class ConfigMigration:
             new_config["mcp"].update(
                 {
                     "enabled": old_mcp.get("enabled", True),
-                    "servers": self._migrate_mcp_servers_v1(
-                        old_mcp.get("servers", {})
-                    ),
-                    "auto_approve_timeout": old_mcp.get(
-                        "auto_approve_timeout", 30
-                    ),
-                    "max_concurrent_servers": old_mcp.get(
-                        "max_concurrent_servers", 10
-                    ),
+                    "servers": self._migrate_mcp_servers_v1(old_mcp.get("servers", {})),
+                    "auto_approve_timeout": old_mcp.get("auto_approve_timeout", 30),
+                    "max_concurrent_servers": old_mcp.get("max_concurrent_servers", 10),
                 }
             )
 
@@ -346,9 +331,7 @@ class ConfigMigration:
 
         new_config = {
             "api_key": old_config.get("api_key"),
-            "model": old_config.get(
-                "model", provider_defaults.get("model", "default")
-            ),
+            "model": old_config.get("model", provider_defaults.get("model", "default")),
             "max_tokens": old_config.get("max_tokens"),
             "temperature": old_config.get("temperature"),
             "base_url": old_config.get("base_url"),
@@ -366,15 +349,9 @@ class ConfigMigration:
             "max_retries": old_config.get("max_retries", 3),
             "retry_delay": old_config.get("retry_delay", 1.0),
             "exponential_backoff": old_config.get("exponential_backoff", True),
-            "health_check_enabled": old_config.get(
-                "health_check_enabled", True
-            ),
-            "health_check_interval": old_config.get(
-                "health_check_interval", 300
-            ),
-            "health_check_timeout": old_config.get(
-                "health_check_timeout", 10.0
-            ),
+            "health_check_enabled": old_config.get("health_check_enabled", True),
+            "health_check_interval": old_config.get("health_check_interval", 300),
+            "health_check_timeout": old_config.get("health_check_timeout", 10.0),
             "auth_type": old_config.get("auth_type", "api_key"),
             "custom_headers": old_config.get("custom_headers"),
             "oauth_config": old_config.get("oauth_config"),
@@ -387,9 +364,7 @@ class ConfigMigration:
         # Remove None values
         return {k: v for k, v in new_config.items() if v is not None}
 
-    def _migrate_mcp_servers_v1(
-        self, old_servers: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _migrate_mcp_servers_v1(self, old_servers: Dict[str, Any]) -> Dict[str, Any]:
         """
         Migrate MCP server configurations from v1 format.
 
@@ -552,9 +527,7 @@ class ConfigValidator:
 
         # Provider validation
         for provider_name, provider_config in config.providers.items():
-            provider_errors = self._validate_provider(
-                provider_name, provider_config
-            )
+            provider_errors = self._validate_provider(provider_name, provider_config)
             errors.extend(provider_errors)
 
         # MCP validation
@@ -584,13 +557,9 @@ class ConfigValidator:
 
         # Provider validation
         for provider_name, provider_config in self.config.providers.items():
-            provider_errors = self._validate_provider(
-                provider_name, provider_config
-            )
+            provider_errors = self._validate_provider(provider_name, provider_config)
             if provider_errors:
-                validation_results["providers"][
-                    provider_name
-                ] = provider_errors
+                validation_results["providers"][provider_name] = provider_errors
 
         # MCP validation
         validation_results["mcp"] = self._validate_mcp()
@@ -733,12 +702,8 @@ class ConfigValidator:
         """Validate Ollama provider configuration."""
         errors = []
 
-        if config.base_url and not config.base_url.startswith(
-            ("http://", "https://")
-        ):
-            errors.append(
-                "Ollama base_url must start with 'http://' or 'https://'"
-            )
+        if config.base_url and not config.base_url.startswith(("http://", "https://")):
+            errors.append("Ollama base_url must start with 'http://' or 'https://'")
 
         return errors
 
@@ -778,25 +743,17 @@ class ConfigValidator:
 
         # Check for insecure configurations
         if not self.config.api_key_encryption_enabled:
-            errors.append(
-                "API key encryption is disabled - this is a security risk"
-            )
+            errors.append("API key encryption is disabled - this is a security risk")
 
         if not self.config.secure_storage_enabled:
-            errors.append(
-                "Secure storage is disabled - this is a security risk"
-            )
+            errors.append("Secure storage is disabled - this is a security risk")
 
         # Check MCP security settings
         if self.config.mcp.allow_dangerous_tools:
-            errors.append(
-                "MCP dangerous tools are allowed - this is a security risk"
-            )
+            errors.append("MCP dangerous tools are allowed - this is a security risk")
 
         if not self.config.mcp.sandbox_mode:
-            errors.append(
-                "MCP sandbox mode is disabled - this is a security risk"
-            )
+            errors.append("MCP sandbox mode is disabled - this is a security risk")
 
         return errors
 

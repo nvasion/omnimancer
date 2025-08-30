@@ -5,34 +5,30 @@ This module provides reusable Rich UI components for displaying agent status
 information in a comprehensive and user-friendly terminal interface.
 """
 
-import time
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Union
-from rich.console import Console, Group, RenderableType
-from rich.table import Table
+from datetime import datetime
+from typing import Any, Dict, List, Union
+
+from rich.console import Group
+from rich.layout import Layout
 from rich.panel import Panel
-from rich.text import Text
 from rich.progress import (
-    Progress,
     BarColumn,
+    Progress,
+    SpinnerColumn,
     TextColumn,
     TimeElapsedColumn,
-    SpinnerColumn,
 )
-from rich.status import Status
-from rich.tree import Tree
-from rich.align import Align
-from rich.columns import Columns
 from rich.rule import Rule
-from rich.layout import Layout
+from rich.table import Table
+from rich.text import Text
+from rich.tree import Tree
 
 from .status_core import (
-    AgentStatus,
-    OperationType,
-    OperationStatus,
-    EventType,
     AgentEvent,
     AgentOperation,
+    AgentStatus,
+    EventType,
+    OperationStatus,
 )
 
 
@@ -57,9 +53,7 @@ class AgentStatusTable:
         Returns:
             Rich Table object
         """
-        table = Table(
-            title=self.title, show_header=True, header_style="bold magenta"
-        )
+        table = Table(title=self.title, show_header=True, header_style="bold magenta")
 
         table.add_column("Agent ID", style="cyan", width=12)
         table.add_column("Status", style="bold", width=12)
@@ -110,9 +104,7 @@ class AgentStatusTable:
             AgentStatus.SHUTTING_DOWN: ("⏹️", "orange", "Stopping"),
         }
 
-        emoji, color, text = status_mapping.get(
-            status, ("❓", "white", status.value)
-        )
+        emoji, color, text = status_mapping.get(status, ("❓", "white", status.value))
 
         return Text(f"{emoji} {text}", style=color)
 
@@ -154,7 +146,9 @@ class OperationProgress:
         # Add current operations
         for operation in operations:
             if operation.is_active:
-                description = f"[{operation.agent_id or 'system'}] {operation.description[:40]}"
+                description = (
+                    f"[{operation.agent_id or 'system'}] {operation.description[:40]}"
+                )
                 if len(operation.description) > 40:
                     description += "..."
 
@@ -195,9 +189,7 @@ class EventLogPanel:
         else:
             # Take only the most recent events
             recent_events = (
-                events[-self.max_events :]
-                if len(events) > self.max_events
-                else events
+                events[-self.max_events :] if len(events) > self.max_events else events
             )
 
             lines = []
@@ -217,14 +209,14 @@ class EventLogPanel:
                 description = self._get_event_description(event)
 
                 # Combine into a line
-                line = f"[dim]{timestamp}[/dim] [{agent_id}] {event_display} {description}"
+                line = (
+                    f"[dim]{timestamp}[/dim] [{agent_id}] {event_display} {description}"
+                )
                 lines.append(line)
 
             content = "\n".join(lines)
 
-        return Panel(
-            content, title=title, border_style="yellow", padding=(0, 1)
-        )
+        return Panel(content, title=title, border_style="yellow", padding=(0, 1))
 
     def _format_event_type(self, event_type: EventType) -> Text:
         """Format event type with appropriate color."""
@@ -254,7 +246,9 @@ class EventLogPanel:
         elif event.event_type == EventType.OPERATION_STARTED:
             op_type = event.data.get("operation_type", "unknown")
             description = event.data.get("description", "No description")
-            return f"{op_type}: {description[:30]}{'...' if len(description) > 30 else ''}"
+            return (
+                f"{op_type}: {description[:30]}{'...' if len(description) > 30 else ''}"
+            )
 
         elif event.event_type == EventType.OPERATION_PROGRESS:
             progress = event.data.get("progress", 0)
@@ -312,10 +306,7 @@ class SystemStatsPanel:
             # Color coding for certain metrics
             if metric == "Failed" and int(str(value)) > 0:
                 value_style = "red"
-            elif (
-                metric in ["Completed", "Active Agents"]
-                and int(str(value)) > 0
-            ):
+            elif metric in ["Completed", "Active Agents"] and int(str(value)) > 0:
                 value_style = "green"
             else:
                 value_style = "white"
@@ -365,9 +356,7 @@ class OperationDetailsTree:
                 f"[cyan]{agent_id}[/cyan] ({len(agent_operations)} operations)"
             )
 
-            for operation in agent_operations[
-                :5
-            ]:  # Limit to 5 operations per agent
+            for operation in agent_operations[:5]:  # Limit to 5 operations per agent
                 # Format operation
                 status_emoji = {
                     OperationStatus.PENDING: "⏳",
@@ -380,9 +369,7 @@ class OperationDetailsTree:
 
                 duration_str = ""
                 if operation.duration:
-                    duration_str = (
-                        f" ({operation.duration.total_seconds():.1f}s)"
-                    )
+                    duration_str = f" ({operation.duration.total_seconds():.1f}s)"
 
                 operation_text = (
                     f"{status_emoji} {operation.operation_type.value} "
@@ -452,26 +439,20 @@ class ComprehensiveStatusDisplay:
                 name="agents",
             ),
             Layout(
-                self.operation_progress.create_progress_display(
-                    active_operations
-                ),
+                self.operation_progress.create_progress_display(active_operations),
                 name="progress",
             ),
         )
 
         # Right side: Events, stats, and operation tree
         layout["right"].split_column(
-            Layout(
-                self.event_log.create_event_log(recent_events), name="events"
-            ),
+            Layout(self.event_log.create_event_log(recent_events), name="events"),
             Layout(name="bottom_right"),
         )
 
         # Split bottom right into stats and tree
         layout["bottom_right"].split_row(
-            Layout(
-                self.stats_panel.create_stats_panel(system_stats), name="stats"
-            ),
+            Layout(self.stats_panel.create_stats_panel(system_stats), name="stats"),
             Layout(
                 self.operation_tree.create_operation_tree(active_operations),
                 name="tree",
@@ -498,15 +479,11 @@ class ComprehensiveStatusDisplay:
             Rich Group object
         """
         components = [
-            self.stats_panel.create_stats_panel(
-                system_stats, "📊 System Status"
-            ),
+            self.stats_panel.create_stats_panel(system_stats, "📊 System Status"),
             Rule(),
             self.agent_table.create_table(agent_statuses),
             Rule(),
-            self.event_log.create_event_log(
-                recent_events, "📝 Recent Activity"
-            ),
+            self.event_log.create_event_log(recent_events, "📝 Recent Activity"),
         ]
 
         return Group(*components)
@@ -521,9 +498,7 @@ def create_agent_status_summary(
         return Text("No agents available", style="dim")
 
     enabled = sum(
-        1
-        for status in agent_statuses.values()
-        if status == AgentStatus.ENABLED
+        1 for status in agent_statuses.values() if status == AgentStatus.ENABLED
     )
     total = len(agent_statuses)
 
@@ -545,9 +520,7 @@ def create_operation_summary(operations: List[AgentOperation]) -> Text:
         return Text("No active operations", style="dim")
 
     active = sum(1 for op in operations if op.is_active)
-    completed = sum(
-        1 for op in operations if op.status == OperationStatus.COMPLETED
-    )
+    completed = sum(1 for op in operations if op.status == OperationStatus.COMPLETED)
     failed = sum(1 for op in operations if op.status == OperationStatus.FAILED)
 
     summary = f"Ops: {active} active, {completed} done, {failed} failed"

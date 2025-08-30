@@ -3,11 +3,12 @@ Tests for the conversation manager module.
 """
 
 import json
-import pytest
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, patch
+
+import pytest
 
 from omnimancer.core.conversation_manager import ConversationManager
 from omnimancer.core.models import ChatContext, ChatMessage, MessageRole
@@ -88,17 +89,13 @@ class TestSaveConversation:
         self, conversation_manager, sample_chat_context
     ):
         """Test saving conversation with auto-generated filename."""
-        with patch(
-            "omnimancer.core.conversation_manager.datetime"
-        ) as mock_datetime:
+        with patch("omnimancer.core.conversation_manager.datetime") as mock_datetime:
             mock_now = Mock()
             mock_now.strftime.return_value = "20240101_123045"
             mock_now.isoformat.return_value = "2024-01-01T12:30:45"
             mock_datetime.now.return_value = mock_now
 
-            filename = conversation_manager.save_conversation(
-                sample_chat_context
-            )
+            filename = conversation_manager.save_conversation(sample_chat_context)
 
             assert filename == "conversation_20240101_123045.json"
 
@@ -183,9 +180,7 @@ class TestSaveConversation:
     ):
         """Test handling of file write errors."""
         with patch("builtins.open", side_effect=IOError("Permission denied")):
-            with pytest.raises(
-                ConversationError, match="Failed to save conversation"
-            ):
+            with pytest.raises(ConversationError, match="Failed to save conversation"):
                 conversation_manager.save_conversation(
                     sample_chat_context, "error_test"
                 )
@@ -194,12 +189,10 @@ class TestSaveConversation:
 class TestLoadConversation:
     """Test conversation loading functionality."""
 
-    def test_load_conversation_success(
-        self, conversation_manager, sample_chat_context
-    ):
+    def test_load_conversation_success(self, conversation_manager, sample_chat_context):
         """Test successful conversation loading."""
         # First save a conversation
-        filename = conversation_manager.save_conversation(
+        conversation_manager.save_conversation(
             sample_chat_context, "load_test"
         )
 
@@ -208,16 +201,11 @@ class TestLoadConversation:
 
         # Verify loaded data
         assert loaded_context.session_id == sample_chat_context.session_id
+        assert loaded_context.current_model == sample_chat_context.current_model
         assert (
-            loaded_context.current_model == sample_chat_context.current_model
+            loaded_context.max_context_length == sample_chat_context.max_context_length
         )
-        assert (
-            loaded_context.max_context_length
-            == sample_chat_context.max_context_length
-        )
-        assert len(loaded_context.messages) == len(
-            sample_chat_context.messages
-        )
+        assert len(loaded_context.messages) == len(sample_chat_context.messages)
 
         # Verify first message
         loaded_msg = loaded_context.messages[0]
@@ -231,22 +219,16 @@ class TestLoadConversation:
     ):
         """Test loading conversation with .json extension."""
         # Save conversation
-        conversation_manager.save_conversation(
-            sample_chat_context, "extension_test"
-        )
+        conversation_manager.save_conversation(sample_chat_context, "extension_test")
 
         # Load with .json extension
-        loaded_context = conversation_manager.load_conversation(
-            "extension_test.json"
-        )
+        loaded_context = conversation_manager.load_conversation("extension_test.json")
 
         assert loaded_context.session_id == sample_chat_context.session_id
 
     def test_load_conversation_file_not_found(self, conversation_manager):
         """Test loading non-existent conversation."""
-        with pytest.raises(
-            ConversationError, match="Conversation file not found"
-        ):
+        with pytest.raises(ConversationError, match="Conversation file not found"):
             conversation_manager.load_conversation("nonexistent")
 
     def test_load_conversation_invalid_version(self, conversation_manager):
@@ -254,9 +236,7 @@ class TestLoadConversation:
         # Create file with invalid version
         invalid_data = {"version": "2.0", "messages": []}
 
-        file_path = (
-            conversation_manager.conversations_dir / "invalid_version.json"
-        )
+        file_path = conversation_manager.conversations_dir / "invalid_version.json"
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(invalid_data, f)
 
@@ -272,9 +252,7 @@ class TestLoadConversation:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("invalid json content")
 
-        with pytest.raises(
-            ConversationError, match="Failed to load conversation"
-        ):
+        with pytest.raises(ConversationError, match="Failed to load conversation"):
             conversation_manager.load_conversation("corrupted")
 
 
@@ -315,24 +293,18 @@ class TestListConversations:
         self, conversation_manager, sample_chat_context
     ):
         """Test that conversations are sorted by creation date."""
-        with patch(
-            "omnimancer.core.conversation_manager.datetime"
-        ) as mock_datetime:
+        with patch("omnimancer.core.conversation_manager.datetime") as mock_datetime:
             # First conversation
             mock_now_1 = Mock()
             mock_now_1.isoformat.return_value = "2024-01-01T12:00:00"
             mock_datetime.now.return_value = mock_now_1
-            conversation_manager.save_conversation(
-                sample_chat_context, "older"
-            )
+            conversation_manager.save_conversation(sample_chat_context, "older")
 
             # Second conversation (newer)
             mock_now_2 = Mock()
             mock_now_2.isoformat.return_value = "2024-01-02T12:00:00"
             mock_datetime.now.return_value = mock_now_2
-            conversation_manager.save_conversation(
-                sample_chat_context, "newer"
-            )
+            conversation_manager.save_conversation(sample_chat_context, "newer")
 
         conversations = conversation_manager.list_conversations()
 
@@ -386,14 +358,10 @@ class TestDeleteConversation:
     ):
         """Test deleting conversation with .json extension."""
         # Save conversation
-        conversation_manager.save_conversation(
-            sample_chat_context, "delete_ext_test"
-        )
+        conversation_manager.save_conversation(sample_chat_context, "delete_ext_test")
 
         # Delete with .json extension
-        result = conversation_manager.delete_conversation(
-            "delete_ext_test.json"
-        )
+        result = conversation_manager.delete_conversation("delete_ext_test.json")
 
         assert result is True
 
@@ -407,13 +375,11 @@ class TestDeleteConversation:
     ):
         """Test handling permission errors during deletion."""
         # Save conversation
-        filename = conversation_manager.save_conversation(
+        conversation_manager.save_conversation(
             sample_chat_context, "perm_test"
         )
 
-        with patch.object(
-            Path, "unlink", side_effect=PermissionError("Access denied")
-        ):
+        with patch.object(Path, "unlink", side_effect=PermissionError("Access denied")):
             result = conversation_manager.delete_conversation("perm_test")
             assert result is False
 
@@ -447,9 +413,7 @@ class TestGetConversationInfo:
         self, conversation_manager, sample_chat_context
     ):
         """Test getting info with .json extension."""
-        conversation_manager.save_conversation(
-            sample_chat_context, "info_ext_test"
-        )
+        conversation_manager.save_conversation(sample_chat_context, "info_ext_test")
 
         info = conversation_manager.get_conversation_info("info_ext_test.json")
 
@@ -464,9 +428,7 @@ class TestGetConversationInfo:
     def test_get_conversation_info_corrupted_file(self, conversation_manager):
         """Test getting info for corrupted file."""
         # Create corrupted file
-        file_path = (
-            conversation_manager.conversations_dir / "corrupted_info.json"
-        )
+        file_path = conversation_manager.conversations_dir / "corrupted_info.json"
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("invalid json")
 
@@ -477,12 +439,10 @@ class TestGetConversationInfo:
 class TestExportConversation:
     """Test conversation export functionality."""
 
-    def test_export_conversation_json(
-        self, conversation_manager, sample_chat_context
-    ):
+    def test_export_conversation_json(self, conversation_manager, sample_chat_context):
         """Test exporting conversation to JSON format."""
         # Save conversation
-        filename = conversation_manager.save_conversation(
+        conversation_manager.save_conversation(
             sample_chat_context, "export_json_test"
         )
 
@@ -492,24 +452,16 @@ class TestExportConversation:
         )
 
         # The method returns the path using the input filename, not the saved filename
-        expected_path = str(
-            conversation_manager.conversations_dir / "export_json_test"
-        )
+        expected_path = str(conversation_manager.conversations_dir / "export_json_test")
         assert export_path == expected_path
 
-    def test_export_conversation_txt(
-        self, conversation_manager, sample_chat_context
-    ):
+    def test_export_conversation_txt(self, conversation_manager, sample_chat_context):
         """Test exporting conversation to TXT format."""
         # Save conversation
-        conversation_manager.save_conversation(
-            sample_chat_context, "export_txt_test"
-        )
+        conversation_manager.save_conversation(sample_chat_context, "export_txt_test")
 
         # Export to TXT
-        export_path = conversation_manager.export_conversation(
-            "export_txt_test", "txt"
-        )
+        export_path = conversation_manager.export_conversation("export_txt_test", "txt")
 
         # Verify export file was created
         export_file = Path(export_path)
@@ -529,14 +481,10 @@ class TestExportConversation:
     ):
         """Test exporting conversation to Markdown format."""
         # Save conversation
-        conversation_manager.save_conversation(
-            sample_chat_context, "export_md_test"
-        )
+        conversation_manager.save_conversation(sample_chat_context, "export_md_test")
 
         # Export to Markdown
-        export_path = conversation_manager.export_conversation(
-            "export_md_test", "md"
-        )
+        export_path = conversation_manager.export_conversation("export_md_test", "md")
 
         # Verify export file was created
         export_file = Path(export_path)
@@ -562,27 +510,19 @@ class TestExportConversation:
         )
 
         # Try to export to unsupported format
-        with pytest.raises(
-            ConversationError, match="Unsupported export format"
-        ):
-            conversation_manager.export_conversation(
-                "export_unsupported_test", "xml"
-            )
+        with pytest.raises(ConversationError, match="Unsupported export format"):
+            conversation_manager.export_conversation("export_unsupported_test", "xml")
 
     def test_export_conversation_not_found(self, conversation_manager):
         """Test exporting non-existent conversation."""
-        with pytest.raises(
-            ConversationError, match="Conversation file not found"
-        ):
+        with pytest.raises(ConversationError, match="Conversation file not found"):
             conversation_manager.export_conversation("nonexistent", "txt")
 
 
 class TestPrivateMethods:
     """Test private helper methods."""
 
-    def test_export_to_txt_content(
-        self, conversation_manager, sample_chat_context
-    ):
+    def test_export_to_txt_content(self, conversation_manager, sample_chat_context):
         """Test TXT export content formatting."""
         export_path = conversation_manager._export_to_txt(
             sample_chat_context, "test_txt"
@@ -636,9 +576,7 @@ class TestEdgeCases:
             max_context_length=4000,
         )
 
-        filename = conversation_manager.save_conversation(
-            empty_context, "empty_test"
-        )
+        filename = conversation_manager.save_conversation(empty_context, "empty_test")
 
         # Verify file was created
         file_path = conversation_manager.conversations_dir / filename
@@ -665,19 +603,13 @@ class TestEdgeCases:
             max_context_length=4000,
         )
 
-        filename = conversation_manager.save_conversation(
-            context, "special_chars_test"
-        )
-        loaded_context = conversation_manager.load_conversation(
-            "special_chars_test"
-        )
+        conversation_manager.save_conversation(context, "special_chars_test")
+        loaded_context = conversation_manager.load_conversation("special_chars_test")
 
         assert loaded_context.messages[0].content == special_message.content
 
     def test_directory_creation_failure(self, temp_storage_path):
         """Test handling directory creation failure."""
-        with patch.object(
-            Path, "mkdir", side_effect=PermissionError("Access denied")
-        ):
+        with patch.object(Path, "mkdir", side_effect=PermissionError("Access denied")):
             with pytest.raises(PermissionError):
                 ConversationManager(temp_storage_path)

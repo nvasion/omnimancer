@@ -73,9 +73,7 @@ def get_git_commits_since_tag(tag: Optional[str] = None) -> List[str]:
             # Get all commits if no previous tag
             cmd = ["git", "log", "--oneline", "--no-merges"]
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         commits = result.stdout.strip().split("\n")
         return [commit for commit in commits if commit.strip()]
     except subprocess.CalledProcessError:
@@ -101,7 +99,9 @@ def generate_changelog(version: str) -> str:
     last_tag = get_last_tag()
     commits = get_git_commits_since_tag(last_tag)
 
-    changelog = f"# Changelog\n\n## [{version}] - {datetime.now().strftime('%Y-%m-%d')}\n\n"
+    changelog = (
+        f"# Changelog\n\n## [{version}] - {datetime.now().strftime('%Y-%m-%d')}\n\n"
+    )
 
     if commits:
         # Categorize commits
@@ -150,9 +150,7 @@ def update_changelog_file(new_changelog: str) -> None:
         # Insert new changelog after the first line (title)
         lines = existing_content.split("\n")
         if lines and lines[0].startswith("# "):
-            updated_content = (
-                lines[0] + "\n\n" + new_changelog + "\n".join(lines[1:])
-            )
+            updated_content = lines[0] + "\n\n" + new_changelog + "\n".join(lines[1:])
         else:
             updated_content = new_changelog + existing_content
     else:
@@ -164,9 +162,7 @@ def update_changelog_file(new_changelog: str) -> None:
 
 def main():
     """Main function."""
-    parser = argparse.ArgumentParser(
-        description="Manage Omnimancer CLI versions"
-    )
+    parser = argparse.ArgumentParser(description="Manage Omnimancer CLI versions")
     parser.add_argument(
         "action",
         choices=["bump", "set", "current", "changelog"],
@@ -177,9 +173,7 @@ def main():
         choices=["major", "minor", "patch"],
         help="Type of version bump (for bump action)",
     )
-    parser.add_argument(
-        "--version", help="Specific version to set (for set action)"
-    )
+    parser.add_argument("--version", help="Specific version to set (for set action)")
     parser.add_argument(
         "--update-changelog",
         action="store_true",

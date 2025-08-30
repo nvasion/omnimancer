@@ -6,29 +6,27 @@ including all components working together: file reading, UI interactions,
 error handling, and write operations.
 """
 
-import pytest
-import tempfile
-import shutil
 import asyncio
+import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 from omnimancer.core.agent.file_system_manager import FileSystemManager
-from omnimancer.core.agent.read_before_write_ui import (
-    ReadBeforeWriteUI,
-    create_review_callback,
-)
 from omnimancer.core.agent.read_before_write_errors import (
-    ReadBeforeWriteErrorHandler,
-    ReadBeforeWriteError,
-    ReadBeforeWriteErrorType,
-    RecoveryStrategy,
+    CallbackError,
+    ContentValidationError,
     FileReadError,
     FileWriteError,
-    CallbackError,
+    ReadBeforeWriteErrorHandler,
+    ReadBeforeWriteErrorType,
+    RecoveryStrategy,
     UserRejectionError,
-    ContentValidationError,
+)
+from omnimancer.core.agent.read_before_write_ui import (
+    create_review_callback,
 )
 
 
@@ -57,14 +55,10 @@ class TestReadBeforeWriteLogicIntegration:
     @pytest.fixture
     def error_handler(self):
         """Create error handler for testing."""
-        return ReadBeforeWriteErrorHandler(
-            enable_recovery=True, log_errors=True
-        )
+        return ReadBeforeWriteErrorHandler(enable_recovery=True, log_errors=True)
 
     @pytest.fixture
-    def file_system_manager(
-        self, temp_dir, mock_security_manager, error_handler
-    ):
+    def file_system_manager(self, temp_dir, mock_security_manager, error_handler):
         """Create FileSystemManager with full configuration for testing."""
         return FileSystemManager(
             security_manager=mock_security_manager,
@@ -215,9 +209,7 @@ class TestReadBeforeWriteLogicIntegration:
         # Verify rejection was handled correctly
         assert result["success"] is False
         assert "User rejected" in result["error"]
-        assert (
-            test_file.read_text() == original_content
-        )  # Original content preserved
+        assert test_file.read_text() == original_content  # Original content preserved
 
     @pytest.mark.asyncio
     async def test_read_before_write_fallback_on_callback_error(
@@ -326,8 +318,7 @@ class TestReadBeforeWriteLogicIntegration:
         assert result["success"] is False
         assert "error_details" in result
         assert (
-            result["error_details"]["error"]["error_type"]
-            == "content_validation_error"
+            result["error_details"]["error"]["error_type"] == "content_validation_error"
         )
 
     @pytest.mark.asyncio
@@ -430,9 +421,7 @@ Line 5"""
         # Verify atomic operation succeeded
         assert result["success"] is True
         assert test_file.read_text() == new_content
-        assert result.get(
-            "atomic", False
-        )  # Should indicate atomic operation was used
+        assert result.get("atomic", False)  # Should indicate atomic operation was used
 
     @pytest.mark.asyncio
     async def test_read_before_write_with_backup_enabled(
@@ -715,9 +704,7 @@ class TestReadBeforeWriteErrorHandler:
     @pytest.fixture
     def error_handler(self):
         """Create error handler for testing."""
-        return ReadBeforeWriteErrorHandler(
-            enable_recovery=True, log_errors=True
-        )
+        return ReadBeforeWriteErrorHandler(enable_recovery=True, log_errors=True)
 
     @pytest.fixture
     def temp_dir(self):
@@ -760,16 +747,12 @@ class TestReadBeforeWriteErrorHandler:
         write_error = FileWriteError(str(test_file), original_exception)
 
         # First attempt - should retry
-        result = error_handler.handle_error(
-            write_error, retry_count=0, max_retries=2
-        )
+        result = error_handler.handle_error(write_error, retry_count=0, max_retries=2)
         assert result["recovery_result"]["should_retry"] is True
         assert "attempt 1/2" in result["recovery_result"]["message"]
 
         # Max retries exceeded - should abort
-        result = error_handler.handle_error(
-            write_error, retry_count=2, max_retries=2
-        )
+        result = error_handler.handle_error(write_error, retry_count=2, max_retries=2)
         assert result["recovery_result"]["should_abort"] is True
         assert "Maximum retries" in result["recovery_result"]["message"]
 
@@ -781,10 +764,7 @@ class TestReadBeforeWriteErrorHandler:
         rejection_error = UserRejectionError(str(test_file), rejection_reason)
         result = error_handler.handle_error(rejection_error)
 
-        assert (
-            result["recovery_strategy"]
-            == RecoveryStrategy.SKIP_OPERATION.value
-        )
+        assert result["recovery_strategy"] == RecoveryStrategy.SKIP_OPERATION.value
         assert result["recovery_result"]["fallback_action"] == "skip"
         assert "Skipping operation" in result["recovery_result"]["message"]
 
@@ -807,14 +787,10 @@ class TestReadBeforeWriteErrorHandler:
         test_file = temp_dir / "test.txt"
         validation_issue = "Content contains suspicious patterns"
 
-        validation_error = ContentValidationError(
-            str(test_file), validation_issue
-        )
+        validation_error = ContentValidationError(str(test_file), validation_issue)
         result = error_handler.handle_error(validation_error)
 
-        assert (
-            result["recovery_strategy"] == RecoveryStrategy.PROMPT_USER.value
-        )
+        assert result["recovery_strategy"] == RecoveryStrategy.PROMPT_USER.value
         assert result["recovery_result"]["fallback_action"] == "prompt_user"
 
 

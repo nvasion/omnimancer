@@ -7,22 +7,14 @@ and tool usage during AI interactions.
 
 import asyncio
 import time
-from enum import Enum
-from typing import Optional, Dict, List, Callable
 from dataclasses import dataclass, field
+from enum import Enum
+from typing import Dict, List, Optional
+
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
-from rich.progress import (
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    BarColumn,
-    TaskProgressColumn,
-)
 from rich.live import Live
-from rich.layout import Layout
+from rich.panel import Panel
+from rich.table import Table
 
 
 class OperationType(Enum):
@@ -154,9 +146,7 @@ class ProgressIndicator:
 
         self._update_display()
 
-    def complete_operation(
-        self, operation_id: str, status: str = "completed"
-    ) -> None:
+    def complete_operation(self, operation_id: str, status: str = "completed") -> None:
         """
         Complete an operation and move it to history.
 
@@ -195,9 +185,7 @@ class ProgressIndicator:
 
         # Trim history
         if len(self.operation_history) > self.max_history:
-            self.operation_history = self.operation_history[
-                -self.max_history :
-            ]
+            self.operation_history = self.operation_history[-self.max_history :]
 
         # Always stop live display when clearing all operations
         self.stop_live_display()
@@ -247,9 +235,7 @@ class ProgressIndicator:
                 progress_str = ""
 
             # Operation details
-            details_str = (
-                f" - {operation.details}" if operation.details else ""
-            )
+            details_str = f" - {operation.details}" if operation.details else ""
 
             current_table.add_row(
                 f"[{color}]{icon}[/{color}]",
@@ -310,9 +296,7 @@ def start_operation(
     """Global function to start tracking an operation."""
     indicator = get_progress_indicator()
     if indicator:
-        indicator.start_operation(
-            operation_id, operation_type, description, details
-        )
+        indicator.start_operation(operation_id, operation_type, description, details)
 
 
 def update_operation(

@@ -7,23 +7,21 @@ status-enhanced agent engine, enabling status display in CLI commands.
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Any, Callable
+from typing import Any, Callable, Dict, List, Optional
+
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 
+from ..config_manager import ConfigManager
 from .status_integrated_engine import (
     StatusIntegratedAgentEngine,
     create_status_integrated_engine,
 )
-from .terminal_status_listener import TerminalStatusListener
 from .status_ui_components import (
     ComprehensiveStatusDisplay,
-    create_agent_status_summary,
 )
-from .status_core import AgentStatus
-from .status_manager import get_status_manager
-from ..config_manager import ConfigManager
+from .terminal_status_listener import TerminalStatusListener
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +61,7 @@ class CLIStatusIntegration:
         """
         try:
             if not self.engine.is_status_display_enabled():
-                self.console.print(
-                    "[yellow]Status display is disabled[/yellow]"
-                )
+                self.console.print("[yellow]Status display is disabled[/yellow]")
                 return False
 
             # Ensure status monitoring is started
@@ -78,9 +74,7 @@ class CLIStatusIntegration:
                 )
 
                 # Add to status manager (which handles streaming)
-                await self.engine.status_manager.add_listener(
-                    self.status_listener
-                )
+                await self.engine.status_manager.add_listener(self.status_listener)
 
             # Start live display
             await self.status_listener.start_live_display()
@@ -90,9 +84,7 @@ class CLIStatusIntegration:
 
         except Exception as e:
             logger.error(f"Failed to start live status display: {e}")
-            self.console.print(
-                f"[red]❌ Failed to start status display: {e}[/red]"
-            )
+            self.console.print(f"[red]❌ Failed to start status display: {e}[/red]")
             return False
 
     async def stop_live_status_display(self) -> bool:
@@ -113,16 +105,12 @@ class CLIStatusIntegration:
 
                 self.status_listener = None
 
-            self.console.print(
-                "[yellow]⏹️ Live status display stopped[/yellow]"
-            )
+            self.console.print("[yellow]⏹️ Live status display stopped[/yellow]")
             return True
 
         except Exception as e:
             logger.error(f"Failed to stop live status display: {e}")
-            self.console.print(
-                f"[red]❌ Failed to stop status display: {e}[/red]"
-            )
+            self.console.print(f"[red]❌ Failed to stop status display: {e}[/red]")
             return False
 
     async def show_status_snapshot(self, detailed: bool = False) -> None:
@@ -134,9 +122,7 @@ class CLIStatusIntegration:
         """
         try:
             if not self.engine.is_status_display_enabled():
-                self.console.print(
-                    "[yellow]Status display is disabled[/yellow]"
-                )
+                self.console.print("[yellow]Status display is disabled[/yellow]")
                 return
 
             # Get status data
@@ -149,8 +135,8 @@ class CLIStatusIntegration:
                 return
 
             # Display basic info
-            agent_status = status_summary.get("status", "unknown")
-            active_ops = status_summary.get("active_operations_count", 0)
+            status_summary.get("status", "unknown")
+            status_summary.get("active_operations_count", 0)
 
             # Create status display
             if detailed:
@@ -192,9 +178,7 @@ class CLIStatusIntegration:
         else:
             content += f"Status Stream: [red]🔴 Stopped[/red]\n"
 
-        self.console.print(
-            Panel(content, title="📊 Agent Status", border_style="blue")
-        )
+        self.console.print(Panel(content, title="📊 Agent Status", border_style="blue"))
 
     def _show_detailed_status(self, status_summary: Dict[str, Any]) -> None:
         """Show detailed status information."""
@@ -217,9 +201,7 @@ class CLIStatusIntegration:
                 filled = int((progress / 100) * bar_width)
                 bar = "█" * filled + "░" * (bar_width - filled)
 
-                op_info = (
-                    f"  [{progress:5.1f}%] {bar} {op_type}: {description}"
-                )
+                op_info = f"  [{progress:5.1f}%] {bar} {op_type}: {description}"
                 if duration > 0:
                     op_info += f" ({duration:.1f}s)"
 
@@ -273,7 +255,7 @@ class CLIStatusIntegration:
 
             return result
 
-        except Exception as e:
+        except Exception:
             # Stop display if we started it
             if display_started and self.status_listener:
                 await self.stop_live_status_display()
@@ -395,9 +377,7 @@ class CLIStatusCommand:
 """
 
         self.console.print(
-            Panel(
-                help_text, title="📊 Status Command Help", border_style="blue"
-            )
+            Panel(help_text, title="📊 Status Command Help", border_style="blue")
         )
 
 

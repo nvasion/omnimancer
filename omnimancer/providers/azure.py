@@ -5,23 +5,24 @@ This module provides the Azure OpenAI provider implementation using Azure's Open
 with support for deployment names, API versioning, and Azure-specific authentication.
 """
 
-import httpx
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+import httpx
 
 from ..core.models import (
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
-    ToolDefinition,
     ToolCall,
+    ToolDefinition,
 )
 from ..utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
+    RateLimitError,
 )
 from .base import BaseProvider
 
@@ -59,9 +60,7 @@ class AzureProvider(BaseProvider):
 
         # Validate required Azure configuration
         if not self.azure_endpoint:
-            raise ValueError(
-                "azure_endpoint is required for Azure OpenAI provider"
-            )
+            raise ValueError("azure_endpoint is required for Azure OpenAI provider")
 
         # Ensure endpoint format is correct
         if not self.azure_endpoint.startswith("https://"):
@@ -73,9 +72,7 @@ class AzureProvider(BaseProvider):
                     f"{self.azure_endpoint.rstrip('/')}.openai.azure.com"
                 )
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to Azure OpenAI API.
 
@@ -243,9 +240,7 @@ class AzureProvider(BaseProvider):
         Returns:
             Complete Azure OpenAI API URL
         """
-        base_url = (
-            f"{self.azure_endpoint}/openai/deployments/{self.azure_deployment}"
-        )
+        base_url = f"{self.azure_endpoint}/openai/deployments/{self.azure_deployment}"
         return f"{base_url}/{endpoint}?api-version={self.api_version}"
 
     def _prepare_messages(
@@ -272,9 +267,7 @@ class AzureProvider(BaseProvider):
 
         return messages
 
-    def _convert_tools_to_azure_format(
-        self, tools: List[ToolDefinition]
-    ) -> List[Dict]:
+    def _convert_tools_to_azure_format(self, tools: List[ToolDefinition]) -> List[Dict]:
         """
         Convert tool definitions to Azure OpenAI API format.
 
@@ -322,9 +315,7 @@ class AzureProvider(BaseProvider):
                 usage = data.get("usage", {})
 
                 # Use model name instead of deployment name for consistency
-                model_name = (
-                    self.model if self.model else self.azure_deployment
-                )
+                model_name = self.model if self.model else self.azure_deployment
                 return ChatResponse(
                     content=content,
                     model_used=model_name,
@@ -347,17 +338,13 @@ class AzureProvider(BaseProvider):
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get(
-                    "message", "Unknown error"
-                )
+                error_msg = error_data.get("error", {}).get("message", "Unknown error")
             except:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Azure OpenAI API error: {error_msg}")
 
-    def _handle_response_with_tools(
-        self, response: httpx.Response
-    ) -> ChatResponse:
+    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
         """
         Handle Azure OpenAI API response with tool calls.
 
@@ -390,9 +377,7 @@ class AzureProvider(BaseProvider):
                             )
 
                 # Use model name instead of deployment name for consistency
-                model_name = (
-                    self.model if self.model else self.azure_deployment
-                )
+                model_name = self.model if self.model else self.azure_deployment
                 return ChatResponse(
                     content=content,
                     model_used=model_name,
@@ -467,9 +452,7 @@ class AzureProvider(BaseProvider):
 
         # Default configuration if no match found
         if not config:
-            model_name_for_desc = (
-                self.model if self.model else self.azure_deployment
-            )
+            model_name_for_desc = self.model if self.model else self.azure_deployment
             config = {
                 "description": f"Azure OpenAI model {model_name_for_desc}",
                 "max_tokens": 4096,
@@ -496,9 +479,7 @@ class AzureProvider(BaseProvider):
             latest_version="gpt-4o" in self.azure_deployment.lower(),
             context_window=config["max_tokens"],
             is_free=False,
-            release_date=datetime(
-                2024, 5, 1
-            ),  # Approximate Azure availability
+            release_date=datetime(2024, 5, 1),  # Approximate Azure availability
         )
 
         # Update SWE rating based on score
@@ -615,9 +596,7 @@ class AzureProvider(BaseProvider):
             True for GPT-4 models with vision support
         """
         vision_models = ["gpt-4-turbo", "gpt-4o", "gpt-4-vision"]
-        return any(
-            model in self.azure_deployment.lower() for model in vision_models
-        )
+        return any(model in self.azure_deployment.lower() for model in vision_models)
 
     def supports_streaming(self) -> bool:
         """

@@ -1,143 +1,143 @@
 """Omnimancer agent core components."""
 
-from .file_system_manager import FileSystemManager
-from .web_client import WebClient
-from .config import AgentConfig
-from .status_core import (
-    AgentStatus,
-    OperationType,
-    OperationStatus,
-    EventType,
-    AgentOperation,
-    AgentEvent,
-    EventListener,
-)
-from .status_manager import (
-    UnifiedStatusManager as AgentStatusManager,
-    get_status_manager,
-    initialize_status_system,
-    shutdown_status_system,
-)
-from .persona import (
-    PersonaCapability,
-    PersonaCategory,
-    PersonaStatus,
-    PersonaMetadata,
-    PersonaConfiguration,
-    AgentPersona,
-    PersonaManager,
-    CodingPersona,
-    ResearchPersona,
-    CreativePersona,
-    PerformancePersona,
-    GeneralPersona,
-    get_persona_manager,
-    set_persona_manager,
-)
 from .agent_switcher import (
     AgentSwitcher,
     SessionState,
     SwitchContext,
+    SwitchOperationError,
     SwitchState,
     SwitchValidationError,
-    SwitchOperationError,
     get_agent_switcher,
     set_agent_switcher,
 )
-from .persona_validator import (
-    PersonaValidator,
-    ValidationResult,
-    ValidationIssue,
-    ValidationSeverity,
-    ValidationCategory,
-    get_persona_validator,
-    set_persona_validator,
-)
-from .template_applicator import (
-    TemplateApplicator,
-    ApplicationContext,
-    ApplicationResult,
-    ApplicationOptions,
-    ApplicationStage,
-    get_template_applicator,
-    set_template_applicator,
-)
-from .input_handler import (
-    InteractiveInputHandler,
-    KeyAction,
-    InputMode,
-    InputState,
-    KeyBinding,
-    create_input_handler,
-    create_custom_input_handler,
+from .approval_context import (
+    ApprovalContext,
+    ApprovalDecision,
+    FileChange,
+    FileOperationType,
+    OperationDetails,
+    OperationStatus,
+    SecurityFlags,
+    create_command_execution_context,
+    create_file_operation_context,
+    create_web_request_context,
 )
 from .approval_dialog import (
     ApprovalDialog,
-    DialogState,
-    DialogSection,
     DialogOptions,
+    DialogSection,
+    DialogState,
     create_approval_dialog,
     show_quick_approval,
 )
-from .approval_context import (
-    ApprovalContext,
-    OperationDetails,
-    ApprovalDecision,
-    SecurityFlags,
-    FileChange,
-    FileOperationType,
-    OperationStatus,
-    create_file_operation_context,
-    create_command_execution_context,
-    create_web_request_context,
-)
-from .performance_monitor import (
-    PerformanceMonitor,
-    PerformanceSnapshot,
-    PerformanceAlert,
-    OptimizationSuggestion,
-    AlertLevel,
-    OptimizationType,
-    MetricType,
-    get_performance_monitor,
-    set_performance_monitor,
-    initialize_performance_monitoring,
-    shutdown_performance_monitoring,
-)
-from .token_tracker import (
-    TokenUsageTracker,
-    DetailedTokenUsage,
-    TokenCost,
-    UsagePattern,
-    TokenCountMethod,
-    UsageCategory,
-    get_token_tracker,
-    set_token_tracker,
+from .config import AgentConfig
+from .file_system_manager import FileSystemManager
+from .input_handler import (
+    InputMode,
+    InputState,
+    InteractiveInputHandler,
+    KeyAction,
+    KeyBinding,
+    create_custom_input_handler,
+    create_input_handler,
 )
 from .metrics_collector import (
-    PerformanceMetricsCollector,
-    MetricValue,
     AggregatedMetric,
-    MetricCategory,
     AggregationMethod,
+    MetricCategory,
+    MetricValue,
+    PerformanceMetricsCollector,
     SystemResourceSnapshot,
     get_metrics_collector,
-    set_metrics_collector,
     initialize_metrics_collection,
+    set_metrics_collector,
     shutdown_metrics_collection,
 )
 from .optimization_engine import (
+    AlertRule,
+    AlertTrigger,
+    OptimizationCategory,
     OptimizationEngine,
     OptimizationRule,
-    AlertRule,
-    OptimizationCategory,
-    AlertTrigger,
     TrendAnalyzer,
     get_optimization_engine,
-    set_optimization_engine,
     initialize_optimization_engine,
+    set_optimization_engine,
     shutdown_optimization_engine,
 )
+from .performance_monitor import (
+    AlertLevel,
+    MetricType,
+    OptimizationSuggestion,
+    OptimizationType,
+    PerformanceAlert,
+    PerformanceMonitor,
+    PerformanceSnapshot,
+    get_performance_monitor,
+    initialize_performance_monitoring,
+    set_performance_monitor,
+    shutdown_performance_monitoring,
+)
+from .persona import (
+    AgentPersona,
+    CodingPersona,
+    CreativePersona,
+    GeneralPersona,
+    PerformancePersona,
+    PersonaCapability,
+    PersonaCategory,
+    PersonaConfiguration,
+    PersonaManager,
+    PersonaMetadata,
+    PersonaStatus,
+    ResearchPersona,
+    get_persona_manager,
+    set_persona_manager,
+)
+from .persona_validator import (
+    PersonaValidator,
+    ValidationCategory,
+    ValidationIssue,
+    ValidationResult,
+    ValidationSeverity,
+    get_persona_validator,
+    set_persona_validator,
+)
+from .status_core import (
+    AgentEvent,
+    AgentOperation,
+    AgentStatus,
+    EventListener,
+    EventType,
+    OperationStatus,
+    OperationType,
+)
+from .status_manager import UnifiedStatusManager as AgentStatusManager
+from .status_manager import (
+    get_status_manager,
+    initialize_status_system,
+    shutdown_status_system,
+)
+from .template_applicator import (
+    ApplicationContext,
+    ApplicationOptions,
+    ApplicationResult,
+    ApplicationStage,
+    TemplateApplicator,
+    get_template_applicator,
+    set_template_applicator,
+)
+from .token_tracker import (
+    DetailedTokenUsage,
+    TokenCost,
+    TokenCountMethod,
+    TokenUsageTracker,
+    UsageCategory,
+    UsagePattern,
+    get_token_tracker,
+    set_token_tracker,
+)
+from .web_client import WebClient
 
 __all__ = [
     "FileSystemManager",

@@ -4,29 +4,27 @@ Google Gemini provider implementation for Omnimancer.
 This module provides the Google Gemini AI provider implementation using Google AI Studio API.
 """
 
-import httpx
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+import httpx
 
 from ..core.models import (
     ChatContext,
     ChatResponse,
     ModelInfo,
-    ToolDefinition,
     ToolCall,
-    ToolResult,
+    ToolDefinition,
 )
 from ..utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
     ProviderUnavailableError,
     QuotaExceededError,
-    ProviderConfigurationError,
+    RateLimitError,
 )
-from ..utils.error_handler import handle_provider_error
 from .base import BaseProvider
 
 
@@ -50,9 +48,7 @@ class GeminiProvider(BaseProvider):
         self.max_tokens = kwargs.get("max_tokens", 8192)
         self.temperature = kwargs.get("temperature", 0.7)
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to Gemini API.
 
@@ -144,17 +140,12 @@ class GeminiProvider(BaseProvider):
                 try:
                     error_data = response.json()
                     error_msg = error_data.get("error", {}).get("message", "")
-                    if (
-                        "API_KEY" in error_msg.upper()
-                        or "INVALID" in error_msg.upper()
-                    ):
+                    if "API_KEY" in error_msg.upper() or "INVALID" in error_msg.upper():
                         raise AuthenticationError(
                             f"Invalid Gemini API key: {error_msg}"
                         )
                     else:
-                        raise ProviderError(
-                            f"Gemini API validation error: {error_msg}"
-                        )
+                        raise ProviderError(f"Gemini API validation error: {error_msg}")
                 except (ValueError, KeyError):
                     raise ProviderError(
                         "Invalid response from Gemini API during validation"
@@ -175,16 +166,12 @@ class GeminiProvider(BaseProvider):
                     )
                 except:
                     error_msg = f"HTTP {response.status_code}"
-                raise ProviderError(
-                    f"Gemini API validation failed: {error_msg}"
-                )
+                raise ProviderError(f"Gemini API validation failed: {error_msg}")
 
         except httpx.TimeoutException:
             raise NetworkError("Gemini API validation request timed out")
         except httpx.RequestError as e:
-            raise NetworkError(
-                f"Network error during Gemini API validation: {e}"
-            )
+            raise NetworkError(f"Network error during Gemini API validation: {e}")
         except (
             AuthenticationError,
             NetworkError,
@@ -194,13 +181,9 @@ class GeminiProvider(BaseProvider):
             # Re-raise our custom exceptions
             raise
         except Exception as e:
-            raise ProviderError(
-                f"Unexpected error during Gemini API validation: {e}"
-            )
+            raise ProviderError(f"Unexpected error during Gemini API validation: {e}")
 
-    def _prepare_contents(
-        self, message: str, context: ChatContext
-    ) -> List[Dict]:
+    def _prepare_contents(self, message: str, context: ChatContext) -> List[Dict]:
         """
         Prepare contents for Gemini API format.
 
@@ -273,9 +256,7 @@ class GeminiProvider(BaseProvider):
                         return ChatResponse(
                             content=text_content,
                             model_used=self.model,
-                            tokens_used=usage_metadata.get(
-                                "totalTokenCount", 0
-                            ),
+                            tokens_used=usage_metadata.get("totalTokenCount", 0),
                             timestamp=datetime.now(),
                         )
                     else:
@@ -315,9 +296,7 @@ class GeminiProvider(BaseProvider):
                         provider="gemini",
                     )
                 elif "MODEL_NOT_FOUND" in error_msg.upper():
-                    available_models = [
-                        m.name for m in self.get_available_models()
-                    ]
+                    available_models = [m.name for m in self.get_available_models()]
                     raise ModelNotFoundError(
                         f"Gemini model '{self.model}' not found",
                         provider="gemini",
@@ -329,9 +308,7 @@ class GeminiProvider(BaseProvider):
                         f"Gemini API error: {error_msg}", provider="gemini"
                     )
             except (ValueError, KeyError):
-                raise ProviderError(
-                    "Bad request to Gemini API", provider="gemini"
-                )
+                raise ProviderError("Bad request to Gemini API", provider="gemini")
 
         elif response.status_code == 401:
             raise AuthenticationError(
@@ -404,15 +381,11 @@ class GeminiProvider(BaseProvider):
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get(
-                    "message", "Unknown error"
-                )
+                error_msg = error_data.get("error", {}).get("message", "Unknown error")
             except:
                 error_msg = f"HTTP {response.status_code}"
 
-            raise ProviderError(
-                f"Gemini API error: {error_msg}", provider="gemini"
-            )
+            raise ProviderError(f"Gemini API error: {error_msg}", provider="gemini")
 
     def get_model_info(self) -> ModelInfo:
         """
@@ -525,9 +498,7 @@ class GeminiProvider(BaseProvider):
 
                 # Parse models from API response
                 for model_data in data.get("models", []):
-                    model_name = model_data.get("name", "").replace(
-                        "models/", ""
-                    )
+                    model_name = model_data.get("name", "").replace("models/", "")
 
                     # Only include generative models
                     if "gemini" in model_name.lower():
@@ -543,7 +514,7 @@ class GeminiProvider(BaseProvider):
                         )
 
                         # Get token limits
-                        input_limit = model_data.get("inputTokenLimit", 32768)
+                        model_data.get("inputTokenLimit", 32768)
                         output_limit = model_data.get("outputTokenLimit", 8192)
 
                         # Estimate costs (these are approximate)
@@ -557,9 +528,7 @@ class GeminiProvider(BaseProvider):
                             ModelInfo(
                                 name=model_name,
                                 provider="gemini",
-                                description=model_data.get(
-                                    "displayName", model_name
-                                ),
+                                description=model_data.get("displayName", model_name),
                                 max_tokens=output_limit,
                                 cost_per_token=cost_per_token,
                                 available=True,
@@ -572,7 +541,7 @@ class GeminiProvider(BaseProvider):
 
                 return models if models else self.get_available_models()
 
-        except Exception as e:
+        except Exception:
             # Fall back to static model list if API call fails
             return self.get_available_models()
 
@@ -683,15 +652,11 @@ class GeminiProvider(BaseProvider):
             function_declarations.append(function_declaration)
 
         if function_declarations:
-            gemini_tools.append(
-                {"function_declarations": function_declarations}
-            )
+            gemini_tools.append({"function_declarations": function_declarations})
 
         return gemini_tools
 
-    def _handle_response_with_tools(
-        self, response: httpx.Response
-    ) -> ChatResponse:
+    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
         """
         Handle Gemini API response that may contain tool calls.
 

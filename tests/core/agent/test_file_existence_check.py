@@ -5,14 +5,13 @@ This module tests the file existence check methods in FileSystemManager,
 including comprehensive metadata retrieval and simple boolean checks.
 """
 
-import pytest
-import asyncio
-import tempfile
-import shutil
 import os
+import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
-from typing import Dict, Any
+from unittest.mock import patch
+
+import pytest
 
 from omnimancer.core.agent.file_system_manager import FileSystemManager
 from omnimancer.core.security import SecurityManager
@@ -39,9 +38,7 @@ class TestFileExistenceCheck:
         )
 
     @pytest.mark.asyncio
-    async def test_check_file_exists_new_file(
-        self, file_system_manager, temp_dir
-    ):
+    async def test_check_file_exists_new_file(self, file_system_manager, temp_dir):
         """Test existence check for non-existent file."""
         test_file = temp_dir / "non_existent.txt"
 
@@ -57,9 +54,7 @@ class TestFileExistenceCheck:
         assert result["error"] is None
 
     @pytest.mark.asyncio
-    async def test_check_file_exists_existing_file(
-        self, file_system_manager, temp_dir
-    ):
+    async def test_check_file_exists_existing_file(self, file_system_manager, temp_dir):
         """Test existence check for existing file."""
         test_file = temp_dir / "existing_file.txt"
         test_content = "This is test content for existence check."
@@ -79,9 +74,7 @@ class TestFileExistenceCheck:
         assert result["error"] is None
 
     @pytest.mark.asyncio
-    async def test_check_file_exists_directory(
-        self, file_system_manager, temp_dir
-    ):
+    async def test_check_file_exists_directory(self, file_system_manager, temp_dir):
         """Test existence check for directory."""
         test_dir = temp_dir / "test_directory"
         test_dir.mkdir()
@@ -98,15 +91,11 @@ class TestFileExistenceCheck:
         assert result["error"] is None
 
     @pytest.mark.asyncio
-    async def test_check_file_exists_symlink(
-        self, file_system_manager, temp_dir
-    ):
+    async def test_check_file_exists_symlink(self, file_system_manager, temp_dir):
         """Test existence check for symbolic link."""
         # Skip on Windows as symlinks require special permissions
         if os.name == "nt":
-            pytest.skip(
-                "Symbolic links require special permissions on Windows"
-            )
+            pytest.skip("Symbolic links require special permissions on Windows")
 
         original_file = temp_dir / "original.txt"
         symlink_file = temp_dir / "symlink.txt"
@@ -132,9 +121,7 @@ class TestFileExistenceCheck:
         """Test existence check without following symbolic links."""
         # Skip on Windows as symlinks require special permissions
         if os.name == "nt":
-            pytest.skip(
-                "Symbolic links require special permissions on Windows"
-            )
+            pytest.skip("Symbolic links require special permissions on Windows")
 
         original_file = temp_dir / "original.txt"
         symlink_file = temp_dir / "symlink.txt"
@@ -175,9 +162,7 @@ class TestFileExistenceCheck:
             result = await file_system_manager.check_file_exists(test_file)
 
             assert result["exists"] is True  # File exists but access denied
-            assert (
-                result["error"] == "Access denied: Access denied for testing"
-            )
+            assert result["error"] == "Access denied: Access denied for testing"
 
     @pytest.mark.asyncio
     async def test_check_file_exists_security_error(
@@ -211,9 +196,7 @@ class TestFileExistenceCheck:
         test_file.write_text("Test content")
 
         # Mock os.stat to raise OSError
-        with patch(
-            "aiofiles.os.stat", side_effect=OSError("Permission denied")
-        ):
+        with patch("aiofiles.os.stat", side_effect=OSError("Permission denied")):
             result = await file_system_manager.check_file_exists(test_file)
 
             assert result["exists"] is True  # File exists but metadata failed
@@ -221,9 +204,7 @@ class TestFileExistenceCheck:
             assert "Metadata access failed" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_file_exists_simple_true(
-        self, file_system_manager, temp_dir
-    ):
+    async def test_file_exists_simple_true(self, file_system_manager, temp_dir):
         """Test simple boolean existence check for existing file."""
         test_file = temp_dir / "simple_test.txt"
         test_file.write_text("Simple test content")
@@ -233,9 +214,7 @@ class TestFileExistenceCheck:
         assert exists is True
 
     @pytest.mark.asyncio
-    async def test_file_exists_simple_false(
-        self, file_system_manager, temp_dir
-    ):
+    async def test_file_exists_simple_false(self, file_system_manager, temp_dir):
         """Test simple boolean existence check for non-existent file."""
         test_file = temp_dir / "non_existent_simple.txt"
 
@@ -244,9 +223,7 @@ class TestFileExistenceCheck:
         assert exists is False
 
     @pytest.mark.asyncio
-    async def test_file_exists_simple_with_error(
-        self, file_system_manager, temp_dir
-    ):
+    async def test_file_exists_simple_with_error(self, file_system_manager, temp_dir):
         """Test simple boolean existence check with security error."""
         test_file = temp_dir / "error_simple.txt"
         test_file.write_text("Content for simple error test")
@@ -276,12 +253,7 @@ class TestFileExistenceCheck:
 
         # Use relative path with .. navigation
         relative_path = (
-            temp_dir
-            / "level1"
-            / "level2"
-            / ".."
-            / "level2"
-            / "nested_file.txt"
+            temp_dir / "level1" / "level2" / ".." / "level2" / "nested_file.txt"
         )
 
         result = await file_system_manager.check_file_exists(relative_path)
@@ -346,9 +318,7 @@ class TestFileExistenceIntegration:
         assert info["size"] == len(new_content)
 
     @pytest.mark.asyncio
-    async def test_existence_check_performance(
-        self, file_system_manager, temp_dir
-    ):
+    async def test_existence_check_performance(self, file_system_manager, temp_dir):
         """Test performance of existence checks with multiple files."""
         import time
 

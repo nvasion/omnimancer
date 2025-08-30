@@ -5,33 +5,29 @@ Interactive CLI wizard that guides users through creating custom agent
 configurations step-by-step with validation and real-time feedback.
 """
 
-import asyncio
 import logging
-from typing import Dict, List, Optional, Any, Set
-from pathlib import Path
-from dataclasses import replace
+from typing import List, Optional, Set
 
+from rich.align import Align
+from rich.box import ROUNDED
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Prompt, Confirm, IntPrompt, FloatPrompt
+from rich.prompt import Confirm, FloatPrompt, IntPrompt, Prompt
 from rich.table import Table
 from rich.text import Text
-from rich.box import ROUNDED
-from rich.align import Align
-from rich.columns import Columns
 
 from ..core.agent.agent_config import (
-    CustomAgentConfig,
-    ModelSettings,
-    ContextParameters,
-    BehaviorRules,
+    AgentRepository,
     AgentTool,
+    BehaviorRules,
+    ContextParameters,
+    CustomAgentConfig,
     CustomAgentStatus,
     CustomAgentValidator,
-    AgentRepository,
+    ModelSettings,
 )
-from ..core.agent.persona import PersonaCapability, PersonaCategory
 from ..core.agent.config import ProviderType
+from ..core.agent.persona import PersonaCapability, PersonaCategory
 from ..core.models import ConfigTemplateManager
 
 logger = logging.getLogger(__name__)
@@ -210,9 +206,7 @@ class AgentCreationWizard:
                         f"[red]Please enter a number between 1 and {len(categories)}.[/red]"
                     )
             except (ValueError, EOFError):
-                self.console.print(
-                    "[red]Invalid input. Please enter a number.[/red]"
-                )
+                self.console.print("[red]Invalid input. Please enter a number.[/red]")
 
         self.step_history.append("basic_info")
         return True
@@ -266,14 +260,10 @@ class AgentCreationWizard:
                         break
                     elif 1 <= choice <= len(templates):
                         selected_template = templates[choice - 1]
-                        self.current_config.base_template_id = (
-                            selected_template.id
-                        )
+                        self.current_config.base_template_id = selected_template.id
 
                         # Inherit from template
-                        self.current_config.inherit_from_template(
-                            self.template_manager
-                        )
+                        self.current_config.inherit_from_template(self.template_manager)
 
                         self.console.print(
                             f"[green]Selected template: {selected_template.name}[/green]"
@@ -311,8 +301,7 @@ class AgentCreationWizard:
             try:
                 choice = IntPrompt.ask(
                     "Provider",
-                    default=providers.index(current_settings.provider_type)
-                    + 1,
+                    default=providers.index(current_settings.provider_type) + 1,
                     show_default=True,
                 )
                 if 1 <= choice <= len(providers):
@@ -323,16 +312,12 @@ class AgentCreationWizard:
                         f"[red]Please enter a number between 1 and {len(providers)}.[/red]"
                     )
             except (ValueError, EOFError):
-                self.console.print(
-                    "[red]Invalid input. Please enter a number.[/red]"
-                )
+                self.console.print("[red]Invalid input. Please enter a number.[/red]")
 
         # Model name
         model_suggestions = self._get_model_suggestions(provider_type)
         if model_suggestions:
-            self.console.print(
-                f"\\nSuggested models for {provider_type.value}:"
-            )
+            self.console.print(f"\\nSuggested models for {provider_type.value}:")
             for suggestion in model_suggestions[:5]:  # Show top 5
                 self.console.print(f"  • {suggestion}")
 
@@ -342,9 +327,7 @@ class AgentCreationWizard:
 
         if not model_name:
             model_name = self._get_default_model(provider_type)
-            self.console.print(
-                f"[yellow]Using default model: {model_name}[/yellow]"
-            )
+            self.console.print(f"[yellow]Using default model: {model_name}[/yellow]")
 
         # Temperature
         while True:
@@ -361,9 +344,7 @@ class AgentCreationWizard:
                         "[red]Temperature must be between 0.0 and 2.0.[/red]"
                     )
             except (ValueError, EOFError):
-                self.console.print(
-                    "[red]Invalid input. Please enter a number.[/red]"
-                )
+                self.console.print("[red]Invalid input. Please enter a number.[/red]")
 
         # Max tokens (optional)
         max_tokens = None
@@ -422,9 +403,7 @@ class AgentCreationWizard:
         }
 
         for tool in all_tools:
-            description = tool_descriptions.get(
-                tool, "Advanced tool functionality"
-            )
+            description = tool_descriptions.get(tool, "Advanced tool functionality")
             enabled = "✅" if tool in current_tools else "❌"
             tool_table.add_row(
                 tool.value.replace("_", " ").title(), description, enabled
@@ -441,9 +420,7 @@ class AgentCreationWizard:
             self.console.print("2. Select preset configuration")
             self.console.print("3. Continue with current selection")
 
-            choice = Prompt.ask(
-                "Choose option", choices=["1", "2", "3"], default="3"
-            )
+            choice = Prompt.ask("Choose option", choices=["1", "2", "3"], default="3")
 
             if choice == "1":
                 selected_tools = await self._interactive_tool_selection(
@@ -462,18 +439,14 @@ class AgentCreationWizard:
         current_capabilities = self.current_config.capabilities
 
         # Smart capability suggestions based on selected tools
-        suggested_capabilities = self._suggest_capabilities_for_tools(
-            selected_tools
-        )
+        suggested_capabilities = self._suggest_capabilities_for_tools(selected_tools)
 
         if suggested_capabilities:
             self.console.print(
                 "\\n[cyan]Suggested capabilities based on selected tools:[/cyan]"
             )
             for cap in suggested_capabilities:
-                self.console.print(
-                    f"  • {cap.value.replace('_', ' ').title()}"
-                )
+                self.console.print(f"  • {cap.value.replace('_', ' ').title()}")
 
             if Confirm.ask("Use suggested capabilities?", default=True):
                 self.current_config.capabilities = suggested_capabilities
@@ -501,9 +474,7 @@ class AgentCreationWizard:
 
         # System prompt
         self.console.print("\\nConfigure the system prompt for your agent:")
-        self.console.print(
-            "This defines the agent's personality and behavior."
-        )
+        self.console.print("This defines the agent's personality and behavior.")
 
         current_prompt = current_params.system_prompt
         if current_prompt:
@@ -516,9 +487,7 @@ class AgentCreationWizard:
         if Confirm.ask("Edit system prompt?", default=bool(current_prompt)):
             # For simplicity, use basic input. In a full implementation,
             # this could open an editor or provide multi-line input
-            system_prompt = Prompt.ask(
-                "System prompt", default=current_prompt
-            ).strip()
+            system_prompt = Prompt.ask("System prompt", default=current_prompt).strip()
         else:
             system_prompt = current_prompt
 
@@ -583,14 +552,10 @@ class AgentCreationWizard:
         self.console.print("\\nSelect safety level:")
         self.console.print("1. Strict - Maximum safety, conservative behavior")
         self.console.print("2. Standard - Balanced safety and functionality")
-        self.console.print(
-            "3. Permissive - Minimal restrictions, maximum freedom"
-        )
+        self.console.print("3. Permissive - Minimal restrictions, maximum freedom")
 
         safety_levels = ["strict", "standard", "permissive"]
-        safety_choice = Prompt.ask(
-            "Safety level", choices=["1", "2", "3"], default="2"
-        )
+        safety_choice = Prompt.ask("Safety level", choices=["1", "2", "3"], default="2")
         safety_level = safety_levels[int(safety_choice) - 1]
 
         # Reasoning style
@@ -621,9 +586,7 @@ class AgentCreationWizard:
         # Confirmation requirements
         require_confirmation = []
 
-        self.console.print(
-            "\\nConfigure operations that require user confirmation:"
-        )
+        self.console.print("\\nConfigure operations that require user confirmation:")
         confirmation_options = [
             ("file_delete", "File deletion operations"),
             ("system_commands", "System command execution"),
@@ -663,9 +626,7 @@ class AgentCreationWizard:
             self.validator.validate_config(self.current_config)
             self.console.print("[green]✅ Configuration is valid![/green]")
         except ValueError as e:
-            self.console.print(
-                f"[red]❌ Configuration validation failed: {e}[/red]"
-            )
+            self.console.print(f"[red]❌ Configuration validation failed: {e}[/red]")
             if not Confirm.ask("Continue anyway?", default=False):
                 return False
 
@@ -699,30 +660,22 @@ class AgentCreationWizard:
         basic_table.add_column("Value", style="white")
 
         basic_table.add_row("Name", config.name)
-        basic_table.add_row(
-            "Description", config.description or "[dim]None[/dim]"
-        )
+        basic_table.add_row("Description", config.description or "[dim]None[/dim]")
         basic_table.add_row("Category", config.category.value.title())
         basic_table.add_row(
             "Base Template", config.base_template_id or "[dim]None[/dim]"
         )
 
-        self.console.print(
-            Panel(basic_table, title="Basic Information", box=ROUNDED)
-        )
+        self.console.print(Panel(basic_table, title="Basic Information", box=ROUNDED))
 
         # Model settings
         model_table = Table(show_header=False, box=None)
         model_table.add_column("Field", style="cyan")
         model_table.add_column("Value", style="white")
 
-        model_table.add_row(
-            "Provider", config.model_settings.provider_type.value
-        )
+        model_table.add_row("Provider", config.model_settings.provider_type.value)
         model_table.add_row("Model", config.model_settings.model_name)
-        model_table.add_row(
-            "Temperature", str(config.model_settings.temperature)
-        )
+        model_table.add_row("Temperature", str(config.model_settings.temperature))
         model_table.add_row(
             "Max Tokens",
             (
@@ -732,22 +685,14 @@ class AgentCreationWizard:
             ),
         )
 
-        self.console.print(
-            Panel(model_table, title="Model Configuration", box=ROUNDED)
-        )
+        self.console.print(Panel(model_table, title="Model Configuration", box=ROUNDED))
 
         # Tools and capabilities
         tools_text = ", ".join(
-            [
-                tool.value.replace("_", " ").title()
-                for tool in config.enabled_tools
-            ]
+            [tool.value.replace("_", " ").title() for tool in config.enabled_tools]
         )
         caps_text = ", ".join(
-            [
-                cap.value.replace("_", " ").title()
-                for cap in config.capabilities
-            ]
+            [cap.value.replace("_", " ").title() for cap in config.capabilities]
         )
 
         tools_table = Table(show_header=False, box=None)
@@ -797,9 +742,7 @@ class AgentCreationWizard:
                         f"[red]Please enter a number between 1 and {len(all_tools) + 1}.[/red]"
                     )
             except (ValueError, EOFError):
-                self.console.print(
-                    "[red]Invalid input. Please enter a number.[/red]"
-                )
+                self.console.print("[red]Invalid input. Please enter a number.[/red]")
 
         return selected
 
@@ -841,9 +784,7 @@ class AgentCreationWizard:
                         f"[red]Please enter a number between 1 and {len(preset_names)}.[/red]"
                     )
             except (ValueError, EOFError):
-                self.console.print(
-                    "[red]Invalid input. Please enter a number.[/red]"
-                )
+                self.console.print("[red]Invalid input. Please enter a number.[/red]")
 
     async def _interactive_capability_selection(
         self,
@@ -893,15 +834,11 @@ class AgentCreationWizard:
 
         # Simple yes/no for each group
         for group_name, group_caps in capability_groups.items():
-            available_caps = [
-                cap for cap in group_caps if cap in all_capabilities
-            ]
+            available_caps = [cap for cap in group_caps if cap in all_capabilities]
             if not available_caps:
                 continue
 
-            current_count = len(
-                [cap for cap in available_caps if cap in selected]
-            )
+            current_count = len([cap for cap in available_caps if cap in selected])
 
             if Confirm.ask(
                 f"\\nEnable {group_name.lower()} capabilities? (currently {current_count}/{len(available_caps)})",
@@ -999,9 +936,7 @@ async def quick_agent_creation(
 
     config = CustomAgentConfig(
         name=name,
-        model_settings=ModelSettings(
-            provider_type=provider_type, model_name=model
-        ),
+        model_settings=ModelSettings(provider_type=provider_type, model_name=model),
         status=CustomAgentStatus.ACTIVE,
     )
 

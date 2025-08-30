@@ -32,7 +32,6 @@ async def handle_command(args, **kwargs):
         String message to display
     """
     from rich.table import Table
-    from rich.panel import Panel
 
     engine = kwargs.get("engine")
     console = kwargs.get("console")
@@ -55,9 +54,7 @@ async def handle_command(args, **kwargs):
     # Calculate statistics
     total_messages = len(history)
     user_messages = sum(1 for msg in history if msg.get("role") == "user")
-    assistant_messages = sum(
-        1 for msg in history if msg.get("role") == "assistant"
-    )
+    assistant_messages = sum(1 for msg in history if msg.get("role") == "assistant")
 
     total_words = 0
     user_words = 0
@@ -94,9 +91,7 @@ async def handle_command(args, **kwargs):
             str(assistant_messages),
             str(total_messages),
         )
-        table.add_row(
-            "Words", str(user_words), str(assistant_words), str(total_words)
-        )
+        table.add_row("Words", str(user_words), str(assistant_words), str(total_words))
         table.add_row(
             "Avg Words/Msg",
             str(round(user_words / max(user_messages, 1), 1)),

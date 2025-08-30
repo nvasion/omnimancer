@@ -8,20 +8,17 @@ API key setup, and validation.
 This is now a simplified facade that delegates to specialized modules.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
-from rich.console import Console
-from rich.prompt import Prompt, Confirm  # For test compatibility
-from rich.progress import Progress  # For test compatibility
 
 from .config_manager import ConfigManager
+from .models import ProviderConfig
 from .provider_registry import ProviderRegistry
 from .setup_wizard_core import SetupWizardCore
-from .setup_wizard_ui import SetupWizardUI
-from .setup_wizard_provider_setup import SetupWizardProviderSetup
-from .setup_wizard_validation import SetupWizardValidation
 from .setup_wizard_guide_generator import SetupWizardGuideGenerator
-from .models import ProviderConfig
+from .setup_wizard_provider_setup import SetupWizardProviderSetup
+from .setup_wizard_ui import SetupWizardUI
+from .setup_wizard_validation import SetupWizardValidation
 
 
 class SetupWizard(SetupWizardCore):
@@ -46,9 +43,7 @@ class SetupWizard(SetupWizardCore):
         """
         super().__init__(config_manager, provider_registry)
         self.ui = SetupWizardUI(self.console, self.provider_info)
-        self.provider_setup = SetupWizardProviderSetup(
-            self.console, self.provider_info
-        )
+        self.provider_setup = SetupWizardProviderSetup(self.console, self.provider_info)
         self.validation = SetupWizardValidation(
             self.console,
             self.provider_info,
@@ -158,9 +153,7 @@ class SetupWizard(SetupWizardCore):
         Returns:
             Setup guide content as markdown string
         """
-        return self.guide_generator.create_setup_guide(
-            provider_name, output_path
-        )
+        return self.guide_generator.create_setup_guide(provider_name, output_path)
 
     def generate_all_setup_guides(self, output_dir: str) -> List[str]:
         """
@@ -176,9 +169,7 @@ class SetupWizard(SetupWizardCore):
 
     # Delegation methods for backward compatibility with tests
 
-    def _get_api_key(
-        self, provider_name: str, info: Dict[str, Any]
-    ) -> Optional[str]:
+    def _get_api_key(self, provider_name: str, info: Dict[str, Any]) -> Optional[str]:
         """
         Get and validate API key from user.
 
@@ -206,9 +197,7 @@ class SetupWizard(SetupWizardCore):
         """
         return self.validation._validate_api_key_format(provider_name, api_key)
 
-    def _select_model(
-        self, provider_name: str, info: Dict[str, Any]
-    ) -> Optional[str]:
+    def _select_model(self, provider_name: str, info: Dict[str, Any]) -> Optional[str]:
         """
         Select model for the provider.
 
@@ -260,13 +249,9 @@ class SetupWizard(SetupWizardCore):
         Returns:
             True if configuration is valid, False otherwise
         """
-        return await self.validation.test_configuration(
-            provider_name, provider_config
-        )
+        return await self.validation.test_configuration(provider_name, provider_config)
 
-    async def _configure_provider(
-        self, provider_name: str
-    ) -> Optional[ProviderConfig]:
+    async def _configure_provider(self, provider_name: str) -> Optional[ProviderConfig]:
         """
         Configure a specific provider with validation.
 
@@ -309,9 +294,7 @@ class SetupWizard(SetupWizardCore):
         """
         return self.ui.show_completion(provider_name)
 
-    def _show_troubleshooting_guidance(
-        self, provider_name: str, error: str
-    ) -> None:
+    def _show_troubleshooting_guidance(self, provider_name: str, error: str) -> None:
         """
         Show provider-specific troubleshooting guidance.
 
@@ -331,9 +314,7 @@ class SetupWizard(SetupWizardCore):
         provider_config = ProviderConfig(**config)
         return await self._test_configuration(provider_name, provider_config)
 
-    async def _check_model_availability(
-        self, provider_name: str, model: str
-    ) -> bool:
+    async def _check_model_availability(self, provider_name: str, model: str) -> bool:
         """Check if model is available for provider."""
         return True  # Stub implementation
 

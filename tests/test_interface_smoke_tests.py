@@ -5,18 +5,17 @@ These tests ensure that the refactored interface maintains
 all functionality during the modularization process.
 """
 
-import pytest
 import tempfile
-import asyncio
 from pathlib import Path
-from unittest.mock import patch, AsyncMock, MagicMock
-from io import StringIO
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from omnimancer.cli.interface import CommandLineInterface
+import pytest
+
 from omnimancer.cli.commands import Command, CommandType, parse_command
+from omnimancer.cli.interface import CommandLineInterface
 from omnimancer.core.config_manager import ConfigManager
-from omnimancer.core.models import Config, ProviderConfig
 from omnimancer.core.engine import CoreEngine
+from omnimancer.core.models import ProviderConfig
 
 
 class TestInterfaceSmokeTests:

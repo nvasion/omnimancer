@@ -5,10 +5,10 @@ These tests verify that all modules can be imported without errors,
 particularly focusing on modules that had import issues during test collection.
 """
 
-import pytest
-import sys
 import importlib
-from pathlib import Path
+import sys
+
+import pytest
 
 
 class TestCoreModuleImports:
@@ -23,30 +23,10 @@ class TestCoreModuleImports:
 
         # Test importing specific error classes
         from omnimancer.utils.errors import (
-            OmnimancerError,
             AgentError,
             ExecutionError,
+            OmnimancerError,
             TimeoutError,
-            SecurityError,
-            PermissionError,
-            ConfigurationError,
-            ProviderError,
-            AuthenticationError,
-            RateLimitError,
-            NetworkError,
-            ValidationError,
-            ModelNotFoundError,
-            ConversationError,
-            MCPError,
-            MCPServerError,
-            MCPToolError,
-            MCPConfigurationError,
-            ProviderUnavailableError,
-            ToolExecutionError,
-            QuotaExceededError,
-            ProviderConfigurationError,
-            MCPConnectionError,
-            MCPTimeoutError,
         )
 
         # Verify error classes are actually classes
@@ -64,11 +44,11 @@ class TestCoreModuleImports:
 
         # Test specific classes from program_executor
         from omnimancer.core.agent.program_executor import (
-            EnhancedProgramExecutor,
-            CommandResult,
-            ExecutionConfig,
-            CommandValidator,
             CommandCategory,
+            CommandResult,
+            CommandValidator,
+            EnhancedProgramExecutor,
+            ExecutionConfig,
             ExecutionMode,
         )
 
@@ -82,9 +62,7 @@ class TestCoreModuleImports:
     def test_agent_core_imports(self):
         """Test that agent core modules import successfully."""
         # Test agent system modules
-        from omnimancer.core import agent_engine
-        from omnimancer.core import agent_mode_manager
-        from omnimancer.core import agent_progress_ui
+        from omnimancer.core import agent_engine, agent_mode_manager, agent_progress_ui
 
         assert agent_engine is not None
         assert agent_mode_manager is not None
@@ -92,8 +70,7 @@ class TestCoreModuleImports:
 
     def test_security_module_imports(self):
         """Test that security modules import successfully."""
-        from omnimancer.core.security import sandbox_manager
-        from omnimancer.core.security import approval_workflow
+        from omnimancer.core.security import approval_workflow, sandbox_manager
 
         assert sandbox_manager is not None
         assert approval_workflow is not None
@@ -128,9 +105,7 @@ class TestCoreModuleImports:
 
     def test_core_engine_imports(self):
         """Test that core engine modules import successfully."""
-        from omnimancer.core import engine
-        from omnimancer.core import models
-        from omnimancer.core import config_manager
+        from omnimancer.core import config_manager, engine, models
 
         assert engine is not None
         assert models is not None
@@ -138,8 +113,7 @@ class TestCoreModuleImports:
 
     def test_cli_interface_imports(self):
         """Test that CLI interface modules import successfully."""
-        from omnimancer.cli import interface
-        from omnimancer.cli import commands
+        from omnimancer.cli import commands, interface
 
         assert interface is not None
         assert commands is not None
@@ -192,18 +166,18 @@ class TestModuleIntegrity:
         """Test that critical import paths used by program_executor work."""
         # These are the exact imports that were causing test collection to fail
         try:
-            from omnimancer.core.security.sandbox_manager import (
-                SandboxManager,
-                ResourceLimits,
-                SandboxedProcess,
-            )
             from omnimancer.core.security.approval_workflow import (
                 ApprovalWorkflow,
                 RiskLevel,
             )
+            from omnimancer.core.security.sandbox_manager import (
+                ResourceLimits,
+                SandboxedProcess,
+                SandboxManager,
+            )
             from omnimancer.utils.errors import (
-                SecurityError,
                 ExecutionError,
+                SecurityError,
                 TimeoutError,
             )
 
@@ -260,18 +234,17 @@ class TestModuleCompatibility:
         """Test that the complete agent system can be imported."""
         try:
             # Import the main agent engine
-            from omnimancer.core.agent_engine import AgentEngine
-
             # Import the program executor that was failing
             from omnimancer.core.agent.program_executor import (
                 EnhancedProgramExecutor,
             )
-
-            # Import security components
-            from omnimancer.core.security.sandbox_manager import SandboxManager
+            from omnimancer.core.agent_engine import AgentEngine
             from omnimancer.core.security.approval_workflow import (
                 ApprovalWorkflow,
             )
+
+            # Import security components
+            from omnimancer.core.security.sandbox_manager import SandboxManager
 
             # Verify all are classes that can be instantiated
             assert issubclass(AgentEngine, object)
@@ -307,8 +280,8 @@ class TestErrorModuleSpecific:
 
     def test_all_error_classes_instantiable(self):
         """Test that all error classes in __all__ can be instantiated."""
-        from omnimancer.utils.errors import __all__ as all_exports
         import omnimancer.utils.errors as errors_module
+        from omnimancer.utils.errors import __all__ as all_exports
 
         for error_name in all_exports:
             error_class = getattr(errors_module, error_name)
@@ -329,8 +302,8 @@ class TestErrorModuleSpecific:
         )
         from omnimancer.utils.errors import (
             ExecutionError,
-            TimeoutError,
             SecurityError,
+            TimeoutError,
         )
 
         # Verify the executor can reference these error types

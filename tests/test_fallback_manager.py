@@ -2,24 +2,23 @@
 Comprehensive tests for the enhanced provider fallback system.
 """
 
-import pytest
-import asyncio
 import time
-from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 from omnimancer.core.fallback_manager import (
     EnhancedProviderFallback,
+    FallbackAttempt,
     FallbackReason,
     ProviderRank,
     ProviderStats,
-    FallbackAttempt,
 )
 from omnimancer.core.health_monitor import HealthMonitor
 from omnimancer.utils.errors import (
+    NetworkError,
     ProviderError,
     ProviderUnavailableError,
-    NetworkError,
     RateLimitError,
 )
 
@@ -27,9 +26,7 @@ from omnimancer.utils.errors import (
 class MockProvider:
     """Mock provider for testing."""
 
-    def __init__(
-        self, name: str, should_fail: bool = False, fail_count: int = 0
-    ):
+    def __init__(self, name: str, should_fail: bool = False, fail_count: int = 0):
         self.name = name
         self.should_fail = should_fail
         self.fail_count = fail_count
@@ -200,9 +197,7 @@ class TestEnhancedProviderFallback:
         assert "secondary" in mock_core_engine.switch_calls
 
     @pytest.mark.asyncio
-    async def test_retry_logic_with_backoff(
-        self, fallback_manager, mock_core_engine
-    ):
+    async def test_retry_logic_with_backoff(self, fallback_manager, mock_core_engine):
         """Test retry logic with exponential backoff."""
         # Make primary provider fail first 2 attempts, then succeed
         mock_core_engine.providers["primary"].fail_count = 2
@@ -227,9 +222,7 @@ class TestEnhancedProviderFallback:
         assert end_time - start_time >= 1.0  # At least 1 second for backoff
 
     @pytest.mark.asyncio
-    async def test_all_providers_fail(
-        self, fallback_manager, mock_core_engine
-    ):
+    async def test_all_providers_fail(self, fallback_manager, mock_core_engine):
         """Test behavior when all providers fail."""
         # Make all providers fail
         for provider in mock_core_engine.providers.values():
@@ -345,12 +338,8 @@ class TestEnhancedProviderFallback:
     def test_fallback_history_tracking(self, fallback_manager):
         """Test fallback history tracking."""
         attempts = [
-            FallbackAttempt(
-                "primary", FallbackReason.PROVIDER_ERROR, "Error 1"
-            ),
-            FallbackAttempt(
-                "secondary", FallbackReason.NETWORK_ERROR, "Error 2"
-            ),
+            FallbackAttempt("primary", FallbackReason.PROVIDER_ERROR, "Error 1"),
+            FallbackAttempt("secondary", FallbackReason.NETWORK_ERROR, "Error 2"),
         ]
 
         fallback_manager._record_fallback_history(attempts)
@@ -376,9 +365,7 @@ class TestEnhancedProviderFallback:
         assert stats_summary["secondary"]["success_rate"] == 0.0
 
     @pytest.mark.asyncio
-    async def test_context_preservation(
-        self, fallback_manager, mock_core_engine
-    ):
+    async def test_context_preservation(self, fallback_manager, mock_core_engine):
         """Test conversation context preservation during fallback."""
         # Enable context preservation
         fallback_manager.context_preservation_enabled = True
@@ -396,9 +383,7 @@ class TestEnhancedProviderFallback:
 
     def test_circuit_breaker_configuration(self, fallback_manager):
         """Test circuit breaker configuration."""
-        fallback_manager.configure_circuit_breaker(
-            threshold=3, recovery_time=300
-        )
+        fallback_manager.configure_circuit_breaker(threshold=3, recovery_time=300)
 
         assert fallback_manager.circuit_breaker_threshold == 3
         assert fallback_manager.circuit_breaker_recovery_time == 300
@@ -408,7 +393,7 @@ class TestEnhancedProviderFallback:
         self, fallback_manager, mock_health_monitor
     ):
         """Test integration with health monitoring system."""
-        health_status = await fallback_manager.health_check_all_providers()
+        await fallback_manager.health_check_all_providers()
 
         # Should call the health monitor
         mock_health_monitor.check_all_providers_health.assert_called_once()
@@ -430,9 +415,7 @@ class TestEnhancedProviderFallback:
         assert not fallback_manager._is_provider_excluded(provider_name)
 
     @pytest.mark.asyncio
-    async def test_jitter_in_retry_delay(
-        self, fallback_manager, mock_core_engine
-    ):
+    async def test_jitter_in_retry_delay(self, fallback_manager, mock_core_engine):
         """Test that retry delays include jitter to avoid thundering herd."""
         fallback_manager.jitter_factor = 0.5  # High jitter for testing
 
@@ -444,7 +427,7 @@ class TestEnhancedProviderFallback:
                 raise ProviderError("Temporary failure")
             return "success"
 
-        start_time = time.time()
+        time.time()
         await fallback_manager.execute_with_fallback(mock_operation)
 
         # Check that delays between calls vary (jitter effect)
@@ -500,9 +483,7 @@ class TestFallbackIntegration:
     """Integration tests for fallback system."""
 
     @pytest.mark.asyncio
-    async def test_full_fallback_scenario(
-        self, fallback_manager, mock_core_engine
-    ):
+    async def test_full_fallback_scenario(self, fallback_manager, mock_core_engine):
         """Test complete fallback scenario with multiple providers."""
         # Setup scenario: primary fails, secondary always fails, tertiary succeeds
         mock_core_engine.providers["primary"].should_fail = True

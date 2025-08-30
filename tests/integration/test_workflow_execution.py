@@ -2,17 +2,15 @@
 Integration tests for end-to-end workflow execution.
 """
 
-import pytest
-import asyncio
-import tempfile
 import os
-from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch
+import tempfile
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+
+from omnimancer.cli.commands import Command
 from omnimancer.cli.interface import CommandLineInterface
 from omnimancer.core.engine import CoreEngine
-from omnimancer.core.config_manager import ConfigManager
-from omnimancer.cli.commands import Command
 
 
 class TestWorkflowExecutionIntegration:
@@ -73,9 +71,7 @@ The workspace has been analyzed and documented successfully.[/FILE_WRITE]
 
 The workspace analysis is now complete. I've created a summary file with the key findings. Task completed."""
 
-            elif (
-                "analyze" in message.lower() and "workspace" in message.lower()
-            ):
+            elif "analyze" in message.lower() and "workspace" in message.lower():
                 response.content = """I'll analyze the workspace structure.
                 
 [COMMAND_EXEC] ls -la [/COMMAND_EXEC]
@@ -268,9 +264,7 @@ Let me also check if there are any Python files and their content.
 
             return response
 
-        cli.engine.send_message = AsyncMock(
-            side_effect=command_focused_responses
-        )
+        cli.engine.send_message = AsyncMock(side_effect=command_focused_responses)
 
         executed_commands = []
 
@@ -304,9 +298,7 @@ Let me also check if there are any Python files and their content.
             "_parse_and_execute_operations",
             side_effect=mock_command_execution,
         ):
-            command = Command.create_chat_message(
-                "check git status and list all files"
-            )
+            command = Command.create_chat_message("check git status and list all files")
 
             await cli._handle_chat_message(command)
 
@@ -348,9 +340,7 @@ Let me also check if there are any Python files and their content.
 
             return response
 
-        cli.engine.send_message = AsyncMock(
-            side_effect=error_inducing_responses
-        )
+        cli.engine.send_message = AsyncMock(side_effect=error_inducing_responses)
 
         error_count = 0
 

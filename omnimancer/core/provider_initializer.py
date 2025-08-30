@@ -5,15 +5,15 @@ This module provides optimized initialization for providers with
 lazy loading and caching mechanisms to improve performance.
 """
 
-import time
-import threading
-import logging
-from typing import Dict, Type, Any, Optional, List, Callable
 import importlib
 import inspect
+import logging
+import threading
+import time
+from typing import Dict, List, Type
 
 from ..providers.base import BaseProvider
-from .models import ProviderConfig, EnhancedModelInfo
+from .models import EnhancedModelInfo, ProviderConfig
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +83,7 @@ class ProviderInitializer:
                         break
 
                 if not provider_class:
-                    raise ValueError(
-                        f"Could not find provider class in {module_path}"
-                    )
+                    raise ValueError(f"Could not find provider class in {module_path}")
 
                 # Cache provider class
                 cls._provider_classes[provider_name] = provider_class
@@ -99,9 +97,7 @@ class ProviderInitializer:
                 )
                 raise
             except Exception as e:
-                logger.error(
-                    f"Error loading provider class for {provider_name}: {e}"
-                )
+                logger.error(f"Error loading provider class for {provider_name}: {e}")
                 raise ValueError(
                     f"Failed to load provider class for {provider_name}: {e}"
                 )
@@ -144,21 +140,15 @@ class ProviderInitializer:
         """
         if not cls._cache_enabled:
             # If caching is disabled, create new instance every time
-            return cls._create_provider_instance(
-                provider_name, config, config_manager
-            )
+            return cls._create_provider_instance(provider_name, config, config_manager)
 
         # Generate cache key based on provider name and config
         cache_key = cls._generate_cache_key(provider_name, config)
 
         with cls._instance_lock:
             # Check if instance is already cached and valid
-            if cache_key in cls._provider_instances and cls._is_cache_valid(
-                cache_key
-            ):
-                logger.debug(
-                    f"Using cached provider instance for {provider_name}"
-                )
+            if cache_key in cls._provider_instances and cls._is_cache_valid(cache_key):
+                logger.debug(f"Using cached provider instance for {provider_name}")
                 return cls._provider_instances[cache_key]
 
             # Create new instance
@@ -202,26 +192,18 @@ class ProviderInitializer:
                 if decrypted_key:
                     api_key = decrypted_key
             except Exception as e:
-                logger.warning(
-                    f"Failed to decrypt API key for {provider_name}: {e}"
-                )
+                logger.warning(f"Failed to decrypt API key for {provider_name}: {e}")
                 # Fall back to using the key as-is
                 pass
 
         # If still no valid API key, try environment variables
-        if (
-            not api_key
-            or api_key.startswith("your-")
-            or api_key.startswith("sk-your")
-        ):
+        if not api_key or api_key.startswith("your-") or api_key.startswith("sk-your"):
             from .env_loader import load_api_key_from_env
 
             env_key = load_api_key_from_env(provider_name)
             if env_key:
                 api_key = env_key
-                logger.info(
-                    f"Using API key from environment for {provider_name}"
-                )
+                logger.info(f"Using API key from environment for {provider_name}")
 
         # Create instance
         # Filter out None values to allow provider defaults to work
@@ -230,16 +212,12 @@ class ProviderInitializer:
             for k, v in config.model_dump(exclude={"api_key", "model"}).items()
             if v is not None
         }
-        instance = provider_class(
-            api_key=api_key, model=config.model, **kwargs
-        )
+        instance = provider_class(api_key=api_key, model=config.model, **kwargs)
 
         return instance
 
     @classmethod
-    def _generate_cache_key(
-        cls, provider_name: str, config: ProviderConfig
-    ) -> str:
+    def _generate_cache_key(cls, provider_name: str, config: ProviderConfig) -> str:
         """
         Generate cache key for provider instance.
 
@@ -281,9 +259,7 @@ class ProviderInitializer:
         if cache_key not in cls._cache_timestamps:
             return False
 
-        return (
-            time.time() - cls._cache_timestamps[cache_key]
-        ) < cls._cache_ttl
+        return (time.time() - cls._cache_timestamps[cache_key]) < cls._cache_ttl
 
     @classmethod
     def get_model_info(
@@ -304,14 +280,10 @@ class ProviderInitializer:
             return cls._fetch_model_info(provider_name, enhanced)
 
         with cls._model_lock:
-            cache_key = (
-                f"{provider_name}:{'enhanced' if enhanced else 'basic'}"
-            )
+            cache_key = f"{provider_name}:{'enhanced' if enhanced else 'basic'}"
 
             # Check if models are already cached and valid
-            if cache_key in cls._model_cache and cls._is_cache_valid(
-                cache_key
-            ):
+            if cache_key in cls._model_cache and cls._is_cache_valid(cache_key):
                 logger.debug(f"Using cached model info for {provider_name}")
                 return cls._model_cache[cache_key]
 
@@ -352,10 +324,7 @@ class ProviderInitializer:
             from .models import ModelInfo
 
             if enhanced and models and isinstance(models[0], ModelInfo):
-                models = [
-                    EnhancedModelInfo.from_model_info(model)
-                    for model in models
-                ]
+                models = [EnhancedModelInfo.from_model_info(model) for model in models]
 
             return models
 
@@ -398,9 +367,7 @@ class ProviderInitializer:
             enabled: Whether to enable lazy loading
         """
         cls._lazy_loading_enabled = enabled
-        logger.info(
-            f"{'Enabled' if enabled else 'Disabled'} provider lazy loading"
-        )
+        logger.info(f"{'Enabled' if enabled else 'Disabled'} provider lazy loading")
 
     @classmethod
     def enable_caching(cls, enabled: bool = True) -> None:
@@ -448,7 +415,6 @@ class ProviderInitializer:
         Returns:
             Dictionary of initialized provider instances
         """
-        from .provider_registry import ProviderRegistry
         from ..providers.factory import ProviderFactory
 
         providers = {}
@@ -462,9 +428,7 @@ class ProviderInitializer:
                 providers[provider_name] = provider
                 logger.info(f"Initialized provider: {provider_name}")
             except Exception as e:
-                logger.error(
-                    f"Failed to initialize provider {provider_name}: {e}"
-                )
+                logger.error(f"Failed to initialize provider {provider_name}: {e}")
                 # Continue with other providers instead of failing completely
                 continue
 
@@ -483,6 +447,4 @@ class ProviderInitializer:
                 cls.get_model_info(provider_name)
                 logger.debug(f"Preloaded model info for {provider_name}")
             except Exception as e:
-                logger.warning(
-                    f"Failed to preload model info for {provider_name}: {e}"
-                )
+                logger.warning(f"Failed to preload model info for {provider_name}: {e}")

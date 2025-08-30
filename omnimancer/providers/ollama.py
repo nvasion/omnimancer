@@ -5,20 +5,19 @@ This module provides the Ollama provider implementation for local AI inference
 using the Ollama server API.
 """
 
-import httpx
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+import httpx
 
 from ..core.models import ChatContext, ChatResponse, ModelInfo
 from ..utils.errors import (
-    ProviderError,
-    AuthenticationError,
-    NetworkError,
     ModelNotFoundError,
-    ProviderUnavailableError,
+    NetworkError,
     ProviderConfigurationError,
+    ProviderError,
+    ProviderUnavailableError,
 )
-from ..utils.error_handler import handle_provider_error
 from .base import BaseProvider
 
 
@@ -47,9 +46,7 @@ class OllamaProvider(BaseProvider):
         self.temperature = kwargs.get("temperature", 0.7)
         self.timeout = kwargs.get("timeout", 60.0)  # Ollama can be slower
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to Ollama server.
 
@@ -106,9 +103,7 @@ class OllamaProvider(BaseProvider):
             # Re-raise our custom errors without wrapping them
             raise
         except Exception as e:
-            raise ProviderError(
-                f"Unexpected error with Ollama: {e}", provider="ollama"
-            )
+            raise ProviderError(f"Unexpected error with Ollama: {e}", provider="ollama")
 
     async def validate_credentials(self) -> bool:
         """
@@ -142,9 +137,7 @@ class OllamaProvider(BaseProvider):
         """
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self.base_url}/api/tags", timeout=5.0
-                )
+                response = await client.get(f"{self.base_url}/api/tags", timeout=5.0)
 
                 if response.status_code != 200:
                     raise NetworkError(
@@ -176,9 +169,7 @@ class OllamaProvider(BaseProvider):
         """
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self.base_url}/api/tags", timeout=10.0
-                )
+                response = await client.get(f"{self.base_url}/api/tags", timeout=10.0)
 
                 if response.status_code == 200:
                     data = response.json()
@@ -294,18 +285,14 @@ class OllamaProvider(BaseProvider):
                 error_data = response.json()
                 error_msg = error_data.get("error", "Bad request")
 
-                if (
-                    "model" in error_msg.lower()
-                    and "not found" in error_msg.lower()
-                ):
+                if "model" in error_msg.lower() and "not found" in error_msg.lower():
                     raise ModelNotFoundError(
                         f"Model '{self.model}' not found. Use 'ollama pull {self.model}' to download it.",
                         provider="ollama",
                         model_name=self.model,
                     )
                 elif (
-                    "invalid" in error_msg.lower()
-                    and "parameter" in error_msg.lower()
+                    "invalid" in error_msg.lower() and "parameter" in error_msg.lower()
                 ):
                     raise ProviderConfigurationError(
                         f"Invalid parameter: {error_msg}",
@@ -325,17 +312,13 @@ class OllamaProvider(BaseProvider):
                         f"Ollama API error: {error_msg}", provider="ollama"
                     )
             except (ValueError, KeyError):
-                raise ProviderError(
-                    "Bad request to Ollama API", provider="ollama"
-                )
+                raise ProviderError("Bad request to Ollama API", provider="ollama")
 
         elif response.status_code == 404:
             # Model not found
             try:
                 error_data = response.json()
-                error_msg = error_data.get(
-                    "error", f"Model '{self.model}' not found"
-                )
+                error_msg = error_data.get("error", f"Model '{self.model}' not found")
             except:
                 error_msg = f"Model '{self.model}' not found"
 
@@ -350,18 +333,12 @@ class OllamaProvider(BaseProvider):
                 error_data = response.json()
                 error_msg = error_data.get("error", "Internal server error")
 
-                if (
-                    "out of memory" in error_msg.lower()
-                    or "oom" in error_msg.lower()
-                ):
+                if "out of memory" in error_msg.lower() or "oom" in error_msg.lower():
                     raise ProviderError(
                         "Ollama server out of memory. Try using a smaller model or restart Ollama.",
                         provider="ollama",
                     )
-                elif (
-                    "model" in error_msg.lower()
-                    and "loading" in error_msg.lower()
-                ):
+                elif "model" in error_msg.lower() and "loading" in error_msg.lower():
                     raise ProviderError(
                         f"Model '{self.model}' failed to load. Check if model is corrupted.",
                         provider="ollama",
@@ -392,9 +369,7 @@ class OllamaProvider(BaseProvider):
                     estimated_recovery="a few minutes",
                 )
             else:
-                raise ProviderError(
-                    f"Ollama API error: {error_msg}", provider="ollama"
-                )
+                raise ProviderError(f"Ollama API error: {error_msg}", provider="ollama")
 
     def get_model_info(self) -> ModelInfo:
         """
@@ -474,9 +449,7 @@ class OllamaProvider(BaseProvider):
                         cost_per_token=0.0,  # Local models are free
                         available=True,
                         supports_tools=False,
-                        supports_multimodal=self._model_supports_multimodal(
-                            model_name
-                        ),
+                        supports_multimodal=self._model_supports_multimodal(model_name),
                     )
                 )
 
@@ -507,9 +480,7 @@ class OllamaProvider(BaseProvider):
             "llava-phi3",
         ]
 
-        return any(
-            mm_model in check_model.lower() for mm_model in multimodal_models
-        )
+        return any(mm_model in check_model.lower() for mm_model in multimodal_models)
 
     def supports_tools(self) -> bool:
         """

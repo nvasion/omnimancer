@@ -3,18 +3,17 @@ Unit tests for the core models.
 """
 
 import pytest
-from datetime import datetime
 from pydantic import ValidationError
 
 from omnimancer.core.models import (
-    ProviderConfig,
+    ChatSettings,
+    Config,
+    ConfigProfile,
+    EnhancedModelInfo,
     MCPConfig,
     MCPServerConfig,
-    Config,
-    ChatSettings,
-    EnhancedModelInfo,
     ModelInfo,
-    ConfigProfile,
+    ProviderConfig,
 )
 
 
@@ -200,9 +199,7 @@ class TestMCPConfig:
     def test_mcp_config_get_enabled_servers(self):
         """Test getting only enabled servers."""
         server1 = MCPServerConfig(name="fs", command="fs-server", enabled=True)
-        server2 = MCPServerConfig(
-            name="git", command="git-server", enabled=False
-        )
+        server2 = MCPServerConfig(name="git", command="git-server", enabled=False)
 
         config = MCPConfig(servers={"filesystem": server1, "git": server2})
 

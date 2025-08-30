@@ -2,22 +2,21 @@
 Comprehensive tests for the enhanced MCP integration layer.
 """
 
-import pytest
 import asyncio
 import time
-from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
+import pytest
 
 from omnimancer.core.mcp_integration_layer import (
     EnhancedMCPIntegrator,
-    ToolCapability,
     ExecutionPriority,
+    ToolCapability,
     ToolExecutionContext,
-    ToolExecutionResult,
     ToolMetrics,
 )
 from omnimancer.core.models import ToolDefinition
-from omnimancer.utils.errors import MCPError, MCPToolError
+from omnimancer.utils.errors import MCPError
 
 
 class MockToolDefinition:
@@ -54,9 +53,7 @@ class MockMCPManager:
             MockToolDefinition("image_process", "Process an image file"),
         ]
 
-    async def execute_tool(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> Any:
+    async def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """Mock tool execution."""
         # Simulate execution delay if configured
         if tool_name in self.execution_delays:
@@ -146,9 +143,7 @@ class TestToolCapabilityAnalysis:
 
     def test_multiple_capabilities(self, mcp_integrator):
         """Test tool with multiple capabilities."""
-        tool = MockToolDefinition(
-            "file_api", "Read file and send data via API"
-        )
+        tool = MockToolDefinition("file_api", "Read file and send data via API")
         capabilities = mcp_integrator._analyze_tool_capabilities(tool)
 
         assert ToolCapability.FILE_OPERATIONS in capabilities
@@ -198,9 +193,7 @@ class TestToolDiscovery:
         )
         assert "file_read" in file_tools
 
-        web_tools = mcp_integrator.find_tools_by_capability(
-            ToolCapability.WEB_REQUESTS
-        )
+        web_tools = mcp_integrator.find_tools_by_capability(ToolCapability.WEB_REQUESTS)
         assert "web_fetch" in web_tools
 
     @pytest.mark.asyncio
@@ -209,7 +202,7 @@ class TestToolDiscovery:
         await mcp_integrator.initialize()
 
         # First discovery
-        start_time = time.time()
+        time.time()
         tools1 = await mcp_integrator.discover_tools()
         first_discovery_time = mcp_integrator.last_discovery_time
 
@@ -232,9 +225,7 @@ class TestToolExecution:
     """Test tool execution functionality."""
 
     @pytest.mark.asyncio
-    async def test_execute_tool_success(
-        self, mcp_integrator, mock_mcp_manager
-    ):
+    async def test_execute_tool_success(self, mcp_integrator, mock_mcp_manager):
         """Test successful tool execution."""
         await mcp_integrator.initialize()
 
@@ -257,23 +248,18 @@ class TestToolExecution:
         """Test execution of non-existent tool."""
         await mcp_integrator.initialize()
 
-        result = await mcp_integrator.execute_tool_with_context(
-            "nonexistent_tool", {}
-        )
+        result = await mcp_integrator.execute_tool_with_context("nonexistent_tool", {})
 
         assert result.success is False
         assert "not found" in result.error
 
     @pytest.mark.asyncio
-    async def test_execute_tool_with_retries(
-        self, mcp_integrator, mock_mcp_manager
-    ):
+    async def test_execute_tool_with_retries(self, mcp_integrator, mock_mcp_manager):
         """Test tool execution with retries."""
         await mcp_integrator.initialize()
 
         # Set up tool to fail first two attempts
         call_count = 0
-        original_execute = mock_mcp_manager.execute_tool
 
         async def failing_execute(tool_name, arguments):
             nonlocal call_count
@@ -294,9 +280,7 @@ class TestToolExecution:
         assert call_count == 3
 
     @pytest.mark.asyncio
-    async def test_execute_tool_timeout(
-        self, mcp_integrator, mock_mcp_manager
-    ):
+    async def test_execute_tool_timeout(self, mcp_integrator, mock_mcp_manager):
         """Test tool execution timeout."""
         await mcp_integrator.initialize()
 
@@ -350,16 +334,12 @@ class TestToolMetrics:
     """Test tool metrics functionality."""
 
     @pytest.mark.asyncio
-    async def test_metrics_recording_success(
-        self, mcp_integrator, mock_mcp_manager
-    ):
+    async def test_metrics_recording_success(self, mcp_integrator, mock_mcp_manager):
         """Test metrics recording for successful executions."""
         await mcp_integrator.initialize()
 
         # Execute tool successfully
-        result = await mcp_integrator.execute_tool_with_context(
-            "file_read", {}
-        )
+        result = await mcp_integrator.execute_tool_with_context("file_read", {})
 
         assert result.success is True
 
@@ -372,18 +352,14 @@ class TestToolMetrics:
         assert metrics.consecutive_failures == 0
 
     @pytest.mark.asyncio
-    async def test_metrics_recording_failure(
-        self, mcp_integrator, mock_mcp_manager
-    ):
+    async def test_metrics_recording_failure(self, mcp_integrator, mock_mcp_manager):
         """Test metrics recording for failed executions."""
         await mcp_integrator.initialize()
 
         # Set up tool to fail
         mock_mcp_manager.set_tool_error("file_read", "Test error")
 
-        result = await mcp_integrator.execute_tool_with_context(
-            "file_read", {}
-        )
+        result = await mcp_integrator.execute_tool_with_context("file_read", {})
 
         assert result.success is False
 
@@ -397,9 +373,7 @@ class TestToolMetrics:
         assert len(metrics.error_patterns) == 1
 
     @pytest.mark.asyncio
-    async def test_metrics_reliability_score(
-        self, mcp_integrator, mock_mcp_manager
-    ):
+    async def test_metrics_reliability_score(self, mcp_integrator, mock_mcp_manager):
         """Test reliability score calculation with basic executions."""
         await mcp_integrator.initialize()
 
@@ -439,9 +413,7 @@ class TestToolMetrics:
         metrics.consecutive_failures = 1
 
         assert metrics.success_rate == 0.8
-        assert (
-            metrics.reliability_score <= 0.8
-        )  # Should be penalized for failure
+        assert metrics.reliability_score <= 0.8  # Should be penalized for failure
 
 
 class TestToolCaching:
@@ -541,15 +513,11 @@ class TestToolSelection:
         await mcp_integrator.initialize()
 
         # Test file-related task
-        best_tool = mcp_integrator.find_best_tool_for_task(
-            "read a configuration file"
-        )
+        best_tool = mcp_integrator.find_best_tool_for_task("read a configuration file")
         assert best_tool == "file_read"
 
         # Test web-related task
-        best_tool = mcp_integrator.find_best_tool_for_task(
-            "fetch data from a website"
-        )
+        best_tool = mcp_integrator.find_best_tool_for_task("fetch data from a website")
         assert best_tool == "web_fetch"
 
         # Test search-related task
@@ -576,16 +544,12 @@ class TestToolSelection:
         assert "file_read" in file_tools
         assert "file_write" in file_tools
 
-        web_tools = mcp_integrator.find_tools_by_capability(
-            ToolCapability.WEB_REQUESTS
-        )
+        web_tools = mcp_integrator.find_tools_by_capability(ToolCapability.WEB_REQUESTS)
         assert "web_fetch" in web_tools
         assert "api_call" in web_tools
 
         # Non-existent capability
-        empty_tools = mcp_integrator.find_tools_by_capability(
-            ToolCapability.MULTIMEDIA
-        )
+        empty_tools = mcp_integrator.find_tools_by_capability(ToolCapability.MULTIMEDIA)
         assert len(empty_tools) == 0
 
 
@@ -593,9 +557,7 @@ class TestHealthChecking:
     """Test health checking functionality."""
 
     @pytest.mark.asyncio
-    async def test_health_check_healthy(
-        self, mcp_integrator, mock_mcp_manager
-    ):
+    async def test_health_check_healthy(self, mcp_integrator, mock_mcp_manager):
         """Test health check when everything is healthy."""
         await mcp_integrator.initialize()
 
@@ -607,9 +569,7 @@ class TestHealthChecking:
         assert health["discovered_tools_count"] > 0
 
     @pytest.mark.asyncio
-    async def test_health_check_stale_discovery(
-        self, mcp_integrator, mock_mcp_manager
-    ):
+    async def test_health_check_stale_discovery(self, mcp_integrator, mock_mcp_manager):
         """Test health check with stale discovery."""
         await mcp_integrator.initialize()
 
@@ -639,17 +599,13 @@ class TestHealthChecking:
             mcp_integrator.tool_metrics[tool_name] = metrics
 
         # Add some good tools
-        mcp_integrator.discovered_tools = {
-            f"tool{i}": None for i in range(1, 6)
-        }
+        mcp_integrator.discovered_tools = {f"tool{i}": None for i in range(1, 6)}
 
         health = await mcp_integrator.health_check()
 
         assert "problematic_tools" in health
         assert len(health["problematic_tools"]) == 3
-        assert (
-            health["integrator_healthy"] is False
-        )  # More than 30% problematic
+        assert health["integrator_healthy"] is False  # More than 30% problematic
 
 
 class TestExecutionContext:
@@ -733,9 +689,7 @@ class TestIntegrationScenarios:
         mock_mcp_manager.set_tool_error("file_read", "Primary tool failed")
 
         # Execute - should handle the failure gracefully
-        result = await mcp_integrator.execute_tool_with_context(
-            "file_read", {}
-        )
+        result = await mcp_integrator.execute_tool_with_context("file_read", {})
 
         assert result.success is False
         assert "Primary tool failed" in result.error

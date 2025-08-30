@@ -3,33 +3,24 @@ Tests for the AgentSwitcher class and state management.
 """
 
 import json
-import pytest
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, call
+from unittest.mock import Mock
+
+import pytest
 
 from omnimancer.core.agent.agent_switcher import (
     AgentSwitcher,
     SessionState,
     SwitchContext,
     SwitchState,
-    SwitchValidationError,
-    SwitchOperationError,
 )
 from omnimancer.core.agent.persona import (
-    PersonaManager,
     AgentPersona,
+    PersonaManager,
     PersonaStatus,
-    CodingPersona,
-    ResearchPersona,
-    GeneralPersona,
 )
-from omnimancer.core.agent.config import AgentConfig
-from omnimancer.core.agent.status_manager import (
-    UnifiedStatusManager as AgentStatusManager,
-)
-from omnimancer.core.agent.status_core import AgentStatus
 
 
 class TestSessionState:
@@ -85,9 +76,7 @@ class TestSessionState:
         restored_state = SessionState.from_json(json_str)
 
         assert restored_state.session_id == state.session_id
-        assert (
-            restored_state.conversation_history == state.conversation_history
-        )
+        assert restored_state.conversation_history == state.conversation_history
         assert restored_state.user_preferences == state.user_preferences
         assert restored_state.active_tools == state.active_tools
         assert isinstance(restored_state.created_at, datetime)
@@ -183,24 +172,18 @@ class TestAgentSwitcher:
         assert agent_switcher.switch_history == []
         assert agent_switcher.state_storage_path.exists()
 
-    def test_switch_persona_success(
-        self, agent_switcher, mock_persona_manager
-    ):
+    def test_switch_persona_success(self, agent_switcher, mock_persona_manager):
         """Test successful persona switch."""
         # Set up initial state
         mock_persona_manager.active_persona = None
 
         # Perform switch
-        success, message = agent_switcher.switch_persona(
-            "coding", reason="Test switch"
-        )
+        success, message = agent_switcher.switch_persona("coding", reason="Test switch")
 
         assert success is True
         assert "Coding Agent" in message
         assert mock_persona_manager.activate_persona.called
-        assert (
-            mock_persona_manager.activate_persona.call_args[0][0] == "coding"
-        )
+        assert mock_persona_manager.activate_persona.call_args[0][0] == "coding"
         assert len(agent_switcher.switch_history) == 1
         assert agent_switcher.switch_history[0].switch_reason == "Test switch"
 
@@ -226,9 +209,7 @@ class TestAgentSwitcher:
         assert success is True
         assert mock_persona_manager.deactivate_persona.called
         assert mock_persona_manager.activate_persona.called
-        assert (
-            mock_persona_manager.activate_persona.call_args[0][0] == "research"
-        )
+        assert mock_persona_manager.activate_persona.call_args[0][0] == "research"
 
     def test_validation_persona_not_available(
         self, agent_switcher, mock_persona_manager
@@ -299,9 +280,7 @@ class TestAgentSwitcher:
         # Create saved state file
         state = SessionState()
         state.session_id = "restored-session"
-        state.persona_data = {
-            "session_data": {"restored_key": "restored_value"}
-        }
+        state.persona_data = {"session_data": {"restored_key": "restored_value"}}
 
         state_file = temp_storage_path / "coding_state.json"
         with open(state_file, "w") as f:
@@ -315,9 +294,7 @@ class TestAgentSwitcher:
         coding_persona._session_data = {}
         coding_persona.set_session_data = Mock()
 
-        agent_switcher.persona_manager.get_persona = Mock(
-            return_value=coding_persona
-        )
+        agent_switcher.persona_manager.get_persona = Mock(return_value=coding_persona)
 
         # Perform switch
         agent_switcher.switch_persona("coding")
@@ -409,9 +386,7 @@ class TestAgentSwitcher:
 
         # Import pickle
         agent_switcher.current_session_state = None
-        success = agent_switcher.import_session_state(
-            exported_pickle, "pickle"
-        )
+        success = agent_switcher.import_session_state(exported_pickle, "pickle")
         assert success is True
         assert agent_switcher.current_session_state.session_id == "export-test"
 
@@ -541,9 +516,7 @@ class TestIntegration:
             persona_manager=real_persona_manager, state_storage_path=tmp_path
         )
 
-    def test_real_persona_switching(
-        self, real_agent_switcher, real_persona_manager
-    ):
+    def test_real_persona_switching(self, real_agent_switcher, real_persona_manager):
         """Test switching between real personas."""
         # Start with no active persona
         assert real_persona_manager.active_persona is None

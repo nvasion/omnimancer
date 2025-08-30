@@ -1,9 +1,9 @@
 """Test httpx compatibility with web scraping libraries."""
 
-import pytest
-import httpx
-from bs4 import BeautifulSoup
 import html2text
+import httpx
+import pytest
+from bs4 import BeautifulSoup
 from readability import Document
 
 

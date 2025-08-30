@@ -6,11 +6,10 @@ including custom exceptions, error recovery strategies, and error context manage
 """
 
 import logging
-from typing import Dict, Any, Optional, Union, List
-from pathlib import Path
-from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +88,7 @@ class ReadBeforeWriteError(Exception):
                 "operation": self.context.operation if self.context else None,
                 "encoding": self.context.encoding if self.context else None,
                 "timestamp": (
-                    self.context.timestamp.isoformat()
-                    if self.context
-                    else None
+                    self.context.timestamp.isoformat() if self.context else None
                 ),
                 "recovery_attempted": (
                     self.context.recovery_attempted if self.context else False
@@ -109,9 +106,7 @@ class ReadBeforeWriteError(Exception):
                 ),
             },
             "original_exception": (
-                str(self.original_exception)
-                if self.original_exception
-                else None
+                str(self.original_exception) if self.original_exception else None
             ),
         }
 
@@ -161,9 +156,7 @@ class FileWriteError(ReadBeforeWriteError):
 class UserInterfaceError(ReadBeforeWriteError):
     """Error in user interface interaction."""
 
-    def __init__(
-        self, message: str, original_exception: Optional[Exception] = None
-    ):
+    def __init__(self, message: str, original_exception: Optional[Exception] = None):
         context = ErrorContext(
             error_type=ReadBeforeWriteErrorType.USER_INTERFACE_ERROR,
             file_path="unknown",
@@ -335,9 +328,7 @@ class ReadBeforeWriteErrorHandler:
         if error.context:
             error.context.recovery_attempted = True
             error.context.recovery_strategy = strategy
-            error.context.recovery_success = recovery_result.get(
-                "success", False
-            )
+            error.context.recovery_success = recovery_result.get("success", False)
 
         return {
             "error": error.to_dict(),
@@ -481,9 +472,7 @@ class ReadBeforeWriteErrorHandler:
     ):
         """Set custom recovery strategy for an error type."""
         self.recovery_strategies[error_type] = strategy
-        logger.info(
-            f"Set recovery strategy for {error_type.value}: {strategy.value}"
-        )
+        logger.info(f"Set recovery strategy for {error_type.value}: {strategy.value}")
 
 
 # Convenience function for creating error handler

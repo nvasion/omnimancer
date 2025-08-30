@@ -8,6 +8,7 @@ for handling user input in the command-line interface.
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
 from .dynamic_commands import CommandRegistry, DynamicCommand
 
 # Global command registry instance
@@ -20,9 +21,7 @@ def get_command_registry() -> CommandRegistry:
     if _command_registry is None:
         _command_registry = CommandRegistry()
         # Set built-in commands to prevent overriding
-        _command_registry.set_builtin_commands(
-            [cmd.value for cmd in SlashCommand]
-        )
+        _command_registry.set_builtin_commands([cmd.value for cmd in SlashCommand])
         # Load dynamic commands from default directory
         _command_registry.load_commands_from_directory()
     return _command_registry
@@ -240,9 +239,7 @@ def _parse_slash_command(user_input: str) -> Command:
     if slash_cmd:
         # Validate command-specific arguments
         validated_args = _validate_command_args(slash_cmd, args)
-        return Command.create_slash_command(
-            slash_cmd, validated_args, user_input
-        )
+        return Command.create_slash_command(slash_cmd, validated_args, user_input)
 
     # Check for dynamic commands
     registry = get_command_registry()
@@ -255,9 +252,7 @@ def _parse_slash_command(user_input: str) -> Command:
     return Command.create_chat_message(user_input)
 
 
-def _validate_command_args(
-    command: SlashCommand, args: List[str]
-) -> List[str]:
+def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
     """
     Validate arguments for specific slash commands.
 
@@ -320,9 +315,7 @@ def _validate_command_args(
 
     elif command == SlashCommand.SAVE:
         if len(args) > 1:
-            raise ValueError(
-                "Save command accepts at most one argument: filename"
-            )
+            raise ValueError("Save command accepts at most one argument: filename")
 
         if args and args[0]:
             filename = args[0]
@@ -335,14 +328,11 @@ def _validate_command_args(
 
     elif command == SlashCommand.LOAD:
         if len(args) != 1:
-            raise ValueError(
-                "Load command requires exactly one argument: filename"
-            )
+            raise ValueError("Load command requires exactly one argument: filename")
 
         filename = args[0]
         if any(
-            char in filename
-            for char in ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
+            char in filename for char in ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
         ):
             raise ValueError("Filename contains invalid characters")
 
@@ -373,9 +363,7 @@ def _validate_command_args(
         SlashCommand.STATUS,
     ]:
         if args:
-            raise ValueError(
-                f"{command.value} command does not accept arguments"
-            )
+            raise ValueError(f"{command.value} command does not accept arguments")
 
     elif command in [SlashCommand.MODELS, SlashCommand.MODEL]:
         # /models [filter_type] [filter_value]
@@ -416,13 +404,9 @@ def _validate_command_args(
                     try:
                         float(args[1])
                     except ValueError:
-                        raise ValueError(
-                            "Performance filter value must be a number"
-                        )
+                        raise ValueError("Performance filter value must be a number")
                 elif filter_type in ["free", "latest"]:
-                    raise ValueError(
-                        f"{filter_type} filter does not accept a value"
-                    )
+                    raise ValueError(f"{filter_type} filter does not accept a value")
             elif filter_type in [
                 "provider",
                 "capability",
@@ -507,9 +491,7 @@ def _validate_command_args(
                 "Add-model command requires at least two arguments: model name and provider"
             )
         if len(args) > 10:
-            raise ValueError(
-                "Add-model command accepts at most 10 arguments total"
-            )
+            raise ValueError("Add-model command accepts at most 10 arguments total")
 
         # Validate model name and provider
         model_name = args[0]
@@ -591,9 +573,7 @@ def _validate_command_args(
     elif command == SlashCommand.LIST_CUSTOM_MODELS:
         # /list-custom-models
         if args:
-            raise ValueError(
-                "List-custom-models command does not accept arguments"
-            )
+            raise ValueError("List-custom-models command does not accept arguments")
 
     elif command == SlashCommand.AGENTS:
         # /agents [action] [agent_name] [options]
@@ -643,16 +623,12 @@ def _validate_command_args(
 
             # Revoke action requires a signature
             if action == "revoke" and len(args) < 2:
-                raise ValueError(
-                    "Revoke action requires a signature to revoke"
-                )
+                raise ValueError("Revoke action requires a signature to revoke")
 
     elif command == SlashCommand.PERMISSIONS:
         # /permissions [action] [args...]
         if len(args) > 4:
-            raise ValueError(
-                "Permissions command accepts at most four arguments"
-            )
+            raise ValueError("Permissions command accepts at most four arguments")
 
         if args:
             action = args[0].lower()
@@ -682,9 +658,7 @@ def _validate_command_args(
                     f"{action.capitalize()} action requires at least one additional argument"
                 )
             elif action in ["export", "import"] and len(args) < 2:
-                raise ValueError(
-                    f"{action.capitalize()} action requires a file path"
-                )
+                raise ValueError(f"{action.capitalize()} action requires a file path")
 
             # Validate security levels for set-level
             if action == "set-level" and len(args) >= 2:
@@ -709,9 +683,7 @@ def _validate_command_args(
         SlashCommand.SETUP,
     ]:
         if args:
-            raise ValueError(
-                f"Command {command.value} does not accept arguments"
-            )
+            raise ValueError(f"Command {command.value} does not accept arguments")
 
     return args
 

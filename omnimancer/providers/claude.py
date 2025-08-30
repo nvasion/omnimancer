@@ -4,18 +4,19 @@ Claude provider implementation for Omnimancer.
 This module provides the Claude AI provider implementation using Anthropic's API.
 """
 
-import httpx
-import certifi
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+import certifi
+import httpx
 
 from ..core.models import ChatContext, ChatResponse, ModelInfo
 from ..utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
+    RateLimitError,
 )
 from .base import BaseProvider
 
@@ -36,15 +37,11 @@ class ClaudeProvider(BaseProvider):
             model: Claude model to use (e.g., 'claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022')
             **kwargs: Additional configuration
         """
-        super().__init__(
-            api_key, model or "claude-sonnet-4-20250514", **kwargs
-        )
+        super().__init__(api_key, model or "claude-sonnet-4-20250514", **kwargs)
         self.max_tokens = kwargs.get("max_tokens") or 4096
         self.temperature = kwargs.get("temperature") or 0.7
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to Claude API.
 
@@ -101,7 +98,7 @@ class ClaudeProvider(BaseProvider):
                 RateLimitError,
                 ModelNotFoundError,
                 ProviderError,
-            ) as e:
+            ):
                 # Known provider errors, don't retry
                 raise
             except Exception as e:
@@ -119,7 +116,6 @@ class ClaudeProvider(BaseProvider):
             True if credentials are valid
         """
         # Try different SSL verification methods
-        last_error = None
         for ssl_verify in [True, certifi.where(), False]:
             try:
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
@@ -149,9 +145,7 @@ class ClaudeProvider(BaseProvider):
                     # Bad request - but API key might be valid, could be model issue
                     try:
                         error_data = response.json()
-                        error_type = error_data.get("error", {}).get(
-                            "type", ""
-                        )
+                        error_type = error_data.get("error", {}).get("type", "")
                         # If it's an authentication error, API key is invalid
                         if error_type == "authentication_error":
                             return False
@@ -165,26 +159,22 @@ class ClaudeProvider(BaseProvider):
                     return True
 
             except httpx.ConnectError as e:
-                last_error = e
                 if "SSL" in str(e) or "certificate" in str(e):
                     # SSL error, try next verification method
                     continue
                 else:
                     # Non-SSL connection error
                     return False
-            except httpx.TimeoutException as e:
-                last_error = e
+            except httpx.TimeoutException:
                 # Timeout might mean network issues, try next SSL method
                 continue
             except httpx.RequestError as e:
-                last_error = e
                 if "SSL" not in str(e) and "certificate" not in str(e):
                     # Non-SSL request error
                     return False
                 # SSL-related error, try next verification method
                 continue
             except Exception as e:
-                last_error = e
                 # Other error (timeout, etc.) - if it's not SSL related, stop trying
                 if "SSL" not in str(e) and "certificate" not in str(e):
                     return False
@@ -212,9 +202,7 @@ class ClaudeProvider(BaseProvider):
         # Add context messages (excluding system messages for Claude)
         for msg in context.messages:
             if msg.role.value != "system":
-                messages.append(
-                    {"role": msg.role.value, "content": msg.content}
-                )
+                messages.append({"role": msg.role.value, "content": msg.content})
 
         # Add current message
         messages.append({"role": "user", "content": message})
@@ -260,9 +248,7 @@ class ClaudeProvider(BaseProvider):
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get(
-                    "message", "Unknown error"
-                )
+                error_msg = error_data.get("error", {}).get("message", "Unknown error")
             except:
                 error_msg = f"HTTP {response.status_code}"
 

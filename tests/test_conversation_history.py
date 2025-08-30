@@ -5,12 +5,12 @@ This module tests the save, load, and list conversation functionality
 including integration with the conversation manager.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock, patch
 
-from omnimancer.cli.interface import CommandLineInterface
+import pytest
+
 from omnimancer.cli.commands import Command, SlashCommand
+from omnimancer.cli.interface import CommandLineInterface
 from omnimancer.core.engine import CoreEngine
 
 
@@ -51,9 +51,7 @@ class TestSaveCommand:
     """Test save conversation functionality."""
 
     @pytest.mark.asyncio
-    async def test_save_command_with_messages(
-        self, cli_interface, mock_engine
-    ):
+    async def test_save_command_with_messages(self, cli_interface, mock_engine):
         """Test saving conversation when messages exist."""
         command = Command.create_slash_command(SlashCommand.SAVE, [], "/save")
 
@@ -66,9 +64,7 @@ class TestSaveCommand:
             )
 
     @pytest.mark.asyncio
-    async def test_save_command_with_filename(
-        self, cli_interface, mock_engine
-    ):
+    async def test_save_command_with_filename(self, cli_interface, mock_engine):
         """Test saving conversation with custom filename."""
         command = Command.create_slash_command(
             SlashCommand.SAVE, ["my_conversation"], "/save my_conversation"
@@ -77,9 +73,7 @@ class TestSaveCommand:
         with patch.object(cli_interface, "_show_info") as mock_show_info:
             await cli_interface._handle_save_command(command)
 
-            mock_engine.save_conversation.assert_called_once_with(
-                "my_conversation"
-            )
+            mock_engine.save_conversation.assert_called_once_with("my_conversation")
             mock_show_info.assert_called_once_with(
                 "Conversation saved as: conversation_20240101_120000.json"
             )
@@ -127,9 +121,7 @@ class TestLoadCommand:
             await cli_interface._handle_load_command(command)
 
             mock_engine.load_conversation.assert_called_once_with("test.json")
-            mock_engine.get_conversation_info.assert_called_once_with(
-                "test.json"
-            )
+            mock_engine.get_conversation_info.assert_called_once_with("test.json")
 
             # Check that info messages were shown
             assert mock_show_info.call_count == 2
@@ -148,20 +140,19 @@ class TestLoadCommand:
             await cli_interface._handle_load_command(command)
 
             mock_engine.load_conversation.assert_called_once_with("test.json")
-            mock_show_info.assert_called_once_with(
-                "Loaded conversation: test.json"
-            )
+            mock_show_info.assert_called_once_with("Loaded conversation: test.json")
 
     @pytest.mark.asyncio
     async def test_load_command_no_filename(self, cli_interface, mock_engine):
         """Test load command without filename."""
         command = Command.create_slash_command(SlashCommand.LOAD, [], "/load")
 
-        with patch.object(
-            cli_interface, "_show_conversations"
-        ) as mock_show_conversations, patch.object(
-            cli_interface, "_show_error"
-        ) as mock_show_error:
+        with (
+            patch.object(
+                cli_interface, "_show_conversations"
+            ) as mock_show_conversations,
+            patch.object(cli_interface, "_show_error") as mock_show_error,
+        ):
             await cli_interface._handle_load_command(command)
 
             mock_show_conversations.assert_called_once()
@@ -207,14 +198,10 @@ class TestShowConversations:
 
         with patch.object(cli_interface, "_show_info") as mock_show_info:
             await cli_interface._show_conversations()
-            mock_show_info.assert_called_once_with(
-                "No saved conversations found."
-            )
+            mock_show_info.assert_called_once_with("No saved conversations found.")
 
     @pytest.mark.asyncio
-    async def test_show_conversations_with_data(
-        self, cli_interface, mock_engine
-    ):
+    async def test_show_conversations_with_data(self, cli_interface, mock_engine):
         """Test showing conversations with data."""
         conversations = [
             {
@@ -292,22 +279,18 @@ class TestConversationIntegration:
             SlashCommand.SAVE, ["test_conversation"], "/save test_conversation"
         )
 
-        with patch.object(cli_interface, "_show_info") as mock_show_info:
+        with patch.object(cli_interface, "_show_info"):
             await cli_interface._handle_save_command(save_command)
-            mock_engine.save_conversation.assert_called_once_with(
-                "test_conversation"
-            )
+            mock_engine.save_conversation.assert_called_once_with("test_conversation")
 
         # Test load
         load_command = Command.create_slash_command(
             SlashCommand.LOAD, ["test_conversation"], "/load test_conversation"
         )
 
-        with patch.object(cli_interface, "_show_info") as mock_show_info:
+        with patch.object(cli_interface, "_show_info"):
             await cli_interface._handle_load_command(load_command)
-            mock_engine.load_conversation.assert_called_once_with(
-                "test_conversation"
-            )
+            mock_engine.load_conversation.assert_called_once_with("test_conversation")
 
     @pytest.mark.asyncio
     async def test_list_then_load_workflow(self, cli_interface, mock_engine):
@@ -337,9 +320,7 @@ class TestConversationIntegration:
 
         with patch.object(cli_interface, "_show_info"):
             await cli_interface._handle_load_command(load_command)
-            mock_engine.load_conversation.assert_called_once_with(
-                "conversation1.json"
-            )
+            mock_engine.load_conversation.assert_called_once_with("conversation1.json")
 
 
 class TestConversationValidation:
@@ -366,9 +347,10 @@ class TestConversationValidation:
         # Invalid case - no filename
         command = Command.create_slash_command(SlashCommand.LOAD, [], "/load")
 
-        with patch.object(cli_interface, "_show_conversations"), patch.object(
-            cli_interface, "_show_error"
-        ) as mock_show_error:
+        with (
+            patch.object(cli_interface, "_show_conversations"),
+            patch.object(cli_interface, "_show_error") as mock_show_error,
+        ):
             await cli_interface._handle_load_command(command)
             mock_show_error.assert_called_once_with("Usage: /load <filename>")
 
@@ -377,9 +359,7 @@ class TestConversationDisplay:
     """Test conversation display formatting."""
 
     @pytest.mark.asyncio
-    async def test_conversation_list_formatting(
-        self, cli_interface, mock_engine
-    ):
+    async def test_conversation_list_formatting(self, cli_interface, mock_engine):
         """Test that conversation list is properly formatted."""
         conversations = [
             {

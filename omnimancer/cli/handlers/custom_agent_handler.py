@@ -6,23 +6,15 @@ management commands including creation, listing, loading, and configuration.
 """
 
 import logging
-from typing import Dict, List, Optional, Any
 from pathlib import Path
+from typing import List, Optional
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Prompt, Confirm
-from rich.text import Text
+from rich.prompt import Confirm
 
+from ..agent_manager import create_agent_manager
 from ..commands import Command
-from ..agent_manager import AgentManager, create_agent_manager
-from ..agent_wizard import AgentCreationWizard
-from ...core.agent.agent_config import (
-    CustomAgentConfig,
-    AgentRepository,
-    CustomAgentStatus,
-)
-from ...core.agent.persona import PersonaCategory
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +73,7 @@ class CustomAgentHandler:
             elif subcommand == "active":
                 await self._handle_show_active(remaining_args)
             else:
-                self.console.print(
-                    f"[red]Unknown subcommand: {subcommand}[/red]"
-                )
+                self.console.print(f"[red]Unknown subcommand: {subcommand}[/red]")
                 await self._show_help()
 
         except Exception as e:
@@ -179,9 +169,7 @@ class CustomAgentHandler:
     async def _handle_show_agent(self, args: List[str]):
         """Handle show agent command."""
         if not args:
-            self.console.print(
-                "[red]Please specify an agent name or ID.[/red]"
-            )
+            self.console.print("[red]Please specify an agent name or ID.[/red]")
             self.console.print("Usage: /agent show <name|id>")
             return
 
@@ -213,9 +201,7 @@ class CustomAgentHandler:
     async def _handle_load_agent(self, args: List[str]):
         """Handle load agent command."""
         if not args:
-            self.console.print(
-                "[red]Please specify an agent name or ID.[/red]"
-            )
+            self.console.print("[red]Please specify an agent name or ID.[/red]")
             self.console.print("Usage: /agent load <name|id>")
             return
 
@@ -225,9 +211,7 @@ class CustomAgentHandler:
     async def _handle_delete_agent(self, args: List[str]):
         """Handle delete agent command."""
         if not args:
-            self.console.print(
-                "[red]Please specify an agent name or ID.[/red]"
-            )
+            self.console.print("[red]Please specify an agent name or ID.[/red]")
             self.console.print("Usage: /agent delete <name|id>")
             return
 
@@ -244,9 +228,7 @@ class CustomAgentHandler:
     async def _handle_clone_agent(self, args: List[str]):
         """Handle clone agent command."""
         if len(args) < 2:
-            self.console.print(
-                "[red]Please specify source agent and new name.[/red]"
-            )
+            self.console.print("[red]Please specify source agent and new name.[/red]")
             self.console.print("Usage: /agent clone <source> <new_name>")
             return
 
@@ -279,12 +261,8 @@ class CustomAgentHandler:
     async def _handle_export_agent(self, args: List[str]):
         """Handle export agent command."""
         if not args:
-            self.console.print(
-                "[red]Please specify an agent name or ID.[/red]"
-            )
-            self.console.print(
-                "Usage: /agent export <name|id> [--path <file>]"
-            )
+            self.console.print("[red]Please specify an agent name or ID.[/red]")
+            self.console.print("Usage: /agent export <name|id> [--path <file>]")
             return
 
         # Parse arguments
@@ -301,9 +279,7 @@ class CustomAgentHandler:
                 i += 1
 
         if not identifier_args:
-            self.console.print(
-                "[red]Please specify an agent name or ID.[/red]"
-            )
+            self.console.print("[red]Please specify an agent name or ID.[/red]")
             return
 
         identifier = " ".join(identifier_args)
@@ -313,9 +289,7 @@ class CustomAgentHandler:
         """Handle import agent command."""
         if not args:
             self.console.print("[red]Please specify import file path.[/red]")
-            self.console.print(
-                "Usage: /agent import <file> [--name <new_name>]"
-            )
+            self.console.print("Usage: /agent import <file> [--name <new_name>]")
             return
 
         # Parse arguments
@@ -353,9 +327,7 @@ class CustomAgentHandler:
         active_agent = self.agent_manager.get_active_agent()
 
         if not active_agent:
-            self.console.print(
-                "[yellow]No agent is currently active.[/yellow]"
-            )
+            self.console.print("[yellow]No agent is currently active.[/yellow]")
             return
 
         self.console.print(f"[green]Active Agent:[/green]")

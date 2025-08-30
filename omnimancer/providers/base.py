@@ -6,7 +6,7 @@ to ensure consistent behavior across different AI services.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from ..core.models import ChatContext, ChatResponse, ModelInfo, ToolDefinition
 
@@ -33,9 +33,7 @@ class BaseProvider(ABC):
         self.config = kwargs
 
     @abstractmethod
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to the AI provider and get a response.
 

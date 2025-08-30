@@ -1,11 +1,9 @@
 """Core data models and interfaces for Omnimancer CLI."""
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
-import uuid
 
 from pydantic import BaseModel, field_validator
 
@@ -67,8 +65,7 @@ class ChatContext:
     def get_context_for_api(self) -> List[Dict[str, str]]:
         """Get messages formatted for API calls."""
         return [
-            {"role": msg.role.value, "content": msg.content}
-            for msg in self.messages
+            {"role": msg.role.value, "content": msg.content} for msg in self.messages
         ]
 
 
@@ -186,9 +183,7 @@ class EnhancedModelInfo:
             return "Free"
 
         # Calculate average cost per million tokens
-        avg_cost = (
-            self.cost_per_million_input + self.cost_per_million_output
-        ) / 2
+        avg_cost = (self.cost_per_million_input + self.cost_per_million_output) / 2
 
         if avg_cost <= 1.0:
             return "💰"
@@ -201,13 +196,9 @@ class EnhancedModelInfo:
         """Validate pricing data."""
         if self.is_free:
             return (
-                self.cost_per_million_input == 0
-                and self.cost_per_million_output == 0
+                self.cost_per_million_input == 0 and self.cost_per_million_output == 0
             )
-        return (
-            self.cost_per_million_input >= 0
-            and self.cost_per_million_output >= 0
-        )
+        return self.cost_per_million_input >= 0 and self.cost_per_million_output >= 0
 
     def validate_swe_score(self) -> bool:
         """Validate SWE score data."""
@@ -245,9 +236,7 @@ class EnhancedModelInfo:
         )
 
     @classmethod
-    def from_model_info(
-        cls, model_info: ModelInfo, **kwargs
-    ) -> "EnhancedModelInfo":
+    def from_model_info(cls, model_info: ModelInfo, **kwargs) -> "EnhancedModelInfo":
         """Create EnhancedModelInfo from legacy ModelInfo."""
         # Convert legacy cost_per_token to per-million costs
         cost_per_million = model_info.cost_per_token * 1_000_000
@@ -290,9 +279,7 @@ class ProviderConfig(BaseModel):
     temperature: Optional[float] = None
 
     # Provider-specific settings
-    base_url: Optional[str] = (
-        None  # For custom endpoints (OpenAI-compatible, Ollama)
-    )
+    base_url: Optional[str] = None  # For custom endpoints (OpenAI-compatible, Ollama)
     organization: Optional[str] = None  # For OpenAI organizations
     project_id: Optional[str] = None  # For Google Cloud projects
     timeout: Optional[float] = None  # Request timeout in seconds
@@ -304,22 +291,16 @@ class ProviderConfig(BaseModel):
 
     # Gemini-specific settings
     safety_settings: Optional[Dict[str, str]] = None  # Gemini safety settings
-    generation_config: Optional[Dict[str, Any]] = (
-        None  # Gemini generation config
-    )
+    generation_config: Optional[Dict[str, Any]] = None  # Gemini generation config
     vertex_ai_project: Optional[str] = None  # Vertex AI project ID
     vertex_ai_location: Optional[str] = None  # Vertex AI location
     service_account_path: Optional[str] = None  # Path to service account JSON
 
     # Cohere-specific settings
     max_input_tokens: Optional[int] = None  # Cohere input token limit
-    connectors: Optional[List[Dict[str, Any]]] = (
-        None  # Cohere connectors for RAG
-    )
+    connectors: Optional[List[Dict[str, Any]]] = None  # Cohere connectors for RAG
     chat_history: Optional[List[Dict[str, str]]] = None  # Cohere chat history
-    documents: Optional[List[Dict[str, Any]]] = (
-        None  # Cohere documents for RAG
-    )
+    documents: Optional[List[Dict[str, Any]]] = None  # Cohere documents for RAG
     preamble: Optional[str] = None  # Cohere preamble for conversation context
     k: Optional[int] = None  # Cohere k parameter for RAG
 
@@ -348,15 +329,9 @@ class ProviderConfig(BaseModel):
     # Provider capabilities
     supports_tools: bool = False  # Whether provider supports function calling
     supports_multimodal: bool = False  # Whether provider supports images/files
-    supports_streaming: bool = (
-        True  # Whether provider supports streaming responses
-    )
-    supports_system_messages: bool = (
-        True  # Whether provider supports system messages
-    )
-    supports_function_calling: bool = (
-        False  # Alias for supports_tools for clarity
-    )
+    supports_streaming: bool = True  # Whether provider supports streaming responses
+    supports_system_messages: bool = True  # Whether provider supports system messages
+    supports_function_calling: bool = False  # Alias for supports_tools for clarity
     supports_vision: bool = False  # Whether provider supports image analysis
     supports_json_mode: bool = False  # Whether provider supports JSON mode
 
@@ -408,9 +383,7 @@ class ProviderConfig(BaseModel):
     # Vertex AI-specific settings
     vertex_project: Optional[str] = None  # Google Cloud project ID
     vertex_location: Optional[str] = None  # Vertex AI location
-    vertex_credentials_path: Optional[str] = (
-        None  # Path to service account JSON
-    )
+    vertex_credentials_path: Optional[str] = None  # Path to service account JSON
 
     # AWS Bedrock-specific settings
     aws_region: Optional[str] = None  # AWS region
@@ -428,9 +401,7 @@ class ProviderConfig(BaseModel):
     # Claude-code specific settings
     claude_code_mode: Optional[str] = None  # opus, sonnet
     claude_code_path: Optional[str] = None  # Path to claude-code executable
-    working_directory: Optional[str] = (
-        None  # Working directory for claude-code
-    )
+    working_directory: Optional[str] = None  # Working directory for claude-code
 
     # Provider-specific extra settings (for extensibility)
     extra_settings: Optional[Dict[str, Any]] = None
@@ -559,9 +530,7 @@ class ProviderConfig(BaseModel):
     def validate_auth_type(cls, v):
         valid_types = ["api_key", "bearer", "oauth", "service_account", "none"]
         if v not in valid_types:
-            raise ValueError(
-                f'auth_type must be one of: {", ".join(valid_types)}'
-            )
+            raise ValueError(f'auth_type must be one of: {", ".join(valid_types)}')
         return v
 
     @field_validator("mirostat")
@@ -616,9 +585,7 @@ class ProviderConfig(BaseModel):
         if v is not None:
             valid_modes = ["balanced", "creative", "precise"]
             if v not in valid_modes:
-                raise ValueError(
-                    f'grok_mode must be one of: {", ".join(valid_modes)}'
-                )
+                raise ValueError(f'grok_mode must be one of: {", ".join(valid_modes)}')
         return v
 
     @field_validator("random_seed")
@@ -699,9 +666,7 @@ class ProviderConfig(BaseModel):
         return config
 
     @classmethod
-    def get_provider_config_template(
-        cls, provider_name: str
-    ) -> Dict[str, Any]:
+    def get_provider_config_template(cls, provider_name: str) -> Dict[str, Any]:
         """
         Get configuration template for a specific provider.
 
@@ -820,9 +785,7 @@ class ProviderConfig(BaseModel):
 
         templates = {}
         for provider_name in provider_names:
-            templates[provider_name] = cls.get_provider_config_template(
-                provider_name
-            )
+            templates[provider_name] = cls.get_provider_config_template(provider_name)
 
         return templates
 
@@ -838,11 +801,7 @@ class ProviderConfig(BaseModel):
                     data[field] = self._mask_string(data[field])
                 elif isinstance(data[field], dict):
                     data[field] = {
-                        k: (
-                            self._mask_string(str(v))
-                            if isinstance(v, str)
-                            else v
-                        )
+                        k: (self._mask_string(str(v)) if isinstance(v, str) else v)
                         for k, v in data[field].items()
                     }
 
@@ -920,9 +879,7 @@ class MCPConfig(BaseModel):
         if v is not None and v <= 0:
             raise ValueError("auto_approve_timeout must be positive")
         if v is not None and v > 120:  # 2 minutes max
-            raise ValueError(
-                "auto_approve_timeout must be 120 seconds or less"
-            )
+            raise ValueError("auto_approve_timeout must be 120 seconds or less")
         return v
 
     @field_validator("max_concurrent_servers")
@@ -965,9 +922,7 @@ class MCPConfig(BaseModel):
     def validate_log_level(cls, v):
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if v.upper() not in valid_levels:
-            raise ValueError(
-                f'log_level must be one of: {", ".join(valid_levels)}'
-            )
+            raise ValueError(f'log_level must be one of: {", ".join(valid_levels)}')
         return v.upper()
 
     @field_validator("tool_cache_ttl")
@@ -979,11 +934,7 @@ class MCPConfig(BaseModel):
 
     def get_enabled_servers(self) -> Dict[str, MCPServerConfig]:
         """Get only enabled MCP servers."""
-        return {
-            name: config
-            for name, config in self.servers.items()
-            if config.enabled
-        }
+        return {name: config for name, config in self.servers.items() if config.enabled}
 
     def get_server_by_name(self, name: str) -> Optional[MCPServerConfig]:
         """Get a specific MCP server configuration by name."""
@@ -1106,9 +1057,7 @@ class Config(BaseModel):
     def validate_log_level(cls, v):
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if v.upper() not in valid_levels:
-            raise ValueError(
-                f'log_level must be one of: {", ".join(valid_levels)}'
-            )
+            raise ValueError(f'log_level must be one of: {", ".join(valid_levels)}')
         return v.upper()
 
     @field_validator("provider_timeout_default")
@@ -1208,15 +1157,13 @@ class Config(BaseModel):
             if env_var.startswith("omnimancer_") and "_API_KEY" in env_var:
                 # Extract provider name from env var (e.g., omnimancer_CLAUDE_API_KEY -> claude)
                 provider_name = (
-                    env_var.replace("omnimancer_", "")
-                    .replace("_API_KEY", "")
-                    .lower()
+                    env_var.replace("omnimancer_", "").replace("_API_KEY", "").lower()
                 )
                 if provider_name in self.providers:
                     # Don't store the actual API key in config_sources for security
-                    self.config_sources[
-                        f"providers.{provider_name}.api_key"
-                    ] = f"env:{env_var}"
+                    self.config_sources[f"providers.{provider_name}.api_key"] = (
+                        f"env:{env_var}"
+                    )
 
     def _set_nested_value(self, path: str, value: str) -> None:
         """Set a nested configuration value from a dot-separated path."""
@@ -1286,9 +1233,7 @@ class Config(BaseModel):
 
         # Validate profiles
         for profile_name, profile in self.profiles.items():
-            profile_errors = self._validate_profile_config(
-                profile_name, profile
-            )
+            profile_errors = self._validate_profile_config(profile_name, profile)
             errors.extend(profile_errors)
 
         # Validate active profile
@@ -1345,9 +1290,7 @@ class Config(BaseModel):
         """Validate Claude-specific configuration."""
         errors = []
         if not config.api_key:
-            errors.append(
-                f"Claude provider '{provider_name}' requires an API key"
-            )
+            errors.append(f"Claude provider '{provider_name}' requires an API key")
         return errors
 
     def _validate_openai_config(
@@ -1356,9 +1299,7 @@ class Config(BaseModel):
         """Validate OpenAI-specific configuration."""
         errors = []
         if not config.api_key:
-            errors.append(
-                f"OpenAI provider '{provider_name}' requires an API key"
-            )
+            errors.append(f"OpenAI provider '{provider_name}' requires an API key")
         return errors
 
     def _validate_gemini_config(
@@ -1367,9 +1308,7 @@ class Config(BaseModel):
         """Validate Gemini-specific configuration."""
         errors = []
         if not config.api_key:
-            errors.append(
-                f"Gemini provider '{provider_name}' requires an API key"
-            )
+            errors.append(f"Gemini provider '{provider_name}' requires an API key")
         return errors
 
     def _validate_cohere_config(
@@ -1378,9 +1317,7 @@ class Config(BaseModel):
         """Validate Cohere-specific configuration."""
         errors = []
         if not config.api_key:
-            errors.append(
-                f"Cohere provider '{provider_name}' requires an API key"
-            )
+            errors.append(f"Cohere provider '{provider_name}' requires an API key")
         return errors
 
     def _validate_ollama_config(
@@ -1426,10 +1363,7 @@ class Config(BaseModel):
                 provider_name, provider_config
             )
             errors.extend(
-                [
-                    f"Profile '{profile_name}': {error}"
-                    for error in provider_errors
-                ]
+                [f"Profile '{profile_name}': {error}" for error in provider_errors]
             )
 
         return errors
@@ -1441,9 +1375,7 @@ class Config(BaseModel):
         errors = []
 
         if not config.api_key:
-            errors.append(
-                f"Claude provider '{provider_name}' requires an API key"
-            )
+            errors.append(f"Claude provider '{provider_name}' requires an API key")
 
         # Validate model
         valid_models = [
@@ -1466,9 +1398,7 @@ class Config(BaseModel):
         errors = []
 
         if not config.api_key:
-            errors.append(
-                f"OpenAI provider '{provider_name}' requires an API key"
-            )
+            errors.append(f"OpenAI provider '{provider_name}' requires an API key")
 
         # Validate model
         valid_models = [
@@ -1513,9 +1443,7 @@ class Config(BaseModel):
         errors = []
 
         if not config.api_key:
-            errors.append(
-                f"Cohere provider '{provider_name}' requires an API key"
-            )
+            errors.append(f"Cohere provider '{provider_name}' requires an API key")
 
         # Validate model
         valid_models = [
@@ -1547,9 +1475,7 @@ class Config(BaseModel):
 
         # Model validation is difficult for Ollama since models are dynamic
         if not config.model:
-            errors.append(
-                f"Ollama provider '{provider_name}' requires a model name"
-            )
+            errors.append(f"Ollama provider '{provider_name}' requires a model name")
 
         return errors
 
@@ -1584,9 +1510,7 @@ class Config(BaseModel):
             )
 
         if not profile.providers:
-            errors.append(
-                f"Profile '{profile_name}' has no providers configured"
-            )
+            errors.append(f"Profile '{profile_name}' has no providers configured")
 
         # Validate each provider in the profile
         for provider_name, provider_config in profile.providers.items():
@@ -1600,9 +1524,7 @@ class Config(BaseModel):
     def get_enabled_providers(self) -> Dict[str, ProviderConfig]:
         """Get all enabled provider configurations."""
         return {
-            name: config
-            for name, config in self.providers.items()
-            if config.enabled
+            name: config for name, config in self.providers.items() if config.enabled
         }
 
     def get_providers_by_priority(self) -> List[tuple[str, ProviderConfig]]:
@@ -1639,9 +1561,7 @@ class Config(BaseModel):
             # This would be tracked in runtime state, not persisted config
             pass
 
-    def get_fallback_providers(
-        self, exclude_provider: str = None
-    ) -> List[str]:
+    def get_fallback_providers(self, exclude_provider: str = None) -> List[str]:
         """Get list of fallback providers in priority order."""
         providers_by_priority = self.get_providers_by_priority()
         fallback_providers = []
@@ -1678,8 +1598,7 @@ class Config(BaseModel):
 
         config = self.providers[provider_name]
         return {
-            "supports_tools": config.supports_tools
-            or config.supports_function_calling,
+            "supports_tools": config.supports_tools or config.supports_function_calling,
             "supports_multimodal": config.supports_multimodal,
             "supports_streaming": config.supports_streaming,
             "supports_system_messages": config.supports_system_messages,
@@ -1702,9 +1621,7 @@ class Config(BaseModel):
             "total_providers": len(self.providers),
             "enabled_providers": len(self.get_enabled_providers()),
             "providers_with_tools": len(self.get_providers_with_tools()),
-            "providers_with_multimodal": len(
-                self.get_providers_with_multimodal()
-            ),
+            "providers_with_multimodal": len(self.get_providers_with_multimodal()),
             "total_profiles": len(self.profiles),
             "mcp_enabled": self.mcp.enabled,
             "mcp_servers": len(self.mcp.servers),

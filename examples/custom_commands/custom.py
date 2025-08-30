@@ -36,12 +36,12 @@ def handle_command(args, **kwargs):
     Returns:
         String message to display
     """
-    from rich.table import Table
-    from rich.panel import Panel
-    from rich.text import Text
-    from pathlib import Path
     import sys
-    import os
+    from pathlib import Path
+
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
 
     # Add parent directory to path to import our modules
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -63,9 +63,7 @@ def handle_command(args, **kwargs):
         if not commands:
             if console:
                 console.print("[yellow]No custom commands loaded[/yellow]")
-                console.print(
-                    f"[dim]Commands directory: {registry.commands_dir}[/dim]"
-                )
+                console.print(f"[dim]Commands directory: {registry.commands_dir}[/dim]")
             return "No custom commands loaded"
 
         if console:
@@ -80,16 +78,12 @@ def handle_command(args, **kwargs):
 
             for name, cmd in commands.items():
                 cmd_type = (
-                    "Python"
-                    if cmd.handler
-                    else "Script" if cmd.script_path else "JSON"
+                    "Python" if cmd.handler else "Script" if cmd.script_path else "JSON"
                 )
                 table.add_row(f"/{name}", cmd.description, cmd_type)
 
             console.print(table)
-            console.print(
-                f"\n[dim]Commands loaded from: {registry.commands_dir}[/dim]"
-            )
+            console.print(f"\n[dim]Commands loaded from: {registry.commands_dir}[/dim]")
             return None
         else:
             lines = ["Custom Commands:"]
@@ -128,15 +122,11 @@ def handle_command(args, **kwargs):
             if cmd.arguments:
                 info_text.append(f"Arguments:\n", style="bold")
                 for arg in cmd.arguments:
-                    info_text.append(
-                        f"  • {arg.get('name', 'unnamed')}", style="cyan"
-                    )
+                    info_text.append(f"  • {arg.get('name', 'unnamed')}", style="cyan")
                     if arg.get("type"):
                         info_text.append(f" ({arg['type']})", style="dim")
                     if arg.get("description"):
-                        info_text.append(
-                            f" - {arg['description']}", style="green"
-                        )
+                        info_text.append(f" - {arg['description']}", style="green")
                     if arg.get("choices"):
                         info_text.append(
                             f"\n    Choices: {', '.join(arg['choices'])}",

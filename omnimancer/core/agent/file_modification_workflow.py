@@ -7,43 +7,33 @@ integrating all UI components and approval mechanisms into a cohesive system.
 
 import asyncio
 import logging
-import json
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Union, Callable
 from dataclasses import dataclass, field
-from enum import Enum
 from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
-from rich.progress import Progress, TaskID
+from rich.progress import Progress
 
-from .file_content_display import (
-    UnifiedFileContentDisplay,
-    FileDisplayConfig,
-    DisplayMode,
-)
-from .proposed_changes_integration import (
-    ProposedChangesIntegration,
-    ProposedChange,
-    ChangeSet,
-    ChangeDisplayMode,
-)
-from .approval_dialog import ApprovalDialog, DialogOptions, DialogState
+from ...cli.approval_formatter import CLIApprovalFormatter
 from ...cli.approval_prompt import (
-    CLIApprovalPrompt,
     ApprovalDecision,
     ApprovalDecisionType,
+    CLIApprovalPrompt,
 )
-from ...cli.approval_formatter import CLIApprovalFormatter
-from .file_system_manager import FileSystemManager
-from .approval_manager import EnhancedApprovalManager
 from ..security.approval_workflow import (
-    ApprovalRequest,
     RiskLevel,
-    ApprovalStatus,
+)
+from .approval_manager import EnhancedApprovalManager
+from .file_content_display import (
+    FileDisplayConfig,
+    UnifiedFileContentDisplay,
+)
+from .file_system_manager import FileSystemManager
+from .proposed_changes_integration import (
+    ChangeDisplayMode,
+    ChangeSet,
+    ProposedChangesIntegration,
 )
 
 logger = logging.getLogger(__name__)
@@ -222,12 +212,8 @@ class FileModificationWorkflow:
 
             if not change_set.changes:
                 workflow_context.final_result = WorkflowResult.CANCELLED
-                await self._transition_state(
-                    workflow_context, WorkflowState.COMPLETED
-                )
-                self.console.print(
-                    "[yellow]No changes found to process.[/yellow]"
-                )
+                await self._transition_state(workflow_context, WorkflowState.COMPLETED)
+                self.console.print("[yellow]No changes found to process.[/yellow]")
                 return workflow_context
 
             # Step 2: Display changes and get approval
@@ -240,9 +226,7 @@ class FileModificationWorkflow:
 
             if not approval_result.get("approved", False):
                 workflow_context.final_result = WorkflowResult.DENIED
-                await self._transition_state(
-                    workflow_context, WorkflowState.COMPLETED
-                )
+                await self._transition_state(workflow_context, WorkflowState.COMPLETED)
                 return workflow_context
 
             # Step 3: Apply approved changes
@@ -255,28 +239,18 @@ class FileModificationWorkflow:
                 )
 
                 if apply_result["success"]:
-                    workflow_context.final_result = (
-                        WorkflowResult.APPROVED_AND_APPLIED
-                    )
+                    workflow_context.final_result = WorkflowResult.APPROVED_AND_APPLIED
                 else:
-                    workflow_context.final_result = (
-                        WorkflowResult.APPROVED_NOT_APPLIED
-                    )
+                    workflow_context.final_result = WorkflowResult.APPROVED_NOT_APPLIED
             else:
-                workflow_context.final_result = (
-                    WorkflowResult.APPROVED_NOT_APPLIED
-                )
+                workflow_context.final_result = WorkflowResult.APPROVED_NOT_APPLIED
 
-            await self._transition_state(
-                workflow_context, WorkflowState.COMPLETED
-            )
+            await self._transition_state(workflow_context, WorkflowState.COMPLETED)
 
         except asyncio.TimeoutError:
             workflow_context.final_result = WorkflowResult.TIMEOUT
             await self._transition_state(workflow_context, WorkflowState.ERROR)
-            self.console.print(
-                "[red]Workflow timed out waiting for user input.[/red]"
-            )
+            self.console.print("[red]Workflow timed out waiting for user input.[/red]")
 
         except Exception as e:
             logger.error(f"Error in workflow {operation_id}: {e}")
@@ -339,16 +313,10 @@ class FileModificationWorkflow:
 
             # Step 4: Complete
             if apply_result.get("success", False):
-                await self._transition_state(
-                    workflow_context, WorkflowState.COMPLETED
-                )
+                await self._transition_state(workflow_context, WorkflowState.COMPLETED)
             else:
-                await self._transition_state(
-                    workflow_context, WorkflowState.ERROR
-                )
-                workflow_context.failed_changes = apply_result.get(
-                    "failed_changes", []
-                )
+                await self._transition_state(workflow_context, WorkflowState.ERROR)
+                workflow_context.failed_changes = apply_result.get("failed_changes", [])
 
         except Exception as e:
             workflow_context.current_state = WorkflowState.ERROR
@@ -380,9 +348,7 @@ class FileModificationWorkflow:
         Returns:
             WorkflowContext with results
         """
-        operation_id = (
-            f"single-file-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        )
+        operation_id = f"single-file-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
         workflow_context = WorkflowContext(
             operation_id=operation_id,
@@ -400,38 +366,30 @@ class FileModificationWorkflow:
                 "current_model", "Omnimancer AI"
             )
             if operation_type == "create":
-                display_result = (
-                    await self.unified_display.display_file_creation(
-                        file_path,
-                        new_content or "",
-                        {"interactive": True, "current_model": current_model},
-                    )
+                display_result = await self.unified_display.display_file_creation(
+                    file_path,
+                    new_content or "",
+                    {"interactive": True, "current_model": current_model},
                 )
             elif operation_type == "modify":
-                display_result = (
-                    await self.unified_display.display_file_modification(
-                        file_path,
-                        current_content or "",
-                        new_content or "",
-                        {"interactive": True, "current_model": current_model},
-                    )
+                display_result = await self.unified_display.display_file_modification(
+                    file_path,
+                    current_content or "",
+                    new_content or "",
+                    {"interactive": True, "current_model": current_model},
                 )
             elif operation_type == "delete":
-                display_result = (
-                    await self.unified_display.display_file_deletion(
-                        file_path,
-                        current_content or "",
-                        {"interactive": True, "current_model": current_model},
-                    )
+                display_result = await self.unified_display.display_file_deletion(
+                    file_path,
+                    current_content or "",
+                    {"interactive": True, "current_model": current_model},
                 )
             else:
                 raise ValueError(f"Unknown operation type: {operation_type}")
 
             # Process approval decision
             if display_result.get("approved", False):
-                workflow_context.final_result = (
-                    WorkflowResult.APPROVED_AND_APPLIED
-                )
+                workflow_context.final_result = WorkflowResult.APPROVED_AND_APPLIED
 
                 # Apply the change (bypass autonomous approval since we already got approval)
                 if operation_type == "create" and new_content is not None:
@@ -465,9 +423,7 @@ class FileModificationWorkflow:
             else:
                 workflow_context.final_result = WorkflowResult.DENIED
 
-            await self._transition_state(
-                workflow_context, WorkflowState.COMPLETED
-            )
+            await self._transition_state(workflow_context, WorkflowState.COMPLETED)
 
         except Exception as e:
             logger.error(f"Error in single file workflow: {e}")
@@ -476,9 +432,7 @@ class FileModificationWorkflow:
 
         return workflow_context
 
-    async def get_workflow_status(
-        self, operation_id: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_workflow_status(self, operation_id: str) -> Optional[Dict[str, Any]]:
         """
         Get current status of a workflow.
 
@@ -496,9 +450,7 @@ class FileModificationWorkflow:
             "operation_id": workflow.operation_id,
             "current_state": workflow.current_state.value,
             "initiated_at": workflow.initiated_at.isoformat(),
-            "elapsed_seconds": (
-                datetime.now() - workflow.initiated_at
-            ).total_seconds(),
+            "elapsed_seconds": (datetime.now() - workflow.initiated_at).total_seconds(),
             "decisions_count": len(workflow.user_decisions),
             "applied_changes": workflow.applied_changes,
             "failed_changes": workflow.failed_changes,
@@ -560,12 +512,10 @@ class FileModificationWorkflow:
                     changes=[change],
                 )
 
-                result = (
-                    await self.changes_integration.display_proposed_changes(
-                        single_change_set,
-                        display_mode=self.config.default_display_mode,
-                        interactive=True,
-                    )
+                result = await self.changes_integration.display_proposed_changes(
+                    single_change_set,
+                    display_mode=self.config.default_display_mode,
+                    interactive=True,
                 )
 
                 if result.get("approved", False):
@@ -603,24 +553,18 @@ class FileModificationWorkflow:
                     "Applying changes...", total=len(change_set.changes)
                 )
 
-                apply_result = (
-                    await self.changes_integration.apply_proposed_changes(
-                        change_set.id, selected_changes
-                    )
+                apply_result = await self.changes_integration.apply_proposed_changes(
+                    change_set.id, selected_changes
                 )
 
                 progress.update(task, completed=len(change_set.changes))
         else:
-            apply_result = (
-                await self.changes_integration.apply_proposed_changes(
-                    change_set.id, selected_changes
-                )
+            apply_result = await self.changes_integration.apply_proposed_changes(
+                change_set.id, selected_changes
             )
 
         # Update workflow context
-        workflow_context.applied_changes.extend(
-            apply_result.get("applied", [])
-        )
+        workflow_context.applied_changes.extend(apply_result.get("applied", []))
         workflow_context.failed_changes.extend(apply_result.get("failed", []))
 
         # Display results
@@ -630,9 +574,7 @@ class FileModificationWorkflow:
             )
         else:
             failed_count = len(apply_result.get("failed", []))
-            self.console.print(
-                f"[red]✗ {failed_count} changes failed to apply[/red]"
-            )
+            self.console.print(f"[red]✗ {failed_count} changes failed to apply[/red]")
 
             for file_path, error in apply_result.get("failed", []):
                 self.console.print(f"  [red]• {file_path}: {error}[/red]")
@@ -674,9 +616,7 @@ class FileModificationWorkflow:
                 days=self.config.history_retention_days
             )
             self.workflow_history = [
-                w
-                for w in self.workflow_history
-                if w.initiated_at > cutoff_date
+                w for w in self.workflow_history if w.initiated_at > cutoff_date
             ]
 
         # Call completion callback
@@ -692,11 +632,7 @@ class FileModificationWorkflow:
         # Count results
         result_counts = {}
         for workflow in self.workflow_history:
-            result = (
-                workflow.final_result.value
-                if workflow.final_result
-                else "unknown"
-            )
+            result = workflow.final_result.value if workflow.final_result else "unknown"
             result_counts[result] = result_counts.get(result, 0) + 1
 
         # Calculate success rate

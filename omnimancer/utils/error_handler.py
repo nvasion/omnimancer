@@ -6,24 +6,20 @@ and user-friendly error messages with suggested solutions.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Tuple
 
 from .errors import (
-    OmnimancerError,
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
-    ModelNotFoundError,
-    ProviderUnavailableError,
-    ToolExecutionError,
-    QuotaExceededError,
-    ProviderConfigurationError,
-    MCPError,
-    MCPServerError,
     MCPConnectionError,
+    MCPServerError,
     MCPTimeoutError,
+    ModelNotFoundError,
+    NetworkError,
+    ProviderConfigurationError,
+    ProviderUnavailableError,
+    QuotaExceededError,
+    RateLimitError,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,9 +75,7 @@ class ErrorHandler:
 
             # Suggest alternative providers
             if available_providers:
-                working_providers = self._get_working_providers(
-                    available_providers
-                )
+                working_providers = self._get_working_providers(available_providers)
                 if working_providers:
                     suggestions.append(
                         f"Try switching to: {', '.join(working_providers)}"
@@ -92,17 +86,13 @@ class ErrorHandler:
             should_retry = True
 
             if hasattr(error, "retry_after") and error.retry_after:
-                suggestions.append(
-                    f"Wait {error.retry_after} seconds before retrying"
-                )
+                suggestions.append(f"Wait {error.retry_after} seconds before retrying")
             else:
                 suggestions.append("Wait a few minutes before retrying")
 
             # Suggest alternative providers for immediate use
             if available_providers:
-                working_providers = self._get_working_providers(
-                    available_providers
-                )
+                working_providers = self._get_working_providers(available_providers)
                 if working_providers:
                     suggestions.append(
                         f"Use alternative provider: {', '.join(working_providers)}"
@@ -120,13 +110,9 @@ class ErrorHandler:
 
             # Suggest alternative providers
             if available_providers:
-                working_providers = self._get_working_providers(
-                    available_providers
-                )
+                working_providers = self._get_working_providers(available_providers)
                 if working_providers:
-                    suggestions.append(
-                        f"Switch to: {', '.join(working_providers)}"
-                    )
+                    suggestions.append(f"Switch to: {', '.join(working_providers)}")
 
         elif isinstance(error, ModelNotFoundError):
             error_msg = f"Model not found or unavailable on {provider_name}"
@@ -170,18 +156,10 @@ class ErrorHandler:
             error_msg = f"{provider_name} is temporarily unavailable"
             should_retry = True
 
-            if (
-                hasattr(error, "estimated_recovery")
-                and error.estimated_recovery
-            ):
-                suggestions.append(
-                    f"Estimated recovery: {error.estimated_recovery}"
-                )
+            if hasattr(error, "estimated_recovery") and error.estimated_recovery:
+                suggestions.append(f"Estimated recovery: {error.estimated_recovery}")
 
-            if (
-                hasattr(error, "fallback_providers")
-                and error.fallback_providers
-            ):
+            if hasattr(error, "fallback_providers") and error.fallback_providers:
                 suggestions.append(
                     f"Use fallback: {', '.join(error.fallback_providers)}"
                 )
@@ -209,9 +187,7 @@ class ErrorHandler:
             )
 
             if available_providers:
-                working_providers = self._get_working_providers(
-                    available_providers
-                )
+                working_providers = self._get_working_providers(available_providers)
                 if working_providers:
                     suggestions.append(
                         f"Try alternative: {', '.join(working_providers)}"
@@ -440,9 +416,7 @@ class ErrorHandler:
         """
         cutoff_time = datetime.now() - timedelta(hours=time_window_hours)
         recent_errors = [
-            error
-            for error in self.error_history
-            if error["timestamp"] > cutoff_time
+            error for error in self.error_history if error["timestamp"] > cutoff_time
         ]
 
         # Group errors by type and component
@@ -483,9 +457,7 @@ class ErrorHandler:
             "most_recent_error": recent_errors[-1] if recent_errors else None,
         }
 
-    def _record_error(
-        self, error: Exception, component_name: str, component_type: str
-    ):
+    def _record_error(self, error: Exception, component_name: str, component_type: str):
         """Record an error in the error history."""
         error_record = {
             "timestamp": datetime.now(),
@@ -518,9 +490,7 @@ class ErrorHandler:
         status["error_count"] += 1
 
         # Determine status based on error type
-        if isinstance(
-            error, (AuthenticationError, ProviderConfigurationError)
-        ):
+        if isinstance(error, (AuthenticationError, ProviderConfigurationError)):
             status["status"] = "configuration_error"
         elif isinstance(error, (RateLimitError, QuotaExceededError)):
             status["status"] = "quota_limited"
@@ -553,9 +523,7 @@ class ErrorHandler:
         else:
             status["status"] = "error"
 
-    def _get_working_providers(
-        self, available_providers: List[str]
-    ) -> List[str]:
+    def _get_working_providers(self, available_providers: List[str]) -> List[str]:
         """Get list of providers that are likely working based on recent status."""
         working_providers = []
 
@@ -602,18 +570,12 @@ def handle_mcp_error(
     available_servers: List[str] = None,
 ):
     """Convenience function for handling MCP errors."""
-    return error_handler.handle_mcp_error(
-        error, server_name, available_servers
-    )
+    return error_handler.handle_mcp_error(error, server_name, available_servers)
 
 
-def should_retry_operation(
-    error: Exception, attempt_count: int, max_attempts: int = 3
-):
+def should_retry_operation(error: Exception, attempt_count: int, max_attempts: int = 3):
     """Convenience function for retry logic."""
-    return error_handler.should_retry_operation(
-        error, attempt_count, max_attempts
-    )
+    return error_handler.should_retry_operation(error, attempt_count, max_attempts)
 
 
 def get_graceful_degradation_options(

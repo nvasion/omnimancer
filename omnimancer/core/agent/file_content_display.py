@@ -5,31 +5,29 @@ This module integrates existing UI components to provide a cohesive interface
 for displaying file content and modifications according to the designed interaction flow.
 """
 
-import asyncio
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional, Union, List
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.text import Text
-from rich.layout import Layout
 from rich.syntax import Syntax
 from rich.table import Table
+from rich.text import Text
 
+from omnimancer.cli.approval_formatter import CLIApprovalFormatter
+from omnimancer.cli.approval_prompt import CLIApprovalPrompt
+
+from .approval_dialog import ApprovalDialog, DialogOptions
 from .diff_renderer import (
-    EnhancedDiffRenderer,
     DiffType,
+    EnhancedDiffRenderer,
     FileChange,
     FileChangeType,
 )
-from .rich_renderer import RichTextRenderer, RiskLevel, create_renderer
-from .approval_dialog import ApprovalDialog, DialogOptions
-from .approval_context import ApprovalContext, OperationDetails
-from omnimancer.cli.approval_prompt import CLIApprovalPrompt
-from omnimancer.cli.approval_formatter import CLIApprovalFormatter
+from .rich_renderer import create_renderer
 
 logger = logging.getLogger(__name__)
 
@@ -144,17 +142,11 @@ class UnifiedFileContentDisplay:
             ):
                 review_data["truncated"] = True
                 review_data["original_size"] = len(content)
-                review_data["new_content"] = content[
-                    : self.config.max_content_size
-                ]
+                review_data["new_content"] = content[: self.config.max_content_size]
 
             # Use unified approval UI for interactive review
-            if operation_context and operation_context.get(
-                "interactive", True
-            ):
-                current_model = operation_context.get(
-                    "current_model", "Omnimancer AI"
-                )
+            if operation_context and operation_context.get("interactive", True):
+                current_model = operation_context.get("current_model", "Omnimancer AI")
                 return await self.unified_approval_ui.prompt_for_file_modification_approval(
                     review_data, current_model
                 )
@@ -214,12 +206,8 @@ class UnifiedFileContentDisplay:
                 review_data.update(operation_context)
 
             # Use unified approval UI for interactive review
-            if operation_context and operation_context.get(
-                "interactive", True
-            ):
-                current_model = operation_context.get(
-                    "current_model", "Omnimancer AI"
-                )
+            if operation_context and operation_context.get("interactive", True):
+                current_model = operation_context.get("current_model", "Omnimancer AI")
                 return await self.unified_approval_ui.prompt_for_file_modification_approval(
                     review_data, current_model
                 )
@@ -255,9 +243,7 @@ class UnifiedFileContentDisplay:
             warning_text.append("⚠️  FILE DELETION WARNING\n", style="bold red")
             warning_text.append(f"File: {file_path}\n", style="yellow")
             warning_text.append(f"Size: {len(content)} bytes\n", style="dim")
-            warning_text.append(
-                "This operation cannot be undone!", style="bold red"
-            )
+            warning_text.append("This operation cannot be undone!", style="bold red")
 
             warning_panel = Panel(
                 warning_text,
@@ -272,9 +258,7 @@ class UnifiedFileContentDisplay:
                 preview_lines = min(
                     self.config.max_preview_lines, len(content.splitlines())
                 )
-                preview_content = "\n".join(
-                    content.splitlines()[:preview_lines]
-                )
+                preview_content = "\n".join(content.splitlines()[:preview_lines])
                 if preview_lines < len(content.splitlines()):
                     preview_content += f"\n... ({len(content.splitlines()) - preview_lines} more lines)"
             else:
@@ -298,9 +282,7 @@ class UnifiedFileContentDisplay:
             self.console.print(content_panel)
 
             # Interactive confirmation if needed
-            if operation_context and operation_context.get(
-                "interactive", True
-            ):
+            if operation_context and operation_context.get("interactive", True):
                 from rich.prompt import Confirm
 
                 confirmed = Confirm.ask(
@@ -352,9 +334,7 @@ class UnifiedFileContentDisplay:
             # Add rows to summary table
             for op_type, count in op_counts.items():
                 risk_summary = self._get_risk_summary(operations, op_type)
-                summary_table.add_row(
-                    op_type.title(), str(count), risk_summary
-                )
+                summary_table.add_row(op_type.title(), str(count), risk_summary)
 
             self.console.print(summary_table)
 
@@ -404,9 +384,7 @@ class UnifiedFileContentDisplay:
                 f"Lines removed: -{file_change.lines_removed}\n", style="red"
             )
 
-        panel = Panel(
-            info_text, title="File Modification", border_style="yellow"
-        )
+        panel = Panel(info_text, title="File Modification", border_style="yellow")
         self.console.print(panel)
 
     def _display_operation_list(self, operations: List[Dict[str, Any]]):
@@ -486,9 +464,7 @@ class UnifiedFileContentDisplay:
         }
         return colors.get(risk_level.lower(), "white")
 
-    def _get_risk_summary(
-        self, operations: List[Dict[str, Any]], op_type: str
-    ) -> str:
+    def _get_risk_summary(self, operations: List[Dict[str, Any]], op_type: str) -> str:
         """Get risk summary for operations of a specific type."""
         type_ops = [op for op in operations if op.get("type") == op_type]
         if not type_ops:
@@ -504,9 +480,7 @@ class UnifiedFileContentDisplay:
         for risk in ["critical", "high", "medium", "low"]:
             if risk in risk_counts:
                 color = self._get_risk_color(risk)
-                summary_parts.append(
-                    f"[{color}]{risk}: {risk_counts[risk]}[/{color}]"
-                )
+                summary_parts.append(f"[{color}]{risk}: {risk_counts[risk]}[/{color}]")
 
         return ", ".join(summary_parts) if summary_parts else "Unknown"
 

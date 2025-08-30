@@ -5,25 +5,23 @@ This module handles loading, saving, and managing configuration
 including provider settings, API keys, and user preferences.
 """
 
+import base64
 import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-import base64
 
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from ..utils.errors import ConfigurationError, MCPConfigurationError
+from .config_migration import ConfigMigration, ConfigValidator
 from .models import (
     Config,
-    ProviderConfig,
+    ConfigProfile,
     MCPConfig,
     MCPServerConfig,
-    ConfigProfile,
+    ProviderConfig,
 )
-from .config_migration import ConfigMigration, ConfigValidator
 
 
 class ConfigManager:
@@ -118,10 +116,7 @@ class ConfigManager:
         Raises:
             ConfigurationError: If config file is invalid or missing
         """
-        if (
-            not self.config_path.exists()
-            or self.config_path.stat().st_size == 0
-        ):
+        if not self.config_path.exists() or self.config_path.stat().st_size == 0:
             # Create default config for missing or empty files
             self.config = self._create_default_config()
             self.save_config()
@@ -150,7 +145,7 @@ class ConfigManager:
             self.config = Config(**config_data)
             return self.config
 
-        except (json.JSONDecodeError, ValueError) as e:
+        except (json.JSONDecodeError, ValueError):
             # If JSON is invalid, create default config
             self.config = self._create_default_config()
             self.save_config()
@@ -199,9 +194,7 @@ class ConfigManager:
             self.config = self.load_config()
         return self.config
 
-    def get_provider_config(
-        self, provider_name: str
-    ) -> Optional[ProviderConfig]:
+    def get_provider_config(self, provider_name: str) -> Optional[ProviderConfig]:
         """
         Get configuration for a specific provider.
 
@@ -240,9 +233,7 @@ class ConfigManager:
         """
         config = self.get_config()
         if provider_name not in config.providers:
-            raise ConfigurationError(
-                f"Provider '{provider_name}' is not configured"
-            )
+            raise ConfigurationError(f"Provider '{provider_name}' is not configured")
 
         config.default_provider = provider_name
         self.save_config()
@@ -300,10 +291,7 @@ class ConfigManager:
         # Check if model already exists (by name and provider)
         existing_model = None
         for i, model in enumerate(config.custom_models):
-            if (
-                model.name == model_info.name
-                and model.provider == model_info.provider
-            ):
+            if model.name == model_info.name and model.provider == model_info.provider:
                 existing_model = i
                 break
 
@@ -441,9 +429,7 @@ class ConfigManager:
             ConfigurationError: If setup fails
         """
         if not provider_configs:
-            raise ConfigurationError(
-                "At least one provider must be configured"
-            )
+            raise ConfigurationError("At least one provider must be configured")
 
         if default_provider not in provider_configs:
             raise ConfigurationError(
@@ -485,9 +471,7 @@ class ConfigManager:
         config = self.get_config()
 
         if provider_name not in config.providers:
-            raise ConfigurationError(
-                f"Provider '{provider_name}' is not configured"
-            )
+            raise ConfigurationError(f"Provider '{provider_name}' is not configured")
 
         provider_config = config.providers[provider_name]
 
@@ -521,9 +505,7 @@ class ConfigManager:
         config.mcp = mcp_config
         self.save_config()
 
-    def get_mcp_server_config(
-        self, server_name: str
-    ) -> Optional[MCPServerConfig]:
+    def get_mcp_server_config(self, server_name: str) -> Optional[MCPServerConfig]:
         """
         Get configuration for a specific MCP server.
 
@@ -589,9 +571,7 @@ class ConfigManager:
         """
         server_config = self.get_mcp_server_config(server_name)
         if not server_config:
-            raise MCPConfigurationError(
-                f"MCP server '{server_name}' is not configured"
-            )
+            raise MCPConfigurationError(f"MCP server '{server_name}' is not configured")
 
         server_config.enabled = True
         self.save_config()
@@ -608,9 +588,7 @@ class ConfigManager:
         """
         server_config = self.get_mcp_server_config(server_name)
         if not server_config:
-            raise MCPConfigurationError(
-                f"MCP server '{server_name}' is not configured"
-            )
+            raise MCPConfigurationError(f"MCP server '{server_name}' is not configured")
 
         server_config.enabled = False
         self.save_config()
@@ -665,9 +643,7 @@ class ConfigManager:
         try:
             config_path = Path(mcp_config_path).expanduser()
             if not config_path.exists():
-                raise MCPConfigurationError(
-                    f"MCP config file not found: {config_path}"
-                )
+                raise MCPConfigurationError(f"MCP config file not found: {config_path}")
 
             with open(config_path, "r") as f:
                 mcp_data = json.load(f)
@@ -681,13 +657,9 @@ class ConfigManager:
             self.save_config()
 
         except json.JSONDecodeError as e:
-            raise MCPConfigurationError(
-                f"Invalid JSON in MCP config file: {e}"
-            )
+            raise MCPConfigurationError(f"Invalid JSON in MCP config file: {e}")
         except Exception as e:
-            raise MCPConfigurationError(
-                f"Failed to load MCP configuration: {e}"
-            )
+            raise MCPConfigurationError(f"Failed to load MCP configuration: {e}")
 
     def export_mcp_config_to_file(self, mcp_config_path: str) -> None:
         """
@@ -709,9 +681,7 @@ class ConfigManager:
                 json.dump(mcp_config.model_dump(mode="json"), f, indent=2)
 
         except Exception as e:
-            raise MCPConfigurationError(
-                f"Failed to export MCP configuration: {e}"
-            )
+            raise MCPConfigurationError(f"Failed to export MCP configuration: {e}")
 
     def validate_provider_config(
         self, provider_name: str, provider_config: ProviderConfig
@@ -873,9 +843,7 @@ class ConfigManager:
         # But we should validate the base_url if provided
         if config.base_url:
             if not config.base_url.startswith(("http://", "https://")):
-                errors.append(
-                    "Ollama base_url must start with 'http://' or 'https://'"
-                )
+                errors.append("Ollama base_url must start with 'http://' or 'https://'")
 
         # Model validation is difficult for Ollama since models are dynamic
         # We'll just ensure it's not empty
@@ -1090,16 +1058,12 @@ class ConfigManager:
 
         return config
 
-    def _merge_cli_args(
-        self, config: Config, cli_args: Dict[str, Any]
-    ) -> None:
+    def _merge_cli_args(self, config: Config, cli_args: Dict[str, Any]) -> None:
         """Merge CLI arguments into configuration."""
         # Map CLI arguments to configuration fields
         cli_mapping = {
             "provider": "default_provider",
-            "model": lambda: self._set_provider_model(
-                config, cli_args.get("model")
-            ),
+            "model": lambda: self._set_provider_model(config, cli_args.get("model")),
             "temperature": lambda: self._set_provider_temperature(
                 config, cli_args.get("temperature")
             ),
@@ -1122,35 +1086,25 @@ class ConfigManager:
         """Set model for the default provider."""
         if model and config.default_provider in config.providers:
             config.providers[config.default_provider].model = model
-            config.config_sources[
-                f"providers.{config.default_provider}.model"
-            ] = "cli:model"
+            config.config_sources[f"providers.{config.default_provider}.model"] = (
+                "cli:model"
+            )
 
-    def _set_provider_temperature(
-        self, config: Config, temperature: float
-    ) -> None:
+    def _set_provider_temperature(self, config: Config, temperature: float) -> None:
         """Set temperature for the default provider."""
-        if (
-            temperature is not None
-            and config.default_provider in config.providers
-        ):
+        if temperature is not None and config.default_provider in config.providers:
             config.providers[config.default_provider].temperature = temperature
             config.config_sources[
                 f"providers.{config.default_provider}.temperature"
             ] = "cli:temperature"
 
-    def _set_provider_max_tokens(
-        self, config: Config, max_tokens: int
-    ) -> None:
+    def _set_provider_max_tokens(self, config: Config, max_tokens: int) -> None:
         """Set max_tokens for the default provider."""
-        if (
-            max_tokens is not None
-            and config.default_provider in config.providers
-        ):
+        if max_tokens is not None and config.default_provider in config.providers:
             config.providers[config.default_provider].max_tokens = max_tokens
-            config.config_sources[
-                f"providers.{config.default_provider}.max_tokens"
-            ] = "cli:max_tokens"
+            config.config_sources[f"providers.{config.default_provider}.max_tokens"] = (
+                "cli:max_tokens"
+            )
 
     def get_effective_config(self) -> Config:
         """
@@ -1366,9 +1320,7 @@ class ConfigManager:
         self.config = config
         return config
 
-    def _merge_cli_args(
-        self, config: Config, cli_args: Dict[str, Any]
-    ) -> None:
+    def _merge_cli_args(self, config: Config, cli_args: Dict[str, Any]) -> None:
         """
         Merge CLI arguments into configuration.
 
@@ -1392,15 +1344,13 @@ class ConfigManager:
 
                 # Handle provider-specific settings
                 if "{provider}" in config_path:
-                    provider = cli_args.get(
-                        "provider", config.default_provider
-                    )
+                    provider = cli_args.get("provider", config.default_provider)
                     config_path = config_path.format(provider=provider)
 
                     # Ensure provider exists
                     if provider not in config.providers:
-                        config.providers[provider] = (
-                            self.create_provider_config(provider)
+                        config.providers[provider] = self.create_provider_config(
+                            provider
                         )
 
                 # Set the value and track source
@@ -1483,8 +1433,7 @@ class ConfigManager:
         """
         config = self.get_config()
         return {
-            name: profile.description or ""
-            for name, profile in config.profiles.items()
+            name: profile.description or "" for name, profile in config.profiles.items()
         }
 
     def switch_profile(self, profile_name: str) -> None:
@@ -1593,13 +1542,11 @@ class ConfigManager:
                 return False  # Already current version
 
             # Backup original config
-            backup_path = self.backup_config()
+            self.backup_config()
 
             # Migrate provider configurations
             if "providers" in config_data:
-                for provider_name, provider_data in config_data[
-                    "providers"
-                ].items():
+                for provider_name, provider_data in config_data["providers"].items():
                     # Add provider_type if missing
                     if "provider_type" not in provider_data:
                         provider_data["provider_type"] = provider_name
@@ -1618,9 +1565,7 @@ class ConfigManager:
             config_data["config_version"] = "2.0"
             config_data["profiles"] = config_data.get("profiles", {})
             config_data["active_profile"] = config_data.get("active_profile")
-            config_data["config_sources"] = config_data.get(
-                "config_sources", {}
-            )
+            config_data["config_sources"] = config_data.get("config_sources", {})
 
             from datetime import datetime
 
@@ -1655,9 +1600,7 @@ class ConfigManager:
         from datetime import datetime
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = (
-            self.config_path.parent / f"config_backup_{timestamp}.json"
-        )
+        backup_path = self.config_path.parent / f"config_backup_{timestamp}.json"
 
         import shutil
 
@@ -1704,9 +1647,7 @@ class ConfigManager:
         provider_capabilities = {}
         for provider_name, provider_config in config.providers.items():
             provider_capabilities[provider_name] = {
-                "supports_tools": getattr(
-                    provider_config, "supports_tools", False
-                ),
+                "supports_tools": getattr(provider_config, "supports_tools", False),
                 "supports_multimodal": getattr(
                     provider_config, "supports_multimodal", False
                 ),
@@ -1730,9 +1671,7 @@ class ConfigManager:
             "storage_path": config.storage_path,
         }
 
-    def _set_nested_config_value(
-        self, config: Config, path: str, value: Any
-    ) -> None:
+    def _set_nested_config_value(self, config: Config, path: str, value: Any) -> None:
         """
         Set a nested configuration value from a dot-separated path.
 
@@ -1929,9 +1868,7 @@ class ConfigManager:
 
         # Migrate provider configurations
         if "providers" in raw_config:
-            for provider_name, provider_config in raw_config[
-                "providers"
-            ].items():
+            for provider_name, provider_config in raw_config["providers"].items():
                 if "provider_type" not in provider_config:
                     provider_config["provider_type"] = provider_name
                     migrated = True
@@ -2025,8 +1962,8 @@ class ConfigManager:
 
             # Create backup of current config before restore
             if self.config_path.exists():
-                from datetime import datetime
                 import time
+                from datetime import datetime
 
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 # Add milliseconds to avoid filename collision
@@ -2079,18 +2016,14 @@ class ConfigManager:
         for name, provider_config in config.providers.items():
             provider_capabilities[name] = {
                 "model": provider_config.model,
-                "supports_tools": getattr(
-                    provider_config, "supports_tools", False
-                ),
+                "supports_tools": getattr(provider_config, "supports_tools", False),
                 "supports_multimodal": getattr(
                     provider_config, "supports_multimodal", False
                 ),
                 "supports_streaming": getattr(
                     provider_config, "supports_streaming", True
                 ),
-                "provider_type": getattr(
-                    provider_config, "provider_type", name
-                ),
+                "provider_type": getattr(provider_config, "provider_type", name),
             }
 
         summary["provider_capabilities"] = provider_capabilities
@@ -2136,9 +2069,7 @@ class ConfigManager:
             else:
                 return str(migration.create_backup())
         except Exception as e:
-            raise ConfigurationError(
-                f"Failed to create configuration backup: {e}"
-            )
+            raise ConfigurationError(f"Failed to create configuration backup: {e}")
 
     def restore_config_backup(self, backup_path: str) -> None:
         """
@@ -2157,9 +2088,7 @@ class ConfigManager:
             self.config = None
             self.load_config()
         except Exception as e:
-            raise ConfigurationError(
-                f"Failed to restore configuration backup: {e}"
-            )
+            raise ConfigurationError(f"Failed to restore configuration backup: {e}")
 
     def list_config_backups(self) -> List[Dict[str, Any]]:
         """
@@ -2230,8 +2159,7 @@ class ConfigManager:
                 elif isinstance(errors, dict):
                     # For nested categories like providers
                     category_total = sum(
-                        len(provider_errors)
-                        for provider_errors in errors.values()
+                        len(provider_errors) for provider_errors in errors.values()
                     )
                     error_counts[category] = category_total
                     total_errors += category_total
@@ -2241,18 +2169,14 @@ class ConfigManager:
             for provider_name in config.providers.keys():
                 provider_health[provider_name] = {
                     "enabled": config.providers[provider_name].enabled,
-                    "has_api_key": bool(
-                        config.providers[provider_name].api_key
-                    ),
+                    "has_api_key": bool(config.providers[provider_name].api_key),
                     "health_check_enabled": config.providers[
                         provider_name
                     ].health_check_enabled,
                 }
 
             return {
-                "overall_health": (
-                    "healthy" if total_errors == 0 else "issues_found"
-                ),
+                "overall_health": ("healthy" if total_errors == 0 else "issues_found"),
                 "total_errors": total_errors,
                 "error_counts_by_category": error_counts,
                 "validation_results": validation_results,
@@ -2264,16 +2188,12 @@ class ConfigManager:
                     "servers_configured": len(config.mcp.servers),
                     "servers_enabled": len(config.mcp.get_enabled_servers()),
                 },
-                "backup_info": {
-                    "available_backups": len(self.list_config_backups())
-                },
+                "backup_info": {"available_backups": len(self.list_config_backups())},
             }
         except Exception as e:
             return {
                 "overall_health": "error",
                 "error": str(e),
                 "total_errors": 1,
-                "validation_results": {
-                    "general": [f"Health check failed: {e}"]
-                },
+                "validation_results": {"general": [f"Health check failed: {e}"]},
             }

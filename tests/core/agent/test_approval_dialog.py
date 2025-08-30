@@ -5,38 +5,36 @@ This module tests the structured approval dialog layout,
 approval context handling, and dialog interaction logic.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
+from unittest.mock import Mock, patch
 
+import pytest
 from rich.console import Console
 from rich.layout import Layout
 from rich.panel import Panel
-from rich.table import Table
 
-from omnimancer.core.agent.approval_dialog import (
-    ApprovalDialog,
-    DialogState,
-    DialogSection,
-    DialogOptions,
-    create_approval_dialog,
-    show_quick_approval,
-)
 from omnimancer.core.agent.approval_context import (
     ApprovalContext,
-    OperationDetails,
     ApprovalDecision,
     FileChange,
     FileOperationType,
-    SecurityFlags,
+    OperationDetails,
     OperationStatus,
-    create_file_operation_context,
+    SecurityFlags,
     create_command_execution_context,
+    create_file_operation_context,
     create_web_request_context,
 )
+from omnimancer.core.agent.approval_dialog import (
+    ApprovalDialog,
+    DialogOptions,
+    DialogState,
+    create_approval_dialog,
+    show_quick_approval,
+)
+from omnimancer.core.agent.diff_renderer import DiffType
 from omnimancer.core.agent.rich_renderer import RiskLevel, create_renderer
-from omnimancer.core.agent.diff_renderer import DiffType, create_diff_renderer
 
 
 class TestDialogOptions:
@@ -216,9 +214,7 @@ class TestOperationDetails:
         details2 = OperationDetails(
             operation_type="file_delete", target="/test/file.txt"
         )
-        assert (
-            details2.get_operation_summary() == "file_delete on /test/file.txt"
-        )
+        assert details2.get_operation_summary() == "file_delete on /test/file.txt"
 
         # With multiple files
         details3 = OperationDetails(
@@ -232,9 +228,7 @@ class TestOperationDetails:
             operation_type="file_read",
             files_affected=[Path("/test/single.py")],
         )
-        assert (
-            details4.get_operation_summary() == "file_read on /test/single.py"
-        )
+        assert details4.get_operation_summary() == "file_read on /test/single.py"
 
 
 class TestApprovalDecision:
@@ -307,9 +301,7 @@ class TestApprovalContext:
         context.add_conversation_entry("Agent analyzing risk")
 
         assert len(context.conversation_history) == 2
-        assert (
-            "User requested file operation" in context.conversation_history[0]
-        )
+        assert "User requested file operation" in context.conversation_history[0]
         assert "Agent analyzing risk" in context.conversation_history[1]
         # Should have timestamps
         assert "[" in context.conversation_history[0]
@@ -398,9 +390,7 @@ class TestApprovalDialog:
         console = Console()
         options = DialogOptions(compact_mode=True)
 
-        dialog = ApprovalDialog(
-            renderer=renderer, console=console, options=options
-        )
+        dialog = ApprovalDialog(renderer=renderer, console=console, options=options)
 
         assert dialog.renderer == renderer
         assert dialog.console == console
@@ -420,9 +410,7 @@ class TestApprovalDialog:
 
         # Mock the Live context manager
         mock_live_instance = Mock()
-        mock_live.return_value.__enter__ = Mock(
-            return_value=mock_live_instance
-        )
+        mock_live.return_value.__enter__ = Mock(return_value=mock_live_instance)
         mock_live.return_value.__exit__ = Mock(return_value=None)
 
         # Create test context
@@ -468,9 +456,7 @@ class TestApprovalDialog:
     def test_render_header(self):
         """Test header rendering."""
         dialog = ApprovalDialog()
-        context = ApprovalContext(
-            agent_name="Test Agent", timestamp=datetime.now()
-        )
+        context = ApprovalContext(agent_name="Test Agent", timestamp=datetime.now())
 
         header = dialog._render_header(context)
 
@@ -635,62 +621,41 @@ class TestContextCreationUtilities:
 
         assert context.agent_name == "Web Agent"
         assert context.operation_details.operation_type == "web_request"
-        assert (
-            context.operation_details.target == "https://api.example.com/data"
-        )
+        assert context.operation_details.target == "https://api.example.com/data"
         assert context.operation_details.metadata["method"] == "POST"
         assert context.operation_details.metadata["headers"] == headers
-        assert (
-            context.operation_details.security_flags.accesses_network is True
-        )
+        assert context.operation_details.security_flags.accesses_network is True
 
     def test_command_security_assessment(self):
         """Test security assessment for commands."""
         # Test sudo command
-        context1 = create_command_execution_context(
-            "sudo", ["rm", "/etc/config"]
-        )
+        context1 = create_command_execution_context("sudo", ["rm", "/etc/config"])
         assert context1.operation_details.security_flags.requires_sudo is True
 
         # Test network command
-        context2 = create_command_execution_context(
-            "curl", ["https://example.com"]
-        )
-        assert (
-            context2.operation_details.security_flags.accesses_network is True
-        )
+        context2 = create_command_execution_context("curl", ["https://example.com"])
+        assert context2.operation_details.security_flags.accesses_network is True
 
         # Test code execution
-        context3 = create_command_execution_context(
-            "python", ["-c", "print('hello')"]
-        )
+        context3 = create_command_execution_context("python", ["-c", "print('hello')"])
         assert context3.operation_details.security_flags.executes_code is True
 
         # Test system file modification
         context4 = create_command_execution_context("rm", ["/etc/hosts"])
-        assert (
-            context4.operation_details.security_flags.modifies_system_files
-            is True
-        )
+        assert context4.operation_details.security_flags.modifies_system_files is True
 
     def test_web_request_security_assessment(self):
         """Test security assessment for web requests."""
         # Test sensitive URL
         context1 = create_web_request_context("https://admin.example.com/api")
-        assert (
-            context1.operation_details.security_flags.accesses_sensitive_data
-            is True
-        )
+        assert context1.operation_details.security_flags.accesses_sensitive_data is True
 
         # Test regular URL
         context2 = create_web_request_context("https://httpbin.org/get")
         assert (
-            context2.operation_details.security_flags.accesses_sensitive_data
-            is False
+            context2.operation_details.security_flags.accesses_sensitive_data is False
         )
-        assert (
-            context2.operation_details.security_flags.accesses_network is True
-        )
+        assert context2.operation_details.security_flags.accesses_network is True
 
 
 class TestEdgeCases:
@@ -702,9 +667,7 @@ class TestEdgeCases:
         dialog = ApprovalDialog()
         context = ApprovalContext()
 
-        with patch.object(
-            dialog, "_wait_for_decision", side_effect=KeyboardInterrupt
-        ):
+        with patch.object(dialog, "_wait_for_decision", side_effect=KeyboardInterrupt):
             decision = await dialog.show_approval_dialog(context)
 
             assert decision.approved is False
@@ -761,9 +724,7 @@ class TestEdgeCases:
     def test_large_file_list(self):
         """Test handling large numbers of files."""
         files = [Path(f"/test/file_{i}.py") for i in range(100)]
-        details = OperationDetails(
-            operation_type="batch_process", files_affected=files
-        )
+        details = OperationDetails(operation_type="batch_process", files_affected=files)
 
         # Should handle large lists without issues
         total = details.get_total_files_affected()

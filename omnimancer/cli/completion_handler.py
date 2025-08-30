@@ -5,12 +5,12 @@ This module provides readline-based auto-completion for slash commands,
 including dynamic commands loaded from ~/.omnimancer/commands directory.
 """
 
-import os
-import readline
 import logging
+import readline
 from pathlib import Path
-from typing import List, Optional, Set, Dict, Any
-from .commands import get_command_registry, SlashCommand
+from typing import Dict, List, Optional, Set
+
+from .commands import SlashCommand
 from .dynamic_commands import CommandRegistry, DynamicCommand
 
 logger = logging.getLogger(__name__)
@@ -45,9 +45,7 @@ class CompletionHandler:
                 # cmd.value already includes the slash, don't add another one
                 self.builtin_commands.add(cmd.value)
 
-            logger.debug(
-                f"Loaded {len(self.builtin_commands)} built-in commands"
-            )
+            logger.debug(f"Loaded {len(self.builtin_commands)} built-in commands")
         except Exception as e:
             logger.error(f"Failed to load built-in commands: {e}")
 
@@ -58,9 +56,7 @@ class CompletionHandler:
             commands_dir = Path.home() / ".omnimancer" / "commands"
 
             if not commands_dir.exists():
-                logger.debug(
-                    f"Commands directory does not exist: {commands_dir}"
-                )
+                logger.debug(f"Commands directory does not exist: {commands_dir}")
                 return
 
             # Set built-in commands to prevent overriding
@@ -75,9 +71,7 @@ class CompletionHandler:
             # Update our dynamic commands cache
             self.dynamic_commands = self.command_registry.commands.copy()
 
-            logger.info(
-                f"Loaded {loaded_count} dynamic commands from {commands_dir}"
-            )
+            logger.info(f"Loaded {loaded_count} dynamic commands from {commands_dir}")
 
         except Exception as e:
             logger.error(f"Failed to load dynamic commands: {e}")

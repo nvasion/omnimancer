@@ -8,22 +8,18 @@ templates with comprehensive error handling and rollback capabilities.
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple, Set, Union
-from pathlib import Path
-import json
+from typing import Any, Dict, List, Optional, Set
 
+from omnimancer.core.models import ConfigTemplate, ConfigTemplateManager
+
+from ..provider_registry import ProviderRegistry
+from .config import AgentConfig
 from .persona import (
     AgentPersona,
-    PersonaConfiguration,
     PersonaCapability,
     PersonaCategory,
-    PersonaStatus,
-    PersonaManager,
+    PersonaConfiguration,
 )
-from .config import AgentConfig, ProviderConfig, ProviderType
-from omnimancer.core.models import ConfigTemplateManager, ConfigTemplate
-from omnimancer.core.models import ModelInfo
-from ..provider_registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +104,7 @@ class ValidationResult:
 
         summary_parts = []
         if self.critical_issues:
-            summary_parts.append(
-                f"{len(self.critical_issues)} critical issues"
-            )
+            summary_parts.append(f"{len(self.critical_issues)} critical issues")
         if self.errors:
             summary_parts.append(f"{len(self.errors)} errors")
         if self.warnings:
@@ -204,9 +198,7 @@ class PersonaValidator:
 
         # Validate provider compatibility
         if persona.configuration:
-            self._validate_provider_compatibility(
-                persona.configuration, result
-            )
+            self._validate_provider_compatibility(persona.configuration, result)
 
         return result
 
@@ -256,9 +248,7 @@ class PersonaValidator:
 
         return result
 
-    def validate_configuration(
-        self, config: PersonaConfiguration
-    ) -> ValidationResult:
+    def validate_configuration(self, config: PersonaConfiguration) -> ValidationResult:
         """
         Validate a persona configuration.
 
@@ -361,10 +351,7 @@ class PersonaValidator:
                     )
                 )
 
-        if (
-            hasattr(config, "timeout_override")
-            and config.timeout_override is not None
-        ):
+        if hasattr(config, "timeout_override") and config.timeout_override is not None:
             if config.timeout_override <= 0:
                 result.add_issue(
                     ValidationIssue(
@@ -410,10 +397,7 @@ class PersonaValidator:
                 )
 
             # Check fallback providers
-            if (
-                hasattr(config, "fallback_providers")
-                and config.fallback_providers
-            ):
+            if hasattr(config, "fallback_providers") and config.fallback_providers:
                 for provider in config.fallback_providers:
                     if provider not in template.provider_configs:
                         result.add_issue(
@@ -504,9 +488,7 @@ class PersonaValidator:
                         message=f"Fallback providers not available: {', '.join(unavailable_providers)}",
                         field_path="configuration.fallback_providers",
                         suggestion="Remove unavailable providers or install/configure them",
-                        details={
-                            "unavailable_providers": unavailable_providers
-                        },
+                        details={"unavailable_providers": unavailable_providers},
                     )
                 )
 
@@ -593,9 +575,7 @@ class PersonaValidator:
 
         try:
             # Check if provider is registered
-            provider_info = self.provider_registry.get_provider_info(
-                provider_id
-            )
+            provider_info = self.provider_registry.get_provider_info(provider_id)
             available = provider_info is not None
 
             # Additional checks could be added here (API keys, installation, etc.)
@@ -626,8 +606,7 @@ class PersonaValidator:
             }
 
             available = (
-                provider_id in basic_models
-                and model_id in basic_models[provider_id]
+                provider_id in basic_models and model_id in basic_models[provider_id]
             )
 
             self._model_cache[cache_key] = available

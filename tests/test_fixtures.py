@@ -5,17 +5,17 @@ This module verifies that all test fixtures and mock factories
 are working correctly.
 """
 
-import pytest
 from datetime import datetime
 from pathlib import Path
 
-from omnimancer.core.models import ChatResponse, ModelInfo, MessageRole
+import pytest
+
 from omnimancer.cli.interface import CommandLineInterface
+from omnimancer.core.models import ChatResponse, MessageRole, ModelInfo
 from tests.conftest import (
+    create_chat_message,
     create_chat_response,
     create_model_info,
-    create_chat_message,
-    MockProviderFactory,
     generate_conversation_data,
     generate_model_list,
 )
@@ -111,9 +111,7 @@ class TestFactoryFunctions:
 
     def test_create_chat_message(self):
         """Test chat message factory."""
-        message = create_chat_message(
-            role=MessageRole.USER, content="Test message"
-        )
+        message = create_chat_message(role=MessageRole.USER, content="Test message")
 
         assert message.role == MessageRole.USER
         assert message.content == "Test message"
@@ -265,9 +263,7 @@ class TestMockManagerFixtures:
 
         # Test that methods can be called
         mock_config_manager.set_default_provider("claude")
-        mock_config_manager.set_default_provider.assert_called_once_with(
-            "claude"
-        )
+        mock_config_manager.set_default_provider.assert_called_once_with("claude")
 
     def test_mock_chat_manager(self, mock_chat_manager, sample_chat_context):
         """Test mock chat manager."""

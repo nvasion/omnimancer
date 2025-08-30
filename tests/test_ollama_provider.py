@@ -5,22 +5,22 @@ This module tests the OllamaProvider class functionality including
 message sending, server connectivity, model discovery, and error handling.
 """
 
-import pytest
-import httpx
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from omnimancer.providers.ollama import OllamaProvider
+import httpx
+import pytest
+
 from omnimancer.core.models import (
     ChatContext,
     ChatMessage,
     MessageRole,
-    ModelInfo,
 )
+from omnimancer.providers.ollama import OllamaProvider
 from omnimancer.utils.errors import (
-    ProviderError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
 )
 
 
@@ -165,18 +165,14 @@ class TestOllamaProviderServerConnectivity:
             await ollama_provider._check_server_availability()
 
     @pytest.mark.asyncio
-    async def test_check_server_availability_connection_error(
-        self, ollama_provider
-    ):
+    async def test_check_server_availability_connection_error(self, ollama_provider):
         """Test server availability check with connection error."""
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
                 side_effect=httpx.ConnectError("Connection refused")
             )
 
-            with pytest.raises(
-                NetworkError, match="Cannot connect to Ollama server"
-            ):
+            with pytest.raises(NetworkError, match="Cannot connect to Ollama server"):
                 await ollama_provider._check_server_availability()
 
     @pytest.mark.asyncio
@@ -187,9 +183,7 @@ class TestOllamaProviderServerConnectivity:
                 side_effect=httpx.TimeoutException("Request timed out")
             )
 
-            with pytest.raises(
-                NetworkError, match="Ollama server is not responding"
-            ):
+            with pytest.raises(NetworkError, match="Ollama server is not responding"):
                 await ollama_provider._check_server_availability()
 
     @pytest.mark.asyncio
@@ -203,9 +197,7 @@ class TestOllamaProviderServerConnectivity:
                 return_value=mock_response
             )
 
-            with pytest.raises(
-                NetworkError, match="Ollama server returned status 500"
-            ):
+            with pytest.raises(NetworkError, match="Ollama server returned status 500"):
                 await ollama_provider._check_server_availability()
 
 
@@ -213,9 +205,7 @@ class TestOllamaProviderModelDiscovery:
     """Test model discovery functionality."""
 
     @pytest.mark.asyncio
-    async def test_get_server_models_success(
-        self, ollama_provider, mock_server_models
-    ):
+    async def test_get_server_models_success(self, ollama_provider, mock_server_models):
         """Test successful model discovery."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -256,9 +246,7 @@ class TestOllamaProviderModelDiscovery:
                 side_effect=httpx.RequestError("Connection failed")
             )
 
-            with pytest.raises(
-                NetworkError, match="Error fetching models from Ollama"
-            ):
+            with pytest.raises(NetworkError, match="Error fetching models from Ollama"):
                 await ollama_provider._get_server_models()
 
     @pytest.mark.asyncio
@@ -351,9 +339,7 @@ class TestOllamaProviderCredentialValidation:
             assert result is True
 
     @pytest.mark.asyncio
-    async def test_validate_credentials_model_not_available(
-        self, ollama_provider
-    ):
+    async def test_validate_credentials_model_not_available(self, ollama_provider):
         """Test validation when model is not available."""
         # Mock server availability check
         mock_tags_response = MagicMock()
@@ -375,9 +361,7 @@ class TestOllamaProviderCredentialValidation:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_validate_credentials_server_unavailable(
-        self, ollama_provider
-    ):
+    async def test_validate_credentials_server_unavailable(self, ollama_provider):
         """Test validation when server is unavailable."""
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
@@ -388,9 +372,7 @@ class TestOllamaProviderCredentialValidation:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_validate_credentials_unexpected_error(
-        self, ollama_provider
-    ):
+    async def test_validate_credentials_unexpected_error(self, ollama_provider):
         """Test validation with unexpected error."""
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
@@ -426,9 +408,7 @@ class TestOllamaProviderMessageSending:
                 return_value=mock_chat_response
             )
 
-            response = await ollama_provider.send_message(
-                "Hello", sample_chat_context
-            )
+            response = await ollama_provider.send_message("Hello", sample_chat_context)
 
             assert response.content == "Hello! How can I help you today?"
             assert response.model_used == "llama2"
@@ -445,17 +425,11 @@ class TestOllamaProviderMessageSending:
                 side_effect=httpx.ConnectError("Connection refused")
             )
 
-            with pytest.raises(
-                NetworkError, match="Cannot connect to Ollama server"
-            ):
-                await ollama_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+            with pytest.raises(NetworkError, match="Cannot connect to Ollama server"):
+                await ollama_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
-    async def test_send_message_timeout(
-        self, ollama_provider, sample_chat_context
-    ):
+    async def test_send_message_timeout(self, ollama_provider, sample_chat_context):
         """Test message sending with timeout."""
         # Mock server availability check
         mock_tags_response = MagicMock()
@@ -472,9 +446,7 @@ class TestOllamaProviderMessageSending:
             with pytest.raises(
                 NetworkError, match="Request to Ollama server timed out"
             ):
-                await ollama_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+                await ollama_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_model_not_found(
@@ -488,9 +460,7 @@ class TestOllamaProviderMessageSending:
         # Mock model not found response
         mock_chat_response = MagicMock()
         mock_chat_response.status_code = 404
-        mock_chat_response.json.return_value = {
-            "error": "model 'llama2' not found"
-        }
+        mock_chat_response.json.return_value = {"error": "model 'llama2' not found"}
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
@@ -504,9 +474,7 @@ class TestOllamaProviderMessageSending:
                 ModelNotFoundError,
                 match="Use 'ollama pull llama2' to download it",
             ):
-                await ollama_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+                await ollama_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_empty_response(
@@ -532,12 +500,8 @@ class TestOllamaProviderMessageSending:
                 return_value=mock_chat_response
             )
 
-            with pytest.raises(
-                ProviderError, match="Empty response from Ollama"
-            ):
-                await ollama_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+            with pytest.raises(ProviderError, match="Empty response from Ollama"):
+                await ollama_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_malformed_response(
@@ -564,9 +528,7 @@ class TestOllamaProviderMessageSending:
             with pytest.raises(
                 ProviderError, match="Invalid response format from Ollama"
             ):
-                await ollama_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+                await ollama_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_network_error(
@@ -588,9 +550,7 @@ class TestOllamaProviderMessageSending:
             with pytest.raises(
                 NetworkError, match="Network error connecting to Ollama"
             ):
-                await ollama_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+                await ollama_provider.send_message("Hello", sample_chat_context)
 
     @pytest.mark.asyncio
     async def test_send_message_unexpected_error(
@@ -609,12 +569,8 @@ class TestOllamaProviderMessageSending:
                 side_effect=Exception("Unexpected error")
             )
 
-            with pytest.raises(
-                ProviderError, match="Unexpected error with Ollama"
-            ):
-                await ollama_provider.send_message(
-                    "Hello", sample_chat_context
-                )
+            with pytest.raises(ProviderError, match="Unexpected error with Ollama"):
+                await ollama_provider.send_message("Hello", sample_chat_context)
 
 
 class TestOllamaProviderModelInfo:
@@ -626,9 +582,7 @@ class TestOllamaProviderModelInfo:
 
         assert model_info.name == "llama2"
         assert model_info.provider == "ollama"
-        assert (
-            model_info.description == "Ollama model llama2 (local inference)"
-        )
+        assert model_info.description == "Ollama model llama2 (local inference)"
         assert model_info.max_tokens == 4096
         assert model_info.cost_per_token == 0.0
         assert model_info.available is True
@@ -689,25 +643,16 @@ class TestOllamaProviderCapabilities:
     def test_model_supports_multimodal_with_model_name(self, ollama_provider):
         """Test multimodal check with specific model name."""
         assert ollama_provider._model_supports_multimodal("llava:7b") is True
-        assert (
-            ollama_provider._model_supports_multimodal("llama2:latest")
-            is False
-        )
-        assert (
-            ollama_provider._model_supports_multimodal("bakllava:13b") is True
-        )
+        assert ollama_provider._model_supports_multimodal("llama2:latest") is False
+        assert ollama_provider._model_supports_multimodal("bakllava:13b") is True
 
 
 class TestOllamaProviderMessagePreparation:
     """Test message preparation for API requests."""
 
-    def test_prepare_messages_with_context(
-        self, ollama_provider, sample_chat_context
-    ):
+    def test_prepare_messages_with_context(self, ollama_provider, sample_chat_context):
         """Test preparing messages with conversation context."""
-        messages = ollama_provider._prepare_messages(
-            "New message", sample_chat_context
-        )
+        messages = ollama_provider._prepare_messages("New message", sample_chat_context)
 
         assert len(messages) == 3  # 2 from context + 1 new
 
@@ -792,9 +737,7 @@ class TestOllamaProviderResponseHandling:
         """Test handling model not found response."""
         mock_response = MagicMock()
         mock_response.status_code = 404
-        mock_response.json.return_value = {
-            "error": "model 'nonexistent' not found"
-        }
+        mock_response.json.return_value = {"error": "model 'nonexistent' not found"}
 
         with pytest.raises(
             ModelNotFoundError, match="Use 'ollama pull llama2' to download it"
@@ -807,9 +750,7 @@ class TestOllamaProviderResponseHandling:
         mock_response.status_code = 404
         mock_response.json.side_effect = ValueError("Invalid JSON")
 
-        with pytest.raises(
-            ModelNotFoundError, match="Model 'llama2' not found"
-        ):
+        with pytest.raises(ModelNotFoundError, match="Model 'llama2' not found"):
             ollama_provider._handle_response(mock_response)
 
     def test_handle_response_server_error(self, ollama_provider):
@@ -847,9 +788,7 @@ class TestOllamaProviderResponseHandling:
         mock_response.status_code = 200
         mock_response.json.side_effect = ValueError("Invalid JSON")
 
-        with pytest.raises(
-            ProviderError, match="Invalid response format from Ollama"
-        ):
+        with pytest.raises(ProviderError, match="Invalid response format from Ollama"):
             ollama_provider._handle_response(mock_response)
 
 
@@ -872,9 +811,7 @@ class TestOllamaProviderUtilityMethods:
 
     def test_estimate_cost(self, ollama_provider):
         """Test cost estimation for local models."""
-        cost = ollama_provider.estimate_cost(
-            input_tokens=100, output_tokens=50
-        )
+        cost = ollama_provider.estimate_cost(input_tokens=100, output_tokens=50)
         assert cost == 0.0  # Local models are free
 
 
@@ -916,17 +853,11 @@ class TestOllamaProviderCustomConfiguration:
                 return_value=mock_chat_response
             )
 
-            await custom_ollama_provider.send_message(
-                "Hello", sample_chat_context
-            )
+            await custom_ollama_provider.send_message("Hello", sample_chat_context)
 
             # Verify the custom URL was used
-            get_call = (
-                mock_client.return_value.__aenter__.return_value.get.call_args
-            )
+            get_call = mock_client.return_value.__aenter__.return_value.get.call_args
             assert "http://custom-server:8080/api/tags" in str(get_call)
 
-            post_call = (
-                mock_client.return_value.__aenter__.return_value.post.call_args
-            )
+            post_call = mock_client.return_value.__aenter__.return_value.post.call_args
             assert "http://custom-server:8080/api/chat" in str(post_call)

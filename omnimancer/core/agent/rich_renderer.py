@@ -8,27 +8,21 @@ highlighting, and responsive layouts.
 
 import os
 import shutil
-from typing import Dict, List, Optional, Any, Tuple, Union
+from dataclasses import dataclass
 from enum import Enum
-from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from rich.console import Console, ConsoleOptions, RenderResult
+from rich.box import ROUNDED, Box
+from rich.columns import Columns
+from rich.console import Console
+from rich.layout import Layout
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
+from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.table import Table
-from rich.panel import Panel
 from rich.text import Text
-from rich.box import Box, ROUNDED, DOUBLE, SIMPLE, MINIMAL
-from rich.layout import Layout
-from rich.columns import Columns
-from rich.align import Align
-from rich.padding import Padding
-from rich.style import Style
 from rich.theme import Theme
-from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
-from rich.rule import Rule
-from rich.tree import Tree
-from rich.markdown import Markdown
-from rich.prompt import Prompt, Confirm
 
 
 class RiskLevel(Enum):
@@ -240,9 +234,7 @@ class RichTextRenderer:
 
         return Theme(theme_dict)
 
-    def get_risk_color(
-        self, risk_level: Union[RiskLevel, str, int, None]
-    ) -> str:
+    def get_risk_color(self, risk_level: Union[RiskLevel, str, int, None]) -> str:
         """
         Get color style for risk level.
 
@@ -281,9 +273,7 @@ class RichTextRenderer:
 
         return risk_styles.get(risk_level, "risk.none")
 
-    def get_operation_color(
-        self, operation_type: Union[OperationType, str]
-    ) -> str:
+    def get_operation_color(self, operation_type: Union[OperationType, str]) -> str:
         """
         Get color style for operation type.
 
@@ -395,9 +385,7 @@ class RichTextRenderer:
             header_style=header_style,
             show_footer=show_footer,
             width=(
-                None
-                if self.capabilities.width > 120
-                else self.capabilities.width - 2
+                None if self.capabilities.width > 120 else self.capabilities.width - 2
             ),
         )
 
@@ -611,9 +599,7 @@ class RichTextRenderer:
                 columns.append(content)
             return Columns(columns, equal=True, padding=1)
 
-    def format_shortcut(
-        self, key: str, description: str, enabled: bool = True
-    ) -> Text:
+    def format_shortcut(self, key: str, description: str, enabled: bool = True) -> Text:
         """
         Format a keyboard shortcut with description.
 
@@ -722,10 +708,7 @@ class RichTextRenderer:
             rich_content: Rich formatted content
             plain_text: Plain text fallback
         """
-        if (
-            self.capabilities.supports_color
-            and self.capabilities.supports_unicode
-        ):
+        if self.capabilities.supports_color and self.capabilities.supports_unicode:
             self.console.print(rich_content)
         else:
             # Fallback to plain text

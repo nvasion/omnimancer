@@ -1,17 +1,15 @@
 """Audit logger for tracking and monitoring agent security events."""
 
+import hashlib
 import json
 import logging
-import os
-import time
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Union
-from pathlib import Path
-from dataclasses import dataclass, asdict
-from enum import Enum
-import hashlib
 import threading
-from queue import Queue, Empty
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from enum import Enum
+from pathlib import Path
+from queue import Empty, Queue
+from typing import Any, Dict, List, Optional
 
 
 class AuditEventType(Enum):
@@ -214,9 +212,7 @@ class AuditLogger:
                 continue
             except Exception as e:
                 # Fallback to stderr for logging errors
-                print(
-                    f"Audit logging error: {e}", file=__import__("sys").stderr
-                )
+                print(f"Audit logging error: {e}", file=__import__("sys").stderr)
 
     def log_event(
         self,
@@ -283,9 +279,7 @@ class AuditLogger:
             python_level = self._audit_level_to_python_level(event.level)
             log_message = f"[{event.event_type.value.upper()}] {event.message}"
             if event.metadata:
-                log_message += (
-                    f" | Metadata: {json.dumps(event.metadata, default=str)}"
-                )
+                log_message += f" | Metadata: {json.dumps(event.metadata, default=str)}"
 
             self.logger.log(python_level, log_message)
 
@@ -327,9 +321,7 @@ class AuditLogger:
         )
         level = AuditLevel.INFO if allowed else AuditLevel.WARNING
 
-        message = (
-            f"Permission {'granted' if allowed else 'denied'} for {operation}"
-        )
+        message = f"Permission {'granted' if allowed else 'denied'} for {operation}"
         if path:
             message += f" on {path}"
 
@@ -374,9 +366,7 @@ class AuditLogger:
         # Don't log full output for security, just indicate if present
         if output:
             metadata["output_length"] = len(output)
-            metadata["output_preview"] = (
-                output[:100] if len(output) > 100 else output
-            )
+            metadata["output_preview"] = output[:100] if len(output) > 100 else output
 
         self.log_event(event_type, level, message, metadata=metadata)
 
@@ -391,15 +381,11 @@ class AuditLogger:
         """Log a file access event."""
 
         event_type = (
-            AuditEventType.FILE_ACCESS
-            if allowed
-            else AuditEventType.FILE_ACCESS_DENIED
+            AuditEventType.FILE_ACCESS if allowed else AuditEventType.FILE_ACCESS_DENIED
         )
         level = AuditLevel.INFO if allowed else AuditLevel.WARNING
 
-        message = (
-            f"File {operation} {'allowed' if allowed else 'denied'}: {path}"
-        )
+        message = f"File {operation} {'allowed' if allowed else 'denied'}: {path}"
 
         metadata = {
             "path": path,
@@ -455,9 +441,7 @@ class AuditLogger:
 
                     # Recreate AuditEvent object
                     event = AuditEvent(
-                        timestamp=datetime.fromisoformat(
-                            event_data["timestamp"]
-                        ),
+                        timestamp=datetime.fromisoformat(event_data["timestamp"]),
                         event_type=AuditEventType(event_data["event_type"]),
                         level=AuditLevel(event_data["level"]),
                         message=event_data["message"],
@@ -498,9 +482,7 @@ class AuditLogger:
             "log_level": self.log_level.value,
             "async_enabled": self.enable_async,
             "total_events": sum(self.event_counts.values()),
-            "event_type_counts": {
-                k.value: v for k, v in self.event_counts.items()
-            },
+            "event_type_counts": {k.value: v for k, v in self.event_counts.items()},
             "level_counts": {k.value: v for k, v in self.level_counts.items()},
             "log_file_size": (
                 self.log_file.stat().st_size if self.log_file.exists() else 0

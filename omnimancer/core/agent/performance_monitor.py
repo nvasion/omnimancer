@@ -6,34 +6,28 @@ including token usage tracking, context efficiency measurement, operation timing
 and resource utilization metrics with optimization suggestions.
 """
 
-import asyncio
-import json
 import logging
+import statistics
+import threading
 import time
-from dataclasses import dataclass, field, asdict
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Set, Callable, Union, Tuple
-from collections import defaultdict, deque
-import threading
-import statistics
-import weakref
+from typing import Any, Callable, Dict, List, Optional
 
+
+from .persona import PersonaManager, get_persona_manager
 from .status_core import (
-    AgentStatus,
-    OperationType,
-    OperationStatus,
-    EventType,
-    AgentOperation,
     AgentEvent,
+    EventType,
+    OperationType,
 )
+from .status_manager import UnifiedStatusManager as AgentStatusManager
 from .status_manager import (
-    UnifiedStatusManager as AgentStatusManager,
     get_status_manager,
 )
-from .persona import AgentPersona, PersonaManager, get_persona_manager
-from omnimancer.core.models import ProviderConfig
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +81,7 @@ class TokenUsageMetrics:
     def efficiency_ratio(self) -> float:
         """Calculate token efficiency ratio (output/total)."""
         return (
-            (self.output_tokens / self.total_tokens)
-            if self.total_tokens > 0
-            else 0.0
+            (self.output_tokens / self.total_tokens) if self.total_tokens > 0 else 0.0
         )
 
 
@@ -242,9 +234,7 @@ class PerformanceMetricsCollector:
             self.active_timings[operation_id] = timing
             return timing
 
-    def complete_operation_timing(
-        self, operation_id: str
-    ) -> Optional[OperationTiming]:
+    def complete_operation_timing(self, operation_id: str) -> Optional[OperationTiming]:
         """Complete timing measurement for an operation."""
         with self._lock:
             if operation_id in self.active_timings:
@@ -265,9 +255,7 @@ class PerformanceMetricsCollector:
                 f"Recorded context metrics: {context.efficiency_score:.1f} efficiency score"
             )
 
-    def record_resource_utilization(
-        self, resources: ResourceUtilization
-    ) -> None:
+    def record_resource_utilization(self, resources: ResourceUtilization) -> None:
         """Record resource utilization metrics."""
         with self._lock:
             self.resource_history.append(resources)
@@ -300,12 +288,8 @@ class PerformanceMetricsCollector:
                 lambda: {"tokens": 0, "cost": 0.0, "requests": 0}
             )
             for usage in relevant_usage:
-                provider_stats[usage.provider_name][
-                    "tokens"
-                ] += usage.total_tokens
-                provider_stats[usage.provider_name][
-                    "cost"
-                ] += usage.cost_estimate
+                provider_stats[usage.provider_name]["tokens"] += usage.total_tokens
+                provider_stats[usage.provider_name]["cost"] += usage.cost_estimate
                 provider_stats[usage.provider_name]["requests"] += 1
 
             # Group by operation type
@@ -349,12 +333,8 @@ class PerformanceMetricsCollector:
             # Aggregate token usage
             token_metrics = TokenUsageMetrics()
             if recent_tokens:
-                token_metrics.total_tokens = sum(
-                    t.total_tokens for t in recent_tokens
-                )
-                token_metrics.input_tokens = sum(
-                    t.input_tokens for t in recent_tokens
-                )
+                token_metrics.total_tokens = sum(t.total_tokens for t in recent_tokens)
+                token_metrics.input_tokens = sum(t.input_tokens for t in recent_tokens)
                 token_metrics.output_tokens = sum(
                     t.output_tokens for t in recent_tokens
                 )
@@ -398,9 +378,7 @@ class PerformanceMonitor:
         """Initialize the performance monitor."""
         self.status_manager = status_manager or get_status_manager()
         self.persona_manager = persona_manager or get_persona_manager()
-        self.storage_path = (
-            storage_path or Path.home() / ".omnimancer" / "performance"
-        )
+        self.storage_path = storage_path or Path.home() / ".omnimancer" / "performance"
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         self.metrics_collector = PerformanceMetricsCollector()
@@ -528,9 +506,7 @@ class PerformanceMonitor:
     def get_performance_dashboard_data(self) -> Dict[str, Any]:
         """Get data for performance dashboard."""
         snapshot = self.metrics_collector.get_performance_snapshot()
-        recent_stats = self.metrics_collector.get_token_usage_stats(
-            timedelta(hours=1)
-        )
+        recent_stats = self.metrics_collector.get_token_usage_stats(timedelta(hours=1))
 
         return {
             "current_snapshot": asdict(snapshot),
@@ -541,9 +517,7 @@ class PerformanceMonitor:
             "suggestions": [
                 asdict(suggestion) for suggestion in self.suggestions[-5:]
             ],  # Last 5 suggestions
-            "monitoring_status": (
-                "active" if self.is_monitoring else "inactive"
-            ),
+            "monitoring_status": ("active" if self.is_monitoring else "inactive"),
         }
 
     def _handle_agent_event(self, event: AgentEvent) -> None:
@@ -563,16 +537,12 @@ class PerformanceMonitor:
             elif event.event_type == EventType.OPERATION_COMPLETED:
                 # Complete tracking operation
                 if event.operation:
-                    self.complete_operation_tracking(
-                        event.operation.operation_id
-                    )
+                    self.complete_operation_tracking(event.operation.operation_id)
 
             elif event.event_type == EventType.OPERATION_FAILED:
                 # Record failed operation
                 if event.operation:
-                    self.complete_operation_tracking(
-                        event.operation.operation_id
-                    )
+                    self.complete_operation_tracking(event.operation.operation_id)
 
         except Exception as e:
             logger.error(f"Error handling agent event: {e}")

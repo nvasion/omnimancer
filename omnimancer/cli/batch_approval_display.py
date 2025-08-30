@@ -6,24 +6,20 @@ information including action lists, summaries, and risk assessments.
 """
 
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+from typing import Dict, List, Optional
 
 from rich.console import Console, Group
-from rich.table import Table
 from rich.panel import Panel
-from rich.layout import Layout
+from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
+from rich.table import Table
 from rich.text import Text
-from rich.columns import Columns
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
-from rich.tree import Tree
-from rich.align import Align
 
 from ..core.agent.approval_manager import BatchApprovalRequest, ChangePreview
 from ..core.agent.types import Operation, OperationType
-from ..core.security.approval_workflow import ApprovalStatus, RiskLevel
+from ..core.security.approval_workflow import ApprovalStatus
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +68,7 @@ class BatchApprovalPanel:
         self.console = console or Console()
         self.config = config or BatchDisplayConfig()
 
-    def render_batch_overview(
-        self, batch_request: BatchApprovalRequest
-    ) -> Panel:
+    def render_batch_overview(self, batch_request: BatchApprovalRequest) -> Panel:
         """
         Render overview panel for batch approval request.
 
@@ -102,9 +96,7 @@ class BatchApprovalPanel:
         overview_table.add_row(
             "Created:", batch_request.created_at.strftime("%Y-%m-%d %H:%M:%S")
         )
-        overview_table.add_row(
-            "Status:", self._format_status(batch_request.status)
-        )
+        overview_table.add_row("Status:", self._format_status(batch_request.status))
 
         if batch_request.expires_at:
             time_remaining = batch_request.expires_at - datetime.now()
@@ -118,13 +110,9 @@ class BatchApprovalPanel:
         # Operation counts
         overview_table.add_row("Total Operations:", str(total_operations))
         if approved_count > 0:
-            overview_table.add_row(
-                "Approved:", f"[green]{approved_count}[/green]"
-            )
+            overview_table.add_row("Approved:", f"[green]{approved_count}[/green]")
         if pending_count > 0:
-            overview_table.add_row(
-                "Pending:", f"[yellow]{pending_count}[/yellow]"
-            )
+            overview_table.add_row("Pending:", f"[yellow]{pending_count}[/yellow]")
 
         # Risk distribution
         if risk_counts:
@@ -206,9 +194,7 @@ class BatchApprovalPanel:
 
             # Determine status
             original_idx = (
-                i
-                if show_approved
-                else self._get_original_index(batch_request, i)
+                i if show_approved else self._get_original_index(batch_request, i)
             )
             is_approved = original_idx in batch_request.approved_operations
             status = (
@@ -238,9 +224,7 @@ class BatchApprovalPanel:
             if self.config.mode == DisplayMode.DETAILED:
                 description = operation.description or "No description"
                 if len(description) > self.config.max_preview_length:
-                    description = (
-                        description[: self.config.max_preview_length] + "..."
-                    )
+                    description = description[: self.config.max_preview_length] + "..."
                 row.append(description)
 
             table.add_row(*row)
@@ -283,19 +267,13 @@ class BatchApprovalPanel:
         info_table.add_column("Label", style="bold cyan")
         info_table.add_column("Value", style="bright_white")
 
-        info_table.add_row(
-            "Type:", self._format_operation_type(operation.type)
-        )
-        info_table.add_row(
-            "Description:", operation.description or "No description"
-        )
+        info_table.add_row("Type:", self._format_operation_type(operation.type))
+        info_table.add_row("Description:", operation.description or "No description")
         info_table.add_row(
             "Requires Approval:",
             "Yes" if operation.requires_approval else "No",
         )
-        info_table.add_row(
-            "Reversible:", "Yes" if operation.reversible else "No"
-        )
+        info_table.add_row("Reversible:", "Yes" if operation.reversible else "No")
 
         if operation.data:
             info_table.add_row("", "")  # Separator
@@ -323,9 +301,7 @@ class BatchApprovalPanel:
             preview_table.add_row(
                 "Risk Assessment:", self._format_risk_assessment(preview)
             )
-            preview_table.add_row(
-                "Reversible:", "Yes" if preview.reversible else "No"
-            )
+            preview_table.add_row("Reversible:", "Yes" if preview.reversible else "No")
 
             if preview.metadata:
                 preview_table.add_row("", "")  # Separator
@@ -362,9 +338,7 @@ class BatchApprovalPanel:
             border_style="white",
         )
 
-    def render_batch_summary(
-        self, batch_request: BatchApprovalRequest
-    ) -> Panel:
+    def render_batch_summary(self, batch_request: BatchApprovalRequest) -> Panel:
         """
         Render summary of batch operations and risk assessment.
 
@@ -407,9 +381,7 @@ class BatchApprovalPanel:
         for risk_level, count in risk_counts.items():
             if count > 0:
                 percentage = (
-                    (count / total_with_risk) * 100
-                    if total_with_risk > 0
-                    else 0
+                    (count / total_with_risk) * 100 if total_with_risk > 0 else 0
                 )
                 color = self._get_risk_color(risk_level)
                 risk_table.add_row(
@@ -432,9 +404,7 @@ class BatchApprovalPanel:
             border_style="blue",
         )
 
-    def render_progress_display(
-        self, batch_request: BatchApprovalRequest
-    ) -> Panel:
+    def render_progress_display(self, batch_request: BatchApprovalRequest) -> Panel:
         """
         Render progress display for batch processing.
 
@@ -457,7 +427,7 @@ class BatchApprovalPanel:
             TimeElapsedColumn(),
         )
 
-        task = progress.add_task(
+        progress.add_task(
             "batch_progress", total=total_operations, completed=approved_count
         )
 

@@ -3,11 +3,10 @@
 import os
 import re
 import tempfile
-import json
-from typing import List, Dict, Set, Optional, Any
-from pathlib import Path
-from enum import Enum
 from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
 
 class PermissionLevel(Enum):
@@ -175,8 +174,7 @@ class PermissionController:
                 # Don't allow writes to system directories
                 system_prefixes = ["/usr", "/etc", "/System", "/sys", "/proc"]
                 if any(
-                    normalized_path.startswith(prefix)
-                    for prefix in system_prefixes
+                    normalized_path.startswith(prefix) for prefix in system_prefixes
                 ):
                     return False
 
@@ -191,8 +189,7 @@ class PermissionController:
                 # Check if path is in project directory or safe temp directory
                 is_in_project = normalized_path.startswith(project_root)
                 is_in_safe_temp = any(
-                    normalized_path.startswith(prefix)
-                    for prefix in safe_temp_prefixes
+                    normalized_path.startswith(prefix) for prefix in safe_temp_prefixes
                 )
 
                 if not (is_in_project or is_in_safe_temp):
@@ -368,9 +365,7 @@ class PermissionController:
 
                 # Check if approval has expired
                 if "expires_at" in approval_data:
-                    expires_at = datetime.fromisoformat(
-                        approval_data["expires_at"]
-                    )
+                    expires_at = datetime.fromisoformat(approval_data["expires_at"])
                     if datetime.now() > expires_at:
                         # Remove expired approval
                         del self._approval_memory[operation_signature]
@@ -382,7 +377,7 @@ class PermissionController:
 
             return False
 
-        except Exception as e:
+        except Exception:
             # If there's any error in checking, don't auto-approve
             return False
 
@@ -412,7 +407,7 @@ class PermissionController:
                 "metadata": metadata,
             }
 
-        except Exception as e:
+        except Exception:
             # Log error but don't fail the operation
             pass
 
@@ -466,8 +461,7 @@ class PermissionController:
         for signature, approval_data in self._approval_memory.items():
             learned.append(
                 {
-                    "pattern": signature[:50]
-                    + ("..." if len(signature) > 50 else ""),
+                    "pattern": signature[:50] + ("..." if len(signature) > 50 else ""),
                     "decision": "approved",
                     "count": 1,  # Could track actual usage count in the future
                     "last_used": approval_data.get("stored_at", ""),
@@ -503,9 +497,7 @@ class PermissionController:
         for signature, approval_data in self._approval_memory.items():
             if "expires_at" in approval_data:
                 try:
-                    expires_at = datetime.fromisoformat(
-                        approval_data["expires_at"]
-                    )
+                    expires_at = datetime.fromisoformat(approval_data["expires_at"])
                     if now > expires_at:
                         expired_signatures.append(signature)
                 except Exception:

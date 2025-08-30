@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Test script for EnhancedModelInfo class."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "."))
 
-from datetime import datetime
+
 from omnimancer.core.models import EnhancedModelInfo, ModelInfo
 
 

@@ -5,22 +5,21 @@ This module tests keyboard input handling, navigation controls,
 interactive features, and integration with the approval dialog.
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
-from datetime import datetime
 
 from omnimancer.core.agent.input_handler import (
-    InteractiveInputHandler,
-    InputMode,
-    KeyAction,
-    KeyBinding,
-    InputState,
-    create_input_handler,
-    create_custom_input_handler,
+    ARROW_KEY_BINDINGS,
     MINIMAL_KEY_BINDINGS,
     VIM_STYLE_KEY_BINDINGS,
-    ARROW_KEY_BINDINGS,
+    InputMode,
+    InputState,
+    InteractiveInputHandler,
+    KeyAction,
+    KeyBinding,
+    create_custom_input_handler,
+    create_input_handler,
 )
 
 
@@ -150,9 +149,7 @@ class TestInteractiveInputHandler:
         handler = InteractiveInputHandler()
 
         # Add some mode-specific bindings
-        handler.add_key_binding(
-            "s", KeyAction.SEARCH, "Search", InputMode.SEARCH
-        )
+        handler.add_key_binding("s", KeyAction.SEARCH, "Search", InputMode.SEARCH)
         handler.add_key_binding("h", KeyAction.HELP, "Help", InputMode.HELP)
 
         normal_bindings = handler.get_key_bindings_by_mode(InputMode.NORMAL)
@@ -164,9 +161,7 @@ class TestInteractiveInputHandler:
         assert len(normal_bindings) > len(help_bindings)
 
         # Check specific mode bindings exist
-        assert any(
-            b.action == KeyAction.SEARCH for b in search_bindings.values()
-        )
+        assert any(b.action == KeyAction.SEARCH for b in search_bindings.values())
         assert any(b.action == KeyAction.HELP for b in help_bindings.values())
 
     @pytest.mark.asyncio
@@ -426,7 +421,6 @@ class TestActionHandlers:
     async def test_navigation_handlers(self):
         """Test navigation handlers."""
         handler = InteractiveInputHandler()
-        initial_position = handler.state.scroll_position
 
         # Test up navigation
         handler.state.scroll_position = 5
@@ -653,9 +647,7 @@ class TestInputIntegration:
         handler = InteractiveInputHandler()
 
         # Add some mode-specific bindings
-        handler.add_key_binding(
-            "s", KeyAction.SEARCH, "Search", InputMode.SEARCH
-        )
+        handler.add_key_binding("s", KeyAction.SEARCH, "Search", InputMode.SEARCH)
         handler.state.mode = InputMode.SEARCH
 
         help_text = handler.get_help_text()

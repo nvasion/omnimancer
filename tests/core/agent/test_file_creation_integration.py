@@ -5,13 +5,12 @@ This module tests the integration between file existence checking, user confirma
 and the file creation workflow.
 """
 
-import pytest
-import asyncio
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
-from typing import Dict, Any
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from omnimancer.core.agent.file_system_manager import FileSystemManager
 from omnimancer.core.agent.read_before_write_ui import (
@@ -235,13 +234,16 @@ class TestFileCreationIntegration:
         test_file.write_text(original_content)
 
         # Create UI callback and mock the confirmation
-        with patch(
-            "omnimancer.core.agent.read_before_write_ui.Prompt.ask",
-            return_value="1",
-        ) as mock_prompt, patch(
-            "omnimancer.core.agent.read_before_write_ui.Confirm.ask",
-            return_value=True,
-        ) as mock_confirm:
+        with (
+            patch(
+                "omnimancer.core.agent.read_before_write_ui.Prompt.ask",
+                return_value="1",
+            ),
+            patch(
+                "omnimancer.core.agent.read_before_write_ui.Confirm.ask",
+                return_value=True,
+            ),
+        ):
 
             ui_callback = create_confirmation_callback()
 
@@ -293,9 +295,7 @@ class TestFileCreationIntegration:
         import os
 
         if os.name == "nt":
-            pytest.skip(
-                "Symbolic links require special permissions on Windows"
-            )
+            pytest.skip("Symbolic links require special permissions on Windows")
 
         original_file = temp_dir / "original.txt"
         symlink_file = temp_dir / "symlink.txt"
@@ -309,9 +309,7 @@ class TestFileCreationIntegration:
         async def mock_callback(file_info):
             # Verify this is indeed a symlink
             if not file_info.get("is_symlink", False):
-                raise AssertionError(
-                    f"Expected symlink, got file_info: {file_info}"
-                )
+                raise AssertionError(f"Expected symlink, got file_info: {file_info}")
             return {
                 "confirmed": True,
                 "action": "overwrite",
@@ -492,9 +490,7 @@ class TestFileCreationWorkflow:
 
         # Check new_feature.py (new file)
         new_file_result = next(
-            result
-            for filename, result in results
-            if filename == "new_feature.py"
+            result for filename, result in results if filename == "new_feature.py"
         )
         assert new_file_result["success"] is True
         assert new_file_result["file_existed_before"] is False

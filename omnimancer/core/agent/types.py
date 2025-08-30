@@ -5,10 +5,10 @@ This module contains shared types that are used across different agent component
 to avoid circular imports between modules.
 """
 
-from enum import Enum
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, Optional
 
 
 class OperationType(Enum):
@@ -49,9 +49,7 @@ class OperationResult:
     success: bool
     data: Any = None
     error: Optional[str] = None
-    details: Optional[str] = (
-        None  # Additional context for errors or operation info
-    )
+    details: Optional[str] = None  # Additional context for errors or operation info
     rollback_data: Optional[Dict[str, Any]] = None
     operation: Optional[Operation] = None
     execution_time: Optional[float] = None

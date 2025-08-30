@@ -2,18 +2,18 @@
 Tests for the Unified File Content Display module.
 """
 
-import asyncio
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from rich.console import Console
 
+from omnimancer.core.agent.diff_renderer import DiffType
 from omnimancer.core.agent.file_content_display import (
-    UnifiedFileContentDisplay,
-    FileDisplayConfig,
     DisplayMode,
+    FileDisplayConfig,
+    UnifiedFileContentDisplay,
     create_file_content_display,
 )
-from omnimancer.core.agent.diff_renderer import DiffType
 
 
 class TestUnifiedFileContentDisplay:
@@ -102,9 +102,7 @@ class TestUnifiedFileContentDisplay:
         with patch.object(
             self.display.diff_renderer, "render_unified_diff"
         ) as mock_diff:
-            mock_diff.return_value = (
-                "--- a/test/file.py\n+++ b/test/file.py\n..."
-            )
+            mock_diff.return_value = "--- a/test/file.py\n+++ b/test/file.py\n..."
 
             with patch.object(
                 self.display.unified_approval_ui,

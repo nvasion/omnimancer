@@ -5,24 +5,25 @@ This module tests the PerplexityProvider class functionality including
 message sending, search capabilities, model information, and error handling.
 """
 
-import pytest
-import httpx
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from omnimancer.providers.perplexity import PerplexityProvider
+import httpx
+import pytest
+
 from omnimancer.core.models import (
     ChatContext,
     ChatMessage,
-    MessageRole,
     EnhancedModelInfo,
+    MessageRole,
 )
+from omnimancer.providers.perplexity import PerplexityProvider
 from omnimancer.utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
+    RateLimitError,
 )
 
 
@@ -172,10 +173,7 @@ class TestPerplexityProviderInitialization:
 
     def test_initialization_offline_model(self, offline_perplexity_provider):
         """Test initialization with offline model."""
-        assert (
-            offline_perplexity_provider.model
-            == "llama-3.1-sonar-small-128k-chat"
-        )
+        assert offline_perplexity_provider.model == "llama-3.1-sonar-small-128k-chat"
         assert offline_perplexity_provider.search_enabled is False
 
 
@@ -224,9 +222,7 @@ class TestPerplexityProviderMessageSending:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = (
-            mock_successful_response_with_metadata
-        )
+        mock_response.json.return_value = mock_successful_response_with_metadata
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
@@ -254,9 +250,7 @@ class TestPerplexityProviderMessageSending:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [
-                {"message": {"role": "assistant", "content": "Test response"}}
-            ],
+            "choices": [{"message": {"role": "assistant", "content": "Test response"}}],
             "usage": {"total_tokens": 10},
         }
 
@@ -264,9 +258,7 @@ class TestPerplexityProviderMessageSending:
             mock_post = AsyncMock(return_value=mock_response)
             mock_client.return_value.__aenter__.return_value.post = mock_post
 
-            await perplexity_provider.send_message(
-                "Test message", sample_chat_context
-            )
+            await perplexity_provider.send_message("Test message", sample_chat_context)
 
             # Check that the request payload includes search parameters
             call_args = mock_post.call_args
@@ -284,9 +276,7 @@ class TestPerplexityProviderMessageSending:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [
-                {"message": {"role": "assistant", "content": "Test response"}}
-            ],
+            "choices": [{"message": {"role": "assistant", "content": "Test response"}}],
             "usage": {"total_tokens": 10},
         }
 
@@ -305,9 +295,7 @@ class TestPerplexityProviderMessageSending:
             assert "search_recency_filter" not in payload
 
     @pytest.mark.asyncio
-    async def test_send_message_timeout(
-        self, perplexity_provider, sample_chat_context
-    ):
+    async def test_send_message_timeout(self, perplexity_provider, sample_chat_context):
         """Test message sending with timeout."""
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
@@ -349,9 +337,7 @@ class TestPerplexityProviderMessageSending:
                 return_value=mock_response
             )
 
-            with pytest.raises(
-                AuthenticationError, match="Invalid Perplexity API key"
-            ):
+            with pytest.raises(AuthenticationError, match="Invalid Perplexity API key"):
                 await perplexity_provider.send_message(
                     "Test message", sample_chat_context
                 )
@@ -487,8 +473,7 @@ class TestPerplexityProviderModelInfo:
         assert model_info.name == "llama-3.1-sonar-small-128k-online"
         assert model_info.provider == "perplexity"
         assert (
-            model_info.description
-            == "Llama 3.1 Sonar Small with real-time web search"
+            model_info.description == "Llama 3.1 Sonar Small with real-time web search"
         )
         assert model_info.max_tokens == 127072
         assert model_info.cost_per_million_input == 0.2
@@ -507,9 +492,7 @@ class TestPerplexityProviderModelInfo:
 
     def test_get_model_info_unknown_model(self):
         """Test getting model info for unknown model."""
-        provider = PerplexityProvider(
-            api_key="test-key", model="unknown-model"
-        )
+        provider = PerplexityProvider(api_key="test-key", model="unknown-model")
         model_info = provider.get_model_info()
 
         assert model_info.name == "unknown-model"
@@ -598,9 +581,7 @@ class TestPerplexityProviderMessagePreparation:
             session_id="test-session",
         )
 
-        messages = perplexity_provider._prepare_messages(
-            "Hello", empty_context
-        )
+        messages = perplexity_provider._prepare_messages("Hello", empty_context)
 
         assert len(messages) == 1
         assert messages[0]["role"] == "user"
@@ -647,9 +628,7 @@ class TestPerplexityProviderResponseHandling:
         mock_response.status_code = 500
         mock_response.json.side_effect = ValueError("Invalid JSON")
 
-        with pytest.raises(
-            ProviderError, match="Perplexity API error: HTTP 500"
-        ):
+        with pytest.raises(ProviderError, match="Perplexity API error: HTTP 500"):
             perplexity_provider._handle_response(mock_response)
 
 
@@ -677,9 +656,7 @@ class TestPerplexityProviderContentFormatting:
         assert "2. [Source 2](https://example2.com)" in formatted
         assert "**Related Questions:**" not in formatted
 
-    def test_format_content_with_related_questions_only(
-        self, perplexity_provider
-    ):
+    def test_format_content_with_related_questions_only(self, perplexity_provider):
         """Test formatting content with related questions only."""
         perplexity_provider.return_citations = False
         perplexity_provider.return_related_questions = True

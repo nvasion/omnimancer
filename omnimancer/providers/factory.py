@@ -7,22 +7,22 @@ based on configuration and provider type.
 
 from typing import Dict, List, Type
 
-from ..core.models import ModelInfo, EnhancedModelInfo, ProviderConfig
+from ..core.models import EnhancedModelInfo, ModelInfo, ProviderConfig
 from ..utils.errors import ConfigurationError
-from .base import BaseProvider
-from .claude import ClaudeProvider
-from .openai import OpenAIProvider
-from .gemini import GeminiProvider
-from .cohere import CohereProvider
-from .ollama import OllamaProvider
-from .perplexity import PerplexityProvider
-from .xai import XAIProvider
-from .mistral import MistralProvider
 from .azure import AzureProvider
-from .vertex import VertexAIProvider
+from .base import BaseProvider
 from .bedrock import BedrockProvider
-from .openrouter import OpenRouterProvider
+from .claude import ClaudeProvider
 from .claude_code import ClaudeCodeProvider
+from .cohere import CohereProvider
+from .gemini import GeminiProvider
+from .mistral import MistralProvider
+from .ollama import OllamaProvider
+from .openai import OpenAIProvider
+from .openrouter import OpenRouterProvider
+from .perplexity import PerplexityProvider
+from .vertex import VertexAIProvider
+from .xai import XAIProvider
 
 
 class ProviderFactory:
@@ -42,9 +42,7 @@ class ProviderFactory:
     _lazy_loading_enabled: bool = True
 
     @classmethod
-    def register_provider(
-        cls, name: str, provider_class: Type[BaseProvider]
-    ) -> None:
+    def register_provider(cls, name: str, provider_class: Type[BaseProvider]) -> None:
         """
         Register a provider class.
 
@@ -59,7 +57,6 @@ class ProviderFactory:
     @classmethod
     def _clear_provider_cache(cls, provider_name: str) -> None:
         """Clear cached data for a specific provider."""
-        import time
 
         if provider_name in cls._model_cache:
             del cls._model_cache[provider_name]
@@ -77,22 +74,16 @@ class ProviderFactory:
 
         if provider_name not in cls._cache_timestamps:
             return False
-        return (
-            time.time() - cls._cache_timestamps[provider_name]
-        ) < cls._cache_ttl
+        return (time.time() - cls._cache_timestamps[provider_name]) < cls._cache_ttl
 
     @classmethod
     def _get_cached_provider_instance(
         cls, provider_name: str, config: ProviderConfig
     ) -> BaseProvider:
         """Get or create a cached provider instance."""
-        cache_key = (
-            f"{provider_name}:{config.model}:{hash(str(config.dict()))}"
-        )
+        cache_key = f"{provider_name}:{config.model}:{hash(str(config.dict()))}"
 
-        if cache_key in cls._provider_instances and cls._is_cache_valid(
-            cache_key
-        ):
+        if cache_key in cls._provider_instances and cls._is_cache_valid(cache_key):
             return cls._provider_instances[cache_key]
 
         # Create new instance
@@ -115,15 +106,11 @@ class ProviderFactory:
         return instance
 
     @classmethod
-    def _get_cached_models(
-        cls, provider_name: str, enhanced: bool = False
-    ) -> List:
+    def _get_cached_models(cls, provider_name: str, enhanced: bool = False) -> List:
         """Get cached model information for a provider."""
         import time
 
-        cache_dict = (
-            cls._enhanced_model_cache if enhanced else cls._model_cache
-        )
+        cache_dict = cls._enhanced_model_cache if enhanced else cls._model_cache
 
         if provider_name in cache_dict and cls._is_cache_valid(provider_name):
             return cache_dict[provider_name]
@@ -141,8 +128,7 @@ class ProviderFactory:
                 # Convert to EnhancedModelInfo if needed
                 if models and isinstance(models[0], ModelInfo):
                     models = [
-                        EnhancedModelInfo.from_model_info(model)
-                        for model in models
+                        EnhancedModelInfo.from_model_info(model) for model in models
                     ]
                 cls._enhanced_model_cache[provider_name] = models
             else:
@@ -208,9 +194,7 @@ class ProviderFactory:
         # Use the optimized provider initializer for lazy loading and caching
         from ..core.provider_initializer import ProviderInitializer
 
-        return ProviderInitializer.get_provider_instance(
-            name, config, config_manager
-        )
+        return ProviderInitializer.get_provider_instance(name, config, config_manager)
 
     @classmethod
     def get_available_providers(cls) -> list[str]:
@@ -284,8 +268,7 @@ class ProviderFactory:
                 # Convert ModelInfo to EnhancedModelInfo if needed
                 if models and isinstance(models[0], ModelInfo):
                     all_models[provider_name] = [
-                        EnhancedModelInfo.from_model_info(model)
-                        for model in models
+                        EnhancedModelInfo.from_model_info(model) for model in models
                     ]
                 else:
                     all_models[provider_name] = models
@@ -313,9 +296,7 @@ class ProviderFactory:
 
                 # Get provider capabilities
                 provider_supports_tools = temp_provider.supports_tools()
-                provider_supports_multimodal = (
-                    temp_provider.supports_multimodal()
-                )
+                provider_supports_multimodal = temp_provider.supports_multimodal()
 
                 result[provider_name] = {
                     "models": models,
@@ -325,19 +306,13 @@ class ProviderFactory:
                         "supports_streaming": temp_provider.supports_streaming(),
                     },
                     "latest_models": [
-                        m
-                        for m in models
-                        if getattr(m, "latest_version", False)
+                        m for m in models if getattr(m, "latest_version", False)
                     ],
                     "tool_capable_models": [
-                        m
-                        for m in models
-                        if getattr(m, "supports_tools", False)
+                        m for m in models if getattr(m, "supports_tools", False)
                     ],
                     "multimodal_models": [
-                        m
-                        for m in models
-                        if getattr(m, "supports_multimodal", False)
+                        m for m in models if getattr(m, "supports_multimodal", False)
                     ],
                 }
             except Exception:
@@ -384,9 +359,7 @@ class ProviderFactory:
             )
 
     @classmethod
-    def validate_model_for_provider(
-        cls, provider_name: str, model_name: str
-    ) -> bool:
+    def validate_model_for_provider(cls, provider_name: str, model_name: str) -> bool:
         """
         Validate that a model is available for a specific provider.
 
@@ -511,9 +484,7 @@ class ProviderFactory:
                 "available": True,
                 "credentials_valid": credentials_valid,
                 "model_available": model_available,
-                "provider_capabilities": cls.get_provider_capabilities(
-                    provider_name
-                ),
+                "provider_capabilities": cls.get_provider_capabilities(provider_name),
             }
 
         except Exception as e:
@@ -557,9 +528,7 @@ class ProviderFactory:
         return health_status
 
     @classmethod
-    def get_models_by_capability(
-        cls, capability: str
-    ) -> Dict[str, List[ModelInfo]]:
+    def get_models_by_capability(cls, capability: str) -> Dict[str, List[ModelInfo]]:
         """
         Get models that support a specific capability.
 
@@ -578,9 +547,7 @@ class ProviderFactory:
 
                 if capability == "tools":
                     filtered_models = [
-                        m
-                        for m in all_models
-                        if getattr(m, "supports_tools", False)
+                        m for m in all_models if getattr(m, "supports_tools", False)
                     ]
                 elif capability == "multimodal":
                     filtered_models = [
@@ -634,18 +601,13 @@ class ProviderFactory:
                 # Convert to EnhancedModelInfo if needed
                 if all_models and isinstance(all_models[0], ModelInfo):
                     all_models = [
-                        EnhancedModelInfo.from_model_info(model)
-                        for model in all_models
+                        EnhancedModelInfo.from_model_info(model) for model in all_models
                     ]
 
                 if capability == "tools":
-                    filtered_models = [
-                        m for m in all_models if m.supports_tools
-                    ]
+                    filtered_models = [m for m in all_models if m.supports_tools]
                 elif capability == "multimodal":
-                    filtered_models = [
-                        m for m in all_models if m.supports_multimodal
-                    ]
+                    filtered_models = [m for m in all_models if m.supports_multimodal]
                 elif capability == "streaming":
                     # For streaming, check provider capability since it's not model-specific
                     if temp_provider.supports_streaming():
@@ -653,16 +615,12 @@ class ProviderFactory:
                     else:
                         filtered_models = []
                 elif capability == "latest":
-                    filtered_models = [
-                        m for m in all_models if m.latest_version
-                    ]
+                    filtered_models = [m for m in all_models if m.latest_version]
                 elif capability == "free":
                     filtered_models = [m for m in all_models if m.is_free]
                 elif capability == "available":
                     filtered_models = [
-                        m
-                        for m in all_models
-                        if m.available and not m.deprecated
+                        m for m in all_models if m.available and not m.deprecated
                     ]
                 else:
                     filtered_models = []
@@ -707,8 +665,7 @@ class ProviderFactory:
                 # Convert to EnhancedModelInfo if needed
                 if all_models and isinstance(all_models[0], ModelInfo):
                     all_models = [
-                        EnhancedModelInfo.from_model_info(model)
-                        for model in all_models
+                        EnhancedModelInfo.from_model_info(model) for model in all_models
                     ]
 
                 high_perf_models = [
@@ -747,8 +704,7 @@ class ProviderFactory:
                 # Convert to EnhancedModelInfo if needed
                 if all_models and isinstance(all_models[0], ModelInfo):
                     all_models = [
-                        EnhancedModelInfo.from_model_info(model)
-                        for model in all_models
+                        EnhancedModelInfo.from_model_info(model) for model in all_models
                     ]
 
                 affordable_models = []
@@ -757,8 +713,7 @@ class ProviderFactory:
                         affordable_models.append(model)
                     else:
                         avg_cost = (
-                            model.cost_per_million_input
-                            + model.cost_per_million_output
+                            model.cost_per_million_input + model.cost_per_million_output
                         ) / 2
                         if avg_cost <= max_cost_per_million:
                             affordable_models.append(model)
@@ -791,10 +746,7 @@ class ProviderFactory:
 
             # Convert to EnhancedModelInfo if needed
             if models and isinstance(models[0], ModelInfo):
-                models = [
-                    EnhancedModelInfo.from_model_info(model)
-                    for model in models
-                ]
+                models = [EnhancedModelInfo.from_model_info(model) for model in models]
 
             # Calculate statistics
             total_models = len(models)
@@ -825,8 +777,7 @@ class ProviderFactory:
                     cheapest_model = min(
                         paid_models,
                         key=lambda x: (
-                            x.cost_per_million_input
-                            + x.cost_per_million_output
+                            x.cost_per_million_input + x.cost_per_million_output
                         )
                         / 2,
                     )
@@ -879,9 +830,7 @@ class ProviderFactory:
         summaries = {}
 
         for provider_name in cls._providers.keys():
-            summaries[provider_name] = cls.get_provider_model_summary(
-                provider_name
-            )
+            summaries[provider_name] = cls.get_provider_model_summary(provider_name)
 
         return summaries
 
@@ -903,8 +852,7 @@ class ProviderFactory:
                 # Convert to EnhancedModelInfo if needed
                 if models and isinstance(models[0], ModelInfo):
                     models = [
-                        EnhancedModelInfo.from_model_info(model)
-                        for model in models
+                        EnhancedModelInfo.from_model_info(model) for model in models
                     ]
 
                 # Find latest models

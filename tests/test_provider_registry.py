@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Test script for ProviderRegistry class."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "."))
 
-from datetime import datetime
+
+from omnimancer.core.models import (
+    ChatContext,
+    ChatResponse,
+    EnhancedModelInfo,
+    ModelInfo,
+)
 from omnimancer.core.provider_registry import ProviderRegistry
-from omnimancer.core.models import EnhancedModelInfo
 from omnimancer.providers.base import BaseProvider
-from omnimancer.core.models import ChatContext, ChatResponse, ModelInfo
 
 
 class MockProvider(BaseProvider):
@@ -19,9 +23,7 @@ class MockProvider(BaseProvider):
     def __init__(self, api_key: str, model: str, **kwargs):
         super().__init__(api_key, model, **kwargs)
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         return ChatResponse(
             content="Mock response", model_used=self.model, tokens_used=10
         )

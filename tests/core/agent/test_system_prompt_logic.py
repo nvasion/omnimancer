@@ -5,15 +5,16 @@ This module tests the system prompt generation and ensures safety and directory
 awareness parameters are properly included.
 """
 
-import pytest
 import os
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 from omnimancer.cli.interface import CommandLineInterface
 from omnimancer.core.agent.file_system_manager import FileSystemManager
-from omnimancer.core.security import SecurityManager
 from omnimancer.core.engine import CoreEngine
+from omnimancer.core.security import SecurityManager
 
 
 class TestSystemPromptLogic:

@@ -5,9 +5,9 @@ This module ensures that critical security settings cannot be accidentally disab
 and validates configuration against security best practices.
 """
 
-from typing import Dict, Any, List, Optional, Tuple
 import logging
 from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +22,8 @@ class ConfigSecurityValidator:
     """Validates Omnimancer configurations for security compliance."""
 
     def __init__(self):
-        self.critical_security_settings = (
-            self._get_critical_security_settings()
-        )
-        self.recommended_security_settings = (
-            self._get_recommended_security_settings()
-        )
+        self.critical_security_settings = self._get_critical_security_settings()
+        self.recommended_security_settings = self._get_recommended_security_settings()
         self.dangerous_combinations = self._get_dangerous_combinations()
 
     def _get_critical_security_settings(self) -> Dict[str, Any]:
@@ -141,9 +137,7 @@ class ConfigSecurityValidator:
 
         return errors
 
-    def _validate_recommended_settings(
-        self, config: Dict[str, Any]
-    ) -> List[str]:
+    def _validate_recommended_settings(self, config: Dict[str, Any]) -> List[str]:
         """Validate recommended security settings."""
         warnings = []
 
@@ -170,9 +164,7 @@ class ConfigSecurityValidator:
         for combination in self.dangerous_combinations:
             all_conditions_met = True
 
-            for setting_path, required_value in combination[
-                "conditions"
-            ].items():
+            for setting_path, required_value in combination["conditions"].items():
                 current_value = self._get_nested_value(config, setting_path)
                 if current_value != required_value:
                     all_conditions_met = False
@@ -281,9 +273,7 @@ class ConfigSecurityValidator:
             current_value = self._get_nested_value(fixed_config, setting_path)
 
             if current_value != required_value:
-                self._set_nested_value(
-                    fixed_config, setting_path, required_value
-                )
+                self._set_nested_value(fixed_config, setting_path, required_value)
                 changes.append(
                     f"Fixed critical setting: {setting_path} = {required_value}"
                 )
@@ -296,18 +286,14 @@ class ConfigSecurityValidator:
             current_value = self._get_nested_value(fixed_config, setting_path)
 
             if current_value is None:  # Only set if not explicitly configured
-                self._set_nested_value(
-                    fixed_config, setting_path, recommended_value
-                )
+                self._set_nested_value(fixed_config, setting_path, recommended_value)
                 changes.append(
                     f"Applied recommended setting: {setting_path} = {recommended_value}"
                 )
 
         return fixed_config, changes
 
-    def _set_nested_value(
-        self, config: Dict[str, Any], path: str, value: Any
-    ) -> None:
+    def _set_nested_value(self, config: Dict[str, Any], path: str, value: Any) -> None:
         """Set a nested configuration value using dot notation."""
         keys = path.split(".")
         current = config
@@ -321,9 +307,7 @@ class ConfigSecurityValidator:
         # Set final value
         current[keys[-1]] = value
 
-    def generate_security_report(
-        self, config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def generate_security_report(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate a comprehensive security report for a configuration.
 
@@ -333,9 +317,7 @@ class ConfigSecurityValidator:
         Returns:
             Security report dictionary
         """
-        is_valid, errors, warnings = self.validate_security(
-            config, strict_mode=False
-        )
+        is_valid, errors, warnings = self.validate_security(config, strict_mode=False)
 
         report = {
             "timestamp": str(Path().resolve()),
@@ -371,7 +353,7 @@ class ConfigSecurityValidator:
             )
 
         # Security score (0-100)
-        max_issues = len(self.critical_security_settings) + len(
+        len(self.critical_security_settings) + len(
             self.recommended_security_settings
         )
         actual_issues = len(errors) + len(warnings)

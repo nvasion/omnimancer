@@ -2,13 +2,12 @@
 Unit tests for the RetryHandler class.
 """
 
-import asyncio
-import pytest
-import time
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
-from omnimancer.utils.retry import RetryHandler
+import pytest
+
 from omnimancer.utils.errors import NetworkError, RateLimitError
+from omnimancer.utils.retry import RetryHandler
 
 
 class TestRetryHandler:
@@ -79,9 +78,7 @@ class TestRetryHandler:
 
     def test_calculate_delay_with_rate_limit_retry_after(self):
         """Test delay calculation with rate limit retry_after."""
-        handler = RetryHandler(
-            jitter=False
-        )  # Disable jitter for exact comparison
+        handler = RetryHandler(jitter=False)  # Disable jitter for exact comparison
 
         # Should use the specific retry_after value
         delay = handler.calculate_delay(1, rate_limit_retry_after=10)
@@ -90,46 +87,31 @@ class TestRetryHandler:
     def test_should_retry_network_error(self):
         """Test retry decision for network errors."""
         assert (
-            self.retry_handler.should_retry(
-                NetworkError("Connection failed"), 0
-            )
+            self.retry_handler.should_retry(NetworkError("Connection failed"), 0)
             is True
         )
-        assert (
-            self.retry_handler.should_retry(NetworkError("Timeout"), 1) is True
-        )
+        assert self.retry_handler.should_retry(NetworkError("Timeout"), 1) is True
 
     def test_should_retry_rate_limit_error(self):
         """Test retry decision for rate limit errors."""
         assert (
-            self.retry_handler.should_retry(RateLimitError("Rate limited"), 0)
-            is True
+            self.retry_handler.should_retry(RateLimitError("Rate limited"), 0) is True
         )
         assert (
-            self.retry_handler.should_retry(
-                RateLimitError("Too many requests"), 1
-            )
+            self.retry_handler.should_retry(RateLimitError("Too many requests"), 1)
             is True
         )
 
     def test_should_retry_other_error(self):
         """Test retry decision for other errors."""
-        assert (
-            self.retry_handler.should_retry(ValueError("Invalid value"), 0)
-            is False
-        )
-        assert (
-            self.retry_handler.should_retry(TypeError("Type error"), 1)
-            is False
-        )
+        assert self.retry_handler.should_retry(ValueError("Invalid value"), 0) is False
+        assert self.retry_handler.should_retry(TypeError("Type error"), 1) is False
 
     def test_should_retry_max_attempts_reached(self):
         """Test retry decision when max attempts reached."""
         handler = RetryHandler(max_retries=2)
 
-        assert (
-            handler.should_retry(NetworkError("Connection failed"), 2) is False
-        )
+        assert handler.should_retry(NetworkError("Connection failed"), 2) is False
         assert handler.should_retry(RateLimitError("Rate limited"), 3) is False
 
     @pytest.mark.asyncio

@@ -6,10 +6,10 @@ retry logic, encryption, and other common functionality.
 """
 
 from .errors import (
-    OmnimancerError,
-    ConfigurationError,
-    ProviderError,
     AuthenticationError,
+    ConfigurationError,
+    OmnimancerError,
+    ProviderError,
     RateLimitError,
 )
 

@@ -6,19 +6,18 @@ and security settings through the CLI interface.
 """
 
 import json
-import asyncio
-from typing import Optional, List, Dict, Any
-from pathlib import Path
 from datetime import datetime
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
-from rich.box import ROUNDED
+from typing import Any, Dict, List, Optional
 
+from rich.box import ROUNDED
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+
+from ...core.security.audit_logger import AuditEventType, AuditLogger
 from ...core.security.permission_controller import PermissionController
 from ...core.security.security_manager import SecurityManager
-from ...core.security.audit_logger import AuditLogger, AuditEventType
 from ..commands import Command
 
 
@@ -124,13 +123,9 @@ class PermissionsHandler:
             if output_format == "json":
                 # JSON output
                 output_data = {
-                    "security_level": security_settings.get(
-                        "level", "unknown"
-                    ),
+                    "security_level": security_settings.get("level", "unknown"),
                     "permission_rules": security_settings.get("rules", []),
-                    "learned_permissions": security_settings.get(
-                        "learned", []
-                    ),
+                    "learned_permissions": security_settings.get("learned", []),
                     "timestamp": datetime.now().isoformat(),
                 }
                 self.console.print(json.dumps(output_data, indent=2))
@@ -157,9 +152,7 @@ class PermissionsHandler:
         """Set the security level."""
         if not args:
             self._show_error("Security level is required")
-            self._show_info(
-                "Valid levels: auto_approve, ask_always, ask_but_remember"
-            )
+            self._show_info("Valid levels: auto_approve, ask_always, ask_but_remember")
             return
 
         level = args[0].lower()
@@ -191,9 +184,7 @@ class PermissionsHandler:
         """Add a new permission rule."""
         if not args:
             self._show_error("Permission rule pattern is required")
-            self._show_info(
-                "Usage: /permissions add-rule <pattern> [type] [level]"
-            )
+            self._show_info("Usage: /permissions add-rule <pattern> [type] [level]")
             return
 
         pattern = args[0]
@@ -218,9 +209,7 @@ class PermissionsHandler:
                 return
 
             # Add the rule
-            success = self._add_permission_rule(
-                pattern, rule_type, permission_level
-            )
+            success = self._add_permission_rule(pattern, rule_type, permission_level)
 
             if success:
                 self._show_success(
@@ -301,9 +290,7 @@ class PermissionsHandler:
                     )
                     return
 
-                success = self.export_audit_trail(
-                    export_path, export_format, limit
-                )
+                success = self.export_audit_trail(export_path, export_format, limit)
                 if success:
                     self._show_success(
                         f"Audit trail exported to {export_path} ({export_format} format)"
@@ -313,9 +300,7 @@ class PermissionsHandler:
 
             else:  # action == "view"
                 # Get and display audit entries
-                audit_entries = self._get_audit_entries(
-                    limit, filter_type, date_filter
-                )
+                audit_entries = self._get_audit_entries(limit, filter_type, date_filter)
 
                 if not audit_entries:
                     self._show_info("No audit entries found")
@@ -327,22 +312,14 @@ class PermissionsHandler:
                 # Show quick stats summary
                 if len(audit_entries) > 5:
                     approved_count = len(
-                        [
-                            e
-                            for e in audit_entries
-                            if e.get("decision") == "approved"
-                        ]
+                        [e for e in audit_entries if e.get("decision") == "approved"]
                     )
                     denied_count = len(
-                        [
-                            e
-                            for e in audit_entries
-                            if e.get("decision") == "denied"
-                        ]
+                        [e for e in audit_entries if e.get("decision") == "denied"]
                     )
-                    avg_risk = sum(
-                        e.get("risk_level", 0) for e in audit_entries
-                    ) / len(audit_entries)
+                    avg_risk = sum(e.get("risk_level", 0) for e in audit_entries) / len(
+                        audit_entries
+                    )
 
                     self._show_info(
                         f"Summary: {approved_count} approved, {denied_count} denied, avg risk: {avg_risk:.1f}"
@@ -470,9 +447,7 @@ class PermissionsHandler:
 
             # Get permission rules from controller
             if self.permission_controller:
-                settings["rules"] = (
-                    self.permission_controller.get_permission_rules()
-                )
+                settings["rules"] = self.permission_controller.get_permission_rules()
                 settings["learned"] = (
                     self.permission_controller.get_learned_permissions()
                 )
@@ -481,16 +456,14 @@ class PermissionsHandler:
             if self.security_manager:
                 status = self.security_manager.get_security_status()
                 # Try to determine security level from policies
-                if status.get("policies", {}).get(
-                    "require_approval_for_high_risk"
-                ):
+                if status.get("policies", {}).get("require_approval_for_high_risk"):
                     settings["level"] = "ask_but_remember"
                 else:
                     settings["level"] = "auto_approve"
 
             return settings
 
-        except Exception as e:
+        except Exception:
             # Fallback to mock data if there's an error
             return {
                 "level": "ask_but_remember",
@@ -721,15 +694,12 @@ class PermissionsHandler:
                     "enable_auto_approval"
                     not in self.security_manager.security_policies
                 ):
-                    self.security_manager.security_policies[
-                        "enable_auto_approval"
-                    ] = False
+                    self.security_manager.security_policies["enable_auto_approval"] = (
+                        False
+                    )
                 else:
-                    success = (
-                        success
-                        and self.security_manager.update_security_policy(
-                            "enable_auto_approval", False
-                        )
+                    success = success and self.security_manager.update_security_policy(
+                        "enable_auto_approval", False
                     )
             elif level == "ask_but_remember":
                 success = self.security_manager.update_security_policy(
@@ -740,15 +710,12 @@ class PermissionsHandler:
                     "enable_auto_approval"
                     not in self.security_manager.security_policies
                 ):
-                    self.security_manager.security_policies[
-                        "enable_auto_approval"
-                    ] = True
+                    self.security_manager.security_policies["enable_auto_approval"] = (
+                        True
+                    )
                 else:
-                    success = (
-                        success
-                        and self.security_manager.update_security_policy(
-                            "enable_auto_approval", True
-                        )
+                    success = success and self.security_manager.update_security_policy(
+                        "enable_auto_approval", True
                     )
             else:
                 return False
@@ -759,9 +726,7 @@ class PermissionsHandler:
             self._show_error(f"Failed to set security level: {e}")
             return False
 
-    def _add_permission_rule(
-        self, pattern: str, rule_type: str, level: str
-    ) -> bool:
+    def _add_permission_rule(self, pattern: str, rule_type: str, level: str) -> bool:
         """Add a permission rule."""
         try:
             if not self.permission_controller:
@@ -773,14 +738,10 @@ class PermissionsHandler:
                     # For allowed patterns, we remove from restricted paths
                     if level == "read":
                         # Allow read access by ensuring it's not restricted
-                        self.permission_controller.remove_restricted_path(
-                            pattern
-                        )
+                        self.permission_controller.remove_restricted_path(pattern)
                     else:  # write
                         # Allow write access by ensuring it's not restricted
-                        self.permission_controller.remove_restricted_path(
-                            pattern
-                        )
+                        self.permission_controller.remove_restricted_path(pattern)
                 else:
                     # For blocked access, add to restricted paths
                     self.permission_controller.add_restricted_path(pattern)
@@ -797,10 +758,8 @@ class PermissionsHandler:
                 # Network rules would need to be implemented in SecurityManager policies
                 if self.security_manager:
                     if level == "allowed":
-                        allowed_domains = (
-                            self.security_manager.security_policies.get(
-                                "allowed_network_domains", []
-                            )
+                        allowed_domains = self.security_manager.security_policies.get(
+                            "allowed_network_domains", []
                         )
                         if pattern not in allowed_domains:
                             allowed_domains.append(pattern)
@@ -808,10 +767,8 @@ class PermissionsHandler:
                             "allowed_network_domains", allowed_domains
                         )
                     else:
-                        blocked_domains = (
-                            self.security_manager.security_policies.get(
-                                "blocked_network_domains", []
-                            )
+                        blocked_domains = self.security_manager.security_policies.get(
+                            "blocked_network_domains", []
                         )
                         if pattern not in blocked_domains:
                             blocked_domains.append(pattern)
@@ -933,7 +890,6 @@ class PermissionsHandler:
             # Get recent events from audit logger
             from ...core.security.audit_logger import (
                 AuditEventType,
-                AuditLevel,
             )
 
             # Apply filter by event type if specified
@@ -983,9 +939,7 @@ class PermissionsHandler:
                 # Apply date filter if specified
                 if date_filter:
                     try:
-                        filter_date = datetime.fromisoformat(
-                            date_filter
-                        ).date()
+                        filter_date = datetime.fromisoformat(date_filter).date()
                         if event.timestamp.date() < filter_date:
                             continue
                     except ValueError:
@@ -1169,21 +1123,15 @@ class PermissionsHandler:
             )
 
             approval_rate = (
-                (approved_count / total_entries) * 100
-                if total_entries > 0
-                else 0
+                (approved_count / total_entries) * 100 if total_entries > 0 else 0
             )
             denial_rate = (
-                (denied_count / total_entries) * 100
-                if total_entries > 0
-                else 0
+                (denied_count / total_entries) * 100 if total_entries > 0 else 0
             )
 
             # Calculate average risk level
             risk_levels = [e.get("risk_level", 0) for e in recent_entries]
-            avg_risk_level = (
-                sum(risk_levels) / len(risk_levels) if risk_levels else 0
-            )
+            avg_risk_level = sum(risk_levels) / len(risk_levels) if risk_levels else 0
 
             # Find common operations
             operation_counts = {}
@@ -1191,9 +1139,7 @@ class PermissionsHandler:
                 op_type = entry.get("operation", "unknown")
                 # Extract base operation type
                 base_op = op_type.split(":")[0] if ":" in op_type else op_type
-                operation_counts[base_op] = (
-                    operation_counts.get(base_op, 0) + 1
-                )
+                operation_counts[base_op] = operation_counts.get(base_op, 0) + 1
 
             common_operations = sorted(
                 operation_counts.items(), key=lambda x: x[1], reverse=True
@@ -1211,9 +1157,7 @@ class PermissionsHandler:
                 else:
                     category = "Critical (9-10)"
 
-                risk_distribution[category] = (
-                    risk_distribution.get(category, 0) + 1
-                )
+                risk_distribution[category] = risk_distribution.get(category, 0) + 1
 
             return {
                 "total_entries": total_entries,
@@ -1239,9 +1183,7 @@ class PermissionsHandler:
             stats = self.get_audit_statistics_summary()
 
             if "error" in stats:
-                self._show_error(
-                    f"Failed to get audit statistics: {stats['error']}"
-                )
+                self._show_error(f"Failed to get audit statistics: {stats['error']}")
                 return
 
             # Create statistics display
@@ -1347,34 +1289,24 @@ class PermissionsHandler:
 
             if self.permission_controller:
                 # Get stored approvals (learned patterns)
-                stored_approvals = (
-                    self.permission_controller.get_stored_approvals()
-                )
+                stored_approvals = self.permission_controller.get_stored_approvals()
                 patterns_learned = len(stored_approvals)
 
                 # Approximate decisions made (could be enhanced with actual tracking)
-                decisions_made = (
-                    patterns_learned + 5
-                )  # Mock additional decisions
+                decisions_made = patterns_learned + 5  # Mock additional decisions
 
             # Determine status display
             if learning_enabled:
-                status_color = "green"
                 status_text = "[green]✓[/green] Permission learning is [bold green]enabled[/bold green]"
                 border_style = "green"
             else:
-                status_color = "yellow"
                 status_text = "[yellow]○[/yellow] Permission learning is [bold yellow]disabled[/bold yellow]"
                 border_style = "yellow"
 
             # Create status content
-            status_content = (
-                f"{status_text}\n[dim]Decisions made: {decisions_made}\n"
-            )
+            status_content = f"{status_text}\n[dim]Decisions made: {decisions_made}\n"
             status_content += f"Patterns learned: {patterns_learned}\n"
-            status_content += (
-                f"Auto-approvals available: {patterns_learned}[/dim]"
-            )
+            status_content += f"Auto-approvals available: {patterns_learned}[/dim]"
 
             status_panel = Panel(
                 status_content,
@@ -1403,28 +1335,22 @@ class PermissionsHandler:
             most_common = []
 
             if self.permission_controller:
-                stored_approvals = (
-                    self.permission_controller.get_stored_approvals()
-                )
+                stored_approvals = self.permission_controller.get_stored_approvals()
                 unique_patterns = len(stored_approvals)
-                auto_approvals = unique_patterns  # Each stored approval could trigger auto-approval
+                auto_approvals = (
+                    unique_patterns  # Each stored approval could trigger auto-approval
+                )
 
                 # Mock total decisions (in real implementation, this would be tracked)
-                total_decisions = (
-                    unique_patterns * 2 + 10
-                )  # Estimate based on patterns
+                total_decisions = unique_patterns * 2 + 10  # Estimate based on patterns
 
                 # Get most common approval types from stored data
                 if stored_approvals:
                     # Analyze approval patterns
                     pattern_counts = {}
                     for signature, approval_data in stored_approvals.items():
-                        op_type = approval_data.get(
-                            "operation_type", "unknown"
-                        )
-                        pattern_counts[op_type] = (
-                            pattern_counts.get(op_type, 0) + 1
-                        )
+                        op_type = approval_data.get("operation_type", "unknown")
+                        pattern_counts[op_type] = pattern_counts.get(op_type, 0) + 1
 
                     # Create most common list
                     for op_type, count in sorted(
@@ -1456,9 +1382,7 @@ class PermissionsHandler:
                 stats_lines.append("[dim]Most learned patterns:[/dim]")
                 stats_lines.extend(most_common)
             else:
-                stats_lines.append(
-                    "[dim]No learning patterns recorded yet[/dim]"
-                )
+                stats_lines.append("[dim]No learning patterns recorded yet[/dim]")
 
             stats_panel = Panel(
                 "\n".join(stats_lines),
@@ -1484,9 +1408,7 @@ class PermissionsHandler:
                 return 0
 
             # Get current stored approvals
-            stored_approvals = (
-                self.permission_controller.get_stored_approvals()
-            )
+            stored_approvals = self.permission_controller.get_stored_approvals()
 
             if not stored_approvals:
                 return 0
@@ -1520,9 +1442,7 @@ class PermissionsHandler:
             self._show_error(f"Error clearing learned permissions: {e}")
             return 0
 
-    def _export_permissions(
-        self, file_path: str, include_learned: bool
-    ) -> bool:
+    def _export_permissions(self, file_path: str, include_learned: bool) -> bool:
         """Export permissions to file."""
         try:
             # Get current security settings
@@ -1593,12 +1513,8 @@ class PermissionsHandler:
                                     operation_signature=pattern,
                                     metadata={
                                         "imported": True,
-                                        "decision": learned_item.get(
-                                            "decision"
-                                        ),
-                                        "original_count": learned_item.get(
-                                            "count", 1
-                                        ),
+                                        "decision": learned_item.get("decision"),
+                                        "original_count": learned_item.get("count", 1),
                                     },
                                     expires_hours=24
                                     * 365,  # 1 year for imported permissions
@@ -1673,9 +1589,7 @@ class PermissionsHandler:
   /permissions audit --limit=20       - Show last 20 permission decisions
 """
 
-        panel = Panel(
-            help_text.strip(), title="Permissions Help", border_style="cyan"
-        )
+        panel = Panel(help_text.strip(), title="Permissions Help", border_style="cyan")
         self.console.print(panel)
 
     def _show_info(self, message: str) -> None:

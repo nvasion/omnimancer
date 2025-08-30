@@ -5,17 +5,18 @@ This module provides the Perplexity AI provider implementation using Perplexity'
 with support for search-enabled conversations and recency filtering.
 """
 
-import httpx
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+import httpx
 
 from ..core.models import ChatContext, ChatResponse, EnhancedModelInfo
 from ..utils.errors import (
-    ProviderError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
     ModelNotFoundError,
+    NetworkError,
+    ProviderError,
+    RateLimitError,
 )
 from .base import BaseProvider
 
@@ -50,13 +51,9 @@ class PerplexityProvider(BaseProvider):
         )  # hour, day, week, month, year
         self.return_citations = kwargs.get("return_citations", False)
         self.return_images = kwargs.get("return_images", False)
-        self.return_related_questions = kwargs.get(
-            "return_related_questions", False
-        )
+        self.return_related_questions = kwargs.get("return_related_questions", False)
 
-    async def send_message(
-        self, message: str, context: ChatContext
-    ) -> ChatResponse:
+    async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
         Send a message to Perplexity API with search capabilities.
 
@@ -214,15 +211,11 @@ class PerplexityProvider(BaseProvider):
         elif response.status_code == 429:
             raise RateLimitError("Perplexity API rate limit exceeded")
         elif response.status_code == 404:
-            raise ModelNotFoundError(
-                f"Perplexity model '{self.model}' not found"
-            )
+            raise ModelNotFoundError(f"Perplexity model '{self.model}' not found")
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("error", {}).get(
-                    "message", "Unknown error"
-                )
+                error_msg = error_data.get("error", {}).get("message", "Unknown error")
             except:
                 error_msg = f"HTTP {response.status_code}"
 

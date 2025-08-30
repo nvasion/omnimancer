@@ -6,34 +6,28 @@ that uses the simplified configuration interface to guide users through
 setting up Omnimancer with minimal complexity.
 """
 
-import json
-import sys
-import time
 import logging
-from typing import Dict, List, Optional, Any, Tuple
-from pathlib import Path
+import time
+from typing import Any, Dict, List, Optional
+
 from rich.console import Console
-from rich.prompt import Prompt, Confirm
+from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.table import Table
 from rich.progress import (
+    BarColumn,
     Progress,
     SpinnerColumn,
-    TextColumn,
-    BarColumn,
     TaskProgressColumn,
+    TextColumn,
 )
-from rich.markdown import Markdown
-from rich.columns import Columns
-from rich.text import Text
+from rich.prompt import Confirm, Prompt
+from rich.table import Table
 
 from ..core.config_manager import ConfigManager
 from ..core.config_provider import (
-    ConfigurationProvider,
     ConfigurationContext,
-    ConfigurationMode,
+    ConfigurationProvider,
 )
-from ..utils.errors import ConfigurationError
 
 logger = logging.getLogger(__name__)
 
@@ -140,9 +134,7 @@ The entire process takes just **5-10 minutes** and you can change everything lat
         )
 
         if choice == "1":
-            self.console.print(
-                "[green]✓[/green] Keeping existing configuration"
-            )
+            self.console.print("[green]✓[/green] Keeping existing configuration")
             return True
         elif choice == "2":
             return self._add_providers_to_existing()
@@ -192,18 +184,14 @@ The entire process takes just **5-10 minutes** and you can change everything lat
                 continue
 
         self.config_manager.save_config()
-        self.console.print(
-            "[green]✓[/green] New providers added successfully!"
-        )
+        self.console.print("[green]✓[/green] New providers added successfully!")
         return True
 
     def _migrate_existing_configuration(self) -> bool:
         """Migrate existing configuration to a template."""
         self.console.print("\n[blue]Configuration Migration[/blue]")
 
-        with self.console.status(
-            "[bold green]Analyzing your current configuration..."
-        ):
+        with self.console.status("[bold green]Analyzing your current configuration..."):
             analysis = (
                 self.config_provider.migration_helper.analyze_current_configuration()
             )
@@ -247,18 +235,14 @@ The entire process takes just **5-10 minutes** and you can change everything lat
         table.add_column("Current State", style="magenta")
 
         table.add_row("Complexity Level", analysis.current_complexity.title())
-        table.add_row(
-            "Recommended Template", analysis.recommended_template or "None"
-        )
+        table.add_row("Recommended Template", analysis.recommended_template or "None")
         table.add_row("Confidence", f"{analysis.confidence:.0%}")
         table.add_row("Estimated Time", analysis.estimated_time)
 
         self.console.print(table)
 
         if analysis.simplification_opportunities:
-            self.console.print(
-                "\n[green]Simplification Opportunities:[/green]"
-            )
+            self.console.print("\n[green]Simplification Opportunities:[/green]")
             for opportunity in analysis.simplification_opportunities:
                 self.console.print(f"  • {opportunity}")
 
@@ -309,10 +293,8 @@ The entire process takes just **5-10 minutes** and you can change everything lat
                 "Migrating configuration...", total=len(migration_plan.steps)
             )
 
-            success, messages = (
-                self.config_provider.migration_helper.execute_migration(
-                    migration_plan, template_name
-                )
+            success, messages = self.config_provider.migration_helper.execute_migration(
+                migration_plan, template_name
             )
 
             for i, step in enumerate(migration_plan.steps):
@@ -371,9 +353,7 @@ The entire process takes just **5-10 minutes** and you can change everything lat
         """Execute a single wizard step."""
         step_type = step["type"]
 
-        self.console.print(
-            f"\n[blue]Step {step['step']}: {step['title']}[/blue]"
-        )
+        self.console.print(f"\n[blue]Step {step['step']}: {step['title']}[/blue]")
         self.console.print(step["description"])
 
         if step_type == "welcome":
@@ -466,9 +446,7 @@ The entire process takes just **5-10 minutes** and you can change everything lat
 
         for i, provider_info in enumerate(providers):
             provider = provider_info["provider"]
-            recommended = (
-                "✓" if provider_info.get("recommended", False) else ""
-            )
+            recommended = "✓" if provider_info.get("recommended", False) else ""
             setup_difficulty = provider_info.get("setup_difficulty", "Easy")
 
             table.add_row(
@@ -548,9 +526,7 @@ The entire process takes just **5-10 minutes** and you can change everything lat
         for i, step in enumerate(instructions["steps"], 1):
             panel_content += f"{i}. {step}\n"
 
-        panel_content += (
-            f"\nExpected format: `{instructions['api_key_format']}`\n"
-        )
+        panel_content += f"\nExpected format: `{instructions['api_key_format']}`\n"
         panel_content += f"Cost: {instructions['cost_info']}"
 
         panel = Panel(
@@ -570,9 +546,7 @@ The entire process takes just **5-10 minutes** and you can change everything lat
 
         if api_key and api_key.lower() != "skip":
             self.user_answers[f"{provider_name}_api_key"] = api_key
-            self.console.print(
-                f"[green]✓[/green] {provider_name} API key saved"
-            )
+            self.console.print(f"[green]✓[/green] {provider_name} API key saved")
         else:
             self.console.print(
                 f"[yellow]⚠[/yellow] {provider_name} will be disabled until API key is added"
@@ -607,9 +581,7 @@ The entire process takes just **5-10 minutes** and you can change everything lat
         self.console.print(f"\n{content.get('message', '')}")
 
         # Show configuration preview
-        preview = self.config_provider.get_configuration_preview(
-            self.user_answers
-        )
+        preview = self.config_provider.get_configuration_preview(self.user_answers)
         self._show_configuration_preview(preview)
 
         if not preview.get("setup_complete", False):
@@ -638,21 +610,13 @@ The entire process takes just **5-10 minutes** and you can change everything lat
         table.add_row(
             "Estimated Cost", preview.get("estimated_monthly_cost", "Unknown")
         )
-        table.add_row(
-            "Features", ", ".join(preview.get("features_enabled", []))
-        )
+        table.add_row("Features", ", ".join(preview.get("features_enabled", [])))
 
-        status_color = (
-            "green" if preview.get("setup_complete", False) else "yellow"
-        )
+        status_color = "green" if preview.get("setup_complete", False) else "yellow"
         status_text = (
-            "Complete"
-            if preview.get("setup_complete", False)
-            else "Incomplete"
+            "Complete" if preview.get("setup_complete", False) else "Incomplete"
         )
-        table.add_row(
-            "Status", f"[{status_color}]{status_text}[/{status_color}]"
-        )
+        table.add_row("Status", f"[{status_color}]{status_text}[/{status_color}]")
 
         self.console.print(table)
 
@@ -670,29 +634,21 @@ The entire process takes just **5-10 minutes** and you can change everything lat
 
             # Generate configuration
             success, config_dict, messages = (
-                self.config_provider.generate_simple_configuration(
-                    self.user_answers
-                )
+                self.config_provider.generate_simple_configuration(self.user_answers)
             )
             progress.update(task, description="Saving configuration...")
 
             if success:
-                progress.update(
-                    task, description="Validating configuration..."
-                )
+                progress.update(task, description="Validating configuration...")
                 time.sleep(1)  # Show progress
 
                 # Validate final configuration
-                is_valid, errors = (
-                    self.config_provider.validate_simple_answers(
-                        self.user_answers
-                    )
+                is_valid, errors = self.config_provider.validate_simple_answers(
+                    self.user_answers
                 )
 
                 if is_valid:
-                    progress.update(
-                        task, description="Configuration complete!"
-                    )
+                    progress.update(task, description="Configuration complete!")
                     time.sleep(1)
 
         # Show results
@@ -764,9 +720,7 @@ omnimancer --help
 
         # Add to current configuration
         # This would integrate with the actual config manager
-        self.console.print(
-            f"[green]✓[/green] {provider.display_name} configured"
-        )
+        self.console.print(f"[green]✓[/green] {provider.display_name} configured")
 
 
 def run_config_setup_wizard(
@@ -785,9 +739,7 @@ def run_config_setup_wizard(
     return wizard.run_initial_setup()
 
 
-def run_quick_setup(
-    use_case: str = "general", providers: List[str] = None
-) -> bool:
+def run_quick_setup(use_case: str = "general", providers: List[str] = None) -> bool:
     """
     Run a quick setup with minimal prompts.
 
@@ -799,17 +751,15 @@ def run_quick_setup(
         True if setup completed successfully, False otherwise
     """
     console = Console()
-    config_manager = ConfigManager()
+    ConfigManager()
     simple_interface = create_simple_config_interface()
 
     console.print(f"[blue]Quick Setup for {use_case.title()} Use Case[/blue]")
 
     # Get recommended configuration
     context = ConfigurationContext(use_case=use_case)
-    recommendation = (
-        simple_interface.config_mode_manager.get_recommended_configuration(
-            context
-        )
+    recommendation = simple_interface.config_mode_manager.get_recommended_configuration(
+        context
     )
 
     console.print(f"Using template: {recommendation.template_name}")

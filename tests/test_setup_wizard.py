@@ -2,16 +2,15 @@
 Tests for the setup wizard module.
 """
 
-import pytest
-import asyncio
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
-from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
-from omnimancer.core.setup_wizard import SetupWizard
+import pytest
+
 from omnimancer.core.config_manager import ConfigManager
+from omnimancer.core.models import ProviderConfig
 from omnimancer.core.provider_registry import ProviderRegistry
-from omnimancer.core.models import ProviderConfig, EnhancedModelInfo
-from omnimancer.utils.errors import ConfigurationError, ProviderError
+from omnimancer.core.setup_wizard import SetupWizard
+from omnimancer.utils.errors import ProviderError
 
 
 @pytest.fixture
@@ -78,12 +77,11 @@ class TestProviderSelection:
 
     def test_select_provider_valid_choice(self, setup_wizard, mock_console):
         """Test selecting a valid provider."""
-        with patch.object(setup_wizard, "console", mock_console), patch(
-            "omnimancer.core.setup_wizard.Prompt.ask", return_value="1"
-        ), patch(
-            "omnimancer.core.setup_wizard.Confirm.ask", return_value=True
-        ), patch.object(
-            setup_wizard, "_show_provider_details"
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch("omnimancer.core.setup_wizard.Prompt.ask", return_value="1"),
+            patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=True),
+            patch.object(setup_wizard, "_show_provider_details"),
         ):
 
             result = setup_wizard._select_provider()
@@ -94,8 +92,9 @@ class TestProviderSelection:
 
     def test_select_provider_quit(self, setup_wizard, mock_console):
         """Test quitting provider selection."""
-        with patch.object(setup_wizard, "console", mock_console), patch(
-            "omnimancer.core.setup_wizard.Prompt.ask", return_value="q"
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch("omnimancer.core.setup_wizard.Prompt.ask", return_value="q"),
         ):
 
             result = setup_wizard._select_provider()
@@ -103,8 +102,9 @@ class TestProviderSelection:
 
     def test_show_provider_details(self, setup_wizard, mock_console):
         """Test showing provider details."""
-        with patch.object(setup_wizard, "console", mock_console), patch.object(
-            setup_wizard.ui, "console", mock_console
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch.object(setup_wizard.ui, "console", mock_console),
         ):
             setup_wizard._show_provider_details("openai")
 
@@ -130,10 +130,9 @@ class TestAPIKeyHandling:
         """Test getting empty API key then continuing without it."""
         provider_info = setup_wizard.provider_info["openai"]
 
-        with patch(
-            "omnimancer.core.setup_wizard.Prompt.ask", return_value=""
-        ), patch(
-            "omnimancer.core.setup_wizard.Confirm.ask", return_value=True
+        with (
+            patch("omnimancer.core.setup_wizard.Prompt.ask", return_value=""),
+            patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=True),
         ):
 
             result = setup_wizard._get_api_key("openai", provider_info)
@@ -150,9 +149,7 @@ class TestAPIKeyHandling:
 
     def test_validate_api_key_format_openai_invalid(self, setup_wizard):
         """Test OpenAI API key format validation - invalid."""
-        assert (
-            setup_wizard._validate_api_key_format("openai", "invalid") is False
-        )
+        assert setup_wizard._validate_api_key_format("openai", "invalid") is False
 
     def test_validate_api_key_format_claude_valid(self, setup_wizard):
         """Test Claude API key format validation - valid."""
@@ -175,8 +172,9 @@ class TestModelSelection:
         """Test selecting model from predefined list."""
         provider_info = setup_wizard.provider_info["openai"]
 
-        with patch.object(setup_wizard, "console", mock_console), patch(
-            "omnimancer.core.setup_wizard.Prompt.ask", return_value="1"
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch("omnimancer.core.setup_wizard.Prompt.ask", return_value="1"),
         ):
 
             result = setup_wizard._select_model("openai", provider_info)
@@ -186,8 +184,9 @@ class TestModelSelection:
         """Test model selection with invalid choice."""
         provider_info = setup_wizard.provider_info["openai"]
 
-        with patch.object(setup_wizard, "console", mock_console), patch(
-            "omnimancer.core.setup_wizard.Prompt.ask", side_effect=["999", "1"]
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch("omnimancer.core.setup_wizard.Prompt.ask", side_effect=["999", "1"]),
         ):
 
             result = setup_wizard._select_model("openai", provider_info)
@@ -198,20 +197,23 @@ class TestProviderConfiguration:
     """Test provider configuration functionality."""
 
     @pytest.mark.asyncio
-    async def test_configure_provider_openai_success(
-        self, setup_wizard, mock_console
-    ):
+    async def test_configure_provider_openai_success(self, setup_wizard, mock_console):
         """Test successful OpenAI provider configuration."""
-        with patch.object(setup_wizard, "console", mock_console), patch.object(
-            setup_wizard.provider_setup,
-            "_get_api_key",
-            return_value="sk-test123",
-        ), patch.object(
-            setup_wizard.provider_setup, "_select_model", return_value="gpt-4"
-        ), patch.object(
-            setup_wizard.provider_setup,
-            "_get_additional_settings",
-            return_value={},
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch.object(
+                setup_wizard.provider_setup,
+                "_get_api_key",
+                return_value="sk-test123",
+            ),
+            patch.object(
+                setup_wizard.provider_setup, "_select_model", return_value="gpt-4"
+            ),
+            patch.object(
+                setup_wizard.provider_setup,
+                "_get_additional_settings",
+                return_value={},
+            ),
         ):
 
             result = await setup_wizard._configure_provider("openai")
@@ -225,14 +227,18 @@ class TestProviderConfiguration:
         self, setup_wizard, mock_console
     ):
         """Test Ollama provider configuration (no API key required)."""
-        with patch.object(setup_wizard, "console", mock_console), patch.object(
-            setup_wizard.provider_setup,
-            "_select_model",
-            return_value="llama3.2",
-        ), patch.object(
-            setup_wizard.provider_setup,
-            "_get_additional_settings",
-            return_value={},
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch.object(
+                setup_wizard.provider_setup,
+                "_select_model",
+                return_value="llama3.2",
+            ),
+            patch.object(
+                setup_wizard.provider_setup,
+                "_get_additional_settings",
+                return_value={},
+            ),
         ):
 
             result = await setup_wizard._configure_provider("ollama")
@@ -246,69 +252,56 @@ class TestConfigurationTesting:
     """Test configuration testing functionality."""
 
     @pytest.mark.asyncio
-    async def test_test_configuration_success(
-        self, setup_wizard, mock_console
-    ):
+    async def test_test_configuration_success(self, setup_wizard, mock_console):
         """Test successful configuration testing."""
         provider_config = ProviderConfig(
             api_key="sk-test123456789012345678901234567890", model="gpt-4"
         )
 
-        with patch.object(setup_wizard, "console", mock_console), patch.object(
-            setup_wizard.provider_factory, "create_provider"
-        ) as mock_create, patch(
-            "omnimancer.core.setup_wizard.Progress"
-        ) as mock_progress:
-
-            mock_provider = AsyncMock()
-            mock_provider.send_message.return_value = Mock(
-                content="Test response"
-            )
-            mock_create.return_value = mock_provider
-
-            # Mock progress context manager
-            mock_progress_instance = Mock()
-            mock_progress.return_value.__enter__.return_value = (
-                mock_progress_instance
-            )
-            mock_progress.return_value.__exit__.return_value = None
-
-            result = await setup_wizard._test_configuration(
-                "openai", provider_config
-            )
-            assert result is True
-
-    @pytest.mark.asyncio
-    async def test_test_configuration_failure(
-        self, setup_wizard, mock_console
-    ):
-        """Test configuration testing failure."""
-        provider_config = ProviderConfig(api_key="invalid-key", model="gpt-4")
-
-        with patch.object(setup_wizard, "console", mock_console), patch.object(
-            setup_wizard.provider_factory, "create_provider"
-        ) as mock_create, patch(
-            "omnimancer.core.setup_wizard.Progress"
-        ) as mock_progress, patch(
-            "omnimancer.core.setup_wizard.Confirm.ask", return_value=False
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch.object(
+                setup_wizard.provider_factory, "create_provider"
+            ) as mock_create,
+            patch("omnimancer.core.setup_wizard.Progress") as mock_progress,
         ):
 
             mock_provider = AsyncMock()
-            mock_provider.send_message.side_effect = ProviderError(
-                "Invalid API key"
-            )
+            mock_provider.send_message.return_value = Mock(content="Test response")
             mock_create.return_value = mock_provider
 
             # Mock progress context manager
             mock_progress_instance = Mock()
-            mock_progress.return_value.__enter__.return_value = (
-                mock_progress_instance
-            )
+            mock_progress.return_value.__enter__.return_value = mock_progress_instance
             mock_progress.return_value.__exit__.return_value = None
 
-            result = await setup_wizard._test_configuration(
-                "openai", provider_config
-            )
+            result = await setup_wizard._test_configuration("openai", provider_config)
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_test_configuration_failure(self, setup_wizard, mock_console):
+        """Test configuration testing failure."""
+        provider_config = ProviderConfig(api_key="invalid-key", model="gpt-4")
+
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch.object(
+                setup_wizard.provider_factory, "create_provider"
+            ) as mock_create,
+            patch("omnimancer.core.setup_wizard.Progress") as mock_progress,
+            patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=False),
+        ):
+
+            mock_provider = AsyncMock()
+            mock_provider.send_message.side_effect = ProviderError("Invalid API key")
+            mock_create.return_value = mock_provider
+
+            # Mock progress context manager
+            mock_progress_instance = Mock()
+            mock_progress.return_value.__enter__.return_value = mock_progress_instance
+            mock_progress.return_value.__exit__.return_value = None
+
+            result = await setup_wizard._test_configuration("openai", provider_config)
             assert result is False
 
 
@@ -321,15 +314,13 @@ class TestConfigurationSaving:
         provider_config = ProviderConfig(api_key="sk-test123", model="gpt-4")
 
         # Mock Confirm.ask to avoid stdin issues in pytest
-        with patch(
-            "omnimancer.core.setup_wizard.Confirm.ask", return_value=False
-        ):
+        with patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=False):
             # Mock the config manager's methods
             with patch.object(
                 setup_wizard.config_manager, "get_config"
             ) as mock_get_config:
                 # Mock an empty config (first provider)
-                from omnimancer.core.models import Config, ChatSettings
+                from omnimancer.core.models import ChatSettings, Config
 
                 mock_config = Config(
                     providers={},
@@ -345,9 +336,7 @@ class TestConfigurationSaving:
                     with patch.object(
                         setup_wizard.config_manager, "set_default_provider"
                     ) as mock_set_default:
-                        setup_wizard._save_configuration(
-                            "openai", provider_config
-                        )
+                        setup_wizard._save_configuration("openai", provider_config)
 
                         # Verify config manager methods were called
                         mock_set_provider.assert_called_once_with(
@@ -361,19 +350,18 @@ class TestUtilityMethods:
 
     def test_get_additional_settings_empty(self, setup_wizard):
         """Test getting additional settings returns empty dict by default."""
-        with patch(
-            "omnimancer.core.setup_wizard.Confirm.ask", return_value=False
-        ):
+        with patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=False):
             result = setup_wizard._get_additional_settings("openai")
             assert result == {}
 
     def test_get_additional_settings_with_values(self, setup_wizard):
         """Test getting additional settings with user input."""
-        with patch(
-            "omnimancer.core.setup_wizard.Confirm.ask", return_value=True
-        ), patch(
-            "omnimancer.core.setup_wizard.Prompt.ask",
-            side_effect=["0.8", "2048"],
+        with (
+            patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=True),
+            patch(
+                "omnimancer.core.setup_wizard.Prompt.ask",
+                side_effect=["0.8", "2048"],
+            ),
         ):
 
             result = setup_wizard._get_additional_settings("openai")
@@ -419,9 +407,7 @@ class TestFullWizardWorkflow:
         reason="Over-engineered test - complex mocking issues after config simplification"
     )
     @pytest.mark.asyncio
-    async def test_start_wizard_complete_success(
-        self, setup_wizard, mock_console
-    ):
+    async def test_start_wizard_complete_success(self, setup_wizard, mock_console):
         """Test complete successful wizard workflow."""
         provider_config = ProviderConfig(api_key="sk-test123", model="gpt-4")
 
@@ -432,25 +418,28 @@ class TestFullWizardWorkflow:
 
         # Configure the mocks to return expected values
         mock_provider_setup.select_provider.return_value = "openai"
-        mock_provider_setup.configure_provider = AsyncMock(
-            return_value=provider_config
-        )
+        mock_provider_setup.configure_provider = AsyncMock(return_value=provider_config)
         mock_provider_setup.save_configuration = (
             Mock()
         )  # Add missing save_configuration mock
         mock_validation.test_configuration = AsyncMock(return_value=True)
 
-        with patch.object(
-            setup_wizard.config_manager, "is_first_run", return_value=True
-        ), patch(
-            "omnimancer.core.setup_wizard_ui.SetupWizardUI",
-            return_value=mock_ui,
-        ), patch(
-            "omnimancer.core.setup_wizard_provider_setup.SetupWizardProviderSetup",
-            return_value=mock_provider_setup,
-        ), patch(
-            "omnimancer.core.setup_wizard_validation.SetupWizardValidation",
-            return_value=mock_validation,
+        with (
+            patch.object(
+                setup_wizard.config_manager, "is_first_run", return_value=True
+            ),
+            patch(
+                "omnimancer.core.setup_wizard_ui.SetupWizardUI",
+                return_value=mock_ui,
+            ),
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.SetupWizardProviderSetup",
+                return_value=mock_provider_setup,
+            ),
+            patch(
+                "omnimancer.core.setup_wizard_validation.SetupWizardValidation",
+                return_value=mock_validation,
+            ),
         ):
 
             result = await setup_wizard.start_wizard()
@@ -459,9 +448,7 @@ class TestFullWizardWorkflow:
             # Verify the workflow was called correctly
             mock_ui.show_welcome.assert_called_once()
             mock_provider_setup.select_provider.assert_called_once()
-            mock_provider_setup.configure_provider.assert_called_once_with(
-                "openai"
-            )
+            mock_provider_setup.configure_provider.assert_called_once_with("openai")
             mock_validation.test_configuration.assert_called_once_with(
                 "openai", provider_config
             )
@@ -469,28 +456,26 @@ class TestFullWizardWorkflow:
             mock_ui.show_completion.assert_called_once_with("openai")
 
     @pytest.mark.asyncio
-    async def test_start_wizard_no_provider_selected(
-        self, setup_wizard, mock_console
-    ):
+    async def test_start_wizard_no_provider_selected(self, setup_wizard, mock_console):
         """Test wizard workflow when no provider is selected."""
-        with patch.object(setup_wizard, "console", mock_console), patch.object(
-            setup_wizard, "_show_welcome"
-        ), patch.object(
-            setup_wizard.config_manager, "is_first_run", return_value=True
-        ), patch.object(
-            setup_wizard, "_select_provider", return_value=None
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch.object(setup_wizard, "_show_welcome"),
+            patch.object(
+                setup_wizard.config_manager, "is_first_run", return_value=True
+            ),
+            patch.object(setup_wizard, "_select_provider", return_value=None),
         ):
 
             result = await setup_wizard.start_wizard()
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_start_wizard_keyboard_interrupt(
-        self, setup_wizard, mock_console
-    ):
+    async def test_start_wizard_keyboard_interrupt(self, setup_wizard, mock_console):
         """Test wizard workflow with keyboard interrupt."""
-        with patch.object(setup_wizard, "console", mock_console), patch.object(
-            setup_wizard, "_show_welcome", side_effect=KeyboardInterrupt
+        with (
+            patch.object(setup_wizard, "console", mock_console),
+            patch.object(setup_wizard, "_show_welcome", side_effect=KeyboardInterrupt),
         ):
 
             result = await setup_wizard.start_wizard()
@@ -524,9 +509,7 @@ class TestProviderSpecificBehavior:
 
         for provider, api_key, expected in test_cases:
             result = setup_wizard._validate_api_key_format(provider, api_key)
-            assert (
-                result == expected
-            ), f"Failed for {provider} with key {api_key}"
+            assert result == expected, f"Failed for {provider} with key {api_key}"
 
 
 class TestEdgeCases:
@@ -550,9 +533,7 @@ class TestEdgeCases:
             assert (
                 len(info["strengths"]) > 0
             ), f"Provider {provider_name} has no strengths"
-            assert (
-                len(info["models"]) > 0
-            ), f"Provider {provider_name} has no models"
+            assert len(info["models"]) > 0, f"Provider {provider_name} has no models"
 
     @pytest.mark.asyncio
     async def test_configure_provider_unknown_provider(
@@ -562,9 +543,7 @@ class TestEdgeCases:
         with patch.object(setup_wizard, "console", mock_console):
             # Should handle gracefully even for unknown providers
             try:
-                result = await setup_wizard._configure_provider(
-                    "unknown_provider"
-                )
+                await setup_wizard._configure_provider("unknown_provider")
                 # Result depends on implementation - might return None or handle gracefully
             except KeyError:
                 # This is acceptable behavior for unknown providers
@@ -574,15 +553,17 @@ class TestEdgeCases:
         """Test API key input with prefix warning."""
         provider_info = setup_wizard.provider_info["openai"]
 
-        with patch(
-            "omnimancer.core.setup_wizard_provider_setup.Prompt.ask",
-            return_value="invalid-key",
-        ), patch(
-            "omnimancer.core.setup_wizard_provider_setup.Confirm.ask",
-            return_value=True,
-        ), patch.object(
-            setup_wizard.provider_setup, "console"
-        ) as mock_console:
+        with (
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.Prompt.ask",
+                return_value="invalid-key",
+            ),
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.Confirm.ask",
+                return_value=True,
+            ),
+            patch.object(setup_wizard.provider_setup, "console") as mock_console,
+        ):
 
             result = setup_wizard._get_api_key("openai", provider_info)
             assert result == "invalid-key"
@@ -594,9 +575,7 @@ class TestAsyncBehavior:
     """Test asynchronous behavior and error handling."""
 
     @pytest.mark.asyncio
-    async def test_async_methods_handle_exceptions_gracefully(
-        self, setup_wizard
-    ):
+    async def test_async_methods_handle_exceptions_gracefully(self, setup_wizard):
         """Test that async methods handle exceptions gracefully."""
         provider_config = ProviderConfig(
             api_key="sk-test123456789012345678901234567890", model="gpt-4"
@@ -659,6 +638,4 @@ class TestSetupWizardSmokeTests:
             "generate_all_setup_guides",
         ]
         for method in methods:
-            assert hasattr(
-                self.setup_wizard, method
-            ), f"Missing method: {method}"
+            assert hasattr(self.setup_wizard, method), f"Missing method: {method}"

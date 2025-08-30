@@ -1,21 +1,17 @@
 """Agent configuration and settings management system."""
 
 import json
-import os
-import toml
-import yaml
-import asyncio
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Union, Set, Callable
-from datetime import datetime
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-import jsonschema
-from jsonschema import validate, ValidationError
 import logging
 from contextlib import asynccontextmanager
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set
 
-from ..security import SecurityManager
+import toml
+import yaml
+from jsonschema import ValidationError, validate
 
 
 class ConfigFormat(Enum):
@@ -284,9 +280,7 @@ class AgentConfig:
         watch_files: bool = True,
     ):
 
-        self.config_dir = (
-            Path(config_dir) if config_dir else self.DEFAULT_CONFIG_DIR
-        )
+        self.config_dir = Path(config_dir) if config_dir else self.DEFAULT_CONFIG_DIR
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
         self.auto_save = auto_save
@@ -362,15 +356,11 @@ class AgentConfig:
         try:
             with open(path, "w", encoding="utf-8") as f:
                 if format == ConfigFormat.JSON:
-                    json.dump(
-                        data, f, indent=2, default=str, ensure_ascii=False
-                    )
+                    json.dump(data, f, indent=2, default=str, ensure_ascii=False)
                 elif format == ConfigFormat.TOML:
                     toml.dump(data, f)
                 elif format == ConfigFormat.YAML:
-                    yaml.dump(
-                        data, f, default_flow_style=False, allow_unicode=True
-                    )
+                    yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
         except Exception as e:
             raise ConfigurationError(f"Failed to save config file {path}: {e}")
 
@@ -418,11 +408,7 @@ class AgentConfig:
                 provider_type = ProviderType(provider_data["provider_type"])
                 self.providers[provider_id] = ProviderConfig(
                     provider_type=provider_type,
-                    **{
-                        k: v
-                        for k, v in provider_data.items()
-                        if k != "provider_type"
-                    },
+                    **{k: v for k, v in provider_data.items() if k != "provider_type"},
                 )
 
     def _save_all_configs(self) -> None:
@@ -434,9 +420,7 @@ class AgentConfig:
             or not self._get_config_path("security").exists()
         ):
             security_data = asdict(self.security)
-            self._save_config_file(
-                self._get_config_path("security"), security_data
-            )
+            self._save_config_file(self._get_config_path("security"), security_data)
 
         # Save agent settings
         if (
@@ -452,9 +436,7 @@ class AgentConfig:
             or not self._get_config_path("filesystem").exists()
         ):
             filesystem_data = asdict(self.filesystem)
-            self._save_config_file(
-                self._get_config_path("filesystem"), filesystem_data
-            )
+            self._save_config_file(self._get_config_path("filesystem"), filesystem_data)
 
         # Save web client settings
         if (
@@ -462,9 +444,7 @@ class AgentConfig:
             or not self._get_config_path("webclient").exists()
         ):
             webclient_data = asdict(self.web_client)
-            self._save_config_file(
-                self._get_config_path("webclient"), webclient_data
-            )
+            self._save_config_file(self._get_config_path("webclient"), webclient_data)
 
         # Save user preferences
         if (
@@ -484,13 +464,9 @@ class AgentConfig:
             providers_data = {}
             for provider_id, provider_config in self.providers.items():
                 provider_dict = asdict(provider_config)
-                provider_dict["provider_type"] = (
-                    provider_config.provider_type.value
-                )
+                provider_dict["provider_type"] = provider_config.provider_type.value
                 providers_data[provider_id] = provider_dict
-            self._save_config_file(
-                self._get_config_path("providers"), providers_data
-            )
+            self._save_config_file(self._get_config_path("providers"), providers_data)
 
         # Clear dirty flags and update timestamp
         self.dirty_sections.clear()
@@ -509,9 +485,7 @@ class AgentConfig:
         if self.auto_save:
             self._save_all_configs()
 
-    def _notify_change(
-        self, section: str, old_value: Any, new_value: Any
-    ) -> None:
+    def _notify_change(self, section: str, old_value: Any, new_value: Any) -> None:
         """Notify registered callbacks of configuration changes."""
         for callback in self.change_callbacks:
             try:
@@ -563,15 +537,11 @@ class AgentConfig:
         self._mark_dirty("agent")
         self._notify_change("agent", old_settings, new_settings)
 
-    def get_provider_config(
-        self, provider_id: str
-    ) -> Optional[ProviderConfig]:
+    def get_provider_config(self, provider_id: str) -> Optional[ProviderConfig]:
         """Get provider configuration."""
         return self.providers.get(provider_id)
 
-    def add_provider_config(
-        self, provider_id: str, config: ProviderConfig
-    ) -> None:
+    def add_provider_config(self, provider_id: str, config: ProviderConfig) -> None:
         """Add or update provider configuration."""
         # Validate configuration
         config_dict = asdict(config)
@@ -599,11 +569,7 @@ class AgentConfig:
 
     def get_enabled_providers(self) -> Dict[str, ProviderConfig]:
         """Get all enabled provider configurations."""
-        return {
-            pid: config
-            for pid, config in self.providers.items()
-            if config.enabled
-        }
+        return {pid: config for pid, config in self.providers.items() if config.enabled}
 
     def update_user_preferences(self, **kwargs) -> None:
         """Update user preferences."""
@@ -635,15 +601,11 @@ class AgentConfig:
 
         self._mark_dirty("preferences")
 
-    def add_change_callback(
-        self, callback: Callable[[str, Any, Any], None]
-    ) -> None:
+    def add_change_callback(self, callback: Callable[[str, Any, Any], None]) -> None:
         """Add callback for configuration changes."""
         self.change_callbacks.append(callback)
 
-    def remove_change_callback(
-        self, callback: Callable[[str, Any, Any], None]
-    ) -> None:
+    def remove_change_callback(self, callback: Callable[[str, Any, Any], None]) -> None:
         """Remove configuration change callback."""
         if callback in self.change_callbacks:
             self.change_callbacks.remove(callback)
@@ -705,9 +667,7 @@ class AgentConfig:
         # Handle providers
         for provider_id, provider_config in self.providers.items():
             provider_dict = asdict(provider_config)
-            provider_dict["provider_type"] = (
-                provider_config.provider_type.value
-            )
+            provider_dict["provider_type"] = provider_config.provider_type.value
 
             # Remove sensitive data if requested
             if not include_sensitive:
@@ -752,9 +712,7 @@ class AgentConfig:
 
         # Import each section
         if "security" in imported_data:
-            self.validator.validate_security_settings(
-                imported_data["security"]
-            )
+            self.validator.validate_security_settings(imported_data["security"])
             self.security = SecuritySettings(**imported_data["security"])
             self._mark_dirty("security")
 
@@ -772,24 +730,16 @@ class AgentConfig:
             self._mark_dirty("webclient")
 
         if "user_preferences" in imported_data:
-            self.user_preferences = UserPreferences(
-                **imported_data["user_preferences"]
-            )
+            self.user_preferences = UserPreferences(**imported_data["user_preferences"])
             self._mark_dirty("preferences")
 
         if "providers" in imported_data:
-            for provider_id, provider_data in imported_data[
-                "providers"
-            ].items():
+            for provider_id, provider_data in imported_data["providers"].items():
                 self.validator.validate_provider_config(provider_data)
                 provider_type = ProviderType(provider_data["provider_type"])
                 self.providers[provider_id] = ProviderConfig(
                     provider_type=provider_type,
-                    **{
-                        k: v
-                        for k, v in provider_data.items()
-                        if k != "provider_type"
-                    },
+                    **{k: v for k, v in provider_data.items() if k != "provider_type"},
                 )
             self._mark_dirty("providers")
 
@@ -805,12 +755,8 @@ class AgentConfig:
                     "enabled": self.security.enabled,
                     "sandboxing": self.security.enable_sandboxing,
                     "audit_logging": self.security.enable_audit_logging,
-                    "allowed_commands_count": len(
-                        self.security.allowed_commands
-                    ),
-                    "restricted_paths_count": len(
-                        self.security.restricted_paths
-                    ),
+                    "allowed_commands_count": len(self.security.allowed_commands),
+                    "restricted_paths_count": len(self.security.restricted_paths),
                 },
                 "agent": {
                     "enabled": self.agent.enabled,
@@ -822,10 +768,7 @@ class AgentConfig:
                     "total_count": len(self.providers),
                     "enabled_count": len(self.get_enabled_providers()),
                     "types": list(
-                        set(
-                            p.provider_type.value
-                            for p in self.providers.values()
-                        )
+                        set(p.provider_type.value for p in self.providers.values())
                     ),
                 },
             },
@@ -858,20 +801,14 @@ class AgentConfig:
             # Rollback changes to checkpoint state
             self.security = SecuritySettings(**checkpoint_data["security"])
             self.agent = AgentSettings(**checkpoint_data["agent"])
-            self.filesystem = FileSystemSettings(
-                **checkpoint_data["filesystem"]
-            )
-            self.web_client = WebClientSettings(
-                **checkpoint_data["web_client"]
-            )
+            self.filesystem = FileSystemSettings(**checkpoint_data["filesystem"])
+            self.web_client = WebClientSettings(**checkpoint_data["web_client"])
             self.user_preferences = UserPreferences(
                 **checkpoint_data["user_preferences"]
             )
 
             self.providers.clear()
-            for provider_id, provider_data in checkpoint_data[
-                "providers"
-            ].items():
+            for provider_id, provider_data in checkpoint_data["providers"].items():
                 # Convert provider_type string back to enum
                 provider_data["provider_type"] = ProviderType(
                     provider_data["provider_type"]

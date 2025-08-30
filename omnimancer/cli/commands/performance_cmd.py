@@ -4,39 +4,32 @@ Performance monitoring CLI command for Omnimancer.
 Provides command-line access to performance metrics, dashboards, and optimization suggestions.
 """
 
-import asyncio
 import json
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List
 
 import click
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
-from rich.progress import track
 
-from ...core.agent.performance_monitor import (
-    PerformanceMonitor,
-    get_performance_monitor,
-    initialize_performance_monitoring,
-)
-from ...core.agent.token_tracker import TokenUsageTracker, get_token_tracker
 from ...core.agent.metrics_collector import (
-    PerformanceMetricsCollector,
     get_metrics_collector,
     initialize_metrics_collection,
 )
 from ...core.agent.optimization_engine import (
-    OptimizationEngine,
+    AlertLevel,
+    OptimizationCategory,
     get_optimization_engine,
     initialize_optimization_engine,
-    OptimizationCategory,
-    AlertLevel,
 )
+from ...core.agent.performance_monitor import (
+    get_performance_monitor,
+    initialize_performance_monitoring,
+)
+from ...core.agent.token_tracker import get_token_tracker
 from ..performance_dashboard import (
-    PerformanceDashboard,
     create_performance_dashboard,
 )
 
@@ -75,18 +68,12 @@ def status(ctx, start_monitoring, output_format):
 
     try:
         if start_monitoring:
-            console.print(
-                "[yellow]Initializing performance monitoring...[/yellow]"
-            )
+            console.print("[yellow]Initializing performance monitoring...[/yellow]")
 
             # Initialize all components
-            performance_monitor = initialize_performance_monitoring(
-                auto_start=True
-            )
+            performance_monitor = initialize_performance_monitoring(auto_start=True)
             metrics_collector = initialize_metrics_collection(auto_start=True)
-            optimization_engine = initialize_optimization_engine(
-                auto_start=True
-            )
+            optimization_engine = initialize_optimization_engine(auto_start=True)
 
             console.print("[green]✓ Performance monitoring started[/green]")
         else:
@@ -119,9 +106,7 @@ def status(ctx, start_monitoring, output_format):
         status_info.update(
             {
                 "active_alerts": len(dashboard_data.get("active_alerts", [])),
-                "suggestions_count": len(
-                    dashboard_data.get("suggestions", [])
-                ),
+                "suggestions_count": len(dashboard_data.get("suggestions", [])),
                 "recent_snapshot": dashboard_data.get("current_snapshot", {}),
             }
         )
@@ -156,9 +141,7 @@ def status(ctx, start_monitoring, output_format):
     help="Dashboard view to display",
 )
 @click.option("--live", is_flag=True, help="Start live updating dashboard")
-@click.option(
-    "--export", type=click.Path(), help="Export performance report to file"
-)
+@click.option("--export", type=click.Path(), help="Export performance report to file")
 @click.pass_context
 def dashboard(ctx, view, live, export):
     """Show performance dashboard."""
@@ -175,9 +158,7 @@ def dashboard(ctx, view, live, export):
             return
 
         if live:
-            console.print(
-                f"[yellow]Starting live dashboard ({view} view)...[/yellow]"
-            )
+            console.print(f"[yellow]Starting live dashboard ({view} view)...[/yellow]")
             dashboard.start_live_dashboard(view)
         else:
             if view == "overview":
@@ -272,16 +253,12 @@ def suggestions(ctx, category, output_format):
 
         if output_format == "json":
             data = {
-                "optimization_suggestions": [
-                    s.__dict__ for s in current_suggestions
-                ],
+                "optimization_suggestions": [s.__dict__ for s in current_suggestions],
                 "token_suggestions": token_suggestions,
             }
             console.print(json.dumps(data, indent=2, default=str))
         else:
-            _display_suggestions_table(
-                console, current_suggestions, token_suggestions
-            )
+            _display_suggestions_table(console, current_suggestions, token_suggestions)
 
     except Exception as e:
         console.print(f"[red]Error retrieving suggestions: {e}[/red]")
@@ -386,9 +363,7 @@ def analyze(ctx, metric, days, output_format):
     default="json",
     help="Export format",
 )
-@click.option(
-    "--days", type=int, default=7, help="Data period to export (days)"
-)
+@click.option("--days", type=int, default=7, help="Data period to export (days)")
 @click.pass_context
 def export(ctx, output, output_format, days):
     """Export performance metrics to file."""
@@ -402,9 +377,7 @@ def export(ctx, output, output_format, days):
         output_path = Path(output)
         time_window = timedelta(days=days)
 
-        console.print(
-            f"[yellow]Exporting {days} days of performance data...[/yellow]"
-        )
+        console.print(f"[yellow]Exporting {days} days of performance data...[/yellow]")
 
         # Export metrics
         metrics_collector = get_metrics_collector()
@@ -420,12 +393,8 @@ def export(ctx, output, output_format, days):
         dashboard = create_performance_dashboard()
         report_path = dashboard.export_report(output_path)
 
-        console.print(
-            f"[green]✓ Performance data exported to {report_path}[/green]"
-        )
-        console.print(
-            f"[green]✓ Metrics data exported to {metrics_path}[/green]"
-        )
+        console.print(f"[green]✓ Performance data exported to {report_path}[/green]")
+        console.print(f"[green]✓ Metrics data exported to {metrics_path}[/green]")
 
     except Exception as e:
         console.print(f"[red]Error exporting data: {e}[/red]")
@@ -435,9 +404,7 @@ def export(ctx, output, output_format, days):
 
 
 # Helper functions for display
-def _display_status_table(
-    console: Console, status_info: Dict[str, Any]
-) -> None:
+def _display_status_table(console: Console, status_info: Dict[str, Any]) -> None:
     """Display status information in table format."""
     table = Table(title="Performance Monitoring Status")
     table.add_column("Component", style="cyan")
@@ -448,23 +415,17 @@ def _display_status_table(
     monitoring_status = (
         "🟢 Active" if status_info.get("monitoring_active") else "🔴 Inactive"
     )
-    table.add_row(
-        "Performance Monitor", monitoring_status, "Real-time monitoring"
-    )
+    table.add_row("Performance Monitor", monitoring_status, "Real-time monitoring")
 
     # Metrics collection
     metrics_status = (
         "🟢 Active" if status_info.get("metrics_collecting") else "🔴 Inactive"
     )
-    table.add_row(
-        "Metrics Collection", metrics_status, "System metrics gathering"
-    )
+    table.add_row("Metrics Collection", metrics_status, "System metrics gathering")
 
     # Optimization engine
     optimization_status = (
-        "🟢 Running"
-        if status_info.get("optimization_running")
-        else "🔴 Stopped"
+        "🟢 Running" if status_info.get("optimization_running") else "🔴 Stopped"
     )
     table.add_row(
         "Optimization Engine",
@@ -477,9 +438,7 @@ def _display_status_table(
     suggestions_count = status_info.get("suggestions_count", 0)
 
     table.add_row("Active Alerts", f"{alerts_count}", "Performance warnings")
-    table.add_row(
-        "Suggestions", f"{suggestions_count}", "Optimization recommendations"
-    )
+    table.add_row("Suggestions", f"{suggestions_count}", "Optimization recommendations")
 
     console.print(table)
 
@@ -512,12 +471,8 @@ def _display_token_usage_table(
     )
 
     if total_requests > 0:
-        table.add_row(
-            "Avg Tokens/Request", f"{total_tokens/total_requests:.0f}", "-"
-        )
-        table.add_row(
-            "Avg Cost/Request", f"${total_cost/total_requests:.5f}", "-"
-        )
+        table.add_row("Avg Tokens/Request", f"{total_tokens/total_requests:.0f}", "-")
+        table.add_row("Avg Cost/Request", f"${total_cost/total_requests:.5f}", "-")
 
     console.print(table)
 
@@ -549,9 +504,7 @@ def _display_suggestions_table(
 ) -> None:
     """Display optimization suggestions in table format."""
     if not optimization_suggestions and not token_suggestions:
-        console.print(
-            "[green]No optimization suggestions at this time[/green]"
-        )
+        console.print("[green]No optimization suggestions at this time[/green]")
         return
 
     table = Table(title="Optimization Suggestions")
@@ -611,18 +564,12 @@ def _display_alerts_table(console: Console, alerts: List[Any]) -> None:
             "warning": "yellow",
             "critical": "red",
             "emergency": "bright_red",
-        }.get(
-            alert.level.value if hasattr(alert, "level") else "info", "white"
-        )
+        }.get(alert.level.value if hasattr(alert, "level") else "info", "white")
 
         table.add_row(
             f"[{level_color}]{alert.level.value if hasattr(alert, 'level') else 'Unknown'}[/{level_color}]",
             alert.title if hasattr(alert, "title") else "Unknown Alert",
-            (
-                alert.description
-                if hasattr(alert, "description")
-                else "No description"
-            ),
+            (alert.description if hasattr(alert, "description") else "No description"),
             (
                 alert.timestamp.strftime("%H:%M:%S")
                 if hasattr(alert, "timestamp")
@@ -633,9 +580,7 @@ def _display_alerts_table(console: Console, alerts: List[Any]) -> None:
     console.print(table)
 
 
-def _display_analysis_results(
-    console: Console, results: Dict[str, Any]
-) -> None:
+def _display_analysis_results(console: Console, results: Dict[str, Any]) -> None:
     """Display analysis results in readable format."""
     usage_patterns = results.get("usage_patterns", {})
 
@@ -647,12 +592,8 @@ def _display_analysis_results(
     table.add_column("Value")
 
     table.add_row("Total Tokens", f"{usage_patterns.get('total_tokens', 0):,}")
-    table.add_row(
-        "Total Requests", f"{usage_patterns.get('total_requests', 0):,}"
-    )
-    table.add_row(
-        "Total Cost", f"${usage_patterns.get('total_cost', 0.0):.4f}"
-    )
+    table.add_row("Total Requests", f"{usage_patterns.get('total_requests', 0):,}")
+    table.add_row("Total Cost", f"${usage_patterns.get('total_cost', 0.0):.4f}")
     table.add_row(
         "Avg Tokens/Request",
         f"{usage_patterns.get('average_tokens_per_request', 0):.0f}",

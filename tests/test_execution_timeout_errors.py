@@ -6,10 +6,11 @@ the agent system, particularly program_executor.py.
 """
 
 import pytest
+
 from omnimancer.utils.errors import (
-    OmnimancerError,
     AgentError,
     ExecutionError,
+    OmnimancerError,
     TimeoutError,
 )
 

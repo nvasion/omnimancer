@@ -6,28 +6,28 @@ its component managers including FileSystemManager, ProgramExecutor,
 WebClient, MCPIntegrator, ApprovalManager, and ProviderFallback.
 """
 
-import pytest
 import asyncio
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from typing import Any, Dict
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+
+from omnimancer.core.agent.file_system_manager import FileSystemManager
 from omnimancer.core.agent_engine import (
     AgentEngine,
-    ProgramExecutor,
-    WebClient,
-    MCPIntegrator,
     ApprovalManager,
-    ProviderFallback,
+    MCPIntegrator,
     Operation,
     OperationResult,
     OperationType,
+    ProgramExecutor,
+    ProviderFallback,
+    WebClient,
 )
-from omnimancer.core.agent.file_system_manager import FileSystemManager
 from omnimancer.core.config_manager import ConfigManager
-from omnimancer.utils.errors import SecurityError, AgentError
+from omnimancer.utils.errors import SecurityError
 
 
 class TestOperation:
@@ -62,9 +62,7 @@ class TestOperation:
         assert result.rollback_data["backup"] == "old content"
 
 
-@pytest.mark.skip(
-    reason="Outdated tests - use test_file_system_manager.py instead"
-)
+@pytest.mark.skip(reason="Outdated tests - use test_file_system_manager.py instead")
 class TestFileSystemManager:
     """Test FileSystemManager functionality."""
 
@@ -408,9 +406,7 @@ class TestWebClient:
             mock_response.url = "https://httpbin.org/get"
 
             mock_client.request.return_value = mock_response
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_client
-            )
+            mock_client_class.return_value.__aenter__.return_value = mock_client
 
             result = await web_client._make_request(
                 "https://httpbin.org/get", "GET", {}, None
@@ -433,9 +429,7 @@ class TestWebClient:
             mock_response.url = "https://httpbin.org/status/404"
 
             mock_client.request.return_value = mock_response
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_client
-            )
+            mock_client_class.return_value.__aenter__.return_value = mock_client
 
             result = await web_client._make_request(
                 "https://httpbin.org/status/404", "GET", {}, None
@@ -512,9 +506,7 @@ class TestMCPIntegrator:
         )
 
         with patch.object(mcp_integrator, "_call_tool") as mock_call:
-            mock_call.return_value = OperationResult(
-                success=True, data="Tool result"
-            )
+            mock_call.return_value = OperationResult(success=True, data="Tool result")
 
             result = await mcp_integrator.execute_operation(operation)
 
@@ -539,9 +531,7 @@ class TestMCPIntegrator:
     @pytest.mark.asyncio
     async def test_call_tool(self, mcp_integrator):
         """Test MCP tool calling."""
-        result = await mcp_integrator._call_tool(
-            "test_tool", {"param": "value"}
-        )
+        result = await mcp_integrator._call_tool("test_tool", {"param": "value"})
 
         assert result.success is True
         assert "Called tool test_tool" in result.data
@@ -638,9 +628,7 @@ class TestApprovalManager:
         assert OperationType.FILE_READ in approval_manager.auto_approve_types
 
         approval_manager.remove_auto_approve_type(OperationType.FILE_READ)
-        assert (
-            OperationType.FILE_READ not in approval_manager.auto_approve_types
-        )
+        assert OperationType.FILE_READ not in approval_manager.auto_approve_types
 
 
 class TestProviderFallback:
@@ -714,14 +702,10 @@ class TestProviderFallback:
             result = await provider_fallback.execute_with_fallback(test_func)
 
         assert result == "fallback success"
-        assert (
-            core_engine.switch_model.call_count == 1
-        )  # Called for first fallback
+        assert core_engine.switch_model.call_count == 1  # Called for first fallback
 
     @pytest.mark.asyncio
-    async def test_execute_with_fallback_all_fail(
-        self, provider_fallback, core_engine
-    ):
+    async def test_execute_with_fallback_all_fail(self, provider_fallback, core_engine):
         """Test execution when all providers fail."""
         provider_fallback.set_fallback_providers(["provider1"])
 
@@ -811,32 +795,21 @@ class TestAgentEngine:
         # File operations
         file_op = Operation(OperationType.FILE_READ, "Read", {"path": "/test"})
         assert (
-            agent_engine._get_manager_for_operation(file_op)
-            == agent_engine.file_system
+            agent_engine._get_manager_for_operation(file_op) == agent_engine.file_system
         )
 
         # Command operations
-        cmd_op = Operation(
-            OperationType.COMMAND_EXECUTE, "Command", {"command": "ls"}
-        )
-        assert (
-            agent_engine._get_manager_for_operation(cmd_op)
-            == agent_engine.executor
-        )
+        cmd_op = Operation(OperationType.COMMAND_EXECUTE, "Command", {"command": "ls"})
+        assert agent_engine._get_manager_for_operation(cmd_op) == agent_engine.executor
 
         # Web operations
-        web_op = Operation(
-            OperationType.WEB_REQUEST, "Web", {"url": "http://test.com"}
-        )
+        web_op = Operation(OperationType.WEB_REQUEST, "Web", {"url": "http://test.com"})
         assert (
-            agent_engine._get_manager_for_operation(web_op)
-            == agent_engine.web_client
+            agent_engine._get_manager_for_operation(web_op) == agent_engine.web_client
         )
 
         # MCP operations
-        mcp_op = Operation(
-            OperationType.MCP_TOOL_CALL, "MCP", {"tool_name": "test"}
-        )
+        mcp_op = Operation(OperationType.MCP_TOOL_CALL, "MCP", {"tool_name": "test"})
         assert (
             agent_engine._get_manager_for_operation(mcp_op)
             == agent_engine.mcp_integrator
@@ -892,16 +865,13 @@ class TestAgentEngine:
         agent_engine.approval.request_approval = AsyncMock(return_value=True)
 
         # Mock preview and execution
-        with patch.object(
-            agent_engine, "_generate_preview"
-        ) as mock_preview, patch.object(
-            agent_engine, "_execute_operation"
-        ) as mock_execute:
+        with (
+            patch.object(agent_engine, "_generate_preview") as mock_preview,
+            patch.object(agent_engine, "_execute_operation") as mock_execute,
+        ):
 
             mock_preview.return_value = "Preview: Read file"
-            mock_execute.return_value = OperationResult(
-                success=True, data="content"
-            )
+            mock_execute.return_value = OperationResult(success=True, data="content")
 
             result = await agent_engine.execute_with_approval(operation)
 
@@ -931,9 +901,7 @@ class TestAgentEngine:
             assert len(agent_engine.operation_history) == 0
 
     @pytest.mark.asyncio
-    async def test_execute_with_approval_no_approval_needed(
-        self, agent_engine
-    ):
+    async def test_execute_with_approval_no_approval_needed(self, agent_engine):
         """Test operation execution without approval requirement."""
         operation = Operation(
             OperationType.FILE_READ,
@@ -942,16 +910,13 @@ class TestAgentEngine:
             requires_approval=False,
         )
 
-        with patch.object(
-            agent_engine, "_generate_preview"
-        ) as mock_preview, patch.object(
-            agent_engine, "_execute_operation"
-        ) as mock_execute:
+        with (
+            patch.object(agent_engine, "_generate_preview") as mock_preview,
+            patch.object(agent_engine, "_execute_operation") as mock_execute,
+        ):
 
             mock_preview.return_value = "Preview: Read file"
-            mock_execute.return_value = OperationResult(
-                success=True, data="content"
-            )
+            mock_execute.return_value = OperationResult(success=True, data="content")
 
             result = await agent_engine.execute_with_approval(operation)
 
@@ -1005,9 +970,7 @@ class TestAgentEngine:
         ]
 
         # Mock execute_with_approval for rollback
-        with patch.object(
-            agent_engine, "execute_with_approval"
-        ) as mock_execute:
+        with patch.object(agent_engine, "execute_with_approval") as mock_execute:
             mock_execute.return_value = OperationResult(success=True)
 
             success = await agent_engine.rollback_operation(0)
@@ -1022,9 +985,7 @@ class TestAgentEngine:
             assert rollback_op.requires_approval is False
 
     @pytest.mark.asyncio
-    async def test_rollback_operation_file_delete(
-        self, agent_engine, temp_dir
-    ):
+    async def test_rollback_operation_file_delete(self, agent_engine, temp_dir):
         """Test rolling back a file delete operation."""
         # Create mock history entry
         deleted_content = "deleted content"
@@ -1045,9 +1006,7 @@ class TestAgentEngine:
         ]
 
         # Mock execute_with_approval for rollback
-        with patch.object(
-            agent_engine, "execute_with_approval"
-        ) as mock_execute:
+        with patch.object(agent_engine, "execute_with_approval") as mock_execute:
             mock_execute.return_value = OperationResult(success=True)
 
             success = await agent_engine.rollback_operation(0)
@@ -1064,12 +1023,8 @@ class TestAgentEngine:
     @pytest.mark.asyncio
     async def test_rollback_operation_no_rollback_data(self, agent_engine):
         """Test rollback with no rollback data available."""
-        operation = Operation(
-            OperationType.FILE_READ, "Read", {"path": "/test"}
-        )
-        result = OperationResult(
-            success=True, data="content"
-        )  # No rollback_data
+        operation = Operation(OperationType.FILE_READ, "Read", {"path": "/test"})
+        result = OperationResult(success=True, data="content")  # No rollback_data
 
         agent_engine.operation_history = [
             {"operation": operation, "result": result, "timestamp": 123}

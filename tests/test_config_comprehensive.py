@@ -11,29 +11,26 @@ This module consolidates tests from:
 - test_enhanced_config.py
 """
 
-import pytest
 import json
-import time
-import threading
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
+from unittest.mock import Mock, patch
 
+import pytest
+
+from omnimancer.core.config_migration import ConfigMigration
 from omnimancer.core.config_validator import ConfigValidator
 
 # from omnimancer.core.config_generator import ConfigGenerator  # Removed as over-engineered
 # from omnimancer.core.config_repair import ConfigRepair  # Removed as over-engineered
-from omnimancer.core.models import ConfigTemplateManager, ConfigTemplate
-from omnimancer.core.config_migration import ConfigMigration
 from omnimancer.core.models import (
     Config,
-    ProviderConfig,
+    ConfigTemplate,
+    ConfigTemplateManager,
     MCPConfig,
     MCPServerConfig,
-    ChatSettings,
+    ProviderConfig,
 )
-from omnimancer.utils.errors import ConfigurationError
 
 
 class TestConfigValidator:
@@ -77,18 +74,13 @@ class TestConfigValidator:
         mock_config.storage_path = "/tmp/omnimancer"
         mock_config.mcp = Mock()
 
-        with patch.object(
-            self.validator, "validate_provider_config", return_value=[]
-        ):
-            with patch.object(
-                self.validator, "validate_mcp_config", return_value=[]
-            ):
+        with patch.object(self.validator, "validate_provider_config", return_value=[]):
+            with patch.object(self.validator, "validate_mcp_config", return_value=[]):
                 errors = self.validator._validate_config(mock_config)
 
                 assert len(errors) > 0
                 assert any(
-                    "No default provider configured" in error
-                    for error in errors
+                    "No default provider configured" in error for error in errors
                 )
 
     def test_validate_config_default_provider_not_configured(self):
@@ -105,8 +97,7 @@ class TestConfigValidator:
 
         assert len(errors) > 0
         assert any(
-            "Default provider 'claude' is not configured" in error
-            for error in errors
+            "Default provider 'claude' is not configured" in error for error in errors
         )
 
     def test_validate_config_caching(self):
@@ -136,9 +127,7 @@ class TestConfigValidator:
         """Test provider validation with no model."""
         provider_config = ProviderConfig(model="", api_key="sk-test123")
 
-        errors = self.validator.validate_provider_config(
-            "openai", provider_config
-        )
+        errors = self.validator.validate_provider_config("openai", provider_config)
 
         assert len(errors) > 0
         assert any("has no model specified" in error for error in errors)
@@ -278,7 +267,7 @@ class TestConfigRepair:
     def test_analyze_config(self):
         """Test configuration analysis."""
         provider_config = ProviderConfig(model="gpt-4", api_key="sk-test123")
-        config = Config(
+        Config(
             default_provider="openai",
             providers={"openai": provider_config},
             storage_path="/tmp/omnimancer",
@@ -290,15 +279,10 @@ class TestConfigRepair:
 
         assert isinstance(issues, list)
         # Should have minimal issues for valid config
-        assert (
-            len([issue for issue in issues if issue["severity"] == "error"])
-            == 0
-        )
+        assert len([issue for issue in issues if issue["severity"] == "error"]) == 0
 
     def test_is_error_fixable(self):
         """Test error fixability detection."""
-        fixable_error = "Provider 'openai' has no model specified"
-        unfixable_error = "Provider 'invalid' is not supported"
 
         # assert self.repair._is_error_fixable(fixable_error) is True  # Removed as over-engineered
         # assert self.repair._is_error_fixable(unfixable_error) is False  # Removed as over-engineered
@@ -376,9 +360,7 @@ class TestConfigTemplateManager:
 
         # Should have appropriate settings for coding
         assert "temperature" in template.settings
-        assert (
-            template.settings["temperature"] <= 0.3
-        )  # Lower temperature for coding
+        assert template.settings["temperature"] <= 0.3  # Lower temperature for coding
 
     def test_template_mcp_servers_disabled_by_default(self):
         """Test that MCP servers in templates are disabled by default."""
@@ -434,10 +416,7 @@ class TestConfigMigration:
 
     def teardown_method(self):
         """Clean up test fixtures."""
-        if (
-            hasattr(self, "tmp_config_path")
-            and Path(self.tmp_config_path).exists()
-        ):
+        if hasattr(self, "tmp_config_path") and Path(self.tmp_config_path).exists():
             Path(self.tmp_config_path).unlink()
 
     def test_init(self):
@@ -506,9 +485,7 @@ class TestConfigTemplate:
         assert template.mcp_servers["filesystem"]["command"] == "fs-server"
 
 
-@pytest.mark.skip(
-    reason="ConfigGenerator and ConfigRepair removed as over-engineered"
-)
+@pytest.mark.skip(reason="ConfigGenerator and ConfigRepair removed as over-engineered")
 class TestConfigIntegration:
     """Integration tests for config components."""
 
@@ -525,10 +502,7 @@ class TestConfigIntegration:
 
     def teardown_method(self):
         """Clean up test fixtures."""
-        if (
-            hasattr(self, "tmp_config_path")
-            and Path(self.tmp_config_path).exists()
-        ):
+        if hasattr(self, "tmp_config_path") and Path(self.tmp_config_path).exists():
             Path(self.tmp_config_path).unlink()
 
     def test_end_to_end_config_workflow(self):
@@ -559,17 +533,13 @@ class TestConfigIntegration:
         # 5. Analyze for issues
         # issues = self.repair.analyze_config(config)  # Removed as over-engineered
         issues = []
-        error_issues = [
-            issue for issue in issues if issue["severity"] == "error"
-        ]
+        error_issues = [issue for issue in issues if issue["severity"] == "error"]
         assert len(error_issues) == 0
 
         # 6. Test migration detection
         config_dict = {
             "default_provider": "openai",
-            "providers": {
-                "openai": {"model": "gpt-4", "api_key": "sk-test123"}
-            },
+            "providers": {"openai": {"model": "gpt-4", "api_key": "sk-test123"}},
         }
         # Write config to temp file for migration test
         with open(self.tmp_config_path, "w") as f:
@@ -610,9 +580,7 @@ class TestConfigIntegration:
         assert len(errors) == 0
 
         # Get template as config dict
-        config_dict = self.template_manager.get_template_config_dict(
-            "research"
-        )
+        config_dict = self.template_manager.get_template_config_dict("research")
         assert isinstance(config_dict, dict)
         assert "provider_configs" in config_dict
         assert "settings" in config_dict
@@ -621,9 +589,7 @@ class TestConfigIntegration:
         """Test migration integration with validation."""
         # Write old config data to temp file
         old_config = {
-            "providers": {
-                "openai": {"model": "gpt-3.5-turbo", "api_key": "sk-test123"}
-            }
+            "providers": {"openai": {"model": "gpt-3.5-turbo", "api_key": "sk-test123"}}
         }
         with open(self.tmp_config_path, "w") as f:
             json.dump(old_config, f)

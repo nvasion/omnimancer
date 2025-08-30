@@ -5,18 +5,17 @@ This module provides filtering and sorting capabilities to handle large
 batches of approval requests efficiently with complex query support.
 """
 
-import re
 import fnmatch
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Union, Tuple, Callable
-from dataclasses import dataclass
-from enum import Enum
+import re
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..core.agent.approval_manager import BatchApprovalRequest, ChangePreview
 from ..core.agent.types import Operation, OperationType
-from ..core.security.approval_workflow import ApprovalStatus
 
 logger = logging.getLogger(__name__)
 
@@ -190,9 +189,7 @@ class TargetPatternFilter(BatchFilter):
 class StatusFilter(BatchFilter):
     """Filter operations by approval status."""
 
-    def __init__(
-        self, statuses: List[str], batch_request: BatchApprovalRequest
-    ):
+    def __init__(self, statuses: List[str], batch_request: BatchApprovalRequest):
         """
         Initialize status filter.
 
@@ -280,9 +277,7 @@ class CustomQueryFilter(BatchFilter):
             elif ":" in token:
                 # Field:value expression
                 field, value = token.split(":", 1)
-                filter_obj = self._create_field_filter(
-                    field.lower(), value.lower()
-                )
+                filter_obj = self._create_field_filter(field.lower(), value.lower())
                 if filter_obj:
                     if negated:
                         filter_obj = NegatedFilter(filter_obj)
@@ -299,9 +294,7 @@ class CustomQueryFilter(BatchFilter):
 
         return filters
 
-    def _create_field_filter(
-        self, field: str, value: str
-    ) -> Optional[BatchFilter]:
+    def _create_field_filter(self, field: str, value: str) -> Optional[BatchFilter]:
         """Create appropriate filter based on field and value."""
         if field == "risk":
             return RiskLevelFilter([value])
@@ -336,7 +329,6 @@ class CustomQueryFilter(BatchFilter):
             return True
 
         result = True
-        current_op = FilterOperator.AND  # Default operator
 
         for item in filters:
             if isinstance(item, tuple) and len(item) == 2:
@@ -492,9 +484,7 @@ class BatchSorter:
 
         # Apply secondary sort if specified
         if criteria.secondary_sort:
-            secondary_func = self.sort_functions.get(
-                criteria.secondary_sort.sort_by
-            )
+            secondary_func = self.sort_functions.get(criteria.secondary_sort.sort_by)
             if secondary_func:
                 # Stable sort to preserve primary ordering
                 sorted_items = secondary_func(
@@ -519,16 +509,10 @@ class BatchSorter:
         """Sort by timestamp (using batch creation time as proxy)."""
         # Since operations don't have individual timestamps, use batch timestamp
         # In practice, this would sort by when each operation was added
-        timestamp = (
-            batch_request.created_at if batch_request else datetime.now()
-        )
+        batch_request.created_at if batch_request else datetime.now()
 
         # For now, maintain original order since all operations have same timestamp
-        return (
-            items
-            if direction == SortDirection.ASCENDING
-            else list(reversed(items))
-        )
+        return items if direction == SortDirection.ASCENDING else list(reversed(items))
 
     def _sort_by_risk(
         self,
@@ -584,9 +568,7 @@ class BatchSorter:
                 for field in ["path", "url", "command", "target"]:
                     if field in operation.data:
                         return str(operation.data[field]).lower()
-            return (
-                operation.description.lower() if operation.description else ""
-            )
+            return operation.description.lower() if operation.description else ""
 
         reverse = direction == SortDirection.DESCENDING
         return sorted(items, key=get_target, reverse=reverse)
@@ -624,9 +606,7 @@ class BatchSorter:
 
         def get_description(item):
             operation, preview = item
-            return (
-                operation.description.lower() if operation.description else ""
-            )
+            return operation.description.lower() if operation.description else ""
 
         reverse = direction == SortDirection.DESCENDING
         return sorted(items, key=get_description, reverse=reverse)

@@ -15,34 +15,30 @@ Testing complete workflows from setup to validation, including:
 - User experience workflows
 """
 
-import pytest
 import json
-import asyncio
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
-from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from omnimancer.cli.interface import CommandLineInterface
+import pytest
+
 from omnimancer.cli.commands import parse_command
-
-# from omnimancer.core.config_generator import ConfigGenerator  # Removed as over-engineered
-from omnimancer.core.setup_wizard import SetupWizard
+from omnimancer.cli.interface import CommandLineInterface
 from omnimancer.core.config_manager import ConfigManager
-from omnimancer.core.provider_registry import ProviderRegistry
 from omnimancer.core.config_validator import ConfigValidator
 from omnimancer.core.health_monitor import HealthMonitor
 from omnimancer.core.models import (
-    Config,
-    ProviderConfig,
-    EnhancedModelInfo,
     ChatSettings,
-    ChatMessage,
-    MessageRole,
+    Config,
+    EnhancedModelInfo,
+    ProviderConfig,
 )
+from omnimancer.core.provider_registry import ProviderRegistry
+
+# from omnimancer.core.config_generator import ConfigGenerator  # Removed as over-engineered
+from omnimancer.core.setup_wizard import SetupWizard
 from omnimancer.providers.factory import ProviderFactory
-from omnimancer.utils.errors import ConfigurationError, ProviderError
-from tests.conftest import MockProviderFactory, create_chat_response
+from tests.conftest import create_chat_response
 
 
 @pytest.fixture
@@ -113,9 +109,7 @@ def mock_providers():
         mock_provider.get_available_models_enhanced = AsyncMock(
             return_value=available_models
         )
-        mock_provider.get_model_info = AsyncMock(
-            return_value=available_models[0]
-        )
+        mock_provider.get_model_info = AsyncMock(return_value=available_models[0])
         mock_provider.supports_tools.return_value = True
         mock_provider.supports_multimodal.return_value = False
         mock_provider.supports_streaming.return_value = True
@@ -143,9 +137,7 @@ def integrated_system(temp_workspace, mock_providers):
     provider_factory.create_provider.side_effect = (
         lambda name, **kwargs: mock_providers.get(name)
     )
-    provider_factory.get_available_providers.return_value = list(
-        mock_providers.keys()
-    )
+    provider_factory.get_available_providers.return_value = list(mock_providers.keys())
 
     # Register mock providers
     for name, provider_class in mock_providers.items():
@@ -174,7 +166,7 @@ class TestCompleteSetupWorkflow:
         system = integrated_system
 
         # Step 1: Generate initial configuration
-        config_path = system["config_path"]
+        system["config_path"]
         # generator = system['config_generator']  # Removed as over-engineered
 
         # generated_config_path = generator.generate_full_config(str(config_path))  # Removed as over-engineered
@@ -191,9 +183,7 @@ class TestCompleteSetupWorkflow:
         # Step 3: Validate configuration
         validator = system["config_validator"]
 
-        with patch.object(
-            validator, "provider_factory", system["provider_factory"]
-        ):
+        with patch.object(validator, "provider_factory", system["provider_factory"]):
             validation_result = await validator.validate_full_config(config)
             assert validation_result.is_valid is True
 
@@ -213,26 +203,30 @@ class TestCompleteSetupWorkflow:
         setup_wizard = system["setup_wizard"]
 
         # Mock the individual methods directly
-        with patch.object(
-            setup_wizard.config_manager, "is_first_run", return_value=True
-        ), patch.object(
-            setup_wizard.provider_setup,
-            "select_provider",
-            return_value="claude",
-        ), patch.object(
-            setup_wizard.provider_setup,
-            "configure_provider",
-            new_callable=AsyncMock,
-        ) as mock_configure, patch.object(
-            setup_wizard.validation,
-            "test_configuration",
-            new_callable=AsyncMock,
-        ) as mock_test_config, patch.object(
-            setup_wizard.provider_setup, "save_configuration"
-        ) as mock_save, patch.object(
-            setup_wizard.ui, "show_welcome"
-        ), patch.object(
-            setup_wizard.ui, "show_completion"
+        with (
+            patch.object(
+                setup_wizard.config_manager, "is_first_run", return_value=True
+            ),
+            patch.object(
+                setup_wizard.provider_setup,
+                "select_provider",
+                return_value="claude",
+            ),
+            patch.object(
+                setup_wizard.provider_setup,
+                "configure_provider",
+                new_callable=AsyncMock,
+            ) as mock_configure,
+            patch.object(
+                setup_wizard.validation,
+                "test_configuration",
+                new_callable=AsyncMock,
+            ) as mock_test_config,
+            patch.object(
+                setup_wizard.provider_setup, "save_configuration"
+            ) as mock_save,
+            patch.object(setup_wizard.ui, "show_welcome"),
+            patch.object(setup_wizard.ui, "show_completion"),
         ):
 
             # Mock provider configuration
@@ -277,9 +271,7 @@ class TestProviderSwitchingWorkflows:
                     api_key="sk-ant-test-key",
                     model="claude-3-5-sonnet-20241022",
                 ),
-                "openai": ProviderConfig(
-                    api_key="sk-openai-test-key", model="gpt-4o"
-                ),
+                "openai": ProviderConfig(api_key="sk-openai-test-key", model="gpt-4o"),
             },
             chat_settings=ChatSettings(),
             storage_path=str(system["workspace"]),
@@ -294,9 +286,7 @@ class TestProviderSwitchingWorkflows:
 
         # Validate new configuration
         validator = system["config_validator"]
-        with patch.object(
-            validator, "provider_factory", system["provider_factory"]
-        ):
+        with patch.object(validator, "provider_factory", system["provider_factory"]):
             validation_result = await validator.validate_full_config(config)
             assert validation_result.is_valid is True
 
@@ -335,9 +325,7 @@ class TestProviderSwitchingWorkflows:
         # Mock switching functionality
         async def mock_switch_model(provider_name, model_name=None):
             if provider_name in mock_engine.providers:
-                mock_engine.current_provider = mock_engine.providers[
-                    provider_name
-                ]
+                mock_engine.current_provider = mock_engine.providers[provider_name]
                 return True
             return False
 
@@ -373,16 +361,12 @@ class TestProviderSwitchingWorkflows:
         # Mock conversation context
         mock_context = MagicMock()
         mock_context.messages = []
-        mock_engine.chat_manager.get_current_context.return_value = (
-            mock_context
-        )
+        mock_engine.chat_manager.get_current_context.return_value = mock_context
 
         # Mock switching functionality
         async def mock_switch_model(provider_name, model_name=None):
             if provider_name in mock_engine.providers:
-                mock_engine.current_provider = mock_engine.providers[
-                    provider_name
-                ]
+                mock_engine.current_provider = mock_engine.providers[provider_name]
                 return True
             return False
 
@@ -398,9 +382,10 @@ class TestProviderSwitchingWorkflows:
         )
 
         command1 = parse_command("Hello from first provider")
-        with patch.object(cli, "_show_user_message"), patch.object(
-            cli, "_show_assistant_message"
-        ) as mock_show_assistant1:
+        with (
+            patch.object(cli, "_show_user_message"),
+            patch.object(cli, "_show_assistant_message") as mock_show_assistant1,
+        ):
             await cli._handle_chat_message(command1)
             mock_show_assistant1.assert_called_once_with(
                 "First provider response", "gpt-4"
@@ -420,9 +405,10 @@ class TestProviderSwitchingWorkflows:
         )
 
         command2 = parse_command("Hello from second provider")
-        with patch.object(cli, "_show_user_message"), patch.object(
-            cli, "_show_assistant_message"
-        ) as mock_show_assistant2:
+        with (
+            patch.object(cli, "_show_user_message"),
+            patch.object(cli, "_show_assistant_message") as mock_show_assistant2,
+        ):
             await cli._handle_chat_message(command2)
             mock_show_assistant2.assert_called_once_with(
                 "Second provider response", "claude-3-sonnet"
@@ -481,9 +467,7 @@ class TestConfigurationWorkflows:
 
         # Verify coding-specific optimizations
         chat_settings = config_data["chat_settings"]
-        assert (
-            chat_settings["temperature"] <= 0.2
-        )  # Low temperature for coding
+        assert chat_settings["temperature"] <= 0.2  # Low temperature for coding
         assert chat_settings["max_tokens"] >= 4096  # Large context for code
 
         # Test research template
@@ -538,9 +522,7 @@ class TestConfigurationWorkflows:
 
         # Run comprehensive validation
         validator = system["config_validator"]
-        with patch.object(
-            validator, "provider_factory", system["provider_factory"]
-        ):
+        with patch.object(validator, "provider_factory", system["provider_factory"]):
             validation_result = await validator.validate_full_config(config)
 
             # Since we're using mock providers that accept any configuration,
@@ -574,15 +556,11 @@ class TestErrorHandlingWorkflows:
         # Mock provider to fail validation
         failing_provider = MagicMock()
         failing_provider.validate_credentials = AsyncMock(return_value=False)
-        system["provider_factory"].create_provider.return_value = (
-            failing_provider
-        )
+        system["provider_factory"].create_provider.return_value = failing_provider
 
         # Test validation with failing provider
         validator = system["config_validator"]
-        with patch.object(
-            validator, "provider_factory", system["provider_factory"]
-        ):
+        with patch.object(validator, "provider_factory", system["provider_factory"]):
             validation_result = await validator.validate_full_config(config)
 
             # In test environment, validation may still pass since we're mocking providers
@@ -604,9 +582,7 @@ class TestErrorHandlingWorkflows:
             assert len(health_status.provider_health) > 0
 
     @pytest.mark.asyncio
-    async def test_provider_error_recovery(
-        self, mock_engine, mock_provider_factory
-    ):
+    async def test_provider_error_recovery(self, mock_engine, mock_provider_factory):
         """Test recovery from provider errors."""
         # Set up provider that fails initially
         provider = mock_provider_factory.create_failing_provider(
@@ -627,16 +603,18 @@ class TestErrorHandlingWorkflows:
 
         # First attempt should handle error gracefully
         command = parse_command("Test message")
-        with patch.object(cli, "_show_user_message"), patch.object(
-            cli, "_show_assistant_message"
+        with (
+            patch.object(cli, "_show_user_message"),
+            patch.object(cli, "_show_assistant_message"),
         ):
             # Should not raise exception, but handle gracefully
             await cli._handle_chat_message(command)
 
         # Second attempt should work
-        with patch.object(cli, "_show_user_message"), patch.object(
-            cli, "_show_assistant_message"
-        ) as mock_show_assistant:
+        with (
+            patch.object(cli, "_show_user_message"),
+            patch.object(cli, "_show_assistant_message") as mock_show_assistant,
+        ):
             await cli._handle_chat_message(command)
             mock_show_assistant.assert_called_once_with(
                 "Recovered successfully", "gpt-4"
@@ -670,26 +648,30 @@ class TestCLIIntegrationWorkflows:
         setup_wizard = system["setup_wizard"]
 
         # Mock the individual methods directly
-        with patch.object(
-            setup_wizard.config_manager, "is_first_run", return_value=True
-        ), patch.object(
-            setup_wizard.provider_setup,
-            "select_provider",
-            return_value="claude",
-        ), patch.object(
-            setup_wizard.provider_setup,
-            "configure_provider",
-            new_callable=AsyncMock,
-        ) as mock_configure, patch.object(
-            setup_wizard.validation,
-            "test_configuration",
-            new_callable=AsyncMock,
-        ) as mock_test_config, patch.object(
-            setup_wizard.provider_setup, "save_configuration"
-        ) as mock_save, patch.object(
-            setup_wizard.ui, "show_welcome"
-        ), patch.object(
-            setup_wizard.ui, "show_completion"
+        with (
+            patch.object(
+                setup_wizard.config_manager, "is_first_run", return_value=True
+            ),
+            patch.object(
+                setup_wizard.provider_setup,
+                "select_provider",
+                return_value="claude",
+            ),
+            patch.object(
+                setup_wizard.provider_setup,
+                "configure_provider",
+                new_callable=AsyncMock,
+            ) as mock_configure,
+            patch.object(
+                setup_wizard.validation,
+                "test_configuration",
+                new_callable=AsyncMock,
+            ) as mock_test_config,
+            patch.object(
+                setup_wizard.provider_setup, "save_configuration"
+            ) as mock_save,
+            patch.object(setup_wizard.ui, "show_welcome"),
+            patch.object(setup_wizard.ui, "show_completion"),
         ):
 
             # Mock provider configuration
@@ -712,9 +694,7 @@ class TestCLIIntegrationWorkflows:
 
                 # Verify methods were called
                 mock_configure.assert_called_once_with("claude")
-                mock_test_config.assert_called_once_with(
-                    "claude", provider_config
-                )
+                mock_test_config.assert_called_once_with("claude", provider_config)
                 mock_save.assert_called_once_with(
                     "claude", provider_config, system["config_manager"]
                 )
@@ -754,9 +734,7 @@ class TestPerformanceWorkflows:
     """Test performance-related workflows."""
 
     @pytest.mark.asyncio
-    async def test_large_message_handling(
-        self, mock_engine, mock_provider_factory
-    ):
+    async def test_large_message_handling(self, mock_engine, mock_provider_factory):
         """Test handling of large messages within limits."""
         provider = mock_provider_factory.create_working_provider(
             "openai", "gpt-4", "Response to large message"
@@ -772,23 +750,20 @@ class TestPerformanceWorkflows:
         cli = CommandLineInterface(mock_engine)
 
         # Create large but valid message (under 10000 char limit)
-        large_message = (
-            "This is a long message. " * 300
-        )  # About 7200 characters
+        large_message = "This is a long message. " * 300  # About 7200 characters
         command = parse_command(large_message)
 
-        with patch.object(cli, "_show_user_message"), patch.object(
-            cli, "_show_assistant_message"
-        ) as mock_show_assistant:
+        with (
+            patch.object(cli, "_show_user_message"),
+            patch.object(cli, "_show_assistant_message") as mock_show_assistant,
+        ):
             await cli._handle_chat_message(command)
             mock_show_assistant.assert_called_once_with(
                 "Response to large message", "gpt-4"
             )
 
     @pytest.mark.asyncio
-    async def test_rapid_command_sequence(
-        self, mock_engine, mock_provider_factory
-    ):
+    async def test_rapid_command_sequence(self, mock_engine, mock_provider_factory):
         """Test handling rapid sequence of commands."""
         provider = mock_provider_factory.create_working_provider(
             "openai", "gpt-4", "Quick response"
@@ -806,8 +781,9 @@ class TestPerformanceWorkflows:
         # Send multiple commands in sequence
         commands = [parse_command(f"Message {i}") for i in range(5)]
 
-        with patch.object(cli, "_show_user_message"), patch.object(
-            cli, "_show_assistant_message"
+        with (
+            patch.object(cli, "_show_user_message"),
+            patch.object(cli, "_show_assistant_message"),
         ):
             for command in commands:
                 await cli._handle_chat_message(command)
@@ -863,9 +839,7 @@ class TestUserExperienceWorkflows:
             mock_stop.assert_called_once()
 
         # Test alternative system quit commands (not slash commands)
-        exit_command = parse_command(
-            "exit"
-        )  # System command, not slash command
+        exit_command = parse_command("exit")  # System command, not slash command
         assert exit_command.is_system_command
         assert exit_command.content == "quit"
 
@@ -903,15 +877,11 @@ class TestBackwardCompatibilityWorkflows:
 
         # Test conversation save
         save_command = parse_command("/save test_conversation")
-        mock_engine.save_conversation = MagicMock(
-            return_value="test_conversation.json"
-        )
+        mock_engine.save_conversation = MagicMock(return_value="test_conversation.json")
 
-        with patch.object(cli, "_show_info") as mock_show_info:
+        with patch.object(cli, "_show_info"):
             await cli._handle_slash_command(save_command)
-            mock_engine.save_conversation.assert_called_once_with(
-                "test_conversation"
-            )
+            mock_engine.save_conversation.assert_called_once_with("test_conversation")
 
         # Test conversation list
         list_command = parse_command("/list")

@@ -7,32 +7,23 @@ operations in sequence automatically, similar to how Claude Code works.
 
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional, Callable, Union
 from dataclasses import dataclass, field
-from enum import Enum
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 from rich.console import Console
-from rich.progress import (
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-)
-from rich.panel import Panel
-from rich.table import Table
 from rich.markdown import Markdown
+from rich.panel import Panel
 
-# Import existing UI components
-from ...ui.progress_indicator import (
-    ProgressIndicator,
-    OperationType as ProgressOperationType,
-    OperationInfo,
-)
 from ...cli.batch_approval_display import BatchApprovalPanel
 
-from ..agent.types import Operation, OperationType, OperationResult
+# Import existing UI components
+from ...ui.progress_indicator import OperationType as ProgressOperationType
+from ...ui.progress_indicator import (
+    ProgressIndicator,
+)
 from ..agent.approval_manager import EnhancedApprovalManager
 from ..agent.file_system_manager import FileSystemManager
 
@@ -347,17 +338,13 @@ class WorkflowOrchestrator:
                 if step.action:
                     # Merge step parameters with context parameters
                     merged_params = {**step.parameters, **self.context.data}
-                    step.result = await step.action(
-                        self.context, merged_params
-                    )
+                    step.result = await step.action(self.context, merged_params)
 
                 step.status = WorkflowStatus.COMPLETED
                 step.completed_at = datetime.now()
 
                 # Complete progress tracking
-                self.progress_indicator.complete_operation(
-                    operation_id, "completed"
-                )
+                self.progress_indicator.complete_operation(operation_id, "completed")
 
             except Exception as e:
                 step.status = WorkflowStatus.FAILED
@@ -365,9 +352,7 @@ class WorkflowOrchestrator:
                 step.completed_at = datetime.now()
 
                 logger.error(f"Step {step.name} failed: {e}")
-                self.progress_indicator.complete_operation(
-                    operation_id, "failed"
-                )
+                self.progress_indicator.complete_operation(operation_id, "failed")
 
                 if not step.continue_on_error:
                     break
@@ -384,9 +369,7 @@ class WorkflowOrchestrator:
         self, name: str, steps: List[WorkflowStep]
     ) -> None:
         """Display the workflow execution plan using clean UI."""
-        self.console.print(
-            f"\n[bold cyan]🚀 Starting workflow: {name}[/bold cyan]"
-        )
+        self.console.print(f"\n[bold cyan]🚀 Starting workflow: {name}[/bold cyan]")
         self.console.print(f"[dim]Will execute {len(steps)} steps...[/dim]\n")
 
     def _check_dependencies(
@@ -403,15 +386,11 @@ class WorkflowOrchestrator:
 
     async def _request_approval(self, step: WorkflowStep) -> bool:
         """Request approval for a step that requires it."""
-        self.console.print(
-            f"\n[yellow]⚠ Step '{step.name}' requires approval[/yellow]"
-        )
+        self.console.print(f"\n[yellow]⚠ Step '{step.name}' requires approval[/yellow]")
         self.console.print(f"Description: {step.description}")
 
         # Use the approval manager if available
-        if self.approval_manager and hasattr(
-            self.approval_manager, "request_approval"
-        ):
+        if self.approval_manager and hasattr(self.approval_manager, "request_approval"):
             # Create a basic operation object for the approval manager
             from .types import Operation, OperationType
 
@@ -436,9 +415,7 @@ class WorkflowOrchestrator:
     def _display_step_result(self, step: WorkflowStep) -> None:
         """Display the result of a completed step."""
         status_symbol = "✓" if step.status == WorkflowStatus.COMPLETED else "✗"
-        status_color = (
-            "green" if step.status == WorkflowStatus.COMPLETED else "red"
-        )
+        status_color = "green" if step.status == WorkflowStatus.COMPLETED else "red"
 
         self.console.print(
             f"[{status_color}]{status_symbol}[/{status_color}] {step.name}: {step.description}"
@@ -450,14 +427,10 @@ class WorkflowOrchestrator:
     async def _display_workflow_summary(self) -> None:
         """Display a clean summary of the workflow execution."""
         completed = sum(
-            1
-            for s in self.context.history
-            if s.status == WorkflowStatus.COMPLETED
+            1 for s in self.context.history if s.status == WorkflowStatus.COMPLETED
         )
         failed = sum(
-            1
-            for s in self.context.history
-            if s.status == WorkflowStatus.FAILED
+            1 for s in self.context.history if s.status == WorkflowStatus.FAILED
         )
         total = len(self.context.history)
 
@@ -483,9 +456,7 @@ class WorkflowOrchestrator:
             WorkflowStepType.VALIDATE: ProgressOperationType.VALIDATE,
             WorkflowStepType.CUSTOM: ProgressOperationType.OTHER,
         }
-        return type_mapping.get(
-            workflow_step_type, ProgressOperationType.OTHER
-        )
+        return type_mapping.get(workflow_step_type, ProgressOperationType.OTHER)
 
     # Built-in action implementations
 
@@ -524,9 +495,7 @@ class WorkflowOrchestrator:
         files = context.get("project_files", [])
 
         # Check for common tech indicators
-        file_names = [
-            f.replace("📄 ", "").replace("📁 ", "").strip("/") for f in files
-        ]
+        file_names = [f.replace("📄 ", "").replace("📁 ", "").strip("/") for f in files]
 
         if "package.json" in file_names:
             tech_stack["javascript"] = "Node.js/npm"
@@ -568,9 +537,7 @@ class WorkflowOrchestrator:
 
         config_files = {}
         files = context.get("project_files", [])
-        file_names = [
-            f.replace("📄 ", "").replace("📁 ", "").strip("/") for f in files
-        ]
+        file_names = [f.replace("📄 ", "").replace("📁 ", "").strip("/") for f in files]
 
         config_patterns = {
             ".env": "Environment variables",
@@ -685,8 +652,8 @@ class WorkflowOrchestrator:
         self, context: WorkflowContext, params: Dict[str, Any]
     ) -> None:
         """Show diff for review."""
-        original = context.get("original_content", "")
-        modified = context.get("modified_content", "")
+        context.get("original_content", "")
+        context.get("modified_content", "")
 
         # In a real implementation, this would use the diff renderer
         context.console.print("\n[yellow]Changes to review:[/yellow]")
@@ -712,9 +679,7 @@ class WorkflowOrchestrator:
     ) -> bool:
         """Validate applied changes."""
         # In a real implementation, this would verify the changes were applied correctly
-        context.console.print(
-            "[green]✓ Changes validated successfully[/green]"
-        )
+        context.console.print("[green]✓ Changes validated successfully[/green]")
         return True
 
     # General Action Workflow Methods
@@ -723,14 +688,10 @@ class WorkflowOrchestrator:
         self, context: WorkflowContext, params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Understand and analyze the user's request."""
-        user_request = params.get(
-            "user_request", context.get("user_request", "")
-        )
+        user_request = params.get("user_request", context.get("user_request", ""))
 
         # Simulate analyzing the request
-        context.console.print(
-            f"[cyan]📝 Analyzing request: '{user_request}'[/cyan]"
-        )
+        context.console.print(f"[cyan]📝 Analyzing request: '{user_request}'[/cyan]")
 
         # Parse the request to understand intent and extract key information
         analysis = {
@@ -751,9 +712,7 @@ class WorkflowOrchestrator:
         analysis = context.get("request_analysis", {})
         user_request = analysis.get("original_request", "")
 
-        context.console.print(
-            f"[cyan]🎯 Planning approach for: {user_request}[/cyan]"
-        )
+        context.console.print(f"[cyan]🎯 Planning approach for: {user_request}[/cyan]")
 
         # Create a basic plan based on the request
         plan = {
@@ -776,9 +735,7 @@ class WorkflowOrchestrator:
         """Execute the planned action autonomously."""
         user_request = context.get("user_request", "")
 
-        context.console.print(
-            f"[cyan]🚀 Executing autonomous action...[/cyan]"
-        )
+        context.console.print(f"[cyan]🚀 Executing autonomous action...[/cyan]")
 
         # Actually execute the user request with AI provider if available
         try:
@@ -836,13 +793,9 @@ class WorkflowOrchestrator:
         success = result.get("status") == "completed"
 
         if success:
-            context.console.print(
-                "[green]✓ Action completed successfully[/green]"
-            )
+            context.console.print("[green]✓ Action completed successfully[/green]")
         else:
-            context.console.print(
-                "[red]✗ Action may not have completed fully[/red]"
-            )
+            context.console.print("[red]✗ Action may not have completed fully[/red]")
 
         context.set("verification_success", success)
         return success
@@ -859,9 +812,7 @@ class WorkflowOrchestrator:
             if "ai_response" in result:
                 # Don't show summary if we have the actual AI response - it will be shown in interface
                 summary = f"✅ Successfully completed: {user_request}"
-                context.console.print(
-                    f"[bold green]📋 Summary:[/bold green] {summary}"
-                )
+                context.console.print(f"[bold green]📋 Summary:[/bold green] {summary}")
             else:
                 summary = f"✅ Successfully completed: {user_request}\n\nAction taken: {result.get('action_taken', 'Autonomous workflow execution')}"
                 context.console.print(
@@ -869,9 +820,7 @@ class WorkflowOrchestrator:
                 )
         else:
             summary = f"⚠️ Partially completed: {user_request}\n\nStatus: Some issues may have occurred during execution"
-            context.console.print(
-                f"[bold yellow]📋 Summary:[/bold yellow]\n{summary}"
-            )
+            context.console.print(f"[bold yellow]📋 Summary:[/bold yellow]\n{summary}")
 
         context.set("final_summary", summary)
         return summary

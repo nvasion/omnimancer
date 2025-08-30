@@ -5,10 +5,11 @@ This module contains all provider configuration and setup methods,
 including provider selection, API key management, and model selection.
 """
 
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
 from rich.console import Console
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
-from rich.prompt import Prompt, Confirm
 
 from .models import ProviderConfig
 from .setup_wizard_ui import SetupWizardUI
@@ -17,9 +18,7 @@ from .setup_wizard_ui import SetupWizardUI
 class SetupWizardProviderSetup:
     """Provider setup methods for the setup wizard."""
 
-    def __init__(
-        self, console: Console, provider_info: Dict[str, Dict[str, Any]]
-    ):
+    def __init__(self, console: Console, provider_info: Dict[str, Dict[str, Any]]):
         """
         Initialize the provider setup component.
 
@@ -50,9 +49,7 @@ class SetupWizardProviderSetup:
         providers = list(self.provider_info.keys())
         for i, provider_key in enumerate(providers, 1):
             info = self.provider_info[provider_key]
-            strengths = ", ".join(
-                info["strengths"][:2]
-            )  # Show first 2 strengths
+            strengths = ", ".join(info["strengths"][:2])  # Show first 2 strengths
             table.add_row(str(i), info["name"], info["description"], strengths)
 
         self.console.print(table)
@@ -63,8 +60,7 @@ class SetupWizardProviderSetup:
             try:
                 choice = Prompt.ask(
                     "Select a provider",
-                    choices=[str(i) for i in range(1, len(providers) + 1)]
-                    + ["q"],
+                    choices=[str(i) for i in range(1, len(providers) + 1)] + ["q"],
                     default="1",
                 )
 
@@ -83,13 +79,9 @@ class SetupWizardProviderSetup:
                     return selected_provider
 
             except (ValueError, IndexError):
-                self.console.print(
-                    "[red]Invalid selection. Please try again.[/red]"
-                )
+                self.console.print("[red]Invalid selection. Please try again.[/red]")
 
-    async def configure_provider(
-        self, provider_name: str
-    ) -> Optional[ProviderConfig]:
+    async def configure_provider(self, provider_name: str) -> Optional[ProviderConfig]:
         """
         Configure a specific provider with validation.
 
@@ -103,9 +95,7 @@ class SetupWizardProviderSetup:
 
         self.console.print(f"\n[bold]Configuring {info['name']}[/bold]")
         self.console.print(f"[dim]{info['setup_notes']}[/dim]")
-        self.console.print(
-            f"[dim]Get your API key from: {info['api_key_url']}[/dim]\n"
-        )
+        self.console.print(f"[dim]Get your API key from: {info['api_key_url']}[/dim]\n")
 
         # Get API key (if required)
         api_key = None
@@ -137,9 +127,7 @@ class SetupWizardProviderSetup:
 
         return ProviderConfig(**config_data)
 
-    def _get_api_key(
-        self, provider_name: str, info: Dict[str, Any]
-    ) -> Optional[str]:
+    def _get_api_key(self, provider_name: str, info: Dict[str, Any]) -> Optional[str]:
         """
         Get and validate API key from user.
 
@@ -151,14 +139,10 @@ class SetupWizardProviderSetup:
             Valid API key or None if cancelled
         """
         while True:
-            api_key = Prompt.ask(
-                f"Enter your {info['name']} API key", password=True
-            )
+            api_key = Prompt.ask(f"Enter your {info['name']} API key", password=True)
 
             if not api_key:
-                if not Confirm.ask(
-                    "API key is required. Continue without it?"
-                ):
+                if not Confirm.ask("API key is required. Continue without it?"):
                     continue
                 return None
 
@@ -174,9 +158,7 @@ class SetupWizardProviderSetup:
 
             return api_key
 
-    def _select_model(
-        self, provider_name: str, info: Dict[str, Any]
-    ) -> Optional[str]:
+    def _select_model(self, provider_name: str, info: Dict[str, Any]) -> Optional[str]:
         """
         Select model for the provider.
 
@@ -236,13 +218,9 @@ class SetupWizardProviderSetup:
                 self.console.print("  • [dim]gemini-2.0-flash-exp[/dim]")
             elif provider_name == "openrouter":
                 self.console.print("Examples:")
-                self.console.print(
-                    "  • [dim]anthropic/claude-3.5-sonnet[/dim]"
-                )
+                self.console.print("  • [dim]anthropic/claude-3.5-sonnet[/dim]")
                 self.console.print("  • [dim]openai/gpt-4o[/dim]")
-                self.console.print(
-                    "  • [dim]meta-llama/llama-3.1-70b-instruct[/dim]"
-                )
+                self.console.print("  • [dim]meta-llama/llama-3.1-70b-instruct[/dim]")
             elif provider_name == "ollama":
                 self.console.print("Examples:")
                 self.console.print("  • [dim]llama3:8b[/dim]")
@@ -250,12 +228,8 @@ class SetupWizardProviderSetup:
                 self.console.print("  • [dim]codellama:13b[/dim]")
             elif provider_name == "perplexity":
                 self.console.print("Examples:")
-                self.console.print(
-                    "  • [dim]llama-3.1-sonar-large-128k-online[/dim]"
-                )
-                self.console.print(
-                    "  • [dim]llama-3.1-sonar-small-128k-online[/dim]"
-                )
+                self.console.print("  • [dim]llama-3.1-sonar-large-128k-online[/dim]")
+                self.console.print("  • [dim]llama-3.1-sonar-small-128k-online[/dim]")
             elif provider_name == "xai":
                 self.console.print("Examples:")
                 self.console.print("  • [dim]grok-beta[/dim]")
@@ -272,12 +246,8 @@ class SetupWizardProviderSetup:
                 self.console.print("  • [dim]command[/dim]")
             elif provider_name == "azure":
                 self.console.print("Examples:")
-                self.console.print(
-                    "  • [dim]gpt-4[/dim] (your deployment name)"
-                )
-                self.console.print(
-                    "  • [dim]gpt-35-turbo[/dim] (your deployment name)"
-                )
+                self.console.print("  • [dim]gpt-4[/dim] (your deployment name)")
+                self.console.print("  • [dim]gpt-35-turbo[/dim] (your deployment name)")
                 self.console.print(
                     "  • [dim]my-custom-model[/dim] (your deployment name)"
                 )
@@ -333,25 +303,19 @@ class SetupWizardProviderSetup:
         }
 
         for i, model in enumerate(models, 1):
-            description = model_descriptions.get(
-                model, "High-quality AI model"
-            )
+            description = model_descriptions.get(model, "High-quality AI model")
             table.add_row(str(i), model, description)
 
         # Add custom option for non-Bedrock providers
         if provider_name != "bedrock":
-            table.add_row(
-                str(len(models) + 1), "[Custom]", "Enter custom model name"
-            )
+            table.add_row(str(len(models) + 1), "[Custom]", "Enter custom model name")
 
         self.console.print(table)
 
         # Get user selection
         while True:
             try:
-                max_choice = len(models) + (
-                    1 if provider_name != "bedrock" else 0
-                )
+                max_choice = len(models) + (1 if provider_name != "bedrock" else 0)
                 choice = Prompt.ask(
                     "Select a model",
                     choices=[str(i) for i in range(1, max_choice + 1)],
@@ -361,10 +325,7 @@ class SetupWizardProviderSetup:
                 choice_num = int(choice)
 
                 # Handle custom option for non-Bedrock providers
-                if (
-                    provider_name != "bedrock"
-                    and choice_num == len(models) + 1
-                ):
+                if provider_name != "bedrock" and choice_num == len(models) + 1:
                     custom_model = Prompt.ask("Enter custom model name")
                     if custom_model:
                         return custom_model
@@ -375,9 +336,7 @@ class SetupWizardProviderSetup:
                 return models[model_index]
 
             except (ValueError, IndexError):
-                self.console.print(
-                    "[red]Invalid selection. Please try again.[/red]"
-                )
+                self.console.print("[red]Invalid selection. Please try again.[/red]")
 
     def _get_additional_settings(self, provider_name: str) -> Dict[str, Any]:
         """
@@ -409,9 +368,7 @@ class SetupWizardProviderSetup:
 
         # Provider-specific settings
         if provider_name == "ollama":
-            base_url = Prompt.ask(
-                "Ollama server URL", default="http://localhost:11434"
-            )
+            base_url = Prompt.ask("Ollama server URL", default="http://localhost:11434")
             settings["base_url"] = base_url
         elif provider_name == "bedrock":
             # AWS region selection is required for Bedrock
@@ -490,12 +447,8 @@ class SetupWizardProviderSetup:
                         f"[green]✅ {self.provider_info[provider_name]['name']} added to your providers![/green]"
                     )
 
-            self.console.print(
-                "[green]✅ Configuration saved successfully![/green]"
-            )
+            self.console.print("[green]✅ Configuration saved successfully![/green]")
 
         except Exception as e:
-            self.console.print(
-                f"[red]❌ Failed to save configuration: {e}[/red]"
-            )
+            self.console.print(f"[red]❌ Failed to save configuration: {e}[/red]")
             raise

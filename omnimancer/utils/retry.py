@@ -8,7 +8,7 @@ for handling transient errors in API calls and other operations.
 import asyncio
 import logging
 import random
-from typing import Any, Callable, Optional, Type, Union
+from typing import Any, Callable, Optional
 
 from .errors import NetworkError, RateLimitError
 
@@ -165,9 +165,7 @@ class RetryHandler:
         )
         raise last_exception
 
-    def execute_sync_with_retry(
-        self, func: Callable[..., Any], *args, **kwargs
-    ) -> Any:
+    def execute_sync_with_retry(self, func: Callable[..., Any], *args, **kwargs) -> Any:
         """
         Execute a synchronous function with retry logic.
 

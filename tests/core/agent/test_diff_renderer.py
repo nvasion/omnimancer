@@ -5,28 +5,25 @@ This module tests the enhanced diff display and code highlighting system
 for the Omnimancer approval interface.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import Mock, patch
 
 from rich.console import Console
-from rich.text import Text
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 from rich.tree import Tree
 
 from omnimancer.core.agent.diff_renderer import (
-    EnhancedDiffRenderer,
-    DiffType,
-    FileChangeType,
-    FileChange,
     DiffChunk,
+    DiffType,
+    EnhancedDiffRenderer,
+    FileChange,
+    FileChangeType,
+    compare_files,
     create_diff_renderer,
     render_git_diff,
-    compare_files,
 )
 from omnimancer.core.agent.rich_renderer import (
-    RichTextRenderer,
     create_renderer,
 )
 
@@ -36,9 +33,7 @@ class TestFileChange:
 
     def test_file_change_creation(self):
         """Test FileChange creation with default values."""
-        change = FileChange(
-            file_path="test.py", change_type=FileChangeType.MODIFIED
-        )
+        change = FileChange(file_path="test.py", change_type=FileChangeType.MODIFIED)
 
         assert change.file_path == "test.py"
         assert change.change_type == FileChangeType.MODIFIED
@@ -115,9 +110,7 @@ class TestEnhancedDiffRenderer:
         rich_renderer = create_renderer()
         console = Console()
 
-        diff_renderer = EnhancedDiffRenderer(
-            renderer=rich_renderer, console=console
-        )
+        diff_renderer = EnhancedDiffRenderer(renderer=rich_renderer, console=console)
 
         assert diff_renderer.renderer == rich_renderer
         assert diff_renderer.console == console
@@ -391,9 +384,7 @@ index 0000000..1234567
         old_line = "Hello world how are you"
         new_line = "Hello beautiful world how are you today"
 
-        old_formatted, new_formatted = renderer.render_word_diff(
-            old_line, new_line
-        )
+        old_formatted, new_formatted = renderer.render_word_diff(old_line, new_line)
 
         assert isinstance(old_formatted, Text)
         assert isinstance(new_formatted, Text)
@@ -408,9 +399,7 @@ index 0000000..1234567
         old_line = "Hello world"
         new_line = "Hello beautiful world"
 
-        old_formatted, new_formatted = renderer.render_word_diff(
-            old_line, new_line
-        )
+        old_formatted, new_formatted = renderer.render_word_diff(old_line, new_line)
 
         assert isinstance(old_formatted, Text)
         assert isinstance(new_formatted, Text)
@@ -598,9 +587,7 @@ class TestUtilityFunctions:
 
     @patch("omnimancer.core.agent.diff_renderer.Path")
     @patch("omnimancer.core.agent.diff_renderer.EnhancedDiffRenderer")
-    def test_compare_files_with_paths(
-        self, mock_renderer_class, mock_path_class
-    ):
+    def test_compare_files_with_paths(self, mock_renderer_class, mock_path_class):
         """Test file comparison utility with file paths."""
         # Mock Path constructor to return mock objects
         mock_old_path = Mock()
@@ -623,9 +610,7 @@ class TestUtilityFunctions:
         # Mock renderer
         mock_renderer = Mock()
         mock_renderer.console = Mock()
-        mock_renderer.render_file_content_comparison.return_value = Panel(
-            "Comparison"
-        )
+        mock_renderer.render_file_content_comparison.return_value = Panel("Comparison")
         mock_renderer_class.return_value = mock_renderer
 
         compare_files("old.py", "new.py", "test.py")
@@ -647,9 +632,7 @@ class TestUtilityFunctions:
         # Mock renderer
         mock_renderer = Mock()
         mock_renderer.console = Mock()
-        mock_renderer.render_file_content_comparison.return_value = Panel(
-            "Comparison"
-        )
+        mock_renderer.render_file_content_comparison.return_value = Panel("Comparison")
         mock_renderer_class.return_value = mock_renderer
 
         old_content = "old content"
