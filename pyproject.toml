@@ -87,9 +87,9 @@ disallow_untyped_defs = true
 
 [tool.flake8]
 max-line-length = 88
-extend-ignore = E203, W503
-select = C,E,F,W,B,B950
-exclude = .git,__pycache__,build,dist,.venv,venv
+extend-ignore = "E203, W503"
+select = "C,E,F,W,B,B950"
+exclude = ".git,__pycache__,build,dist,.venv,venv"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
