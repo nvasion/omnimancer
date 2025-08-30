@@ -38,7 +38,7 @@ def setup_wizard(mock_config_manager, mock_provider_registry):
 @pytest.fixture
 def mock_console():
     """Create mock console for testing output."""
-    with patch("omnimancer.core.setup_wizard.Console") as mock_console_class:
+    with patch("omnimancer.core.setup_wizard_core.Console") as mock_console_class:
         mock_console = Mock()
         mock_console_class.return_value = mock_console
         yield mock_console
@@ -79,8 +79,14 @@ class TestProviderSelection:
         """Test selecting a valid provider."""
         with (
             patch.object(setup_wizard, "console", mock_console),
-            patch("omnimancer.core.setup_wizard.Prompt.ask", return_value="1"),
-            patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=True),
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.Prompt.ask",
+                return_value="1",
+            ),
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.Confirm.ask",
+                return_value=True,
+            ),
             patch.object(setup_wizard, "_show_provider_details"),
         ):
 
@@ -94,7 +100,10 @@ class TestProviderSelection:
         """Test quitting provider selection."""
         with (
             patch.object(setup_wizard, "console", mock_console),
-            patch("omnimancer.core.setup_wizard.Prompt.ask", return_value="q"),
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.Prompt.ask",
+                return_value="q",
+            ),
         ):
 
             result = setup_wizard._select_provider()
@@ -120,7 +129,7 @@ class TestAPIKeyHandling:
         provider_info = setup_wizard.provider_info["openai"]
 
         with patch(
-            "omnimancer.core.setup_wizard.Prompt.ask",
+            "omnimancer.core.setup_wizard_provider_setup.Prompt.ask",
             return_value="sk-test123",
         ):
             result = setup_wizard._get_api_key("openai", provider_info)
@@ -131,8 +140,14 @@ class TestAPIKeyHandling:
         provider_info = setup_wizard.provider_info["openai"]
 
         with (
-            patch("omnimancer.core.setup_wizard.Prompt.ask", return_value=""),
-            patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=True),
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.Prompt.ask",
+                return_value="",
+            ),
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.Confirm.ask",
+                return_value=True,
+            ),
         ):
 
             result = setup_wizard._get_api_key("openai", provider_info)
@@ -174,7 +189,10 @@ class TestModelSelection:
 
         with (
             patch.object(setup_wizard, "console", mock_console),
-            patch("omnimancer.core.setup_wizard.Prompt.ask", return_value="1"),
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.Prompt.ask",
+                return_value="1",
+            ),
         ):
 
             result = setup_wizard._select_model("openai", provider_info)
@@ -186,7 +204,10 @@ class TestModelSelection:
 
         with (
             patch.object(setup_wizard, "console", mock_console),
-            patch("omnimancer.core.setup_wizard.Prompt.ask", side_effect=["999", "1"]),
+            patch(
+                "omnimancer.core.setup_wizard_provider_setup.Prompt.ask",
+                side_effect=["999", "1"],
+            ),
         ):
 
             result = setup_wizard._select_model("openai", provider_info)
@@ -263,7 +284,7 @@ class TestConfigurationTesting:
             patch.object(
                 setup_wizard.provider_factory, "create_provider"
             ) as mock_create,
-            patch("omnimancer.core.setup_wizard.Progress") as mock_progress,
+            patch("omnimancer.core.setup_wizard_validation.Progress") as mock_progress,
         ):
 
             mock_provider = AsyncMock()
@@ -288,8 +309,8 @@ class TestConfigurationTesting:
             patch.object(
                 setup_wizard.provider_factory, "create_provider"
             ) as mock_create,
-            patch("omnimancer.core.setup_wizard.Progress") as mock_progress,
-            patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=False),
+            patch("omnimancer.core.setup_wizard_validation.Progress") as mock_progress,
+            patch("omnimancer.core.setup_wizard_core.Confirm.ask", return_value=False),
         ):
 
             mock_provider = AsyncMock()
@@ -314,7 +335,7 @@ class TestConfigurationSaving:
         provider_config = ProviderConfig(api_key="sk-test123", model="gpt-4")
 
         # Mock Confirm.ask to avoid stdin issues in pytest
-        with patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=False):
+        with patch("omnimancer.core.setup_wizard_core.Confirm.ask", return_value=False):
             # Mock the config manager's methods
             with patch.object(
                 setup_wizard.config_manager, "get_config"
@@ -350,16 +371,16 @@ class TestUtilityMethods:
 
     def test_get_additional_settings_empty(self, setup_wizard):
         """Test getting additional settings returns empty dict by default."""
-        with patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=False):
+        with patch("omnimancer.core.setup_wizard_core.Confirm.ask", return_value=False):
             result = setup_wizard._get_additional_settings("openai")
             assert result == {}
 
     def test_get_additional_settings_with_values(self, setup_wizard):
         """Test getting additional settings with user input."""
         with (
-            patch("omnimancer.core.setup_wizard.Confirm.ask", return_value=True),
+            patch("omnimancer.core.setup_wizard_core.Confirm.ask", return_value=True),
             patch(
-                "omnimancer.core.setup_wizard.Prompt.ask",
+                "omnimancer.core.setup_wizard_provider_setup.Prompt.ask",
                 side_effect=["0.8", "2048"],
             ),
         ):

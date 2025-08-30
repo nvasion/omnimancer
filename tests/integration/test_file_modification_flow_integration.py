@@ -447,9 +447,7 @@ class TestFileModificationFlowIntegration:
             await asyncio.sleep(0.1)
 
             # Cancel the workflow
-            await self.workflow.cancel_workflow(
-                "cancel-test", "User cancelled"
-            )
+            await self.workflow.cancel_workflow("cancel-test", "User cancelled")
 
             try:
                 # Wait for the workflow to complete

@@ -155,9 +155,7 @@ class TestCoreEngineInitialization:
         """Test CoreEngine initialization."""
         with (
             patch("omnimancer.core.engine.HealthMonitor"),
-            patch(
-                "omnimancer.core.engine.ConversationManager"
-            ),
+            patch("omnimancer.core.engine.ConversationManager"),
         ):
 
             engine = CoreEngine(mock_config_manager)

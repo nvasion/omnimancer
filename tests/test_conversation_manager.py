@@ -192,9 +192,7 @@ class TestLoadConversation:
     def test_load_conversation_success(self, conversation_manager, sample_chat_context):
         """Test successful conversation loading."""
         # First save a conversation
-        conversation_manager.save_conversation(
-            sample_chat_context, "load_test"
-        )
+        conversation_manager.save_conversation(sample_chat_context, "load_test")
 
         # Then load it
         loaded_context = conversation_manager.load_conversation("load_test")
@@ -375,9 +373,7 @@ class TestDeleteConversation:
     ):
         """Test handling permission errors during deletion."""
         # Save conversation
-        conversation_manager.save_conversation(
-            sample_chat_context, "perm_test"
-        )
+        conversation_manager.save_conversation(sample_chat_context, "perm_test")
 
         with patch.object(Path, "unlink", side_effect=PermissionError("Access denied")):
             result = conversation_manager.delete_conversation("perm_test")
@@ -442,9 +438,7 @@ class TestExportConversation:
     def test_export_conversation_json(self, conversation_manager, sample_chat_context):
         """Test exporting conversation to JSON format."""
         # Save conversation
-        conversation_manager.save_conversation(
-            sample_chat_context, "export_json_test"
-        )
+        conversation_manager.save_conversation(sample_chat_context, "export_json_test")
 
         # Export to JSON (should return original file path)
         export_path = conversation_manager.export_conversation(

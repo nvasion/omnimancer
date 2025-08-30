@@ -353,9 +353,7 @@ class ConfigSecurityValidator:
             )
 
         # Security score (0-100)
-        len(self.critical_security_settings) + len(
-            self.recommended_security_settings
-        )
+        len(self.critical_security_settings) + len(self.recommended_security_settings)
         actual_issues = len(errors) + len(warnings)
         report["security_score"] = max(0, 100 - (actual_issues * 10))
 

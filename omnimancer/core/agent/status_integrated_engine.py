@@ -506,9 +506,7 @@ class StatusTrackingContext:
                 requires_approval=False,
             )
 
-            await self.engine._create_status_operation(
-                temp_operation
-            )
+            await self.engine._create_status_operation(temp_operation)
             self.operation_id = temp_operation.id
 
         return self
