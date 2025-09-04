@@ -74,6 +74,7 @@ class SetupWizardValidation:
             ):
                 progress.update(task, description="❌ Invalid API key format!")
                 await asyncio.sleep(0.5)
+                progress.stop()  # Stop the progress spinner before user interaction
                 self.console.print("[red]❌ API key format validation failed![/red]")
                 self.ui.show_troubleshooting_guidance(
                     provider_name, "Invalid API key format"
@@ -118,6 +119,7 @@ class SetupWizardValidation:
                         else:
                             progress.update(task, description="⚠️  Model access issue!")
                             await asyncio.sleep(0.5)
+                            progress.stop()  # Stop the progress spinner before showing warning
 
                             # Show detailed model access warning
                             self.console.print(
@@ -164,6 +166,7 @@ class SetupWizardValidation:
                                 description="⚠️  Model may not be available!",
                             )
                             await asyncio.sleep(0.5)
+                            progress.stop()  # Stop the progress spinner before user interaction
                             self.console.print(
                                 "[yellow]⚠️  Model availability could not be confirmed[/yellow]"
                             )
@@ -171,6 +174,7 @@ class SetupWizardValidation:
                 else:
                     progress.update(task, description="❌ API authentication failed!")
                     await asyncio.sleep(0.5)
+                    progress.stop()  # Stop the progress spinner before showing guidance
                     self.console.print("[red]❌ API authentication failed![/red]")
                     self.ui.show_troubleshooting_guidance(
                         provider_name, "Authentication failed"
@@ -180,6 +184,7 @@ class SetupWizardValidation:
             except Exception as e:
                 progress.update(task, description="❌ Connection test failed!")
                 await asyncio.sleep(0.5)
+                progress.stop()  # Stop the progress spinner before showing guidance
 
                 self.console.print(f"[red]❌ Configuration test failed: {e}[/red]")
 
@@ -227,6 +232,15 @@ class SetupWizardValidation:
             return api_key.startswith("xai-") and len(api_key) > 20
         elif provider_name == "bedrock":
             return api_key.startswith("ABSKQmVkcm9ja0FQSUtleS1") and len(api_key) > 50
+        elif provider_name == "openrouter":
+            return api_key.startswith("sk-or-") and len(api_key) > 10
+        elif provider_name == "azure":
+            # Azure uses the same key format as OpenAI
+            return len(api_key) == 32  # Azure keys are typically 32 characters
+        elif provider_name == "vertex":
+            # Vertex AI uses service account JSON or ADC, not API keys
+            # If an API key is provided, it's likely a service account key JSON
+            return len(api_key) > 100 or api_key.startswith("{")
         elif provider_name == "mistral":
             return len(api_key) > 20  # Mistral keys don't have consistent prefix
         elif provider_name == "cohere":
@@ -273,6 +287,30 @@ class SetupWizardValidation:
         Returns:
             True if model is available, False otherwise
         """
+        # Some providers have dynamic or user-defined model names that can't be validated
+        # against a static list, so we skip validation for them
+        provider_class_name = provider.__class__.__name__ if hasattr(provider, '__class__') else ""
+        
+        # OpenRouter supports hundreds of models, any model name is potentially valid
+        if provider_class_name == 'OpenRouterProvider':
+            return True
+            
+        # Azure uses deployment names which are user-defined
+        if provider_class_name == 'AzureProvider':
+            return True
+            
+        # Bedrock model names can vary by region and account permissions
+        if provider_class_name == 'BedrockProvider':
+            return True
+            
+        # Vertex AI model names can be custom or region-specific
+        if provider_class_name == 'VertexProvider':
+            return True
+            
+        # Ollama models are locally installed, validation happens at runtime
+        if provider_class_name == 'OllamaProvider':
+            return True
+            
         try:
             # Try to get available models with cancellation support
             async def model_availability_check():

@@ -180,6 +180,9 @@ class SetupWizardUI:
         elif provider_name == "gemini":
             guidance.append("  • Status Page: https://status.cloud.google.com/\n")
             guidance.append("  • Support: https://support.google.com/\n")
+        elif provider_name == "openrouter":
+            guidance.append("  • Models: https://openrouter.ai/models\n")
+            guidance.append("  • Documentation: https://openrouter.ai/docs\n")
         elif provider_name == "ollama":
             guidance.append("  • Documentation: https://ollama.ai/docs\n")
             guidance.append("  • GitHub: https://github.com/ollama/ollama\n")
@@ -275,6 +278,47 @@ class SetupWizardUI:
             guidance.append("  • Verify the model supports your use case\n")
             guidance.append("  • Try 'command-light' for faster responses\n\n")
 
+        elif provider_name == "azure":
+            guidance.append("☁️ Azure OpenAI-Specific:\n", style="bold")
+            guidance.append("  • Ensure you're using the correct endpoint URL\n")
+            guidance.append("  • Verify deployment name matches your Azure setup\n")
+            guidance.append("  • Check API version is compatible (2024-02-01 or later)\n")
+            guidance.append("  • Confirm resource group has the deployment\n")
+            guidance.append("  • Test with Azure OpenAI Studio first\n\n")
+
+        elif provider_name == "vertex":
+            guidance.append("🔺 Vertex AI-Specific:\n", style="bold")
+            guidance.append("  • Enable Vertex AI API in Google Cloud Console\n")
+            guidance.append("  • Set up Application Default Credentials (ADC)\n")
+            guidance.append("  • Verify project ID and location are correct\n")
+            guidance.append("  • Check IAM permissions for Vertex AI\n")
+            guidance.append("  • Ensure billing is enabled for the project\n\n")
+
+        elif provider_name == "bedrock":
+            guidance.append("🪨 AWS Bedrock-Specific:\n", style="bold")
+            guidance.append("  • Request model access in AWS Console first\n")
+            guidance.append("  • Verify AWS region supports your model\n")
+            guidance.append("  • Check IAM permissions include bedrock:InvokeModel\n")
+            guidance.append("  • Ensure AWS credentials are properly configured\n")
+            guidance.append("  • Try 'anthropic.claude-3-sonnet' if available\n\n")
+
+        elif provider_name == "claude-code":
+            guidance.append("💻 Claude Code-Specific:\n", style="bold")
+            guidance.append("  • Ensure Claude Code is running locally\n")
+            guidance.append("  • Check the local server is accessible\n")
+            guidance.append("  • Verify no firewall blocking local connections\n")
+            guidance.append("  • Try restarting Claude Code if connection fails\n")
+            guidance.append("  • This is for local development only\n\n")
+
+        elif provider_name == "openrouter":
+            guidance.append("🔀 OpenRouter-Specific:\n", style="bold")
+            guidance.append("  • Ensure your API key starts with 'sk-or-'\n")
+            guidance.append("  • Check account has sufficient credits\n")
+            guidance.append("  • Verify model is available (models vary by region)\n")
+            guidance.append("  • Try 'anthropic/claude-3.5-sonnet' for best results\n")
+            guidance.append("  • Enable fallback if models are unavailable\n")
+            guidance.append("  • Check https://openrouter.ai/models for model list\n\n")
+        
         elif provider_name == "ollama":
             guidance.append("🏠 Ollama-Specific:\n", style="bold")
             guidance.append("  • Start Ollama server: 'ollama serve'\n")

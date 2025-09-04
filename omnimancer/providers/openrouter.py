@@ -570,7 +570,8 @@ class OpenRouterProvider(BaseProvider):
         Get list of popular OpenRouter models.
 
         Note: OpenRouter has hundreds of models. This returns a curated list
-        of the most popular and capable models.
+        of the most popular and capable models. Any valid model name from
+        https://openrouter.ai/models will work, not just the ones listed here.
         """
         models = [
             EnhancedModelInfo(
