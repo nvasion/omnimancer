@@ -1,4 +1,5 @@
 # Omnimancer CLI
+## Just-In-Time Engineering, Inc.
 
 A unified command-line interface for multiple AI providers - chat with Claude, OpenAI, Gemini, and 10+ other AI models through a single, intuitive tool.
 

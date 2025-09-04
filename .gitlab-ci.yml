@@ -505,6 +505,7 @@ pages:
     - job: test:python
       artifacts: false
   script:
+    - apt-get update && apt-get install -y git make && rm -rf /var/lib/apt/lists/*
     - pip install sphinx sphinx-rtd-theme
     - cd docs || mkdir docs
     - sphinx-quickstart -q -p "Omnimancer CLI" -a "Kellan Strong" -v "${VERSION}" --ext-autodoc --ext-viewcode --makefile
