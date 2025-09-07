@@ -2,6 +2,32 @@
 
 # Changelog
 
+## [0.1.3] - 2025-09-07
+
+### Other Changes
+- Edit README.md - kick off pipeline
+- fixing issue with openrouter provider and others not propering going through /setup
+- Edit README.md
+- fixing unittests broken by black, ruff, and isort
+- fixing tool escaping in pyproject
+- more linting
+- More black linting and formating changes
+- removing dependencies on 3.8-9
+- removing python 3.8-9 dependencies
+- remove tag
+- updating the gitlab yaml
+- linting and updating the ci/cd workflow
+- linting and updating the ci/cd workflow
+- Update .gitlab-ci.yml file
+- Apply 1 suggestion(s) to 1 file(s)
+- Apply 1 suggestion(s) to 1 file(s)
+- Apply 1 suggestion(s) to 1 file(s)
+- Apply 1 suggestion(s) to 1 file(s)
+- adding gitlab ci
+
+
+# Changelog
+
 ## [0.1.2] - 2025-09-03
 
 ### Other Changes
