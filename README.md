@@ -110,7 +110,7 @@ Every file operation requires your explicit approval with:
 
 ### ⚡ **Quick Examples**
 
-```bash
+```bash 
 # Ask AI to create files
 >>> Create a Python script to analyze CSV data
 🔍 Shows preview → [Y] to approve → ✅ File created
