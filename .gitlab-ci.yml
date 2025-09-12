@@ -68,12 +68,27 @@ extract_version:
   extends: .default_setup
   script:
     - |
-      python - <<'PY' > version.env
-      from scripts.version_manager import get_current_version
-      v = get_current_version()
-      print(f"VERSION={v}")
-      print(f"PACKAGE_VERSION={v}")
-      PY
+      # For tag pipelines, use the tag version directly
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        VERSION="${CI_COMMIT_TAG#v}"
+        echo "Using version from tag: $VERSION"
+      else
+        # For other pipelines, get from pyproject.toml
+        VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
+        echo "Using version from pyproject.toml: $VERSION"
+      fi
+      
+      # Verify pyproject.toml matches for tag pipelines
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        FILE_VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
+        if [ "$VERSION" != "$FILE_VERSION" ]; then
+          echo "WARNING: Tag version ($VERSION) doesn't match file version ($FILE_VERSION)"
+          echo "Using tag version as authoritative"
+        fi
+      fi
+      
+      echo "VERSION=${VERSION}" > version.env
+      echo "PACKAGE_VERSION=${VERSION}" >> version.env
     - echo "Resolved version:"
     - cat version.env
   artifacts:
@@ -359,12 +374,26 @@ build:package:
     - extract_version
     - job: test:python
       artifacts: false
+    # If auto_bump_version exists in pipeline, wait for it to complete
+    - job: auto_bump_version
+      optional: true
+      artifacts: false
   script:
     - pip install build twine
     - |
       echo "Building package for version: ${VERSION}"
       echo "Current pyproject.toml version:"
       grep '^version = ' pyproject.toml
+      
+      # For tag pipelines, verify version matches tag
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        TAG_VERSION="${CI_COMMIT_TAG#v}"
+        FILE_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+        if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+          echo "ERROR: Tag version ($TAG_VERSION) doesn't match file version ($FILE_VERSION)"
+          exit 1
+        fi
+      fi
     - python -m build
     - ls -la dist/
     - twine check dist/*
@@ -375,8 +404,8 @@ build:package:
   rules:
     # Build on tags (for releases)
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
-    # Build on main (including manual deploys)
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    # Build on main ONLY if NOT a version bump commit
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE !~ /chore\(release\): bump version/'
     # Build on develop for testing
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
@@ -448,8 +477,8 @@ deploy:pypi:
     # Auto-deploy on tag pipelines (from auto_bump_version)
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
       when: on_success
-    # Manual deploy option from main branch as fallback
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    # Manual deploy option from main branch as fallback (but not on version bump commits)
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE !~ /chore\(release\): bump version/'
       when: manual
       allow_failure: true
 
