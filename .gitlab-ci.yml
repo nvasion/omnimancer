@@ -148,10 +148,16 @@ auto_bump_version:
       echo "New version: ${NEW_VERSION}"
       git add pyproject.toml CHANGELOG.md || true
       git commit -m "chore(release): bump version to ${NEW_VERSION} [skip ci]" || echo "No changes to commit"
-      git tag "v${NEW_VERSION}"
+      
+      # Create and push the tag - this will trigger a new pipeline for the release
+      git tag -a "v${NEW_VERSION}" -m "Release version ${NEW_VERSION}"
       git push origin "${CI_COMMIT_REF_NAME}"
       git push origin "v${NEW_VERSION}"
+      
+      # Save version for reference (though the tag pipeline will use its own)
       echo "VERSION=${NEW_VERSION}" > version.env
+      echo "Tagged and pushed version ${NEW_VERSION}"
+      echo "A new pipeline will be triggered for the tag to handle the PyPI release"
   artifacts:
     reports:
       dotenv: version.env
@@ -353,6 +359,10 @@ build:package:
       artifacts: false
   script:
     - pip install build twine
+    - |
+      echo "Building package for version: ${VERSION}"
+      echo "Current pyproject.toml version:"
+      grep '^version = ' pyproject.toml
     - python -m build
     - ls -la dist/
     - twine check dist/*
@@ -361,8 +371,11 @@ build:package:
       - dist/
     expire_in: 1 month
   rules:
-    - if: $CI_PIPELINE_SOURCE == "tag"
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    # Build on tags (for releases)
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
+    # Build on main for testing (but don't auto-deploy)
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE !~ /chore\(release\): bump version/'
+    # Build on develop for testing
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
 # ============================================================================
@@ -416,6 +429,11 @@ deploy:pypi:
         exit 1
       fi
     - |
+      # Verify we're deploying the correct version
+      echo "Package version from VERSION: ${VERSION}"
+      echo "Files in dist/:"
+      ls -la dist/
+      
       twine upload \
         --username __token__ \
         --password $PYPI_TOKEN \
@@ -425,11 +443,9 @@ deploy:pypi:
     name: production-pypi
     url: https://pypi.org/project/omnimancer-cli/
   rules:
+    # Only deploy on tag pipelines, not on branch pipelines
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
       when: on_success
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
-      allow_failure: true
 
 # Deploy to GitLab Package Registry
 deploy:gitlab_registry:
