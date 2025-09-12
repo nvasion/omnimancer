@@ -2,6 +2,14 @@
 
 # Changelog
 
+## [0.1.5] - 2025-09-12
+
+### Bug Fixes
+- fix: GitLab CI pipeline to properly handle version releases
+
+
+# Changelog
+
 ## [0.1.4] - 2025-09-12
 
 ### Bug Fixes
