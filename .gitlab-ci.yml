@@ -147,14 +147,15 @@ auto_bump_version:
       NEW_VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
       echo "New version: ${NEW_VERSION}"
       git add pyproject.toml CHANGELOG.md || true
-      git commit -m "chore(release): bump version to ${NEW_VERSION} [skip ci]" || echo "No changes to commit"
+      # Don't use [skip ci] as it prevents the tag pipeline from running!
+      git commit -m "chore(release): bump version to ${NEW_VERSION}" || echo "No changes to commit"
       
       # Create and push the tag - this will trigger a new pipeline for the release
       git tag -a "v${NEW_VERSION}" -m "Release version ${NEW_VERSION}"
       git push origin "${CI_COMMIT_REF_NAME}"
       git push origin "v${NEW_VERSION}"
       
-      # Save version for reference (though the tag pipeline will use its own)
+      # Save version for reference
       echo "VERSION=${NEW_VERSION}" > version.env
       echo "Tagged and pushed version ${NEW_VERSION}"
       echo "A new pipeline will be triggered for the tag to handle the PyPI release"
@@ -162,7 +163,8 @@ auto_bump_version:
     reports:
       dotenv: version.env
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    # Only run on main branch, not from version bump commits to avoid loops
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_MESSAGE !~ /chore\(release\): bump version/'
       when: on_success
     - when: never
 
@@ -373,8 +375,8 @@ build:package:
   rules:
     # Build on tags (for releases)
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
-    # Build on main for testing (but don't auto-deploy)
-    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE !~ /chore\(release\): bump version/'
+    # Build on main (including manual deploys)
+    - if: '$CI_COMMIT_BRANCH == "main"'
     # Build on develop for testing
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
@@ -443,9 +445,13 @@ deploy:pypi:
     name: production-pypi
     url: https://pypi.org/project/omnimancer-cli/
   rules:
-    # Only deploy on tag pipelines, not on branch pipelines
+    # Auto-deploy on tag pipelines (from auto_bump_version)
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
       when: on_success
+    # Manual deploy option from main branch as fallback
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: true
 
 # Deploy to GitLab Package Registry
 deploy:gitlab_registry:
