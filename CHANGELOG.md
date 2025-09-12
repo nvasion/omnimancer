@@ -2,6 +2,14 @@
 
 # Changelog
 
+## [0.1.4] - 2025-09-12
+
+### Bug Fixes
+- fix: GitLab CI pipeline to correctly deploy version from tag
+
+
+# Changelog
+
 ## [0.1.3] - 2025-09-07
 
 ### Other Changes
