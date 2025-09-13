@@ -87,7 +87,7 @@ extract_version:
     - if: $CI_PIPELINE_SOURCE == "push"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "web"
-    - if: $CI_PIPELINE_SOURCE == "tag"
+    - if: $CI_COMMIT_TAG  # Tag pipelines
 
 # Automatic version bump on main branch
 auto_bump_version:
@@ -262,7 +262,7 @@ test:python:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH
-    - if: $CI_PIPELINE_SOURCE == "tag"
+    - if: $CI_COMMIT_TAG  # Tag pipelines
 
 test:integration:
   stage: test
