@@ -68,6 +68,15 @@ extract_version:
   extends: .default_setup
   script:
     - |
+      # Debug: Show what commit we're on
+      echo "Current commit: ${CI_COMMIT_SHA}"
+      echo "Current tag (if any): ${CI_COMMIT_TAG}"
+      echo "Current ref: ${CI_COMMIT_REF_NAME}"
+      
+      # Show the actual version in pyproject.toml
+      echo "Version in pyproject.toml:"
+      grep '^version = ' pyproject.toml
+      
       # Always get version from pyproject.toml (which should be correct)
       python - <<'PY' > version.env
       from scripts.version_manager import get_current_version
@@ -361,6 +370,8 @@ build:package:
     - job: test:python
       artifacts: false
   script:
+    # Clean any old build artifacts first
+    - rm -rf dist/ build/ *.egg-info
     - pip install build twine
     - |
       echo "Building package for version: ${VERSION}"
