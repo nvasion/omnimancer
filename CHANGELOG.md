@@ -2,6 +2,17 @@
 
 # Changelog
 
+## [0.1.9] - 2025-09-13
+
+### Bug Fixes
+- fix: PROPERLY fix version extraction for tag pipelines
+
+### Other Changes
+- debug: Add more logging and clean old artifacts before build
+
+
+# Changelog
+
 ## [0.1.8] - 2025-09-13
 
 ### Features
