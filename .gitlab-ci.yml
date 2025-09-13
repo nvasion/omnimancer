@@ -385,13 +385,14 @@ build:package:
       echo "Current pyproject.toml version:"
       grep '^version = ' pyproject.toml
       
-      # For tag pipelines, verify version matches tag
+      # For tag pipelines, ensure we use the VERSION from extract_version (not pyproject.toml)
       if [ -n "$CI_COMMIT_TAG" ]; then
-        TAG_VERSION="${CI_COMMIT_TAG#v}"
-        FILE_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-        if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
-          echo "ERROR: Tag version ($TAG_VERSION) doesn't match file version ($FILE_VERSION)"
-          exit 1
+        echo "Tag pipeline detected. Using VERSION=${VERSION} from extract_version job"
+        # Update pyproject.toml to match the tag version if needed
+        CURRENT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+        if [ "$VERSION" != "$CURRENT_VERSION" ]; then
+          echo "Updating pyproject.toml version from $CURRENT_VERSION to $VERSION"
+          sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$VERSION\"/" pyproject.toml
         fi
       fi
     - python -m build
