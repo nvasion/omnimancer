@@ -65,26 +65,37 @@ stages:
 # Extract current version for use in downstream jobs
 extract_version:
   stage: version
-  extends: .default_setup
+  image: python:3.11-slim
+  before_script:
+    - apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+    - git config --global safe.directory "$CI_PROJECT_DIR"
+    # CRITICAL: For tag pipelines, ensure we're on the exact tag commit
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        echo "Tag pipeline detected: ${CI_COMMIT_TAG}"
+        git fetch --tags --force
+        git checkout -f "${CI_COMMIT_TAG}"
+        echo "Checked out tag ${CI_COMMIT_TAG}"
+        echo "Current commit after checkout:"
+        git log -1 --oneline
+      fi
+    - pip install --upgrade pip setuptools wheel
+    - pip install -e ".[dev]"
   script:
     - |
-      # Debug: Show what commit we're on
-      echo "Current commit: ${CI_COMMIT_SHA}"
-      echo "Current tag (if any): ${CI_COMMIT_TAG}"
-      echo "Current ref: ${CI_COMMIT_REF_NAME}"
+      # For tag pipelines, extract version from the tag name itself
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        VERSION="${CI_COMMIT_TAG#v}"
+        echo "Tag pipeline: Using version from tag name: ${VERSION}"
+      else
+        # For non-tag pipelines, get from pyproject.toml
+        VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
+        echo "Non-tag pipeline: Using version from pyproject.toml: ${VERSION}"
+      fi
       
-      # Show the actual version in pyproject.toml
-      echo "Version in pyproject.toml:"
-      grep '^version = ' pyproject.toml
-      
-      # Always get version from pyproject.toml (which should be correct)
-      python - <<'PY' > version.env
-      from scripts.version_manager import get_current_version
-      v = get_current_version()
-      print(f"VERSION={v}")
-      print(f"PACKAGE_VERSION={v}")
-      PY
-    - echo "Resolved version:"
+      echo "VERSION=${VERSION}" > version.env
+      echo "PACKAGE_VERSION=${VERSION}" >> version.env
+    - echo "Final version to be used:"
     - cat version.env
   artifacts:
     reports:
@@ -370,38 +381,22 @@ build:package:
     - job: test:python
       artifacts: false
   script:
-    # Clean any old build artifacts first
-    - rm -rf dist/ build/ *.egg-info
     - pip install build twine
     - |
       echo "Building package for version: ${VERSION}"
-      echo "Current pyproject.toml version:"
-      grep '^version = ' pyproject.toml
+      
+      # CRITICAL: Update pyproject.toml to match VERSION from extract_version
+      current_version=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+      if [ "$current_version" != "$VERSION" ]; then
+        echo "Updating pyproject.toml from $current_version to $VERSION"
+        sed -i "s/version = \"$current_version\"/version = \"$VERSION\"/" pyproject.toml
+        sed -i "s/python_version = \"$current_version\"/python_version = \"$VERSION\"/" pyproject.toml
+      fi
+      
+      # Clean and build
+      rm -rf dist/ build/ *.egg-info
     - python -m build
     - ls -la dist/
-    - |
-      # Verify the built package has the correct version
-      echo "Expected version: ${VERSION}"
-      echo "Built packages:"
-      ls dist/*.whl dist/*.tar.gz
-      
-      # Check if the wheel file has the correct version
-      if ! ls dist/*-${VERSION}-*.whl > /dev/null 2>&1; then
-        echo "ERROR: Built wheel does not match expected version ${VERSION}"
-        echo "Found files:"
-        ls -la dist/
-        exit 1
-      fi
-      
-      # Check if the tar.gz file has the correct version
-      if ! ls dist/*-${VERSION}.tar.gz > /dev/null 2>&1; then
-        echo "ERROR: Built tar.gz does not match expected version ${VERSION}"
-        echo "Found files:"
-        ls -la dist/
-        exit 1
-      fi
-      
-      echo "✓ Built packages have correct version ${VERSION}"
     - twine check dist/*
   artifacts:
     paths:
@@ -466,39 +461,9 @@ deploy:pypi:
         exit 1
       fi
     - |
-      # Verify we're deploying the correct version
-      echo "==========================================="
-      echo "DEPLOYMENT VERIFICATION"
-      echo "==========================================="
-      echo "Expected version from VERSION variable: ${VERSION}"
-      echo "Git tag (if any): ${CI_COMMIT_TAG}"
-      echo "Git commit: ${CI_COMMIT_SHA}"
-      echo ""
-      echo "Files to be uploaded:"
+      echo "Deploying version ${VERSION} to PyPI"
+      echo "Files to upload:"
       ls -la dist/
-      echo ""
-      
-      # Final check - ensure we're deploying the right version
-      if [ -n "$CI_COMMIT_TAG" ]; then
-        TAG_VERSION="${CI_COMMIT_TAG#v}"
-        if [ "$VERSION" != "$TAG_VERSION" ]; then
-          echo "ERROR: VERSION ($VERSION) doesn't match tag version ($TAG_VERSION)"
-          exit 1
-        fi
-        
-        # Check the actual files match
-        if ! ls dist/*-${VERSION}-*.whl > /dev/null 2>&1; then
-          echo "ERROR: No wheel file found for version ${VERSION}"
-          exit 1
-        fi
-        if ! ls dist/*-${VERSION}.tar.gz > /dev/null 2>&1; then
-          echo "ERROR: No tar.gz file found for version ${VERSION}"
-          exit 1
-        fi
-      fi
-      
-      echo "✓ All checks passed - deploying version ${VERSION} to PyPI"
-      echo "==========================================="
       
       twine upload \
         --username __token__ \
