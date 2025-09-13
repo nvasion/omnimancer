@@ -2,6 +2,14 @@
 
 # Changelog
 
+## [0.1.6] - 2025-09-13
+
+### Bug Fixes
+- fix: GitLab CI version synchronization for tag releases
+
+
+# Changelog
+
 ## [0.1.5] - 2025-09-12
 
 ### Bug Fixes
