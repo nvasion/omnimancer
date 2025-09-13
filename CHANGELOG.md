@@ -2,6 +2,14 @@
 
 # Changelog
 
+## [0.1.7] - 2025-09-13
+
+### Bug Fixes
+- fix: Ensure build:package uses VERSION from extract_version for tag pipelines
+
+
+# Changelog
+
 ## [0.1.6] - 2025-09-13
 
 ### Bug Fixes
