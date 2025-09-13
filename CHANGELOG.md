@@ -2,6 +2,18 @@
 
 # Changelog
 
+## [0.1.8] - 2025-09-13
+
+### Features
+- feat: Add comprehensive version verification to CI pipeline
+
+### Bug Fixes
+- fix: CRITICAL - Use correct CI variable for tag pipeline detection
+- fix: Simplify CI version handling for tag releases
+
+
+# Changelog
+
 ## [0.1.7] - 2025-09-13
 
 ### Bug Fixes
