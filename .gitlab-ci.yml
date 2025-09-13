@@ -368,6 +368,29 @@ build:package:
       grep '^version = ' pyproject.toml
     - python -m build
     - ls -la dist/
+    - |
+      # Verify the built package has the correct version
+      echo "Expected version: ${VERSION}"
+      echo "Built packages:"
+      ls dist/*.whl dist/*.tar.gz
+      
+      # Check if the wheel file has the correct version
+      if ! ls dist/*-${VERSION}-*.whl > /dev/null 2>&1; then
+        echo "ERROR: Built wheel does not match expected version ${VERSION}"
+        echo "Found files:"
+        ls -la dist/
+        exit 1
+      fi
+      
+      # Check if the tar.gz file has the correct version
+      if ! ls dist/*-${VERSION}.tar.gz > /dev/null 2>&1; then
+        echo "ERROR: Built tar.gz does not match expected version ${VERSION}"
+        echo "Found files:"
+        ls -la dist/
+        exit 1
+      fi
+      
+      echo "✓ Built packages have correct version ${VERSION}"
     - twine check dist/*
   artifacts:
     paths:
@@ -433,9 +456,38 @@ deploy:pypi:
       fi
     - |
       # Verify we're deploying the correct version
-      echo "Package version from VERSION: ${VERSION}"
-      echo "Files in dist/:"
+      echo "==========================================="
+      echo "DEPLOYMENT VERIFICATION"
+      echo "==========================================="
+      echo "Expected version from VERSION variable: ${VERSION}"
+      echo "Git tag (if any): ${CI_COMMIT_TAG}"
+      echo "Git commit: ${CI_COMMIT_SHA}"
+      echo ""
+      echo "Files to be uploaded:"
       ls -la dist/
+      echo ""
+      
+      # Final check - ensure we're deploying the right version
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        TAG_VERSION="${CI_COMMIT_TAG#v}"
+        if [ "$VERSION" != "$TAG_VERSION" ]; then
+          echo "ERROR: VERSION ($VERSION) doesn't match tag version ($TAG_VERSION)"
+          exit 1
+        fi
+        
+        # Check the actual files match
+        if ! ls dist/*-${VERSION}-*.whl > /dev/null 2>&1; then
+          echo "ERROR: No wheel file found for version ${VERSION}"
+          exit 1
+        fi
+        if ! ls dist/*-${VERSION}.tar.gz > /dev/null 2>&1; then
+          echo "ERROR: No tar.gz file found for version ${VERSION}"
+          exit 1
+        fi
+      fi
+      
+      echo "✓ All checks passed - deploying version ${VERSION} to PyPI"
+      echo "==========================================="
       
       twine upload \
         --username __token__ \
