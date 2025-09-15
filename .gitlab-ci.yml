@@ -66,6 +66,8 @@ stages:
 extract_version:
   stage: version
   image: python:3.11-slim
+  variables:
+    GIT_DEPTH: "0"  # Ensure full history for proper tag resolution
   before_script:
     - apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
     - git config --global safe.directory "$CI_PROJECT_DIR"
@@ -73,11 +75,47 @@ extract_version:
     - |
       if [ -n "$CI_COMMIT_TAG" ]; then
         echo "Tag pipeline detected: ${CI_COMMIT_TAG}"
-        git fetch --tags --force
+        echo "Current directory: $(pwd)"
+        echo "Git remote URL: $(git remote -v)"
+
+        # Retry mechanism to handle repository synchronization delays
+        for i in 1 2 3 4 5; do
+          echo "Attempt $i: Fetching tags..."
+          git fetch --tags --force --prune origin
+
+          # Check if the tag exists locally
+          if git rev-parse "refs/tags/${CI_COMMIT_TAG}" >/dev/null 2>&1; then
+            echo "Tag ${CI_COMMIT_TAG} found locally"
+            break
+          fi
+
+          if [ $i -lt 5 ]; then
+            echo "Tag ${CI_COMMIT_TAG} not found yet, waiting 10 seconds before retry..."
+            sleep 10
+          else
+            echo "ERROR: Tag ${CI_COMMIT_TAG} not found after 5 attempts"
+            exit 1
+          fi
+        done
+
+        # Checkout the tag
+        echo "Checking out tag ${CI_COMMIT_TAG}..."
         git checkout -f "${CI_COMMIT_TAG}"
-        echo "Checked out tag ${CI_COMMIT_TAG}"
+
+        # Verify we're on the correct tag
+        current_tag=$(git describe --exact-match --tags 2>/dev/null || echo "none")
+        if [ "$current_tag" != "$CI_COMMIT_TAG" ]; then
+          echo "ERROR: Expected to be on tag ${CI_COMMIT_TAG} but got ${current_tag}"
+          exit 1
+        fi
+
+        echo "Successfully checked out tag ${CI_COMMIT_TAG}"
         echo "Current commit after checkout:"
         git log -1 --oneline
+
+        # Show the actual version in pyproject.toml for debugging
+        echo "Version in pyproject.toml:"
+        grep "^version = " pyproject.toml || echo "Version line not found!"
       fi
     - pip install --upgrade pip setuptools wheel
     - pip install -e ".[dev]"
@@ -87,16 +125,37 @@ extract_version:
       if [ -n "$CI_COMMIT_TAG" ]; then
         VERSION="${CI_COMMIT_TAG#v}"
         echo "Tag pipeline: Using version from tag name: ${VERSION}"
+
+        # Validate that the version in pyproject.toml matches the tag
+        PYPROJECT_VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
+        echo "Version in pyproject.toml: ${PYPROJECT_VERSION}"
+
+        if [ "$VERSION" != "$PYPROJECT_VERSION" ]; then
+          echo "WARNING: Tag version (${VERSION}) doesn't match pyproject.toml (${PYPROJECT_VERSION})"
+          echo "This might indicate a synchronization issue. Using tag version: ${VERSION}"
+        else
+          echo "✓ Version validation passed: tag and pyproject.toml both show ${VERSION}"
+        fi
       else
         # For non-tag pipelines, get from pyproject.toml
         VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
         echo "Non-tag pipeline: Using version from pyproject.toml: ${VERSION}"
       fi
-      
+
       echo "VERSION=${VERSION}" > version.env
       echo "PACKAGE_VERSION=${VERSION}" >> version.env
     - echo "Final version to be used:"
     - cat version.env
+    - |
+      # Additional validation for tag pipelines
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        echo "=== Tag Pipeline Validation ==="
+        echo "CI_COMMIT_TAG: ${CI_COMMIT_TAG}"
+        echo "CI_COMMIT_SHA: ${CI_COMMIT_SHA}"
+        echo "Current HEAD: $(git rev-parse HEAD)"
+        echo "Tag points to: $(git rev-list -n 1 ${CI_COMMIT_TAG})"
+        echo "==============================="
+      fi
   artifacts:
     reports:
       dotenv: version.env
@@ -116,7 +175,7 @@ auto_bump_version:
   variables:
     BUMP: "patch"
     GIT_STRATEGY: clone
-    GIT_DEPTH: "0"
+    GIT_DEPTH: "0"  # Already set, keeping for consistency
   before_script:
     - apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
     - pip install --upgrade pip
@@ -376,27 +435,63 @@ license_scanning:
 build:package:
   stage: build
   extends: .default_setup
-  needs: 
+  needs:
     - extract_version
     - job: test:python
       artifacts: false
   script:
     - pip install build twine
     - |
+      echo "=== Build Package Information ==="
       echo "Building package for version: ${VERSION}"
-      
+      echo "CI_COMMIT_TAG: ${CI_COMMIT_TAG:-not a tag pipeline}"
+      echo "CI_COMMIT_SHA: ${CI_COMMIT_SHA}"
+      echo "================================="
+
       # CRITICAL: Update pyproject.toml to match VERSION from extract_version
       current_version=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+      echo "Current version in pyproject.toml: $current_version"
+      echo "Target version from extract_version: $VERSION"
+
       if [ "$current_version" != "$VERSION" ]; then
         echo "Updating pyproject.toml from $current_version to $VERSION"
         sed -i "s/version = \"$current_version\"/version = \"$VERSION\"/" pyproject.toml
         sed -i "s/python_version = \"$current_version\"/python_version = \"$VERSION\"/" pyproject.toml
+
+        # Verify the update worked
+        updated_version=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+        if [ "$updated_version" != "$VERSION" ]; then
+          echo "ERROR: Failed to update version in pyproject.toml"
+          exit 1
+        fi
+        echo "✓ Successfully updated pyproject.toml to version $VERSION"
+      else
+        echo "✓ Version already correct in pyproject.toml"
       fi
-      
-      # Clean and build
+
+      # Clean old artifacts thoroughly
+      echo "Cleaning old build artifacts..."
       rm -rf dist/ build/ *.egg-info
+      rm -rf omnimancer.egg-info omnimancer_cli.egg-info
+      find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+      find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+
+      echo "Building distribution packages..."
     - python -m build
-    - ls -la dist/
+    - |
+      echo "=== Build Output ==="
+      echo "Contents of dist/:"
+      ls -la dist/
+      echo "===================="
+
+      # Verify the built packages have the correct version
+      for file in dist/*; do
+        if [[ $file == *"$VERSION"* ]]; then
+          echo "✓ Package $file has correct version"
+        else
+          echo "WARNING: Package $file may not have correct version"
+        fi
+      done
     - twine check dist/*
   artifacts:
     paths:
@@ -450,7 +545,7 @@ deploy:test_pypi:
 deploy:pypi:
   stage: deploy
   extends: .default_setup
-  needs: 
+  needs:
     - build:package
     - extract_version
   script:
@@ -461,15 +556,41 @@ deploy:pypi:
         exit 1
       fi
     - |
+      echo "=== PyPI Deployment Information ==="
       echo "Deploying version ${VERSION} to PyPI"
+      echo "CI_COMMIT_TAG: ${CI_COMMIT_TAG:-not a tag pipeline}"
+      echo "===================================="
+
       echo "Files to upload:"
       ls -la dist/
-      
+
+      # Verify package versions match expected version
+      expected_files=0
+      for file in dist/*; do
+        if [[ $file == *"${VERSION}"* ]]; then
+          echo "✓ $file matches expected version ${VERSION}"
+          expected_files=$((expected_files + 1))
+        else
+          echo "ERROR: $file does not match expected version ${VERSION}"
+          echo "This indicates a version mismatch in the build process"
+          exit 1
+        fi
+      done
+
+      if [ $expected_files -eq 0 ]; then
+        echo "ERROR: No files found with version ${VERSION}"
+        exit 1
+      fi
+
+      echo "Uploading to PyPI..."
       twine upload \
         --username __token__ \
         --password $PYPI_TOKEN \
         --skip-existing \
+        --verbose \
         dist/*
+
+      echo "✓ Successfully deployed version ${VERSION} to PyPI"
   environment:
     name: production-pypi
     url: https://pypi.org/project/omnimancer-cli/
