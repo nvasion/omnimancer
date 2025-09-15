@@ -2,6 +2,14 @@
 
 # Changelog
 
+## [0.1.11] - 2025-09-15
+
+### Other Changes
+- more pipeline fixes: trying a few things to update versions properly
+
+
+# Changelog
+
 ## [0.1.10] - 2025-09-15
 
 ### Other Changes
