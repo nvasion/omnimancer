@@ -282,7 +282,9 @@ class SetupWizardUI:
             guidance.append("☁️ Azure OpenAI-Specific:\n", style="bold")
             guidance.append("  • Ensure you're using the correct endpoint URL\n")
             guidance.append("  • Verify deployment name matches your Azure setup\n")
-            guidance.append("  • Check API version is compatible (2024-02-01 or later)\n")
+            guidance.append(
+                "  • Check API version is compatible (2024-02-01 or later)\n"
+            )
             guidance.append("  • Confirm resource group has the deployment\n")
             guidance.append("  • Test with Azure OpenAI Studio first\n\n")
 
@@ -318,7 +320,7 @@ class SetupWizardUI:
             guidance.append("  • Try 'anthropic/claude-3.5-sonnet' for best results\n")
             guidance.append("  • Enable fallback if models are unavailable\n")
             guidance.append("  • Check https://openrouter.ai/models for model list\n\n")
-        
+
         elif provider_name == "ollama":
             guidance.append("🏠 Ollama-Specific:\n", style="bold")
             guidance.append("  • Start Ollama server: 'ollama serve'\n")
