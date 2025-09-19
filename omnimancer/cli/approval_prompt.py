@@ -154,7 +154,7 @@ class CLIApprovalPrompt:
         """
         if isinstance(value, str):
             return value
-        return str(value) if value else ""
+        return str(value) if value is not None else ""
 
     async def prompt_for_file_modification_approval(
         self,
