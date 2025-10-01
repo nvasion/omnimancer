@@ -2,6 +2,14 @@
 
 # Changelog
 
+## [0.1.13] - 2025-10-01
+
+### Other Changes
+- Update .gitlab-ci.yml file
+
+
+# Changelog
+
 ## [0.1.12] - 2025-10-01
 
 ### Other Changes
