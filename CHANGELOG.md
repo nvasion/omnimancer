@@ -2,6 +2,16 @@
 
 # Changelog
 
+## [0.1.12] - 2025-10-01
+
+### Other Changes
+- Apply 1 suggestion(s) to 1 file(s)
+- fixing for comments
+- staging bug fix for Panel issue
+
+
+# Changelog
+
 ## [0.1.11] - 2025-09-15
 
 ### Other Changes
