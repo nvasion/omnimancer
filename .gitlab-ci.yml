@@ -146,6 +146,8 @@ auto_bump_version:
   artifacts:
     reports:
       dotenv: version.env
+    paths:
+      - version.env
   rules:
     # Only run on main branch, not from version bump commits to avoid loops
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_MESSAGE !~ /chore\(release\): bump version/'
