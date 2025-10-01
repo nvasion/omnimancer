@@ -62,91 +62,6 @@ stages:
 # Version Management Stage
 # ============================================================================
 
-# Extract current version for use in downstream jobs
-extract_version:
-  stage: version
-  image: python:3.11-slim
-  variables:
-    # For tag pipelines, ensure we have full Git history
-    GIT_DEPTH: "0"
-  before_script:
-    - apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-    - git config --global safe.directory "$CI_PROJECT_DIR"
-    # CRITICAL: For tag pipelines, ensure we're on the exact tag commit
-    - |
-      if [ -n "$CI_COMMIT_TAG" ]; then
-        echo "Tag pipeline detected: ${CI_COMMIT_TAG}"
-        echo "Initial state - Current HEAD: $(git rev-parse HEAD)"
-        echo "CI_COMMIT_SHA: ${CI_COMMIT_SHA}"
-
-        # Force fetch all refs to ensure we have the latest state
-        git fetch --tags --force --prune origin
-
-        # Show available tags for debugging
-        echo "Available tags matching pattern:"
-        git tag -l | grep "${CI_COMMIT_TAG}" || echo "Tag not found in local list"
-
-        # Checkout the specific tag
-        echo "Attempting to checkout tag ${CI_COMMIT_TAG}..."
-        git checkout -f "${CI_COMMIT_TAG}"
-
-        # Verify we're on the correct commit
-        echo "After checkout - Current HEAD: $(git rev-parse HEAD)"
-        echo "Tag ${CI_COMMIT_TAG} points to: $(git rev-list -n 1 ${CI_COMMIT_TAG})"
-
-        if [ "$(git rev-parse HEAD)" != "$(git rev-list -n 1 ${CI_COMMIT_TAG})" ]; then
-          echo "ERROR: HEAD doesn't match tag commit!"
-          exit 1
-        fi
-
-        echo "✓ Successfully checked out tag ${CI_COMMIT_TAG}"
-        echo "Current commit info:"
-        git log -1 --oneline
-      else
-        echo "Non-tag pipeline - using current checkout"
-      fi
-    - pip install --upgrade pip setuptools wheel
-    - pip install -e ".[dev]"
-  script:
-    - |
-      # For tag pipelines, extract version from the tag name itself
-      if [ -n "$CI_COMMIT_TAG" ]; then
-        VERSION="${CI_COMMIT_TAG#v}"
-        echo "Tag pipeline: Using version from tag name: ${VERSION}"
-
-        # CRITICAL: Validate that pyproject.toml matches the tag version
-        PYPROJECT_VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
-        echo "Version in pyproject.toml: ${PYPROJECT_VERSION}"
-
-        if [ "$VERSION" != "$PYPROJECT_VERSION" ]; then
-          echo "ERROR: Tag version (${VERSION}) doesn't match pyproject.toml (${PYPROJECT_VERSION})"
-          echo "This indicates the tag is pointing to the wrong commit!"
-          echo "Tag should point to a commit where pyproject.toml has version ${VERSION}"
-          exit 1
-        else
-          echo "✓ Version validation passed: tag ${CI_COMMIT_TAG} matches pyproject.toml version ${VERSION}"
-        fi
-      else
-        # For non-tag pipelines, get from pyproject.toml
-        VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
-        echo "Non-tag pipeline: Using version from pyproject.toml: ${VERSION}"
-      fi
-
-      echo "VERSION=${VERSION}" > version.env
-      echo "PACKAGE_VERSION=${VERSION}" >> version.env
-    - echo "Final version to be used:"
-    - cat version.env
-  artifacts:
-    reports:
-      dotenv: version.env
-    paths:
-      - version.env
-    expire_in: 1 day
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_PIPELINE_SOURCE == "web"
-    - if: $CI_COMMIT_TAG  # Tag pipelines
 
 # Automatic version bump on main branch
 auto_bump_version:
@@ -237,6 +152,7 @@ auto_bump_version:
       when: on_success
     - when: never
 
+
 # Manual version bump for specific version changes
 manual_bump_version:
   stage: version
@@ -248,6 +164,94 @@ manual_bump_version:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: manual
       allow_failure: true
+
+# Extract current version for use in downstream jobs
+extract_version:
+  stage: version
+  image: python:3.11-slim
+  needs:
+    - auto_bump_version
+  variables:
+    # For tag pipelines, ensure we have full Git history
+    GIT_DEPTH: "0"
+  before_script:
+    - apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+    - git config --global safe.directory "$CI_PROJECT_DIR"
+    # CRITICAL: For tag pipelines, ensure we're on the exact tag commit
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        echo "Tag pipeline detected: ${CI_COMMIT_TAG}"
+        echo "Initial state - Current HEAD: $(git rev-parse HEAD)"
+        echo "CI_COMMIT_SHA: ${CI_COMMIT_SHA}"
+
+        # Force fetch all refs to ensure we have the latest state
+        git fetch --tags --force --prune origin
+
+        # Show available tags for debugging
+        echo "Available tags matching pattern:"
+        git tag -l | grep "${CI_COMMIT_TAG}" || echo "Tag not found in local list"
+
+        # Checkout the specific tag
+        echo "Attempting to checkout tag ${CI_COMMIT_TAG}..."
+        git checkout -f "${CI_COMMIT_TAG}"
+
+        # Verify we're on the correct commit
+        echo "After checkout - Current HEAD: $(git rev-parse HEAD)"
+        echo "Tag ${CI_COMMIT_TAG} points to: $(git rev-list -n 1 ${CI_COMMIT_TAG})"
+
+        if [ "$(git rev-parse HEAD)" != "$(git rev-list -n 1 ${CI_COMMIT_TAG})" ]; then
+          echo "ERROR: HEAD doesn't match tag commit!"
+          exit 1
+        fi
+
+        echo "✓ Successfully checked out tag ${CI_COMMIT_TAG}"
+        echo "Current commit info:"
+        git log -1 --oneline
+      else
+        echo "Non-tag pipeline - using current checkout"
+      fi
+    - pip install --upgrade pip setuptools wheel
+    - pip install -e ".[dev]"
+  script:
+    - |
+      # For tag pipelines, extract version from the tag name itself
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        VERSION="${CI_COMMIT_TAG#v}"
+        echo "Tag pipeline: Using version from tag name: ${VERSION}"
+
+        # CRITICAL: Validate that pyproject.toml matches the tag version
+        PYPROJECT_VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
+        echo "Version in pyproject.toml: ${PYPROJECT_VERSION}"
+
+        if [ "$VERSION" != "$PYPROJECT_VERSION" ]; then
+          echo "ERROR: Tag version (${VERSION}) doesn't match pyproject.toml (${PYPROJECT_VERSION})"
+          echo "This indicates the tag is pointing to the wrong commit!"
+          echo "Tag should point to a commit where pyproject.toml has version ${VERSION}"
+          exit 1
+        else
+          echo "✓ Version validation passed: tag ${CI_COMMIT_TAG} matches pyproject.toml version ${VERSION}"
+        fi
+      else
+        # For non-tag pipelines, get from pyproject.toml
+        VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
+        echo "Non-tag pipeline: Using version from pyproject.toml: ${VERSION}"
+      fi
+
+      echo "VERSION=${VERSION}" > version.env
+      echo "PACKAGE_VERSION=${VERSION}" >> version.env
+    - echo "Final version to be used:"
+    - cat version.env
+  artifacts:
+    reports:
+      dotenv: version.env
+    paths:
+      - version.env
+    expire_in: 1 day
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_COMMIT_TAG  # Tag pipelines
 
 # ============================================================================
 # Code Quality Stage
