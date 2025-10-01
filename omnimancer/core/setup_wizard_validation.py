@@ -289,28 +289,30 @@ class SetupWizardValidation:
         """
         # Some providers have dynamic or user-defined model names that can't be validated
         # against a static list, so we skip validation for them
-        provider_class_name = provider.__class__.__name__ if hasattr(provider, '__class__') else ""
-        
+        provider_class_name = (
+            provider.__class__.__name__ if hasattr(provider, "__class__") else ""
+        )
+
         # OpenRouter supports hundreds of models, any model name is potentially valid
-        if provider_class_name == 'OpenRouterProvider':
+        if provider_class_name == "OpenRouterProvider":
             return True
-            
+
         # Azure uses deployment names which are user-defined
-        if provider_class_name == 'AzureProvider':
+        if provider_class_name == "AzureProvider":
             return True
-            
+
         # Bedrock model names can vary by region and account permissions
-        if provider_class_name == 'BedrockProvider':
+        if provider_class_name == "BedrockProvider":
             return True
-            
+
         # Vertex AI model names can be custom or region-specific
-        if provider_class_name == 'VertexProvider':
+        if provider_class_name == "VertexProvider":
             return True
-            
+
         # Ollama models are locally installed, validation happens at runtime
-        if provider_class_name == 'OllamaProvider':
+        if provider_class_name == "OllamaProvider":
             return True
-            
+
         try:
             # Try to get available models with cancellation support
             async def model_availability_check():

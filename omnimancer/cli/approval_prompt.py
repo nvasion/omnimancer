@@ -142,6 +142,20 @@ class CLIApprovalPrompt:
             "cancel": ApprovalDecisionType.CANCELLED,
         }
 
+    def _ensure_string(self, value: Any) -> str:
+        """
+        Ensure a value is converted to string type.
+
+        Args:
+            value: Any value that may need conversion to string
+
+        Returns:
+            String representation of the value, empty string if None/falsy
+        """
+        if isinstance(value, str):
+            return value
+        return str(value) if value is not None else ""
+
     async def prompt_for_file_modification_approval(
         self,
         review_data: Dict[str, Any],
@@ -833,7 +847,7 @@ class CLIApprovalPrompt:
 
     def _display_new_file_preview(self, review_data: Dict[str, Any]):
         """Display preview of new file creation."""
-        new_content = review_data.get("new_content", "")
+        new_content = self._ensure_string(review_data.get("new_content", ""))
         file_path = Path(review_data["file_path"])
 
         # Show content preview with syntax highlighting if possible
@@ -867,9 +881,9 @@ class CLIApprovalPrompt:
 
     def _display_modification_preview(self, review_data: Dict[str, Any]):
         """Display preview of file modification."""
-        current_content = review_data.get("current_content", "")
-        new_content = review_data.get("new_content", "")
-        diff = review_data.get("diff", "")
+        current_content = self._ensure_string(review_data.get("current_content", ""))
+        new_content = self._ensure_string(review_data.get("new_content", ""))
+        diff = self._ensure_string(review_data.get("diff", ""))
 
         # Show current content summary if it exists
         if current_content:
@@ -887,6 +901,7 @@ class CLIApprovalPrompt:
 
     def _display_current_content_summary(self, current_content: str):
         """Display summary of current file content."""
+        current_content = self._ensure_string(current_content)
         lines = current_content.split("\n")
         total_lines = len(lines)
 
@@ -938,6 +953,8 @@ class CLIApprovalPrompt:
 
     def _display_side_by_side_preview(self, current_content: str, new_content: str):
         """Display side-by-side preview when diff is not available."""
+        current_content = self._ensure_string(current_content)
+        new_content = self._ensure_string(new_content)
         # Create table for side-by-side view
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Current Content", style="yellow", width=50)
@@ -965,6 +982,7 @@ class CLIApprovalPrompt:
 
     def _display_content_stats(self, content: str, is_new: bool = False):
         """Display content statistics."""
+        content = self._ensure_string(content)
         lines = content.split("\n")
         chars = len(content)
         words = len(content.split())
@@ -987,6 +1005,9 @@ class CLIApprovalPrompt:
 
     def _display_content_comparison_stats(self, current_content: str, new_content: str):
         """Display comparison statistics between current and new content."""
+        current_content = self._ensure_string(current_content)
+        new_content = self._ensure_string(new_content)
+
         current_lines = len(current_content.split("\n")) if current_content else 0
         new_lines = len(new_content.split("\n")) if new_content else 0
         current_chars = len(current_content) if current_content else 0
