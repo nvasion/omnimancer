@@ -280,9 +280,11 @@ class TestProgramExecutor:
             executor._validate_command("rm")
 
     def test_validate_command_not_whitelisted(self, executor):
-        """Test validation of non-whitelisted command."""
-        with pytest.raises(SecurityError, match="is not whitelisted"):
-            executor._validate_command("unknown_command")
+        """Test that non-forbidden commands pass validation (whitelist removed)."""
+        # After removing whitelist, unknown commands should pass validation
+        # Only explicitly forbidden commands should raise SecurityError
+        result = executor._validate_command("unknown_command")
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_execute_command_success(self, executor):

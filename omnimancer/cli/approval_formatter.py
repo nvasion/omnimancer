@@ -116,19 +116,10 @@ class CLIApprovalFormatter:
             if preview.diff:
                 components.append(self._format_diff_display(preview))
 
-        # Risk assessment
-        components.append(self._format_risk_assessment(approval_request))
-
-        # Impact assessment
-        if preview and preview.metadata:
-            components.append(self._format_impact_assessment(preview))
-
-        # Metadata information
-        if approval_request.metadata:
-            components.append(self._format_metadata(approval_request.metadata))
-
-        # Time information
-        components.append(self._format_time_info(approval_request))
+        # Metadata information (only if critical and not redundant)
+        # Removed: Risk assessment panel (redundant - already in header)
+        # Removed: Impact assessment panel (redundant - command shown in header/details)
+        # Removed: Time information panel (not critical for approval decision)
 
         # Separator before options
         components.append(Rule(style="dim"))
@@ -524,22 +515,13 @@ class CLIApprovalFormatter:
         options_text = [
             Text("Available Options:", style="bold white"),
             Text(),
+            Text("• y or yes - Approve this operation", style="bold green"),
             Text(
-                "• [bold green]y[/bold green] or [bold green]yes[/bold green] - Approve this operation",
-                style="green",
+                "• r or remember - Approve and remember for similar operations",
+                style="bold blue",
             ),
-            Text(
-                "• [bold blue]r[/bold blue] or [bold blue]remember[/bold blue] - Approve and remember for similar operations",
-                style="blue",
-            ),
-            Text(
-                "• [bold red]n[/bold red] or [bold red]no[/bold red] - Deny this operation",
-                style="red",
-            ),
-            Text(
-                "• [bold yellow]q[/bold yellow] or [bold yellow]quit[/bold yellow] - Cancel and exit",
-                style="yellow",
-            ),
+            Text("• n or no - Deny this operation", style="bold red"),
+            Text("• q or quit - Cancel and exit", style="bold yellow"),
             Text(),
             Text("Press Ctrl+C to cancel at any time.", style="dim"),
         ]
@@ -652,26 +634,16 @@ class CLIApprovalFormatter:
         options_text = [
             Text("Batch Approval Options:", style="bold white"),
             Text(),
+            Text("• all - Approve all operations", style="bold green"),
+            Text("• none - Deny all operations", style="bold red"),
             Text(
-                "• [bold green]all[/bold green] - Approve all operations",
-                style="green",
+                f"• select - Choose specific operations (1-{operation_count})",
+                style="bold blue",
             ),
             Text(
-                "• [bold red]none[/bold red] - Deny all operations",
-                style="red",
+                "• individual - Review each operation separately", style="bold yellow"
             ),
-            Text(
-                f"• [bold blue]select[/bold blue] - Choose specific operations (1-{operation_count})",
-                style="blue",
-            ),
-            Text(
-                "• [bold yellow]individual[/bold yellow] - Review each operation separately",
-                style="yellow",
-            ),
-            Text(
-                "• [bold yellow]q[/bold yellow] or [bold yellow]quit[/bold yellow] - Cancel batch",
-                style="yellow",
-            ),
+            Text("• q or quit - Cancel batch", style="bold yellow"),
             Text(),
             Text("Press Ctrl+C to cancel at any time.", style="dim"),
         ]

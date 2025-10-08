@@ -37,6 +37,7 @@ class SignalHandler:
         self.shutdown_event = asyncio.Event()
         self.active_operations: Set[asyncio.Task] = set()
         self.shutdown_in_progress = False
+        self.is_processing = False  # Track if actively processing user input
         logger.debug("SignalHandler initialized")
 
     def setup_signal_handlers(self) -> None:
@@ -61,8 +62,9 @@ class SignalHandler:
         Handle interrupt signals gracefully.
 
         This method is called when SIGINT or SIGTERM is received.
-        On the first signal, it initiates graceful shutdown.
-        On the second signal, it forces immediate exit.
+        - If processing: Cancel current operation and return to prompt
+        - If idle at prompt: Initiate shutdown
+        - On second signal: Force immediate exit
 
         Args:
             signum: Signal number
@@ -77,6 +79,20 @@ class SignalHandler:
             logger.info("Force exit requested, terminating immediately")
             os._exit(1)
 
+        # If actively processing, just cancel the current operation
+        if self.is_processing and self.active_operations:
+            print("\n⚠️  Operation cancelled. Returning to prompt...")
+            logger.info("Cancelling current operation due to SIGINT")
+
+            # Cancel all active operations
+            for task in self.active_operations.copy():
+                if not task.done():
+                    task.cancel()
+
+            # Don't initiate shutdown, just cancel the operation
+            return
+
+        # If idle at prompt, initiate shutdown
         self.shutdown_in_progress = True
         print("\nShutdown requested. Canceling operations...")
         logger.info("Graceful shutdown initiated")

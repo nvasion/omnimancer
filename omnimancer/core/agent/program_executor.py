@@ -69,6 +69,7 @@ class CommandResult:
     sandbox_info: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     was_terminated: bool = False
+    was_cancelled: bool = False  # True if user pressed 'q' to cancel
 
     @property
     def full_command(self) -> str:
@@ -85,7 +86,7 @@ class ExecutionConfig:
     max_output_size: int = 10 * 1024 * 1024  # 10MB
     working_directory: Optional[str] = None
     environment_vars: Dict[str, str] = field(default_factory=dict)
-    execution_mode: ExecutionMode = ExecutionMode.DEVELOPMENT
+    execution_mode: ExecutionMode = ExecutionMode.FULL_ACCESS
     enable_streaming: bool = True
     stream_callback: Optional[Callable[[str, str], None]] = (
         None  # (stream_type, content)
@@ -309,13 +310,8 @@ class CommandValidator:
 
         sanitized_args = []
         for arg in args:
-            # Remove dangerous characters and patterns
-            if any(char in arg for char in [";", "|", "&", "`", "$", ">"]):
-                # For now, reject arguments with shell metacharacters
-                # In production, this could be more sophisticated
-                raise SecurityError(f"Argument contains dangerous characters: {arg}")
-
-            # Ensure proper escaping
+            # Use shlex.quote() to properly escape arguments for safe shell execution
+            # This handles all special characters correctly, including |, ;, &, etc.
             sanitized_args.append(shlex.quote(arg))
 
         return sanitized_args
@@ -393,6 +389,10 @@ class EnhancedProgramExecutor:
         self.active_processes: Dict[str, SandboxedProcess] = {}
         self.execution_history: List[CommandResult] = []
 
+        # Note: Command classification is now handled by AI via metadata in system prompt
+        # The AI adds <!--read-only--> or <!--modifies-system--> before COMMAND_EXEC
+        # This eliminates the need for hardcoded pattern detection
+
     async def execute_command(
         self,
         command: str,
@@ -419,16 +419,12 @@ class EnhancedProgramExecutor:
         start_time = time.time()
 
         try:
-            # Validate command
-            if not self.validator.is_command_allowed(command, config.execution_mode):
-                raise SecurityError(
-                    f"Command '{command}' not allowed in {config.execution_mode.value} mode"
-                )
-
-            # Assess risk and request approval if needed
-            risk_level = self.validator.assess_command_risk(command, args)
+            # Approval is now controlled by AI metadata (<!--read-only--> vs <!--modifies-system-->)
+            # The interface.py parser sets requires_approval based on AI's classification
             if config.require_approval and self.approval_workflow:
-                approved = await self._request_approval(
+                # Assess risk for approval context
+                risk_level = self.validator.assess_command_risk(command, args)
+                approved, was_cancelled = await self._request_approval(
                     command, args, risk_level, config
                 )
                 if not approved:
@@ -437,7 +433,12 @@ class EnhancedProgramExecutor:
                         command=command,
                         args=args,
                         exit_code=-1,
-                        error_message="Command execution denied by user",
+                        error_message=(
+                            "User cancelled operation"
+                            if was_cancelled
+                            else "Command execution denied by user"
+                        ),
+                        was_cancelled=was_cancelled,
                     )
 
             # Sanitize arguments
@@ -480,10 +481,15 @@ class EnhancedProgramExecutor:
             env = dict(os.environ)
             env.update(config.environment_vars)
 
-            # Create process
-            process = await asyncio.create_subprocess_exec(
-                command,
-                *args,
+            # Build full command string
+            if args:
+                full_command = f"{command} {' '.join(args)}"
+            else:
+                full_command = command
+
+            # Use shell execution to handle pipes, redirects, and complex commands
+            process = await asyncio.create_subprocess_shell(
+                full_command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=config.working_directory,
@@ -636,10 +642,14 @@ class EnhancedProgramExecutor:
         args: List[str],
         risk_level: RiskLevel,
         config: ExecutionConfig,
-    ) -> bool:
-        """Request approval for command execution."""
+    ) -> tuple[bool, bool]:
+        """Request approval for command execution.
+
+        Returns:
+            Tuple of (approved: bool, was_cancelled: bool)
+        """
         if not self.approval_workflow:
-            return True
+            return (True, False)
 
         full_command = f"{command} {' '.join(args)}"
 
@@ -655,7 +665,11 @@ class EnhancedProgramExecutor:
             },
         )
 
-        return request.status.value == "approved"
+        # Check if user cancelled (quit) vs denied
+        was_cancelled = request.status.value == "cancelled"
+        approved = request.status.value == "approved"
+
+        return (approved, was_cancelled)
 
     async def terminate_command(self, execution_id: str) -> bool:
         """Terminate a running command."""

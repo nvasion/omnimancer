@@ -71,7 +71,7 @@ class ProgramExecutor(BaseManager):
         self.default_config = ExecutionConfig(
             timeout_seconds=30,
             max_memory_mb=512,
-            execution_mode=ExecutionMode.DEVELOPMENT,
+            execution_mode=ExecutionMode.FULL_ACCESS,
             enable_streaming=True,
             require_approval=True,
         )
@@ -107,7 +107,9 @@ class ProgramExecutor(BaseManager):
             "git",
             "npm",
             "pip",
+            "pip3",
             "python",
+            "python3",
             "node",
             "go",
             "cargo",
@@ -162,7 +164,12 @@ class ProgramExecutor(BaseManager):
         self.timeout_seconds = self.default_config.timeout_seconds
 
     async def execute_operation(self, operation: Operation) -> OperationResult:
-        """Execute command operation using enhanced executor."""
+        """Execute command operation using enhanced executor.
+
+        SECURITY NOTE: This method should ONLY be called from execute_with_approval
+        for operations that require approval. Calling this directly bypasses the
+        approval system!
+        """
         if operation.type != OperationType.COMMAND_EXECUTE:
             return OperationResult(
                 success=False,
@@ -175,6 +182,16 @@ class ProgramExecutor(BaseManager):
         command = operation.data["command"]
         args = operation.data.get("args", [])
         working_dir = operation.data.get("working_dir", None)
+
+        # SECURITY CHECK: If operation requires approval but hasn't been approved,
+        # refuse to execute (safeguard against bugs)
+        if operation.requires_approval and not operation.data.get(
+            "_approval_granted", False
+        ):
+            return OperationResult(
+                success=False,
+                error="SECURITY: Operation requires approval but was not approved. This operation cannot be executed.",
+            )
 
         # Create execution config from operation data
         ExecutionConfig(
@@ -189,7 +206,7 @@ class ProgramExecutor(BaseManager):
                 operation.data.get("execution_mode", "development")
             ),
             enable_streaming=operation.data.get("enable_streaming", True),
-            require_approval=operation.requires_approval,
+            require_approval=False,  # Approval already handled by execute_with_approval
         )
 
         # Use backward compatible method for tests
@@ -261,7 +278,11 @@ class ProgramExecutor(BaseManager):
             True if command is valid
 
         Raises:
-            SecurityError: If command is forbidden or not whitelisted
+            SecurityError: If command is explicitly forbidden
+
+        Note:
+            Security is provided through the approval system's risk assessment
+            and user confirmation. Only explicitly dangerous commands are blocked.
         """
         # Extract the base command (first word)
         base_command = command.strip().split()[0] if command.strip() else ""
@@ -270,10 +291,7 @@ class ProgramExecutor(BaseManager):
         if base_command in self.forbidden_commands:
             raise SecurityError(f"Command '{base_command}' is forbidden")
 
-        # Check if command is in allowed list
-        if base_command not in self.allowed_commands:
-            raise SecurityError(f"Command '{base_command}' is not whitelisted")
-
+        # Approval system handles security - no whitelist needed
         return True
 
     async def _execute_command(
@@ -301,7 +319,7 @@ class ProgramExecutor(BaseManager):
             timeout_seconds=self.timeout_seconds,
             max_memory_mb=self.default_config.max_memory_mb,
             working_directory=working_dir,
-            execution_mode=ExecutionMode.DEVELOPMENT,
+            execution_mode=ExecutionMode.FULL_ACCESS,
             enable_streaming=False,
             require_approval=False,  # Direct execution for backward compatibility
         )
@@ -326,6 +344,7 @@ class ProgramExecutor(BaseManager):
                     if not result.success and result.error_message
                     else (result.stderr if not result.success else None)
                 ),
+                was_cancelled=result.was_cancelled,  # Preserve cancellation status
             )
 
         except asyncio.TimeoutError:
@@ -643,8 +662,8 @@ class ApprovalManager:
             return True
 
         if not self.approval_callback:
-            # Default to requiring approval
-            logger.warning(
+            # Default to requiring approval (silent - no user-facing message)
+            logger.debug(
                 f"No approval callback set, defaulting to deny for {operation.type}"
             )
             return False
@@ -776,11 +795,28 @@ class AgentEngine(CoreEngine):
 
             # Request approval if needed
             if operation.requires_approval:
-                approved = await self.approval.request_approval(operation)
+                approval_result = await self.approval.request_approval(operation)
+
+                # Handle both old bool return and new tuple return for backward compatibility
+                if isinstance(approval_result, tuple):
+                    approved, was_cancelled = approval_result
+                else:
+                    # Legacy bool return
+                    approved = approval_result
+                    was_cancelled = operation.data.get("was_cancelled", False)
+
                 if not approved:
                     return OperationResult(
-                        success=False, error="Operation not approved by user"
+                        success=False,
+                        error=(
+                            "User cancelled operation"
+                            if was_cancelled
+                            else "Operation not approved by user"
+                        ),
+                        was_cancelled=was_cancelled,
                     )
+                # Set approval flag to enable security check in execute_operation
+                operation.data["_approval_granted"] = True
 
             # Execute operation using appropriate manager
             result = await self._execute_operation(operation)

@@ -54,7 +54,9 @@ class ApprovalInterface:
         self.max_diff_lines = 50
         self.page_size = 10
 
-    async def handle_single_approval(self, approval_data: Dict[str, Any]) -> bool:
+    async def handle_single_approval(
+        self, approval_data: Dict[str, Any]
+    ) -> tuple[bool, bool]:
         """
         Handle approval request for a single operation.
 
@@ -62,7 +64,7 @@ class ApprovalInterface:
             approval_data: Dictionary containing operation, preview, and approval request
 
         Returns:
-            True if approved, False if denied
+            Tuple of (approved: bool, was_cancelled: bool)
         """
         operation = approval_data["operation"]
         preview = approval_data["preview"]
@@ -93,15 +95,15 @@ class ApprovalInterface:
 
             if choice == ApprovalChoice.APPROVE:
                 self._print_success("✓ Operation approved")
-                return True
+                return (True, False)
             elif choice == ApprovalChoice.DENY:
                 self._print_warning("✗ Operation denied")
-                return False
+                return (False, False)
             elif choice == ApprovalChoice.VIEW_DETAILS:
                 await self._show_detailed_view(operation, preview, approval_request)
             elif choice == ApprovalChoice.QUIT:
                 self._print_info("Approval cancelled by user")
-                return False
+                return (False, True)  # Not approved, WAS cancelled
 
     async def handle_batch_approval(
         self, batch_request: BatchApprovalRequest

@@ -263,7 +263,7 @@ class TestEnhancedProgramExecutor:
         execution_config.enable_streaming = False
 
         # Test with echo command (should be safe)
-        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
+        with patch("asyncio.create_subprocess_shell") as mock_subprocess:
             # Mock successful process
             mock_process = AsyncMock()
             mock_process.returncode = 0
@@ -283,15 +283,25 @@ class TestEnhancedProgramExecutor:
 
     @pytest.mark.asyncio
     async def test_command_validation_failure(self, program_executor, execution_config):
-        """Test command validation failure."""
-        # Try to execute a dangerous command
+        """Test that write operations require approval and can be denied."""
+        # Enable approval and configure to deny
+        execution_config.require_approval = True
+
+        # Mock approval workflow to deny
+        mock_request = Mock()
+        mock_request.status.value = "denied"
+        program_executor.approval_workflow.request_approval = AsyncMock(
+            return_value=mock_request
+        )
+
+        # Try to execute a write command (pip install requires approval)
         result = await program_executor.execute_command(
-            "rm", ["-rf", "/"], execution_config
+            "pip", ["install", "some-package"], execution_config
         )
 
         assert result.success is False
         assert result.exit_code == -1
-        assert "not allowed" in result.error_message.lower()
+        assert "denied" in result.error_message.lower()
 
     @pytest.mark.asyncio
     async def test_command_timeout(self, program_executor):
@@ -300,7 +310,7 @@ class TestEnhancedProgramExecutor:
             timeout_seconds=1, require_approval=False, enable_streaming=False
         )
 
-        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
+        with patch("asyncio.create_subprocess_shell") as mock_subprocess:
             # Mock process that takes too long
             mock_process = AsyncMock()
             mock_process.communicate.side_effect = asyncio.TimeoutError()
@@ -318,7 +328,7 @@ class TestEnhancedProgramExecutor:
 
     @pytest.mark.asyncio
     async def test_approval_workflow_integration(self, program_executor):
-        """Test integration with approval workflow."""
+        """Test that approval workflow correctly handles write operations."""
         config = ExecutionConfig(require_approval=True)
 
         # Mock approval workflow to deny request
@@ -328,7 +338,8 @@ class TestEnhancedProgramExecutor:
             return_value=mock_request
         )
 
-        result = await program_executor.execute_command("git", ["status"], config)
+        # Use a write command (git commit requires approval, git status does not)
+        result = await program_executor.execute_command("git", ["commit", "-m", "test"], config)
 
         assert result.success is False
         assert "denied" in result.error_message.lower()
@@ -339,7 +350,7 @@ class TestEnhancedProgramExecutor:
         """Test execution history tracking."""
         execution_config.enable_streaming = False
 
-        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
+        with patch("asyncio.create_subprocess_shell") as mock_subprocess:
             mock_process = AsyncMock()
             mock_process.returncode = 0
             mock_process.communicate.return_value = (b"output\n", b"")
@@ -441,7 +452,7 @@ class TestExecutionConfig:
 
         assert config.timeout_seconds == 30
         assert config.max_memory_mb == 512
-        assert config.execution_mode == ExecutionMode.DEVELOPMENT
+        assert config.execution_mode == ExecutionMode.FULL_ACCESS
         assert config.enable_streaming is True
         assert config.require_approval is True
 
@@ -467,7 +478,7 @@ async def test_streaming_command_output(program_executor, execution_config):
     """Test real-time command output streaming."""
     execution_config.enable_streaming = True
 
-    with patch("asyncio.create_subprocess_exec") as mock_subprocess:
+    with patch("asyncio.create_subprocess_shell") as mock_subprocess:
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.wait.return_value = None

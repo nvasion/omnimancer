@@ -142,6 +142,25 @@ class CLIApprovalPrompt:
             "cancel": ApprovalDecisionType.CANCELLED,
         }
 
+        # Batch approval response mappings
+        self.batch_responses = {
+            "all": "approve_all",
+            "approve-all": "approve_all",
+            "yes-all": "approve_all",
+            "none": "deny_all",
+            "deny-all": "deny_all",
+            "no-all": "deny_all",
+            "select": "selective",
+            "selective": "selective",
+            "s": "selective",
+            "individual": "individual",
+            "one-by-one": "individual",
+            "i": "individual",
+            "q": "cancelled",
+            "quit": "cancelled",
+            "cancel": "cancelled",
+        }
+
     def _ensure_string(self, value: Any) -> str:
         """
         Ensure a value is converted to string type.
@@ -405,17 +424,17 @@ class CLIApprovalPrompt:
             self._restore_interrupt_handling()
 
     async def _get_user_decision_with_timeout(
-        self, timeout_seconds: int
+        self, timeout_seconds: int = None
     ) -> ApprovalDecision:
-        """Get user decision with timeout handling."""
+        """Get user decision - waits indefinitely for user response."""
+        # Pause the spinner during user interaction
+        cancellation_handler = get_active_cancellation_handler()
+        if cancellation_handler:
+            cancellation_handler.pause_status_display()
+
         try:
-            # Use asyncio.wait_for for timeout
-            response = await asyncio.wait_for(
-                self._get_user_input_async(
-                    "Enter your decision (y=approve/r=remember/e=edit/n=reject/q=quit): "
-                ),
-                timeout=timeout_seconds,
-            )
+            # Wait indefinitely for user input (no timeout like Claude Code)
+            response = await self._get_user_input_async("\nYour decision (y/n/r/q): ")
 
             response_lower = response.strip().lower()
 
@@ -437,9 +456,8 @@ class CLIApprovalPrompt:
                     "  [yellow]q[/yellow] = Quit (cancel and exit to omnimancer prompt)"
                 )
 
-                # Recursive call with reduced timeout
-                remaining_timeout = max(timeout_seconds - 10, 30)
-                return await self._get_user_decision_with_timeout(remaining_timeout)
+                # Recursive call (no timeout like Claude Code)
+                return await self._get_user_decision_with_timeout()
 
             return ApprovalDecision(decision=decision_type)
 
@@ -447,66 +465,57 @@ class CLIApprovalPrompt:
             raise  # Re-raise timeout for upper level handling
 
     async def _get_batch_decision_with_timeout(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: int
+        self, batch_request: BatchApprovalRequest, timeout_seconds: int = None
     ) -> BatchApprovalDecision:
-        """Get batch decision with timeout handling."""
-        try:
-            response = await asyncio.wait_for(
-                self._get_user_input_async(
-                    "Enter batch decision (all/none/select/individual/q): "
-                ),
-                timeout=timeout_seconds,
+        """Get batch decision - waits indefinitely for user response."""
+        # Wait indefinitely for user input (no timeout like Claude Code)
+        response = await self._get_user_input_async(
+            "Enter batch decision (all/none/select/individual/q): "
+        )
+
+        response_lower = response.strip().lower()
+
+        # Map response using centralized batch_responses
+        decision_type = self.batch_responses.get(response_lower)
+
+        if decision_type == "approve_all":
+            return BatchApprovalDecision(
+                decision_type="approve_all",
+                approved_indices=list(range(len(batch_request.operations))),
             )
 
-            response_lower = response.strip().lower()
+        elif decision_type == "deny_all":
+            return BatchApprovalDecision(decision_type="deny_all")
 
-            if response_lower in ["all", "approve-all", "yes-all"]:
-                return BatchApprovalDecision(
-                    decision_type="approve_all",
-                    approved_indices=list(range(len(batch_request.operations))),
-                )
+        elif decision_type == "selective":
+            return await self._handle_selective_approval(batch_request, None)
 
-            elif response_lower in ["none", "deny-all", "no-all"]:
-                return BatchApprovalDecision(decision_type="deny_all")
+        elif decision_type == "individual":
+            return await self._handle_individual_approval(batch_request, None)
 
-            elif response_lower in ["select", "selective", "s"]:
-                return await self._handle_selective_approval(
-                    batch_request, timeout_seconds
-                )
+        elif decision_type == "cancelled":
+            return BatchApprovalDecision(
+                decision_type="cancelled", user_notes="Cancelled by user"
+            )
 
-            elif response_lower in ["individual", "one-by-one", "i"]:
-                return await self._handle_individual_approval(
-                    batch_request, timeout_seconds
-                )
+        else:
+            # Invalid response
+            self.console.print("[yellow]Invalid response. Please enter:[/yellow]")
+            self.console.print("  [green]all[/green] = Approve all operations")
+            self.console.print("  [red]none[/red] = Deny all operations")
+            self.console.print("  [blue]select[/blue] = Choose specific operations")
+            self.console.print(
+                "  [yellow]individual[/yellow] = Review each operation separately"
+            )
+            self.console.print("  [yellow]q[/yellow] = Cancel batch")
 
-            elif response_lower in ["q", "quit", "cancel"]:
-                return BatchApprovalDecision(
-                    decision_type="cancelled", user_notes="Cancelled by user"
-                )
-
-            else:
-                # Invalid response
-                self.console.print("[yellow]Invalid response. Please enter:[/yellow]")
-                self.console.print("  [green]all[/green] = Approve all operations")
-                self.console.print("  [red]none[/red] = Deny all operations")
-                self.console.print("  [blue]select[/blue] = Choose specific operations")
-                self.console.print(
-                    "  [yellow]individual[/yellow] = Review each operation separately"
-                )
-                self.console.print("  [yellow]q[/yellow] = Cancel batch")
-
-                remaining_timeout = max(timeout_seconds - 15, 30)
-                return await self._get_batch_decision_with_timeout(
-                    batch_request, remaining_timeout
-                )
-
-        except asyncio.TimeoutError:
-            raise
+            # Recursive call (no timeout like Claude Code)
+            return await self._get_batch_decision_with_timeout(batch_request, None)
 
     async def _handle_selective_approval(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: int
+        self, batch_request: BatchApprovalRequest, timeout_seconds: int = None
     ) -> BatchApprovalDecision:
-        """Handle selective operation approval."""
+        """Handle selective operation approval - waits indefinitely for user response."""
         operation_count = len(batch_request.operations)
 
         self.console.print(
@@ -517,34 +526,24 @@ class CLIApprovalPrompt:
         )
         self.console.print("Or enter ranges (e.g., '1-3 5 7-9')")
 
-        try:
-            response = await asyncio.wait_for(
-                self._get_user_input_async(
-                    f"Select operations (1-{operation_count}): "
-                ),
-                timeout=timeout_seconds,
-            )
+        # Wait indefinitely for user input (no timeout like Claude Code)
+        response = await self._get_user_input_async(
+            f"Select operations (1-{operation_count}): "
+        )
 
-            selected_indices = self._parse_operation_selection(
-                response, operation_count
-            )
+        selected_indices = self._parse_operation_selection(response, operation_count)
 
-            if selected_indices is None:
-                # Invalid selection, try again
-                self.console.print("[red]Invalid selection format[/red]")
-                return await self._handle_selective_approval(
-                    batch_request, timeout_seconds - 10
-                )
+        if selected_indices is None:
+            # Invalid selection, try again
+            self.console.print("[red]Invalid selection format[/red]")
+            return await self._handle_selective_approval(batch_request, None)
 
-            return BatchApprovalDecision(
-                decision_type="selective", approved_indices=selected_indices
-            )
-
-        except asyncio.TimeoutError:
-            raise
+        return BatchApprovalDecision(
+            decision_type="selective", approved_indices=selected_indices
+        )
 
     async def _handle_individual_approval(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: int
+        self, batch_request: BatchApprovalRequest, timeout_seconds: int = None
     ) -> BatchApprovalDecision:
         """Handle individual operation approval."""
         individual_decisions = []
@@ -573,7 +572,7 @@ class CLIApprovalPrompt:
                 individual_request,
                 preview,
                 operation.data,
-                timeout_seconds=min(timeout_seconds, 120),  # 2 minute max per operation
+                timeout_seconds=None,  # No timeout - wait indefinitely like Claude Code
             )
 
             individual_decisions.append(decision)
@@ -646,21 +645,12 @@ class CLIApprovalPrompt:
         )
         self.console.print()
 
-        try:
-            response = await asyncio.wait_for(
-                self._get_user_input_async(
-                    "Are you sure you want to remember this? (y/n): "
-                ),
-                timeout=30,  # 30 second timeout for confirmation
-            )
+        # Wait indefinitely for user response (no timeout like Claude Code)
+        response = await self._get_user_input_async(
+            "Are you sure you want to remember this? (y/n): "
+        )
 
-            return response.strip().lower() in ["y", "yes", "true", "1"]
-
-        except asyncio.TimeoutError:
-            self.console.print(
-                "[yellow]Confirmation timed out - not remembering decision[/yellow]"
-            )
-            return False
+        return response.strip().lower() in ["y", "yes", "true", "1"]
 
     async def _get_user_input_async(self, prompt_text: str) -> str:
         """Get user input asynchronously."""
@@ -1083,36 +1073,38 @@ class CLIApprovalPrompt:
         try:
             # Get user choice with timeout
             response = await asyncio.wait_for(
-                self._get_user_input_async("Enter your decision (y/r/e/n/q): "),
+                self._get_user_input_async("Your decision [y/r/n/q]: "),
                 timeout=timeout_seconds,
             )
 
             response_lower = response.strip().lower()
 
-            # Process the user's choice
-            if response_lower in ["y", "yes", "approve", "1"]:
+            # Map response using centralized approval_responses
+            decision_type = self.approval_responses.get(response_lower)
+
+            if decision_type == ApprovalDecisionType.APPROVED:
                 return {"approved": True, "reason": "User approved changes"}
-            elif response_lower in ["r", "remember"]:
+
+            elif decision_type == ApprovalDecisionType.APPROVED_AND_REMEMBER:
                 return {
                     "approved": True,
                     "remember": True,
                     "reason": "User approved and remembered decision",
                 }
-            elif response_lower in ["e", "edit", "2"]:
+
+            elif decision_type == ApprovalDecisionType.REVIEW_AND_EDIT:
                 return await self._handle_edit_content(review_data)
-            elif response_lower in ["n", "no", "reject", "3"]:
-                # Ask for optional reason
-                try:
-                    reason_response = await asyncio.wait_for(
-                        self._get_user_input_async("Reason for rejection (optional): "),
-                        timeout=30,
-                    )
-                    reason = reason_response.strip() or "User rejected changes"
-                except asyncio.TimeoutError:
-                    reason = "User rejected changes"
+
+            elif decision_type == ApprovalDecisionType.DENIED:
+                # Ask for optional reason (wait indefinitely like Claude Code)
+                reason_response = await self._get_user_input_async(
+                    "Reason for rejection (optional): "
+                )
+                reason = reason_response.strip() or "User rejected changes"
 
                 return {"approved": False, "reason": reason}
-            elif response_lower in ["q", "quit", "cancel"]:
+
+            elif decision_type == ApprovalDecisionType.CANCELLED:
                 return {
                     "approved": False,
                     "reason": "User cancelled operation",
@@ -1155,28 +1147,19 @@ class CLIApprovalPrompt:
         self.console.print("2. Open external editor (if configured)")
         self.console.print("3. Go back to original content")
 
-        try:
-            edit_choice = await asyncio.wait_for(
-                self._get_user_input_async("Edit method (1=inline/2=editor/3=back): "),
-                timeout=60,
-            )
+        # Wait indefinitely for edit choice (no timeout like Claude Code)
+        edit_choice = await self._get_user_input_async(
+            "Edit method (1=inline/2=editor/3=back): "
+        )
 
-            edit_choice_lower = edit_choice.strip().lower()
+        edit_choice_lower = edit_choice.strip().lower()
 
-            if edit_choice_lower in ["1", "inline"]:
-                return await self._inline_content_edit(review_data)
-            elif edit_choice_lower in ["2", "editor"]:
-                return await self._external_editor_edit(review_data)
-            else:
-                # Go back to original decision
-                return await self._get_file_modification_decision_with_timeout(
-                    review_data, 300
-                )
-
-        except asyncio.TimeoutError:
-            self.console.print(
-                "[yellow]Edit choice timed out - going back to approval options[/yellow]"
-            )
+        if edit_choice_lower in ["1", "inline"]:
+            return await self._inline_content_edit(review_data)
+        elif edit_choice_lower in ["2", "editor"]:
+            return await self._external_editor_edit(review_data)
+        else:
+            # Go back to original decision
             return await self._get_file_modification_decision_with_timeout(
                 review_data, 300
             )
@@ -1214,32 +1197,21 @@ class CLIApprovalPrompt:
         )
         self.console.print(Panel(preview, title="Modified Content Preview"))
 
-        try:
-            confirm_response = await asyncio.wait_for(
-                self._get_user_input_async("Use this modified content? (y/n): "),
-                timeout=30,
-            )
+        # Wait indefinitely for confirmation (no timeout like Claude Code)
+        confirm_response = await self._get_user_input_async(
+            "Use this modified content? (y/n): "
+        )
 
-            if confirm_response.strip().lower() in ["y", "yes"]:
-                return {
-                    "approved": True,
-                    "modified_content": modified_content,
-                    "reason": "User provided modified content",
-                }
-            else:
-                return await self._get_file_modification_decision_with_timeout(
-                    review_data, 300
-                )
-
-        except asyncio.TimeoutError:
-            self.console.print(
-                "[yellow]Confirmation timed out - using modified content[/yellow]"
-            )
+        if confirm_response.strip().lower() in ["y", "yes"]:
             return {
                 "approved": True,
                 "modified_content": modified_content,
-                "reason": "User provided modified content (auto-confirmed due to timeout)",
+                "reason": "User provided modified content",
             }
+        else:
+            return await self._get_file_modification_decision_with_timeout(
+                review_data, 300
+            )
 
     async def _external_editor_edit(
         self, review_data: Dict[str, Any]

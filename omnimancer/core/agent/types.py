@@ -54,6 +54,7 @@ class OperationResult:
     operation: Optional[Operation] = None
     execution_time: Optional[float] = None
     created_at: Optional[datetime] = None
+    was_cancelled: bool = False  # True if user pressed 'q' to cancel
 
     def __post_init__(self):
         if self.created_at is None:

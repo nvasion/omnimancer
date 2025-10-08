@@ -20,6 +20,7 @@ from ..core.agent.approval_manager import (
 from ..core.agent.types import Operation, OperationType
 from ..core.security.approval_workflow import (
     ApprovalRequest,
+    RiskLevel,
 )
 from ..core.security.permission_controller import PermissionController
 from .approval_formatter import CLIApprovalFormatter
@@ -78,7 +79,9 @@ class CLIApprovalIntegration:
         # Track approval decisions for session
         self.approval_session_log: List[Dict[str, Any]] = []
 
-    async def request_approval_for_operation(self, operation: Operation) -> bool:
+    async def request_approval_for_operation(
+        self, operation: Operation
+    ) -> tuple[bool, bool]:
         """
         Request approval for a single operation with CLI integration.
 
@@ -86,27 +89,29 @@ class CLIApprovalIntegration:
             operation: Operation requiring approval
 
         Returns:
-            True if approved, False if denied
+            Tuple of (approved: bool, was_cancelled: bool)
         """
         try:
             # Check for auto-approval first if enabled
             if self.enable_auto_approval:
                 auto_approval = await self._check_auto_approval(operation)
                 if auto_approval is not None:
-                    return auto_approval
+                    return (auto_approval, False)
 
             # Use the enhanced approval manager for full workflow
-            approved = await self.approval_manager.request_single_approval(operation)
+            approved, was_cancelled = (
+                await self.approval_manager.request_single_approval(operation)
+            )
 
             # Log the decision
             self._log_approval_decision(operation, approved)
 
-            return approved
+            return (approved, was_cancelled)
 
         except Exception as e:
             logger.error(f"Error in approval request: {e}")
             self.console.print(f"[red]❌ Approval system error: {e}[/red]")
-            return False
+            return (False, False)
 
     async def request_batch_approval(
         self, operations: List[Operation]
@@ -154,25 +159,46 @@ class CLIApprovalIntegration:
                 "error": str(e),
             }
 
-    async def _handle_single_approval(self, approval_context: Dict[str, Any]) -> bool:
+    async def _handle_single_approval(self, operation: Operation) -> tuple[bool, bool]:
         """
         Handle single operation approval through CLI dialog.
 
         Args:
-            approval_context: Context dict with operation, preview, approval_request, etc.
+            operation: Operation object requiring approval
 
         Returns:
-            True if approved, False if denied
+            Tuple of (approved: bool, was_cancelled: bool)
         """
         try:
-            operation = approval_context["operation"]
-            preview = approval_context.get("preview")
-            approval_request = approval_context["approval_request"]
+            # Create approval request from operation
+            approval_request = ApprovalRequest(
+                operation_type=operation.type.value,
+                description=operation.description,
+                risk_level=RiskLevel.MEDIUM,  # Default, can be enhanced
+            )
+
+            # Create change preview from operation
+            # Map OperationType to ChangeType (they have matching values)
+            from ..core.agent.approval_manager import ChangeType, ChangePreview
+
+            try:
+                change_type = ChangeType(operation.type.value)
+            except ValueError:
+                # Default to FILE_MODIFY if type not in ChangeType enum
+                change_type = ChangeType.FILE_MODIFY
+
+            change_preview = ChangePreview(
+                change_type=change_type,
+                description=operation.description,
+                proposed_state=operation.preview,  # Use the string preview as proposed_state
+                metadata=operation.data,
+                reversible=operation.reversible,
+            )
 
             # Present approval dialog and get user decision
             decision = await self.prompt_handler.prompt_for_approval(
                 approval_request,
-                preview,
+                change_preview,
                 operation.data,
                 self.approval_timeout_seconds,
             )
@@ -184,11 +210,16 @@ class CLIApprovalIntegration:
             # Record decision in session log
             self._record_session_decision(operation, decision)
 
-            return decision.is_approved
+            # Check if user cancelled (pressed 'q')
+            from .approval_prompt import ApprovalDecisionType
+
+            was_cancelled = decision.decision == ApprovalDecisionType.CANCELLED
+
+            return (decision.is_approved, was_cancelled)
 
         except Exception as e:
-            logger.error(f"Error in single approval handler: {e}")
-            return False
+            logger.error(f"Error in single approval handler: {e}", exc_info=True)
+            return (False, False)
 
     async def _handle_batch_approval(
         self, batch_request: BatchApprovalRequest
@@ -722,9 +753,12 @@ def inject_approval_integration_into_agent_engine(
         agent_engine.approval.set_approval_callback(
             cli_approval_integration._handle_single_approval
         )
-        agent_engine.approval.set_batch_approval_callback(
-            cli_approval_integration._handle_batch_approval
-        )
+
+        # Only set batch callback if the approval manager supports it
+        if hasattr(agent_engine.approval, "set_batch_approval_callback"):
+            agent_engine.approval.set_batch_approval_callback(
+                cli_approval_integration._handle_batch_approval
+            )
 
         # Store reference for cleanup
         agent_engine._cli_approval_integration = cli_approval_integration

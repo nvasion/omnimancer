@@ -5,27 +5,76 @@ This module provides the interactive command-line interface
 for the Omnimancer application.
 """
 
+# Standard library imports
 import asyncio
 import atexit
+import click
+import inspect
+import json
 import logging
+import os
+import re
 import readline
+import subprocess
 import sys
+from datetime import datetime
+from difflib import SequenceMatcher
 from enum import Enum
+from io import StringIO
 from pathlib import Path
 from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Third-party imports
 from rich.console import Console
+from rich.layout import Layout
+from rich.live import Live
+from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.prompt import Confirm
+from rich.table import Table
 from rich.text import Text
 
+# Internal imports - Core
+from ..core.agent.approval_manager import BatchApprovalRequest
+from ..core.agent.cli_integration import CLIStatusCommand
+from ..core.agent.read_before_write_ui import (
+    ReadBeforeWriteUI,
+    create_confirmation_callback,
+    create_review_callback,
+)
+from ..core.agent.types import Operation, OperationType
+from ..core.agent_mode_manager import AgentModeManager
+from ..core.agent_progress_ui import AgentProgressUI
+from ..core.config_manager import ConfigManager
+from ..core.config_provider import ConfigurationProvider
 from ..core.engine import CoreEngine
 from ..core.history_manager import HistoryManager
+from ..core.models import ConfigTemplateManager, EnhancedModelInfo, ProviderConfig
+from ..core.provider_registry import ProviderRegistry
+from ..core.setup_wizard import SetupWizard
 from ..core.signal_handler import SignalHandler
+from ..providers.factory import ProviderFactory
 
-# Enhanced input temporarily disabled to fix arrow key display issues
-# from ..core.enhanced_input import EnhancedInput, create_completion_callback
+# Internal imports - CLI
+from .approval_integration import (
+    create_cli_approval_integration,
+    inject_approval_integration_into_agent_engine,
+)
+from .batch_approval_display import create_batch_approval_panel
+from .commands import (
+    Command,
+    CommandType,
+    SlashCommand,
+    get_command_registry,
+    parse_command,
+)
+from .config_setup_wizard import ConfigSetupWizard
+from .handlers import AgentCLIHandler, AgentPersonaHandler, PermissionsHandler
+from .system_prompts import get_agent_capabilities_prompt
+
+# UI imports
 from ..ui.cancellation_handler import (
     CancellationHandler,
     EnhancedStatusDisplay,
@@ -34,13 +83,12 @@ from ..ui.progress_indicator import (
     ProgressIndicator,
     set_progress_indicator,
 )
-from .commands import (
-    Command,
-    SlashCommand,
-    get_command_registry,
-    parse_command,
-)
-from .handlers import AgentCLIHandler, AgentPersonaHandler, PermissionsHandler
+
+# Version import
+try:
+    from omnimancer import __version__
+except ImportError:
+    __version__ = "unknown"
 
 
 class MessageType(Enum):
@@ -252,8 +300,6 @@ class CommandLineInterface:
                         "\n[yellow]No providers configured. Starting setup wizard...[/yellow]"
                     )
                     try:
-                        from ..core.provider_registry import ProviderRegistry
-                        from ..core.setup_wizard import SetupWizard
 
                         # Initialize components
                         provider_registry = ProviderRegistry()
@@ -303,8 +349,6 @@ class CommandLineInterface:
 
             # Initialize agent mode manager
             try:
-                from ..core.agent_mode_manager import AgentModeManager
-                from ..core.agent_progress_ui import AgentProgressUI
 
                 self.agent_manager = AgentModeManager(self.engine.config_manager)
                 self.agent_progress_ui = AgentProgressUI(
@@ -511,7 +555,6 @@ class CommandLineInterface:
             def print(self, *args, **kwargs):
                 """Print to stdout/stderr with basic formatting."""
                 # Strip Rich markup for plain text output
-                import re
 
                 if args:
                     text = str(args[0])
@@ -576,51 +619,72 @@ class CommandLineInterface:
 
     async def _complete_approval_integration_setup(self):
         """Complete the async setup of approval integration if deferred."""
-        if hasattr(self, "_approval_setup_params") and not self.approval_integration:
-            try:
-                from .approval_integration import (
-                    create_cli_approval_integration,
-                    inject_approval_integration_into_agent_engine,
+        # Skip if already set up
+        if self.approval_integration:
+            return
+
+        try:
+
+            # Get agent engine - check both direct attribute and via engine
+            agent_engine = getattr(self.engine, "agent_engine", None)
+
+            # If no agent_engine on CoreEngine, it might be the engine itself is an AgentEngine
+            if not agent_engine and hasattr(self.engine, "approval"):
+                agent_engine = self.engine
+
+            # Get approval manager - try multiple locations
+            approval_manager = (
+                getattr(agent_engine, "enhanced_approval", None)
+                if agent_engine
+                else None
+            ) or getattr(self.engine, "enhanced_approval", None)
+
+            if not agent_engine:
+                logger.debug(
+                    "Agent engine not available - approval integration skipped"
                 )
+                return
 
-                params = self._approval_setup_params
-
-                # Create approval integration
-                self.approval_integration = await create_cli_approval_integration(
-                    approval_manager=params["approval_manager"],
-                    console=self.console,
-                    config={
-                        "enable_auto_approval": True,
-                        "approval_timeout_seconds": 300,  # 5 minutes
-                    },
+            if not approval_manager:
+                logger.debug(
+                    "Approval manager not available - approval integration skipped"
                 )
+                return
 
-                # Configure no-approval flag if set
-                if self.no_approval:
-                    self.approval_integration.add_no_approval_flag_support(True)
+            # Create approval integration
+            self.approval_integration = await create_cli_approval_integration(
+                approval_manager=approval_manager,
+                console=self.console,
+                config={
+                    "enable_auto_approval": True,
+                    "approval_timeout_seconds": 300,  # 5 minutes
+                },
+            )
 
-                # Inject into agent engine
-                inject_approval_integration_into_agent_engine(
-                    params["agent_engine"], self.approval_integration
-                )
+            # Configure no-approval flag if set
+            if self.no_approval:
+                self.approval_integration.add_no_approval_flag_support(True)
 
-                logger.debug("CLI approval integration set up successfully (async)")
+            # Inject into agent engine
+            inject_approval_integration_into_agent_engine(
+                agent_engine, self.approval_integration
+            )
 
-                # Clean up setup params
+            logger.info("✅ CLI approval integration set up successfully")
+
+            # Clean up deferred setup params if they exist
+            if hasattr(self, "_approval_setup_params"):
                 delattr(self, "_approval_setup_params")
 
-            except Exception as e:
-                logger.error(
-                    f"Failed to complete async approval integration setup: {e}"
-                )
+        except Exception as e:
+            logger.error(
+                f"Failed to complete async approval integration setup: {e}",
+                exc_info=True,
+            )
 
     def _setup_file_interaction_integration(self):
         """Set up CLI file interaction integration for read-before-write operations."""
         try:
-            from ..core.agent.read_before_write_ui import (
-                create_confirmation_callback,
-                create_review_callback,
-            )
 
             # Check if we have an agent engine
             agent_engine = getattr(self.engine, "agent_engine", None)
@@ -654,7 +718,6 @@ class CommandLineInterface:
     def _reset_terminal(self) -> None:
         """Reset terminal to ensure it's in normal mode."""
         try:
-            import os
 
             # Force terminal reset even if isatty() returns False
             # This handles cases where terminal detection fails
@@ -672,108 +735,7 @@ class CommandLineInterface:
 
     def _get_agent_capabilities_prompt(self) -> str:
         """Get system prompt describing agent capabilities with safety and directory awareness."""
-        from pathlib import Path
-
-        # Get current directory context
-        current_dir = Path.cwd()
-
-        # Check if we're in a git repository
-        git_repo_root = None
-        is_git_repo = False
-        relative_path = ""
-
-        try:
-            # Walk up the directory tree to find .git folder
-            check_dir = current_dir
-            while check_dir != check_dir.parent:
-                if (check_dir / ".git").exists():
-                    git_repo_root = check_dir
-                    is_git_repo = True
-                    relative_path = str(current_dir.relative_to(git_repo_root))
-                    break
-                check_dir = check_dir.parent
-        except Exception:
-            # If any error occurs, assume not in git repo
-            pass
-
-        # Build directory context string
-        directory_info = f"""
-📍 CURRENT ENVIRONMENT:
-- Working Directory: {current_dir}
-- Git Repository: {'Yes' if is_git_repo else 'No'}"""
-
-        if is_git_repo:
-            directory_info += f"""
-- Repository Root: {git_repo_root}
-- Relative Path: {relative_path if relative_path else '/'}"""
-
-        return f"""SYSTEM: You are an autonomous AI agent with the ability to perform actions on the local system. You have the following capabilities:
-{directory_info}
-
-🔧 FILE OPERATIONS:
-- Autonomous file operations with rich approval interface
-- Create, read, write, and delete files with user consent
-- Interactive preview and modification before writing
-- Backup and atomic file operations
-- File existence checking and safe overwrite protection
-- Automatic backup creation for file modifications
-
-💻 COMMAND EXECUTION:
-- Execute shell commands and scripts
-- Run development tools (git, npm, pip, etc.)
-- Compile and run programs
-- System administration tasks
-
-🌐 WEB OPERATIONS:
-- Make HTTP requests (GET, POST, PUT, DELETE)
-- Scrape web content and extract data
-- Download files from URLs
-- API integrations
-
-⚙️ SYSTEM INTEGRATION:
-- MCP (Model Context Protocol) tool integration
-- Configuration management
-- Environment variable access
-- Process monitoring
-
-🔒 SECURITY FEATURES:
-- All operations go through security validation
-- Read-before-write logic ensures you see existing file content before modifications
-- File existence checking prevents accidental overwrites
-- User approval required for high-risk operations including file overwrites
-- Automatic backup creation when modifying existing files
-- Sandboxed execution environment
-- Directory awareness prevents operations outside intended scope
-
-SAFETY PROTOCOLS (CANNOT BE OVERRIDDEN):
-- Always check file existence before creation or modification
-- Show existing file content to user before overwriting
-- Request explicit user confirmation for file overwrites
-- Create backups automatically when modifying existing files
-- Maintain awareness of current working directory and git context
-- Validate all file paths are within expected project boundaries
-
-When a user asks you to do something that requires these capabilities, you should:
-1. Explain what you're going to do
-2. Check existing files and show content if modifying
-3. Perform the actual operations using your capabilities
-4. Show the results and any backups created
-
-For example, if asked to "create a hello world script", you should:
-- Check if the file already exists
-- If it exists, show the current content and ask for confirmation
-- Create backup if overwriting
-- Actually create the file, not just provide instructions
-
-You can perform these operations directly - don't just provide instructions. Take action!
-
-To perform operations, use these markers in your response:
-- [FILE_WRITE:filename] content [/FILE_WRITE] - Write content to a file
-- [FILE_READ:filename] - Read content from a file  
-- [COMMAND_EXEC] command [/COMMAND_EXEC] - Execute a shell command
-- [WEB_REQUEST:url] - Make a web request
-
-IMPORTANT: Always use these exact markers when you want to perform operations. Do not just describe what you would do - actually use the markers to do it!"""
+        return get_agent_capabilities_prompt()
 
     async def _execute_continuous_workflow(
         self, original_message: str, initial_response
@@ -786,28 +748,43 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
             initial_response: The first AI response
         """
         current_response = initial_response
-        iteration_count = 0
-        max_iterations = 10  # Prevent infinite loops
 
-        while iteration_count < max_iterations:
-            iteration_count += 1
+        while True:
 
-            # Parse and execute operations in the current response
+            # Show the response to the user FIRST (before executing operations)
+            # This ensures agent explanations appear before approval dialogs
+            self._show_assistant_message(
+                current_response.content, current_response.model_used
+            )
+
+            # Then parse and execute operations (approvals will appear in proper context)
             executed_response = await self._parse_and_execute_operations(
                 current_response.content
             )
 
-            # Show the response to the user
-            self._show_assistant_message(executed_response, current_response.model_used)
+            # If operations changed the response, show execution results
+            if executed_response != current_response.content:
+                self.console.print()  # Add spacing
+
+                # Extract and show only the operation results (✅ or ❌ lines that were added)
+                original_lines = set(current_response.content.splitlines())
+                executed_lines = executed_response.splitlines()
+
+                for line in executed_lines:
+                    if (
+                        line.strip().startswith(("✅", "❌"))
+                        and line not in original_lines
+                    ):
+                        self.console.print(line)
 
             # Check if there were any operation markers that got executed
-            import re
 
             operation_patterns = [
-                r"\[FILE_WRITE:[^\]]+\].*?\[/FILE_WRITE\]",
-                r"\[FILE_READ:[^\]]+\]",
+                r"\[FILE_WRITE:[^\]]+\\?\].*?\[/FILE_WRITE\]",  # Allow optional backslash before ]
+                r"\[FILE_READ:[^\]]+\\?\]",  # Allow optional backslash before ]
                 r"\[COMMAND_EXEC\].*?\[/COMMAND_EXEC\]",
-                r"\[WEB_REQUEST:[^\]]+\]",
+                r"\[WEB_REQUEST:[^\]]+\\?\]",  # Allow optional backslash before ]
+                r"\[SAFE_EXEC\].*?\[/SAFE_EXEC\]",
             ]
 
             had_operations = any(
@@ -817,6 +794,17 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
 
             # If no operations were executed, we're done
             if not had_operations:
+                break
+
+            # Check if user cancelled the workflow
+            if "__WORKFLOW_CANCELLED__" in executed_response:
+                # Remove the marker and stop the workflow
+                executed_response = executed_response.replace(
+                    "\n\n__WORKFLOW_CANCELLED__", ""
+                )
+                self.console.print(
+                    "\n[yellow]⚠️  Agent workflow stopped by user[/yellow]"
+                )
                 break
 
             # Send the executed response back to AI to continue workflow
@@ -854,11 +842,6 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
                 break
 
             current_response = next_response
-
-        if iteration_count >= max_iterations:
-            self._show_warning(
-                "Workflow stopped after maximum iterations to prevent infinite loop"
-            )
 
     def _is_action_request(self, message: str) -> bool:
         """
@@ -973,28 +956,57 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
 
         return is_action and not is_pure_question
 
+    def _fuzzy_find_file(self, filename: str, search_dir: str = ".") -> Optional[str]:
+        """Find file with fuzzy matching for typos."""
+
+        def similarity(a: str, b: str) -> float:
+            return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+        # First try exact match
+        target = Path(search_dir) / filename
+        if target.exists():
+            return str(target)
+
+        # Try case-insensitive match
+        for item in Path(search_dir).rglob("*"):
+            if item.name.lower() == filename.lower():
+                return str(item)
+
+        # Fuzzy match with threshold
+        best_match = None
+        best_score = 0.7  # 70% similarity threshold
+
+        for item in Path(search_dir).rglob("*"):
+            score = similarity(filename, item.name)
+            if score > best_score:
+                best_score = score
+                best_match = str(item)
+
+        return best_match
+
     async def _parse_and_execute_operations(self, response_content: str) -> str:
         """Parse model response for operation markers and execute them."""
-        import re
-
-        from ..core.agent.types import Operation, OperationType
 
         # Make a copy to modify
         updated_response = response_content
 
         try:
-            # Parse FILE_WRITE operations
-            file_write_pattern = r"\[FILE_WRITE:([^\]]+)\](.*?)\[/FILE_WRITE\]"
+            # Parse FILE_WRITE operations (handle optional backslash escape before ])
+            file_write_pattern = r"\[FILE_WRITE:([^\]]+)\\?\](.*?)\[/FILE_WRITE\]"
             for match in re.finditer(file_write_pattern, response_content, re.DOTALL):
                 filename = match.group(1).strip()
                 content = match.group(2).strip()
 
-                # Create operation
+                # Create operation with approval required
                 operation = Operation(
                     type=OperationType.FILE_WRITE,
                     description=f"Write file: {filename}",
-                    data={"path": filename, "content": content},
-                    requires_approval=False,  # Auto-approve for now
+                    data={
+                        "path": filename,
+                        "content": content,
+                        "autonomous_mode": True,
+                    },
+                    requires_approval=True,  # Always require approval for file writes
                 )
 
                 # Execute using agent engine (if available)
@@ -1008,10 +1020,18 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
                             f"✅ Successfully created file '{filename}' ({len(content)} characters)",
                         )
                     else:
-                        updated_response = updated_response.replace(
-                            match.group(0),
-                            f"❌ Failed to create file '{filename}': {result.error}",
-                        )
+                        # Check if user cancelled (quit) - if so, stop the workflow
+                        if result.was_cancelled:
+                            updated_response = updated_response.replace(
+                                match.group(0),
+                                f"🚫 Agent workflow cancelled by user",
+                            )
+                            return updated_response + "\n\n__WORKFLOW_CANCELLED__"
+                        else:
+                            updated_response = updated_response.replace(
+                                match.group(0),
+                                f"❌ Failed to create file '{filename}': {result.error}",
+                            )
                 else:
                     # Fallback: use simple file write
                     try:
@@ -1027,17 +1047,22 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
                             f"❌ Failed to create file '{filename}': {str(e)}",
                         )
 
-            # Parse FILE_READ operations
-            file_read_pattern = r"\[FILE_READ:([^\]]+)\]"
+            # Parse FILE_READ operations (handle optional backslash escape before ])
+            file_read_pattern = r"\[FILE_READ:([^\]]+)\\?\]"
             for match in re.finditer(file_read_pattern, response_content):
                 filename = match.group(1).strip()
+
+                # Try fuzzy matching if file doesn't exist
+                actual_file = self._fuzzy_find_file(filename)
+                if actual_file:
+                    filename = actual_file
 
                 # Create operation
                 operation = Operation(
                     type=OperationType.FILE_READ,
                     description=f"Read file: {filename}",
                     data={"path": filename},
-                    requires_approval=False,  # Auto-approve for now
+                    requires_approval=False,  # Auto-approve reads
                 )
 
                 # Execute using agent engine (if available)
@@ -1081,37 +1106,261 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
                             f"❌ Failed to read file '{filename}': {str(e)}",
                         )
 
-            # Parse COMMAND_EXEC operations
-            command_pattern = r"\[COMMAND_EXEC\](.*?)\[/COMMAND_EXEC\]"
-            for match in re.finditer(command_pattern, response_content, re.DOTALL):
-                command = match.group(1).strip()
+            # Parse FILE_DELETE operations
+            file_delete_pattern = r"\[FILE_DELETE:([^\]]+)\]"
+            for match in re.finditer(file_delete_pattern, response_content):
+                filename = match.group(1).strip()
 
-                # Execute command
+                # Try fuzzy matching
+                actual_file = self._fuzzy_find_file(filename)
+                if actual_file:
+                    filename = actual_file
+
+                operation = Operation(
+                    type=OperationType.FILE_DELETE,
+                    description=f"Delete file: {filename}",
+                    data={"path": filename},
+                    requires_approval=True,
+                )
+
+                if hasattr(self.engine, "agent_engine"):
+                    result = await self.engine.agent_engine.execute_with_approval(
+                        operation
+                    )
+                    if result.success:
+                        status = "✅ Deleted"
+                    elif result.was_cancelled:
+                        # User cancelled - stop the workflow
+                        updated_response = updated_response.replace(
+                            match.group(0), "🚫 Agent workflow cancelled by user"
+                        )
+                        return updated_response + "\n\n__WORKFLOW_CANCELLED__"
+                    else:
+                        status = f"❌ Failed: {result.error}"
+
+                    updated_response = updated_response.replace(
+                        match.group(0), f"{status} '{filename}'"
+                    )
+
+            # Parse FIND operations (find files by pattern)
+            find_pattern = r"\[FIND:([^\]]+)\]"
+            for match in re.finditer(find_pattern, response_content):
+                pattern = match.group(1).strip()
+
                 try:
-                    import subprocess
-
                     result = subprocess.run(
-                        command,
+                        f"find . -name '{pattern}' -type f 2>/dev/null | head -20",
                         shell=True,
                         capture_output=True,
                         text=True,
-                        timeout=30,
+                        timeout=10,
                     )
-                    if result.returncode == 0:
-                        output = result.stdout.strip()
+                    files = result.stdout.strip()
+                    if files:
                         updated_response = updated_response.replace(
                             match.group(0),
-                            f"✅ Command executed successfully: `{command}`\nOutput: {output}",
+                            f"🔍 Found files matching '{pattern}':\n{files}",
                         )
                     else:
                         updated_response = updated_response.replace(
                             match.group(0),
-                            f"❌ Command failed: `{command}`\nError: {result.stderr}",
+                            f"🔍 No files found matching '{pattern}'",
                         )
                 except Exception as e:
                     updated_response = updated_response.replace(
                         match.group(0),
-                        f"❌ Failed to execute command: `{command}`: {str(e)}",
+                        f"❌ Find failed: {str(e)}",
+                    )
+
+            # Parse SEARCH operations (grep for text)
+            search_pattern = r"\[SEARCH:([^\]]+)\]"
+            for match in re.finditer(search_pattern, response_content):
+                search_text = match.group(1).strip()
+
+                try:
+                    result = subprocess.run(
+                        f"grep -r -n '{search_text}' . 2>/dev/null | head -20",
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    matches = result.stdout.strip()
+                    if matches:
+                        updated_response = updated_response.replace(
+                            match.group(0),
+                            f"🔍 Found '{search_text}' in:\n{matches}",
+                        )
+                    else:
+                        updated_response = updated_response.replace(
+                            match.group(0),
+                            f"🔍 No matches found for '{search_text}'",
+                        )
+                except Exception as e:
+                    updated_response = updated_response.replace(
+                        match.group(0),
+                        f"❌ Search failed: {str(e)}",
+                    )
+
+            # Parse LOCATE operations (find file by name with fuzzy matching)
+            locate_pattern = r"\[LOCATE:([^\]]+)\]"
+            for match in re.finditer(locate_pattern, response_content):
+                filename = match.group(1).strip()
+
+                found_file = self._fuzzy_find_file(filename)
+                if found_file:
+                    updated_response = updated_response.replace(
+                        match.group(0),
+                        f"📍 Located: {found_file}",
+                    )
+                else:
+                    updated_response = updated_response.replace(
+                        match.group(0),
+                        f"❌ Could not locate file similar to '{filename}'",
+                    )
+
+            # Parse SAFE_EXEC operations (read-only commands)
+            safe_exec_pattern = r"\[SAFE_EXEC\](.*?)\[/SAFE_EXEC\]"
+            for match in re.finditer(safe_exec_pattern, response_content, re.DOTALL):
+                command = match.group(1).strip()
+
+                # Whitelist of safe commands
+                safe_commands = [
+                    "ls",
+                    "cat",
+                    "head",
+                    "tail",
+                    "grep",
+                    "find",
+                    "pwd",
+                    "whoami",
+                    "date",
+                    "echo",
+                    "wc",
+                    "sort",
+                    "uniq",
+                    "which",
+                    "type",
+                    "file",
+                    "stat",
+                ]
+                cmd_base = command.split()[0] if command.split() else ""
+
+                if cmd_base in safe_commands:
+                    try:
+                        result = subprocess.run(
+                            command,
+                            shell=True,
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
+                            executable="/bin/bash",  # Explicitly use bash
+                        )
+                        output = (
+                            result.stdout.strip()
+                            if result.returncode == 0
+                            else f"Error: {result.stderr}"
+                        )
+                        updated_response = updated_response.replace(
+                            match.group(0),
+                            f"✅ `{command}`\n{output}",
+                        )
+                    except Exception as e:
+                        updated_response = updated_response.replace(
+                            match.group(0),
+                            f"❌ Failed: {str(e)}",
+                        )
+                else:
+                    updated_response = updated_response.replace(
+                        match.group(0),
+                        f"❌ '{cmd_base}' is not a safe command. Use [COMMAND_EXEC] for approval workflow.",
+                    )
+
+            # Parse COMMAND_EXEC operations (with smart classification via metadata)
+            # Pattern captures optional metadata comment before COMMAND_EXEC
+            command_pattern = r"(?:<!--(read-only|modifies-system)-->\s*)?\[COMMAND_EXEC\](.*?)\[/COMMAND_EXEC\]"
+            for match in re.finditer(command_pattern, response_content, re.DOTALL):
+                metadata = match.group(1)  # 'read-only', 'modifies-system', or None
+                command = match.group(2).strip()
+
+                # Determine if approval is needed based on AI's metadata
+                # Default to requiring approval if no metadata (safe fallback)
+                requires_approval = metadata != "read-only"
+
+                # ALWAYS use agent engine with approval - NO UNSAFE FALLBACK
+                agent_engine = getattr(self.engine, "agent_engine", None)
+
+                if not agent_engine:
+                    updated_response = updated_response.replace(
+                        match.group(0),
+                        f"❌ Agent engine not available - command execution disabled for security",
+                    )
+                    continue
+
+                try:
+                    # Parse command into command + args using shlex
+                    import shlex
+
+                    try:
+                        parts = shlex.split(command)
+                        cmd = parts[0] if parts else command
+                        args = parts[1:] if len(parts) > 1 else []
+                    except ValueError:
+                        # If shlex fails (unmatched quotes, etc.), use simple split
+                        parts = command.split()
+                        cmd = parts[0] if parts else command
+                        args = parts[1:] if len(parts) > 1 else []
+
+                    operation = Operation(
+                        type=OperationType.COMMAND_EXECUTE,
+                        description=f"Execute command: {command[:50]}...",
+                        data={"command": cmd, "args": args},
+                        requires_approval=requires_approval,  # Smart routing based on AI metadata
+                    )
+                    result = await agent_engine.execute_with_approval(operation)
+
+                    # Check result status
+                    if result.success:
+                        # Double-check that operation was actually approved
+                        # (safeguard against bugs in approval flow)
+                        if result.error and (
+                            "not approved" in result.error.lower()
+                            or "denied" in result.error.lower()
+                        ):
+                            # Operation was denied but incorrectly marked as success - fix it
+                            updated_response = updated_response.replace(
+                                match.group(0),
+                                f"❌ Command denied: `{command}`\nReason: {result.error}",
+                            )
+                        else:
+                            output = (
+                                result.data.get("stdout", "")
+                                if isinstance(result.data, dict)
+                                else str(result.data)
+                            )
+                            updated_response = updated_response.replace(
+                                match.group(0),
+                                f"✅ Command executed: `{command}`\nOutput: {output}",
+                            )
+                    else:
+                        # Check if user cancelled (quit) - if so, stop the workflow
+                        if result.was_cancelled:
+                            updated_response = updated_response.replace(
+                                match.group(0),
+                                f"🚫 Agent workflow cancelled by user",
+                            )
+                            # Mark that workflow should stop by returning special marker
+                            return updated_response + "\n\n__WORKFLOW_CANCELLED__"
+                        else:
+                            updated_response = updated_response.replace(
+                                match.group(0),
+                                f"❌ Command failed: `{command}`\nError: {result.error}",
+                            )
+                except Exception as e:
+                    logger.error(f"Command execution failed: {e}", exc_info=True)
+                    updated_response = updated_response.replace(
+                        match.group(0),
+                        f"❌ Command execution error: {str(e)}",
                     )
 
         except Exception as e:
@@ -1178,6 +1427,21 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
                 # Add agent capabilities to message if agent mode is enabled
                 final_message = command.content
                 if self.agent_manager and self.agent_manager.mode.value == "on":
+                    # Ensure approval integration is set up for agent operations
+                    await self._complete_approval_integration_setup()
+
+                    # Debug: Check if approval callback is set
+                    if hasattr(self.engine, "agent_engine") and hasattr(
+                        self.engine.agent_engine, "approval"
+                    ):
+                        has_callback = (
+                            self.engine.agent_engine.approval.approval_callback
+                            is not None
+                        )
+                        logger.debug(
+                            f"Agent approval callback is {'SET' if has_callback else 'NOT SET'}"
+                        )
+
                     agent_prompt = self._get_agent_capabilities_prompt()
                     final_message = f"{agent_prompt}\n\nUser: {command.content}"
 
@@ -1205,6 +1469,9 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
 
         # Use enhanced cancellation handler for AI processing with progress display
         try:
+            # Set processing flag so Ctrl+C cancels operation instead of exiting
+            self.signal_handler.is_processing = True
+
             await self.cancellation_handler.start_cancellable_operation(
                 operation=ai_processing_task,
                 status_message="Processing",
@@ -1217,6 +1484,8 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
         except Exception as e:
             self._show_error(f"Error sending message: {e}")
         finally:
+            # Clear processing flag - back to idle at prompt
+            self.signal_handler.is_processing = False
             # Always clear operations on completion or error
             self.progress_indicator.clear_all_operations()
 
@@ -1332,7 +1601,6 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
         self, handler: Callable, args: List[str]
     ) -> Optional[str]:
         """Execute a Python handler for a dynamic command."""
-        import inspect
 
         # Check if handler is async
         if inspect.iscoroutinefunction(handler):
@@ -1344,7 +1612,6 @@ IMPORTANT: Always use these exact markers when you want to perform operations. D
         self, script_path: Path, args: List[str]
     ) -> Optional[str]:
         """Execute a script for a dynamic command."""
-        import asyncio
 
         try:
             # Make script executable if it isn't already
@@ -2538,11 +2805,13 @@ Model available: {'Yes' if model_info else 'No'}"""
             message: Assistant's message
             model: Model that generated the message
         """
-        import re
+
+        # Strip metadata comments (hidden from user display)
+        escaped_message = re.sub(
+            r"<!--(?:read-only|modifies-system)-->\s*", "", message
+        )
 
         # Escape specific operation markers that Rich might interpret as markup
-        escaped_message = message
-
         # Escape operation markers
         operation_patterns = [
             r"\[FILE_WRITE:[^\]]+\]",
@@ -2550,7 +2819,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             r"\[COMMAND_EXEC\]",
             r"\[/COMMAND_EXEC\]",
             r"\[/FILE_WRITE\]",
-            r"\[WEB_REQUEST:[^\]]+\]",
+            r"\[WEB_REQUEST:[^\]]+\\?\]",
+            r"\[SAFE_EXEC\]",
+            r"\[/SAFE_EXEC\]",
         ]
 
         for pattern in operation_patterns:
@@ -2776,7 +3047,6 @@ Model available: {'Yes' if model_info else 'No'}"""
             self._show_error("Usage: /switch <provider> [model]")
             self._show_info("Available providers:")
             # Show available providers as help
-            from .commands import Command, SlashCommand
 
             providers_command = Command.create_slash_command(
                 SlashCommand.PROVIDERS, [], "/providers"
@@ -2790,7 +3060,6 @@ Model available: {'Yes' if model_info else 'No'}"""
         try:
             with self.console.status("[bold yellow]Switching...", spinner="dots"):
                 # Check if provider is available but not initialized
-                from ..providers.factory import ProviderFactory
 
                 available_providers = ProviderFactory.get_available_providers()
 
@@ -2816,7 +3085,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                             )
                         else:
                             self._show_error(f"Provider '{provider_name}' not found.")
-                        from .commands import Command, CommandType
 
                         providers_command = Command(
                             content="/providers",
@@ -2927,7 +3195,6 @@ Model available: {'Yes' if model_info else 'No'}"""
             # Show available options on error
             if "not available" in str(e).lower() or "not found" in str(e).lower():
                 self._show_info("Available options:")
-                from .commands import Command, CommandType
 
                 providers_command = Command(
                     content="/providers",
@@ -3041,10 +3308,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_config_generate(self, args: list) -> None:
         """Handle config generate subcommand."""
         try:
-            import json
-            from pathlib import Path
-
-            from ..core.models import ConfigTemplateManager
 
             # Initialize components
             ConfigTemplateManager()
@@ -3274,7 +3537,6 @@ Model available: {'Yes' if model_info else 'No'}"""
             validation_results.append(("Capabilities", False, f"Check failed: {e}"))
 
         # Display results
-        from rich.table import Table
 
         table = Table(title=f"{provider_name.upper()} Validation Results")
         table.add_column("Check", style="bold", width=20)
@@ -3353,7 +3615,6 @@ Model available: {'Yes' if model_info else 'No'}"""
             validation_summary.append(provider_status)
 
         # Display summary table
-        from rich.table import Table
 
         table = Table(title="Provider Validation Summary")
         table.add_column("Provider", style="bold", width=15)
@@ -3484,8 +3745,6 @@ Model available: {'Yes' if model_info else 'No'}"""
         try:
             config_info = self.engine.get_configuration_info()
 
-            from rich.table import Table
-
             table = Table(title="Current Configuration")
             table.add_column("Setting", style="bold")
             table.add_column("Value", style="cyan")
@@ -3544,11 +3803,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_config_setup(self, args: list) -> None:
         """Handle config setup subcommand using the new configuration wizard."""
         try:
-            from ..core.config_manager import ConfigManager
-            from .config_setup_wizard import (
-                run_config_setup_wizard,
-                run_quick_setup,
-            )
 
             # Parse arguments
             quick = "--quick" in args or "-q" in args
@@ -3586,11 +3840,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_config_mode(self, args: list) -> None:
         """Handle config mode subcommand."""
         try:
-            from ..core.config_manager import ConfigManager
-            from ..core.config_provider import (
-                ConfigurationMode,
-                ConfigurationProvider,
-            )
 
             config_manager = ConfigManager()
             config_provider = ConfigurationProvider(config_manager)
@@ -3605,7 +3854,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                 )
 
                 # Show available modes table
-                from rich.table import Table
 
                 modes_table = Table(title="Available Configuration Modes")
                 modes_table.add_column("Mode", style="cyan")
@@ -3641,10 +3889,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_config_migrate(self, args: list) -> None:
         """Handle config migrate subcommand."""
         try:
-            from rich.prompt import Confirm
-
-            from ..core.config_manager import ConfigManager
-            from ..core.config_migration_helpers import create_migration_helper
 
             config_manager = ConfigManager()
             migration_helper = create_migration_helper(config_manager)
@@ -3722,7 +3966,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_config_templates(self, args: list) -> None:
         """Handle config templates subcommand."""
         try:
-            from ..core.config_provider import ConfigurationProvider
 
             config_provider = ConfigurationProvider()
             templates = config_provider.get_quick_setup_templates()
@@ -3752,7 +3995,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                     self._show_detailed_template(template)
             else:
                 # Show templates table
-                from rich.table import Table
 
                 templates_table = Table(title="Available Configuration Templates")
                 templates_table.add_column("Name", style="cyan")
@@ -3784,9 +4026,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_config_reset(self, args: list) -> None:
         """Handle config reset subcommand."""
         try:
-            from rich.prompt import Confirm
-
-            from ..core.config_manager import ConfigManager
 
             config_manager = ConfigManager()
 
@@ -3817,7 +4056,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_config_validate_enhanced(self, args: list) -> None:
         """Handle enhanced config validate subcommand with compatibility checking."""
         try:
-            from ..core.config_provider import ConfigurationProvider
 
             config_provider = ConfigurationProvider()
 
@@ -3838,7 +4076,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                 return
 
             # Show summary results
-            from rich.table import Table
 
             # Status table
             status_table = Table(title="Configuration Validation Results")
@@ -3968,7 +4205,6 @@ Model available: {'Yes' if model_info else 'No'}"""
 
     def _show_migration_analysis(self, analysis) -> None:
         """Show migration analysis results."""
-        from rich.table import Table
 
         table = Table(title="Configuration Analysis")
         table.add_column("Aspect", style="cyan")
@@ -4019,7 +4255,6 @@ Model available: {'Yes' if model_info else 'No'}"""
 
     def _show_detailed_template(self, template) -> None:
         """Show detailed template information."""
-        from rich.markdown import Markdown
 
         template_text = f"""
 # {template['display_name']} Template
@@ -4050,9 +4285,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _handle_setup_command(self, command: Command) -> None:
         """Handle setup command for interactive configuration."""
         try:
-            from ..core.config_manager import ConfigManager
-            from ..core.provider_registry import ProviderRegistry
-            from ..core.setup_wizard import SetupWizard
 
             # Initialize components
             config_manager = ConfigManager()
@@ -4161,7 +4393,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                 created = conv.get("created_at", "Unknown")
                 if created and created != "Unknown":
                     try:
-                        from datetime import datetime
 
                         created_dt = datetime.fromisoformat(
                             created.replace("Z", "+00:00")
@@ -4205,11 +4436,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     async def _get_enhanced_providers_list(self) -> str:
         """Get enhanced providers list with comprehensive status information."""
         try:
-            from io import StringIO
-
-            from rich.console import Console
-
-            from ..providers.factory import ProviderFactory
 
             available_provider_names = ProviderFactory.get_available_providers()
             if not available_provider_names:
@@ -4250,7 +4476,6 @@ Model available: {'Yes' if model_info else 'No'}"""
 
     def _create_providers_table(self) -> "Table":
         """Create and configure the providers table."""
-        from rich.table import Table
 
         table = Table(show_header=True, header_style="bold magenta", box=None)
         table.add_column("Provider", style="bold", width=13)
@@ -4294,7 +4519,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                 return "Error"
         else:
             try:
-                from ..providers.factory import ProviderFactory
 
                 models = ProviderFactory.get_models_for_provider(provider_name)
                 return f"{len(models)}"
@@ -4320,8 +4544,6 @@ Model available: {'Yes' if model_info else 'No'}"""
     def _detect_provider_capabilities(self, provider_name: str) -> list:
         """Detect capabilities for non-active providers."""
         try:
-            from ..core.models import ProviderConfig
-            from ..providers.factory import ProviderFactory
 
             temp_config = ProviderConfig(api_key="dummy", model="dummy")
             temp_provider = ProviderFactory.create_provider(provider_name, temp_config)
@@ -5053,7 +5275,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                 active_count = status["operations"]["in_progress"]
 
                 if active_count > 0:
-                    from rich.prompt import Confirm
 
                     if not Confirm.ask(
                         f"There are {active_count} active operations. Disable anyway?"
@@ -5195,9 +5416,6 @@ Model available: {'Yes' if model_info else 'No'}"""
             if not hasattr(self, "status_integration") or not self.status_integration:
                 try:
                     # Try to create status integration
-                    from ..core.agent.cli_integration import (
-                        create_cli_status_integration,
-                    )
 
                     self.status_integration = await create_cli_status_integration(
                         self.config_manager, self.console
@@ -5210,7 +5428,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                     return
 
             # Create status command handler
-            from ..core.agent.cli_integration import CLIStatusCommand
 
             status_command = CLIStatusCommand(self.status_integration)
 
@@ -5239,9 +5456,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                 or not self.approval_integration
             ):
                 # Try to initialize approval integration
-                from .approval_integration import (
-                    create_cli_approval_integration,
-                )
 
                 try:
                     self.approval_integration = await create_cli_approval_integration(
@@ -5313,9 +5527,6 @@ Model available: {'Yes' if model_info else 'No'}"""
 
     async def _list_stored_approvals(self, permission_controller) -> None:
         """List all stored approval decisions."""
-        from datetime import datetime
-
-        from rich.table import Table
 
         approvals = permission_controller.get_stored_approvals()
 
@@ -5406,9 +5617,6 @@ Model available: {'Yes' if model_info else 'No'}"""
 
     async def _show_approval_stats(self, permission_controller) -> None:
         """Show approval statistics."""
-        from datetime import datetime
-
-        from rich.table import Table
 
         approvals = permission_controller.get_stored_approvals()
 
@@ -5495,8 +5703,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                 self._show_info("No pending batch approval requests found.")
                 return
 
-            from rich.table import Table
-
             # Create overview table
             table = Table(show_header=True, header_style="bold magenta")
             table.add_column("Batch ID", style="cyan", width=12)
@@ -5524,7 +5730,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                 # Format expiration
                 expires_str = "None"
                 if batch_request.expires_at:
-                    from datetime import datetime
 
                     time_remaining = batch_request.expires_at - datetime.now()
                     if time_remaining.total_seconds() > 0:
@@ -5580,8 +5785,6 @@ Model available: {'Yes' if model_info else 'No'}"""
             if not batch_request:
                 self._show_error(f"Batch not found: {batch_id}")
                 return
-
-            from .batch_approval_display import create_batch_approval_panel
 
             panel = create_batch_approval_panel(console=self.console)
 
@@ -5709,14 +5912,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                 return
 
             # Parse filter arguments
-            from .batch_approval_filters import (
-                ActionTypeFilter,
-                BatchFilterManager,
-                OperationType,
-                RiskLevelFilter,
-                StatusFilter,
-                TargetPatternFilter,
-            )
 
             filter_manager = BatchFilterManager()
 
@@ -5761,12 +5956,10 @@ Model available: {'Yes' if model_info else 'No'}"""
             )
 
             # Display filtered results
-            from .batch_approval_display import create_batch_approval_panel
 
             panel = create_batch_approval_panel(console=self.console)
 
             # Create temporary batch request for display
-            from ..core.agent.approval_manager import BatchApprovalRequest
 
             filtered_batch = BatchApprovalRequest(
                 id=batch_request.id,
@@ -5815,17 +6008,6 @@ Model available: {'Yes' if model_info else 'No'}"""
             if not batch_request:
                 self._show_error(f"Pending batch not found: {batch_id}")
                 return
-
-            from rich.layout import Layout
-            from rich.live import Live
-
-            from .batch_approval_display import create_batch_approval_panel
-            from .batch_approval_filters import (
-                BatchFilterManager,
-                BatchSorter,
-                SortBy,
-                SortCriteria,
-            )
 
             panel = create_batch_approval_panel(console=self.console)
             filter_manager = BatchFilterManager()
@@ -6057,8 +6239,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                     self._show_info("No command history available.")
                     return
 
-                from rich.table import Table
-
                 table = Table(title=f"Recent Commands (Last {len(recent_commands)})")
                 table.add_column("Index", style="dim", width=6)
                 table.add_column("Time", style="cyan", width=16)
@@ -6090,8 +6270,6 @@ Model available: {'Yes' if model_info else 'No'}"""
                     self._show_info(f"No commands found matching '{query}'.")
                     return
 
-                from rich.table import Table
-
                 table = Table(
                     title=f"Search Results for '{query}' ({len(results)} found)"
                 )
@@ -6113,8 +6291,6 @@ Model available: {'Yes' if model_info else 'No'}"""
             elif action == "stats":
                 # Show history statistics
                 stats = self.history_manager.get_statistics()
-
-                from rich.panel import Panel
 
                 stats_text = f"""Total Commands: {stats['total_commands']}
 Current Session: {stats['current_session_commands']}
@@ -6295,7 +6471,6 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
 
     def _complete_slash_commands(self, text: str) -> List[str]:
         """Complete slash commands including dynamic ones."""
-        from .commands import SlashCommand
 
         # Get built-in commands
         all_commands = SlashCommand.get_all_commands()
@@ -6403,9 +6578,6 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
     async def _handle_add_model_command(self, command: Command) -> None:
         """Handle the add-model command."""
         try:
-            from datetime import datetime
-
-            from ..core.models import EnhancedModelInfo
 
             args = command.args
             if len(args) < 2:
@@ -6538,8 +6710,6 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
     async def _handle_list_custom_models_command(self, command: Command) -> None:
         """Handle the list-custom-models command."""
         try:
-            from rich.panel import Panel
-            from rich.table import Table
 
             custom_models = self.engine.config_manager.get_custom_models()
 
@@ -6603,12 +6773,6 @@ def main() -> None:
 
     This function initializes the application and starts the interactive CLI.
     """
-    import sys
-
-    import click
-
-    from ..core.config_manager import ConfigManager
-    from ..core.engine import CoreEngine
 
     @click.command()
     @click.option("--help", "-h", is_flag=True, help="Show this help message and exit")
@@ -6628,7 +6792,6 @@ def main() -> None:
             return
 
         if version:
-            from omnimancer import __version__
 
             click.echo(f"Omnimancer CLI v{__version__}")
             return

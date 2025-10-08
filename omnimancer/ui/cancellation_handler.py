@@ -129,10 +129,26 @@ class CancellationHandler:
 
         except asyncio.CancelledError:
             logger.info("Operation cancelled by user")
+            # Properly stop status display before printing cancellation message
+            if self.status_display:
+                try:
+                    self.status_display.stop()
+                except:
+                    pass
+            # Clear the line and print cancellation message
+            self.console.print("\r" + " " * 80 + "\r", end="")
             self.console.print(f"[yellow]⚠️  {cancellation_message}[/yellow]")
             raise
         finally:
             self.is_listening = False
+            # Ensure status display is fully stopped and cleaned up
+            if self.status_display:
+                try:
+                    self.status_display.stop()
+                    # Clear any remaining spinner artifacts
+                    self.console.print("\r" + " " * 80 + "\r", end="")
+                except:
+                    pass
             self.active_operation = None
             self.status_display = None
             self.is_paused = False
@@ -171,6 +187,8 @@ class CancellationHandler:
             self.is_paused = True
             try:
                 self.status_display.stop()
+                # Clear the line where the spinner was displayed
+                self.console.print("\r" + " " * 80 + "\r", end="")
             except:
                 pass
             logger.debug("Status display paused for user interaction")

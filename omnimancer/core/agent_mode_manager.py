@@ -589,9 +589,11 @@ class AgentModeManager:
         }
 
         try:
-            approved = await self.approval_interface.handle_single_approval(
-                approval_data
+            approved, was_cancelled = (
+                await self.approval_interface.handle_single_approval(approval_data)
             )
+            # Store was_cancelled info in operation metadata for result handling
+            agent_operation.data["was_cancelled"] = was_cancelled
             return approved
         except Exception as e:
             logger.error(
