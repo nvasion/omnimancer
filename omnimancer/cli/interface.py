@@ -1371,14 +1371,49 @@ class CommandLineInterface:
 
     def _get_user_input(self) -> Optional[str]:
         """
-        Get input from the user with basic readline support.
+        Get input from the user with multi-line paste support.
 
         Returns:
             User input string or None if EOF
         """
         try:
-            # Simple input with readline for arrow key history navigation
-            user_input = input(">>> ")
+            # Check if there's immediate input available (paste detection)
+            # This detects if user is pasting multiple lines
+            lines = []
+
+            # Get first line
+            first_line = input(">>> ")
+            lines.append(first_line)
+
+            # Check for additional pasted lines (non-blocking)
+            # On Unix-like systems, check if more input is immediately available
+            if sys.stdin.isatty():
+                # For interactive terminals, check if more lines are waiting
+                import termios
+                import tty
+
+                # Save terminal settings
+                old_settings = termios.tcgetattr(sys.stdin)
+                try:
+                    # Set non-blocking mode briefly to check for paste
+                    tty.setcbreak(sys.stdin.fileno())
+
+                    # Check if data is available (indicates paste)
+                    while select.select([sys.stdin], [], [], 0.05)[0]:
+                        try:
+                            line = sys.stdin.readline()
+                            if line:
+                                lines.append(line.rstrip("\n"))
+                            else:
+                                break
+                        except:
+                            break
+                finally:
+                    # Restore terminal settings
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+
+            # Join all lines
+            user_input = "\n".join(lines) if len(lines) > 1 else first_line
 
             # Add to history if we got valid input
             if user_input and user_input.strip():
@@ -1388,6 +1423,9 @@ class CommandLineInterface:
 
         except (EOFError, KeyboardInterrupt):
             return None
+        except Exception as e:
+            # Fallback to simple input on any error
+            return first_line if "first_line" in locals() else None
 
     async def _process_command(self, command: Command) -> None:
         """
