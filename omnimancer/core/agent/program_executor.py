@@ -307,11 +307,31 @@ class CommandValidator:
 
     def validate_command_args(self, command: str, args: List[str]) -> List[str]:
         """Validate and sanitize command arguments."""
+        import re
+
+        # Define dangerous shell metacharacters and patterns
+        dangerous_patterns = [
+            r';',           # Command separator
+            r'\|',          # Pipe
+            r'&',           # Background/AND
+            r'\$\(',        # Command substitution
+            r'`',           # Backtick command substitution
+            r'>',           # Redirect
+            r'<',           # Redirect
+            r'\n',          # Newline
+            r'\r',          # Carriage return
+        ]
 
         sanitized_args = []
         for arg in args:
+            # Check for dangerous shell metacharacters
+            for pattern in dangerous_patterns:
+                if re.search(pattern, arg):
+                    raise SecurityError(
+                        f"Dangerous shell metacharacter detected in argument: {arg}"
+                    )
+
             # Use shlex.quote() to properly escape arguments for safe shell execution
-            # This handles all special characters correctly, including |, ;, &, etc.
             sanitized_args.append(shlex.quote(arg))
 
         return sanitized_args

@@ -289,13 +289,24 @@ class TestProgramExecutor:
     @pytest.mark.asyncio
     async def test_execute_command_success(self, executor):
         """Test successful command execution."""
-        # Mock subprocess execution
-        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
-            mock_process = AsyncMock()
-            mock_process.communicate.return_value = (b"output", b"")
-            mock_process.returncode = 0
-            mock_subprocess.return_value = mock_process
+        # Mock the enhanced executor's execute_command method
+        from omnimancer.core.agent.program_executor import CommandResult
 
+        mock_result = CommandResult(
+            command="ls",
+            args=["-l"],
+            success=True,
+            exit_code=0,
+            stdout="output",
+            stderr="",
+            execution_time=0.1,
+            error_message=None,
+            was_cancelled=False,
+        )
+
+        with patch.object(
+            executor.enhanced_executor, "execute_command", return_value=mock_result
+        ):
             result = await executor._execute_command("ls", ["-l"])
 
             assert result.success is True
@@ -305,12 +316,23 @@ class TestProgramExecutor:
     @pytest.mark.asyncio
     async def test_execute_command_failure(self, executor):
         """Test command execution failure."""
-        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
-            mock_process = AsyncMock()
-            mock_process.communicate.return_value = (b"", b"error")
-            mock_process.returncode = 1
-            mock_subprocess.return_value = mock_process
+        from omnimancer.core.agent.program_executor import CommandResult
 
+        mock_result = CommandResult(
+            command="ls",
+            args=["nonexistent"],
+            success=False,
+            exit_code=1,
+            stdout="",
+            stderr="error",
+            execution_time=0.1,
+            error_message="error",
+            was_cancelled=False,
+        )
+
+        with patch.object(
+            executor.enhanced_executor, "execute_command", return_value=mock_result
+        ):
             result = await executor._execute_command("ls", ["nonexistent"])
 
             assert result.success is False
@@ -319,14 +341,12 @@ class TestProgramExecutor:
     @pytest.mark.asyncio
     async def test_execute_command_timeout(self, executor):
         """Test command execution timeout."""
-        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
-            mock_process = AsyncMock()
-            mock_process.communicate.side_effect = asyncio.TimeoutError()
-            # terminate() and kill() should be synchronous methods, not async
-            mock_process.terminate = Mock()
-            mock_process.kill = Mock()
-            mock_subprocess.return_value = mock_process
-
+        # Mock the enhanced executor to raise TimeoutError
+        with patch.object(
+            executor.enhanced_executor,
+            "execute_command",
+            side_effect=asyncio.TimeoutError(),
+        ):
             result = await executor._execute_command("ls", [])
 
             assert result.success is False
@@ -338,7 +358,7 @@ class TestProgramExecutor:
         operation = Operation(
             type=OperationType.COMMAND_EXECUTE,
             description="List files",
-            data={"command": "ls", "args": ["-l"]},
+            data={"command": "ls", "args": ["-l"], "_approval_granted": True},
         )
 
         with patch.object(executor, "_execute_command") as mock_execute:

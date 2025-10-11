@@ -53,8 +53,8 @@ async def test_handle_single_approval_creates_change_preview():
     assert change_preview.reversible == operation.reversible
     assert change_preview.metadata == operation.data
 
-    # Verify result
-    assert result is True
+    # Verify result - _handle_single_approval returns (approved, was_cancelled)
+    assert result == (True, False)
 
 
 @pytest.mark.asyncio
