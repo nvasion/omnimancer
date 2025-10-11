@@ -188,10 +188,10 @@ extract_version:
       - version.env
     expire_in: 1 day
   rules:
-    - if: $CI_PIPELINE_SOURCE == "push"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_PIPELINE_SOURCE == "web"
-    - if: $CI_COMMIT_TAG  # Tag pipelines
+    # Only run on main branch, not from version bump commits to avoid loops
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_MESSAGE !~ /chore\(release\): bump version/'
+      when: on_success
+    - when: never
 
 # ============================================================================
 # Code Quality Stage
@@ -200,7 +200,6 @@ extract_version:
 lint:black:
   stage: lint
   extends: .default_setup
-  needs: ["extract_version"]
   script:
     - black --check omnimancer tests scripts
   allow_failure: true
@@ -211,7 +210,6 @@ lint:black:
 lint:isort:
   stage: lint
   extends: .default_setup
-  needs: ["extract_version"]
   script:
     - isort --check-only omnimancer tests scripts
   allow_failure: true
@@ -222,7 +220,6 @@ lint:isort:
 lint:flake8:
   stage: lint
   extends: .default_setup
-  needs: ["extract_version"]
   script:
     - flake8 omnimancer tests --max-line-length=88 --extend-ignore=E203,W503
   allow_failure: true
@@ -233,7 +230,6 @@ lint:flake8:
 lint:mypy:
   stage: lint
   extends: .default_setup
-  needs: ["extract_version"]
   script:
     - mypy omnimancer --ignore-missing-imports
   allow_failure: true
@@ -248,7 +244,6 @@ lint:mypy:
 test:python:
   stage: test
   extends: [.default_setup, .python_matrix]
-  needs: ["extract_version"]
   script:
     - |
       pytest tests/ \
@@ -279,7 +274,6 @@ test:python:
 test:integration:
   stage: test
   extends: .default_setup
-  needs: ["extract_version"]
   script:
     - |
       # Run integration tests separately
