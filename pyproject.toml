@@ -63,9 +63,9 @@ omn = "omnimancer.cli.interface:main"
 omniman = "omnimancer.cli.interface:main"
 
 [project.urls]
-Homepage = "https://gitlab.com/jite-ai/omnimancer"
-Repository = "https://gitlab.com/jite-ai/omnimancer"
-Issues = "https://gitlab.com/jite-ai/omnimancer/issues"
+Homepage = "https://github.com/nvasion/omnimancer"
+Repository = "https://github.com/nvasion/omnimancer"
+Issues = "https://github.com/nvasion/omnimancer/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -209,3 +209,4 @@ node_modules/
 *.sw?
 # OS specific
 
+.factory/worktrees/
