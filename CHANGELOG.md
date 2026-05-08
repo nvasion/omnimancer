@@ -2,6 +2,79 @@
 
 # Changelog
 
+## [0.1.16] - 2026-05-08
+
+### Features
+- feat: Add comprehensive version verification to CI pipeline
+
+### Bug Fixes
+- fix: PROPERLY fix version extraction for tag pipelines
+- fix: CRITICAL - Use correct CI variable for tag pipeline detection
+- fix: Simplify CI version handling for tag releases
+- fix: Ensure build:package uses VERSION from extract_version for tag pipelines
+- fix: GitLab CI version synchronization for tag releases
+- fix: GitLab CI pipeline to properly handle version releases
+- fix: GitLab CI pipeline to correctly deploy version from tag
+
+### Other Changes
+- Update via Factory Nexus
+- staging move
+- fixing tests
+- some fixes to tests
+- Update .gitlab-ci.yml file
+- Update .gitlab-ci.yml file
+- updating missing adds
+- adding new improvements to agent and its responses.
+- chore(release): bump version to 0.1.15
+- Update .gitlab-ci.yml file
+- chore(release): bump version to 0.1.14
+- Update .gitlab-ci.yml file
+- chore(release): bump version to 0.1.13
+- Update .gitlab-ci.yml file
+- chore(release): bump version to 0.1.12
+- Apply 1 suggestion(s) to 1 file(s)
+- fixing for comments
+- staging bug fix for Panel issue
+- chore(release): bump version to 0.1.11
+- more pipeline fixes: trying a few things to update versions properly
+- chore(release): bump version to 0.1.10
+- more pipeline updates
+- chore(release): bump version to 0.1.9
+- debug: Add more logging and clean old artifacts before build
+- chore(release): bump version to 0.1.8
+- chore(release): bump version to 0.1.7
+- chore(release): bump version to 0.1.6
+- chore(release): bump version to 0.1.5
+- chore(release): bump version to 0.1.4 [skip ci]
+- chore(release): bump version to 0.1.3 [skip ci]
+- Edit README.md - kick off pipeline
+- fixing issue with openrouter provider and others not propering going through /setup
+- Edit README.md
+- chore(release): bump version to 0.1.2 [skip ci]
+- Update .gitlab-ci.yml file
+- chore(release): bump version to 0.1.1 [skip ci]
+- Standardize code formatting with black and ci/cd pipeline
+- fixing unittests broken by black, ruff, and isort
+- fixing tool escaping in pyproject
+- more linting
+- More black linting and formating changes
+- removing dependencies on 3.8-9
+- removing python 3.8-9 dependencies
+- remove tag
+- updating the gitlab yaml
+- linting and updating the ci/cd workflow
+- linting and updating the ci/cd workflow
+- Update .gitlab-ci.yml file
+- Apply 1 suggestion(s) to 1 file(s)
+- Apply 1 suggestion(s) to 1 file(s)
+- Apply 1 suggestion(s) to 1 file(s)
+- Apply 1 suggestion(s) to 1 file(s)
+- adding gitlab ci
+- Initial Omnimancer release commit
+
+
+# Changelog
+
 ## [0.1.15] - 2025-10-01
 
 ### Other Changes
