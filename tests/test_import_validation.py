@@ -61,12 +61,10 @@ class TestCoreModuleImports:
 
     def test_agent_core_imports(self):
         """Test that agent core modules import successfully."""
-        # Test agent system modules
-        from omnimancer.core import agent_engine, agent_mode_manager, agent_progress_ui
+        from omnimancer.core import agent_engine, agent_mode_manager
 
         assert agent_engine is not None
         assert agent_mode_manager is not None
-        assert agent_progress_ui is not None
 
     def test_security_module_imports(self):
         """Test that security modules import successfully."""
@@ -235,13 +233,9 @@ class TestModuleCompatibility:
         try:
             # Import the main agent engine
             # Import the program executor that was failing
-            from omnimancer.core.agent.program_executor import (
-                EnhancedProgramExecutor,
-            )
+            from omnimancer.core.agent.program_executor import EnhancedProgramExecutor
             from omnimancer.core.agent_engine import AgentEngine
-            from omnimancer.core.security.approval_workflow import (
-                ApprovalWorkflow,
-            )
+            from omnimancer.core.security.approval_workflow import ApprovalWorkflow
 
             # Import security components
             from omnimancer.core.security.sandbox_manager import SandboxManager
@@ -297,14 +291,8 @@ class TestErrorModuleSpecific:
     def test_program_executor_error_usage(self):
         """Test that program_executor can use the error classes."""
         # Import the module that was failing
-        from omnimancer.core.agent.program_executor import (
-            EnhancedProgramExecutor,
-        )
-        from omnimancer.utils.errors import (
-            ExecutionError,
-            SecurityError,
-            TimeoutError,
-        )
+        from omnimancer.core.agent.program_executor import EnhancedProgramExecutor
+        from omnimancer.utils.errors import ExecutionError, SecurityError, TimeoutError
 
         # Verify the executor can reference these error types
         try:

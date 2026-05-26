@@ -11,7 +11,15 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from .rich_renderer import RiskLevel
+
+class RiskLevel(Enum):
+    """Risk levels for operations."""
+
+    NONE = "none"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
 
 
 class OperationStatus(Enum):

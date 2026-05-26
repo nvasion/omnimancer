@@ -11,11 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from omnimancer.core.models import (
-    ChatContext,
-    ChatMessage,
-    MessageRole,
-)
+from omnimancer.core.models import ChatContext, ChatMessage, MessageRole
 from omnimancer.providers.cohere import CohereProvider
 from omnimancer.utils.errors import (
     AuthenticationError,

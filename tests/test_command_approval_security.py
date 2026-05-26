@@ -4,9 +4,11 @@ Test that command execution always requires approval and cannot be bypassed.
 This is a CRITICAL security test - commands must NEVER execute without user approval.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from omnimancer.core.agent.types import Operation, OperationType, OperationResult
+
+import pytest
+
+from omnimancer.core.agent.types import Operation, OperationResult, OperationType
 
 
 @pytest.mark.asyncio
@@ -113,8 +115,9 @@ async def test_file_write_requires_approval():
 @pytest.mark.asyncio
 async def test_no_subprocess_fallback_for_commands():
     """Test that there is NO subprocess fallback that bypasses approval."""
-    from omnimancer.cli.interface import CommandLineInterface
     import subprocess
+
+    from omnimancer.cli.interface import CommandLineInterface
 
     # Create mock engine with agent_engine that raises exception
     mock_engine = MagicMock()

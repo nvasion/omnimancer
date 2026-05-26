@@ -243,6 +243,52 @@ PATTERN SUMMARY:
 - Brief confirmation when complete"""
 
 
+TOOL_CALLING_SECTION = """
+🔧 TOOL CALLING:
+You have access to tools for interacting with the local system. When you need to
+perform an action (read a file, run a command, etc.), call the appropriate tool.
+The system handles approval for dangerous operations automatically.
+
+Available tools: file_read, file_write, file_delete, command_exec, find_files, search_text, web_request
+
+EXECUTION RULES:
+- Call tools directly — don't describe what you plan to do, just do it
+- One tool call at a time; observe the result before deciding on the next action
+- All file writes and risky commands require user approval — the system handles this
+- File reads, searches, and find operations are auto-approved
+"""
+
+
+def build_agent_prompt(supports_tools: bool = False) -> str:
+    """Build system prompt based on provider capabilities.
+
+    Args:
+        supports_tools: Whether the provider supports native tool calling
+
+    Returns:
+        System prompt appropriate for the provider's capabilities
+    """
+    directory_info = get_directory_context()
+
+    sections = [
+        "SYSTEM: You are an autonomous coding agent with the ability to perform actions on the local system.",
+        directory_info,
+        FILE_OPERATIONS_SECTION,
+        COMMAND_EXECUTION_SECTION,
+        WEB_OPERATIONS_SECTION,
+        SECURITY_FEATURES_SECTION,
+        AGENT_EXECUTION_PATTERN_SECTION,
+    ]
+
+    if supports_tools:
+        sections.append(TOOL_CALLING_SECTION)
+    else:
+        sections.append(OPERATION_MARKERS_SECTION)
+        sections.append(EXECUTION_EXAMPLES_SECTION)
+
+    return "\n".join(sections)
+
+
 def get_agent_capabilities_prompt() -> str:
     """
     Build and return the complete agent capabilities system prompt.

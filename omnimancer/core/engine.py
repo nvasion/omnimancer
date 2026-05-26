@@ -8,9 +8,16 @@ Version: 1.0.0
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
-from ..core.models import ChatResponse, EnhancedModelInfo, ModelInfo
+from ..core.models import (
+    ChatResponse,
+    EnhancedModelInfo,
+    ModelInfo,
+    StreamEvent,
+    StreamEventType,
+    ToolDefinition,
+)
 from ..providers.base import BaseProvider
 from ..ui.progress_indicator import OperationType, get_progress_indicator
 from ..utils.errors import ConfigurationError
@@ -240,6 +247,65 @@ class CoreEngine:
                 tokens_used=0,
                 error=f"Failed to send message: {str(e)}",
             )
+
+    async def send_message_with_tools(
+        self, message: str, tools: List[ToolDefinition]
+    ) -> ChatResponse:
+        if not self.current_provider:
+            return ChatResponse(
+                content="",
+                model_used="",
+                tokens_used=0,
+                error="No provider available.",
+            )
+
+        try:
+            context = self.chat_manager.get_current_context()
+            response = await self.current_provider.send_message_with_tools(
+                message, context, tools
+            )
+
+            self.chat_manager.add_user_message(message)
+            if response.is_success:
+                self.chat_manager.add_assistant_message(
+                    response.content, self.current_provider.model
+                )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Failed to send message with tools: {e}")
+            return ChatResponse(
+                content="",
+                model_used="",
+                tokens_used=0,
+                error=f"Failed to send message: {str(e)}",
+            )
+
+    async def send_message_stream(self, message: str) -> AsyncIterator[StreamEvent]:
+        if not self.current_provider:
+            yield StreamEvent(type=StreamEventType.ERROR, error="No provider available.")
+            return
+        context = self.chat_manager.get_current_context()
+        async for event in self.current_provider.send_message_stream(message, context):
+            yield event
+
+    async def send_message_with_tools_stream(
+        self, message: str, tools: List[ToolDefinition]
+    ) -> AsyncIterator[StreamEvent]:
+        if not self.current_provider:
+            yield StreamEvent(type=StreamEventType.ERROR, error="No provider available.")
+            return
+        context = self.chat_manager.get_current_context()
+        async for event in self.current_provider.send_message_with_tools_stream(
+            message, context, tools
+        ):
+            yield event
+
+    def provider_supports_tools(self) -> bool:
+        if not self.current_provider:
+            return False
+        return self.current_provider.supports_tools()
 
     def get_available_models(self) -> List[ModelInfo]:
         """Get all available models from all providers."""

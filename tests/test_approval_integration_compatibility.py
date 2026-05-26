@@ -2,9 +2,13 @@
 Test approval integration compatibility with different ApprovalManager types.
 """
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
-from omnimancer.cli.approval_integration import inject_approval_integration_into_agent_engine
+
+from omnimancer.cli.approval_integration import (
+    inject_approval_integration_into_agent_engine,
+)
 
 
 @pytest.mark.asyncio

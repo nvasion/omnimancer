@@ -12,23 +12,11 @@ import shlex
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import (
-    Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
-    Optional,
-)
-
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 from ...utils.errors import SecurityError
 from ..security.approval_workflow import ApprovalWorkflow, RiskLevel
-from ..security.sandbox_manager import (
-    ResourceLimits,
-    SandboxedProcess,
-    SandboxManager,
-)
+from ..security.sandbox_manager import ResourceLimits, SandboxedProcess, SandboxManager
 
 logger = logging.getLogger(__name__)
 

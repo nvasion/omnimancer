@@ -2,11 +2,13 @@
 Test that approval handler properly creates ChangePreview objects from Operations.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from omnimancer.core.agent.types import Operation, OperationType
-from omnimancer.core.agent.approval_manager import ChangeType, ChangePreview
+
+import pytest
+
 from omnimancer.cli.approval_integration import CLIApprovalIntegration
+from omnimancer.core.agent.approval_manager import ChangePreview, ChangeType
+from omnimancer.core.agent.types import Operation, OperationType
 
 
 @pytest.mark.asyncio

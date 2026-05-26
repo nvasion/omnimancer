@@ -7,9 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from omnimancer.core.agent.approval_interface import (
-    ApprovalInterface,
-)
+from omnimancer.core.agent.approval_interface import ApprovalInterface
 from omnimancer.core.agent.approval_manager import (
     BatchApprovalRequest,
     ChangePreview,
@@ -17,13 +15,8 @@ from omnimancer.core.agent.approval_manager import (
     EnhancedApprovalManager,
     PreviewFormat,
 )
-from omnimancer.core.agent_engine import (
-    Operation,
-    OperationType,
-)
-from omnimancer.core.security.approval_workflow import (
-    ApprovalWorkflow,
-)
+from omnimancer.core.agent_engine import Operation, OperationType
+from omnimancer.core.security.approval_workflow import ApprovalWorkflow
 
 
 @pytest.fixture

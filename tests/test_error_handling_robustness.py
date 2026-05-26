@@ -64,22 +64,6 @@ class TestConsoleInitializationFallback(unittest.TestCase):
             cli.console.print("test")
             fallback_console.print.assert_called_once_with("test")
 
-    def test_agent_progress_ui_console_fallback(self):
-        """Test agent progress UI console fallback."""
-        from omnimancer.core.agent_progress_ui import AgentProgressUI
-
-        # Mock agent manager
-        mock_agent_manager = Mock()
-
-        # Test with None console (should create default)
-        progress_ui = AgentProgressUI(mock_agent_manager, console=None)
-        assert progress_ui.console is not None
-
-        # Test with provided console
-        mock_console = Mock()
-        progress_ui = AgentProgressUI(mock_agent_manager, console=mock_console)
-        assert progress_ui.console == mock_console
-
     def test_cancellation_handler_console_fallback(self):
         """Test cancellation handler console fallback."""
         from omnimancer.ui.cancellation_handler import CancellationHandler

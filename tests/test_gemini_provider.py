@@ -11,12 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from omnimancer.core.models import (
-    ChatContext,
-    ChatMessage,
-    MessageRole,
-    ToolDefinition,
-)
+from omnimancer.core.models import ChatContext, ChatMessage, MessageRole, ToolDefinition
 from omnimancer.providers.gemini import GeminiProvider
 from omnimancer.utils.errors import (
     AuthenticationError,

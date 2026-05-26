@@ -6,10 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from .approval_workflow import ApprovalStatus, ApprovalWorkflow, RiskLevel
 from .audit_logger import AuditEventType, AuditLevel, AuditLogger
-from .permission_controller import (
-    PermissionController,
-    PermissionOperation,
-)
+from .permission_controller import PermissionController, PermissionOperation
 from .sandbox_manager import ResourceLimits, SandboxManager
 
 

@@ -195,9 +195,7 @@ class TestInterfaceSmokeTests:
 
     def test_agent_integration(self):
         """Test agent integration components."""
-        assert hasattr(self.interface, "agent_cli_handler")
-        assert hasattr(self.interface, "agent_persona_handler")
-        assert hasattr(self.interface, "permissions_handler")
+        assert hasattr(self.interface, "approval_integration")
 
     def test_error_handling_robustness(self):
         """Test that interface handles errors gracefully."""

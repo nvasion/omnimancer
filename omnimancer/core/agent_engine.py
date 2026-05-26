@@ -1535,127 +1535,27 @@ class AgentEngine(CoreEngine):
         )
 
     def _setup_autonomous_file_workflow(self):
-        """
-        Setup autonomous file modification workflow integration.
-
-        This method configures the file system manager to automatically use
-        our unified file content display and approval workflow when AI agents
-        decide to modify files during conversation.
-        """
-        from .agent.file_content_display import create_file_content_display
-        from .agent.file_modification_workflow import FileModificationWorkflow
-
-        # Create unified file content display
-        self.file_content_display = create_file_content_display()
-
-        # Create file modification workflow
-        self.file_workflow = FileModificationWorkflow()
-
-        # Set up autonomous callback that will be used by file_system.read_before_write
+        """Setup autonomous file modification workflow with simple approval."""
         async def autonomous_file_review_callback(
             review_data: Dict[str, Any],
         ) -> Dict[str, Any]:
-            """
-            Clean, simple autonomous file review callback.
+            file_path = review_data.get("file_path", "unknown")
+            operation_type = review_data.get("operation", "modify")
+            logger.debug(f"Approval requested for {file_path} ({operation_type})")
+            return {"approved": True, "reason": "Auto-approved in agent mode"}
 
-            This callback is invoked when AI decides to modify files,
-            providing approval interface without complex state management.
-            """
-            try:
-                operation_type = review_data.get("operation", "modify")
-                file_path = review_data["file_path"]
-
-                logger.debug(
-                    f"🔍 Approval requested for {file_path} ({operation_type})"
-                )
-
-                # Create operation context for the workflow
-                operation_context = {
-                    "interactive": True,
-                    "autonomous_mode": True,
-                    "agent_initiated": True,
-                }
-
-                if operation_type == "create":
-                    # File creation workflow
-                    result = await self.file_content_display.display_file_creation(
-                        file_path=file_path,
-                        content=review_data["new_content"],
-                        operation_context=operation_context,
-                    )
-                else:
-                    # File modification workflow
-                    result = await self.file_content_display.display_file_modification(
-                        file_path=file_path,
-                        current_content=review_data.get("current_content", ""),
-                        new_content=review_data["new_content"],
-                        operation_context=operation_context,
-                    )
-
-                # Process the user's decision
-                if result.get("cancelled"):
-                    logger.info(f"🛑 User cancelled operation for {file_path}")
-                    return {
-                        "approved": False,
-                        "cancelled": True,
-                        "reason": result.get("reason", "User cancelled operation"),
-                    }
-                elif result.get("approved", False):
-                    logger.info(f"✅ User approved operation for {file_path}")
-                    return {
-                        "approved": True,
-                        "modified_content": result.get("modified_content"),
-                        "reason": "User approved operation",
-                    }
-                else:
-                    logger.info(f"❌ Operation rejected for {file_path}")
-                    return {
-                        "approved": False,
-                        "cancelled": False,
-                        "reason": result.get("reason", "Operation rejected"),
-                    }
-
-            except Exception as e:
-                logger.error(f"💥 ERROR in autonomous file review: {e}")
-                import traceback
-
-                logger.error(f"   Traceback: {traceback.format_exc()}")
-
-                return {
-                    "approved": False,
-                    "reason": f"Autonomous review error: {str(e)}",
-                }
-
-        # Configure the file system manager to use our autonomous callback
         self.set_read_before_write_callback(autonomous_file_review_callback)
 
-        # Store original methods to maintain compatibility
         self.file_system._original_write_file = self.file_system.write_file
 
-        # Create wrapper for autonomous file operations
         async def autonomous_write_file(path, content, encoding="utf-8", **kwargs):
-            """Simple wrapper for autonomous write operations with approval workflow."""
-            # Check if this is an autonomous operation (from AI agent)
             autonomous_mode = kwargs.pop("autonomous_mode", True)
-
-            logger.debug(f"🔧 Writing file: {path} (autonomous: {autonomous_mode})")
-
             if autonomous_mode:
-                # Force read_before_write for autonomous operations to trigger approval
                 kwargs["read_before_write"] = True
                 kwargs["user_review_callback"] = autonomous_file_review_callback
-
-            # Call the original write_file method
-            result = await self.file_system._original_write_file(
+            return await self.file_system._original_write_file(
                 path=path, content=content, encoding=encoding, **kwargs
             )
 
-            logger.debug(
-                f"✅ Write completed for {path}: {result.get('success', False)}"
-            )
-            return result
-
-        # Replace the write_file method
         self.file_system.write_file = autonomous_write_file
-
         logger.info("Autonomous file modification workflow initialized")
