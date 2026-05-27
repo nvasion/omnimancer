@@ -13,21 +13,12 @@ from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
-from ..core.agent.approval_manager import (
-    BatchApprovalRequest,
-    EnhancedApprovalManager,
-)
+from ..core.agent.approval_manager import BatchApprovalRequest, EnhancedApprovalManager
 from ..core.agent.types import Operation, OperationType
-from ..core.security.approval_workflow import (
-    ApprovalRequest,
-    RiskLevel,
-)
+from ..core.security.approval_workflow import ApprovalRequest, RiskLevel
 from ..core.security.permission_controller import PermissionController
 from .approval_formatter import CLIApprovalFormatter
-from .approval_prompt import (
-    ApprovalDecision,
-    CLIApprovalPrompt,
-)
+from .approval_prompt import ApprovalDecision, CLIApprovalPrompt
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +170,7 @@ class CLIApprovalIntegration:
 
             # Create change preview from operation
             # Map OperationType to ChangeType (they have matching values)
-            from ..core.agent.approval_manager import ChangeType, ChangePreview
+            from ..core.agent.approval_manager import ChangePreview, ChangeType
 
             try:
                 change_type = ChangeType(operation.type.value)

@@ -24,10 +24,7 @@ from ..core.agent.approval_manager import (
     ChangePreview,
     ChangeType,
 )
-from ..core.security.approval_workflow import (
-    ApprovalRequest,
-    RiskLevel,
-)
+from ..core.security.approval_workflow import ApprovalRequest, RiskLevel
 
 logger = logging.getLogger(__name__)
 

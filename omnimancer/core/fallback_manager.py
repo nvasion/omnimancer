@@ -13,11 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from ..utils.errors import (
-    NetworkError,
-    ProviderError,
-    ProviderUnavailableError,
-)
+from ..utils.errors import NetworkError, ProviderError, ProviderUnavailableError
 from .health_monitor import HealthMonitor
 
 logger = logging.getLogger(__name__)

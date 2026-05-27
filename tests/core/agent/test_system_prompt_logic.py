@@ -121,6 +121,7 @@ class TestSystemPromptLogic:
         """Test that agent prompt is properly injected when agent mode is on."""
         # Mock agent manager in 'on' state
         interface.agent_manager.mode.value = "on"
+        interface.engine.provider_supports_tools = Mock(return_value=False)
         interface.engine.send_message = AsyncMock()
         interface.engine.send_message.return_value = Mock(
             is_success=True, content="Test response", model_used="test-model"
@@ -153,9 +154,11 @@ class TestSystemPromptLogic:
         """Test that agent prompt is NOT injected when agent mode is off."""
         # Mock agent manager in 'off' state
         interface.agent_manager.mode.value = "off"
+        interface.engine.current_provider = None
         interface.engine.send_message = AsyncMock()
         interface.engine.send_message.return_value = Mock(
-            is_success=True, content="Test response", model_used="test-model"
+            is_success=True, content="Test response", model_used="test-model",
+            input_tokens=0, output_tokens=0, cost_estimate=0.0,
         )
         interface._show_assistant_message = Mock()
         interface._show_user_message = Mock()

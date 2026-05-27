@@ -5,10 +5,18 @@ This module defines the abstract base class that all AI providers must implement
 to ensure consistent behavior across different AI services.
 """
 
+import json
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import AsyncIterator, Dict, List
 
-from ..core.models import ChatContext, ChatResponse, ModelInfo, ToolDefinition
+from ..core.models import (
+    ChatContext,
+    ChatResponse,
+    ModelInfo,
+    StreamEvent,
+    StreamEventType,
+    ToolDefinition,
+)
 
 
 class BaseProvider(ABC):
@@ -198,6 +206,37 @@ class BaseProvider(ABC):
         raise NotImplementedError(
             f"{self.__class__.__name__} supports tools but hasn't implemented send_message_with_tools"
         )
+
+    async def send_message_stream(
+        self, message: str, context: ChatContext
+    ) -> AsyncIterator[StreamEvent]:
+        response = await self.send_message(message, context)
+        yield StreamEvent(type=StreamEventType.MESSAGE_START, model=self.model)
+        yield StreamEvent(type=StreamEventType.TEXT_DELTA, text=response.content)
+        yield StreamEvent(type=StreamEventType.MESSAGE_COMPLETE, response=response)
+
+    async def send_message_with_tools_stream(
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
+    ) -> AsyncIterator[StreamEvent]:
+        response = await self.send_message_with_tools(message, context, available_tools)
+        yield StreamEvent(type=StreamEventType.MESSAGE_START, model=self.model)
+        if response.content:
+            yield StreamEvent(type=StreamEventType.TEXT_DELTA, text=response.content)
+        if response.tool_calls:
+            for tc in response.tool_calls:
+                yield StreamEvent(
+                    type=StreamEventType.TOOL_USE_START,
+                    tool_name=tc.name,
+                )
+                yield StreamEvent(
+                    type=StreamEventType.TOOL_USE_DELTA,
+                    partial_json=json.dumps(tc.arguments),
+                )
+                yield StreamEvent(type=StreamEventType.TOOL_USE_END)
+        yield StreamEvent(type=StreamEventType.MESSAGE_COMPLETE, response=response)
 
     def get_provider_name(self) -> str:
         """

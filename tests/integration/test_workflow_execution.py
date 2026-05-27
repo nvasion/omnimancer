@@ -100,6 +100,7 @@ class TestWorkflowExecutionIntegration:
 
         # Enable agent mode for this specific test
         cli.agent_manager.mode.value = "on"
+        cli.engine.provider_supports_tools = Mock(return_value=False)
 
         # Mock _parse_and_execute_operations to track calls
         original_method = cli._parse_and_execute_operations

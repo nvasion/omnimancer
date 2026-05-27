@@ -17,17 +17,11 @@ import pytest
 
 from omnimancer.cli.commands import Command, SlashCommand
 from omnimancer.cli.interface import CommandLineInterface
-
-# from omnimancer.core.agent_demo import AgentModeDemo, create_demo_instance  # Removed during consolidation
 from omnimancer.core.agent_engine import Operation, OperationType
 from omnimancer.core.agent_mode_manager import (
     AgentMode,
     AgentModeManager,
     AgentOperationStatus,
-)
-from omnimancer.core.agent_progress_ui import (
-    AgentProgressUI,
-    AgentStatusIndicator,
 )
 
 
@@ -50,15 +44,6 @@ def mock_config_manager():
 def agent_manager(mock_config_manager, temp_storage):
     """Create agent mode manager for testing."""
     return AgentModeManager(mock_config_manager, storage_path=temp_storage)
-
-
-@pytest.fixture
-def agent_ui(agent_manager):
-    """Create agent progress UI for testing."""
-    from rich.console import Console
-
-    console = Console(file=None, width=80)  # No output during tests
-    return AgentProgressUI(agent_manager, console)
 
 
 @pytest.fixture
@@ -159,80 +144,6 @@ class TestAgentModeManager:
         assert history[0]["type"] == "file_read"
 
 
-class TestAgentProgressUI:
-    """Test the agent progress UI components."""
-
-    def test_status_panel_creation(self, agent_ui):
-        """Test status panel creation."""
-        panel = agent_ui.show_status_panel()
-        assert panel is not None
-        from rich.panel import Panel
-
-        assert isinstance(panel, Panel)
-        assert panel.title == "Agent Status"
-
-    def test_operations_table_creation(self, agent_ui):
-        """Test operations table creation."""
-        table = agent_ui.show_operations_table(limit=5)
-        assert table is not None
-        from rich.table import Table
-
-        assert isinstance(table, Table)
-        assert table.title == "Recent Operations (Last 5)"
-
-    def test_progress_panel_creation(self, agent_ui):
-        """Test progress panel creation."""
-        panel = agent_ui.show_progress_panel()
-        assert panel is not None
-        from rich.panel import Panel
-
-        assert isinstance(panel, Panel)
-        assert panel.title == "Active Operations"
-
-    def test_approval_queue_panel_creation(self, agent_ui):
-        """Test approval queue panel creation."""
-        panel = agent_ui.show_approval_queue_panel()
-        assert panel is not None
-        from rich.panel import Panel
-
-        assert isinstance(panel, Panel)
-        assert "Approval Queue" in panel.title
-
-    def test_dashboard_creation(self, agent_ui):
-        """Test dashboard layout creation."""
-        try:
-            dashboard = agent_ui.show_agent_dashboard()
-            assert dashboard is not None
-            from rich.layout import Layout
-
-            assert isinstance(dashboard, Layout)
-        except Exception:
-            # If there's an error in dashboard creation, it might be a Rich Layout implementation issue
-            # Let's just verify the method exists and can be called
-            assert hasattr(agent_ui, "show_agent_dashboard")
-            assert callable(agent_ui.show_agent_dashboard)
-
-    def test_status_indicator(self, agent_manager):
-        """Test status indicator functionality."""
-        indicator = AgentStatusIndicator(agent_manager)
-
-        # Test ON state (agent starts ON by default)
-        badge = indicator.get_status_badge()
-        assert "AGENT" in str(badge)
-
-        mini_status = indicator.get_mini_status()
-        assert "Agent: ON" in mini_status
-
-    def test_operation_progress_tracking(self, agent_ui):
-        """Test operation progress tracking."""
-        # Update progress for a fake operation
-        agent_ui.update_operation_progress("test_op_1", 50.0, "Processing...")
-
-        assert "test_op_1" in agent_ui.operation_progress
-        assert agent_ui.operation_progress["test_op_1"].progress == 50.0
-        assert agent_ui.operation_progress["test_op_1"].status_text == "Processing..."
-
-
 class TestCLIIntegration:
     """Test CLI command integration."""
 
@@ -279,50 +190,43 @@ class TestCLIIntegration:
         with patch(
             "omnimancer.core.agent_mode_manager.AgentModeManager"
         ) as mock_manager_class:
-            with patch(
-                "omnimancer.core.agent_progress_ui.AgentProgressUI"
-            ) as mock_ui_class:
-                # Setup mocks
-                mock_manager = Mock()
-                mock_manager.mode.value = "off"
-                mock_manager.enable_agent_mode = AsyncMock(return_value=True)
-                mock_manager.disable_agent_mode = AsyncMock(return_value=True)
-                mock_manager.get_status.return_value = {
-                    "mode": "off",
-                    "operations": {
-                        "in_progress": 0,
-                        "queued": 0,
-                        "completed": 0,
-                        "failed": 0,
-                        "requires_approval": 0,
-                    },
-                }
+            mock_manager = Mock()
+            mock_manager.mode.value = "off"
+            mock_manager.enable_agent_mode = AsyncMock(return_value=True)
+            mock_manager.disable_agent_mode = AsyncMock(return_value=True)
+            mock_manager.get_status.return_value = {
+                "mode": "off",
+                "operations": {
+                    "in_progress": 0,
+                    "queued": 0,
+                    "completed": 0,
+                    "failed": 0,
+                    "requires_approval": 0,
+                },
+            }
 
-                mock_manager_class.return_value = mock_manager
-                mock_ui_class.return_value = Mock()
+            mock_manager_class.return_value = mock_manager
 
-                # Initialize agent components
-                cli_interface.agent_manager = mock_manager
-                cli_interface.agent_progress_ui = Mock()
+            cli_interface.agent_manager = mock_manager
 
-                # Test 'on' command
-                command = Command.create_slash_command(
-                    SlashCommand.AGENT, ["on"], "/agent on"
-                )
-                await cli_interface._handle_agent_command(command)
-                mock_manager.enable_agent_mode.assert_called_once_with(
-                    auto_approve=False
-                )
+            # Test 'on' command
+            command = Command.create_slash_command(
+                SlashCommand.AGENT, ["on"], "/agent on"
+            )
+            await cli_interface._handle_agent_command(command)
+            mock_manager.enable_agent_mode.assert_called_once_with(
+                auto_approve=False
+            )
 
-                # Test 'off' command
-                mock_manager.mode.value = "on"
-                command = Command.create_slash_command(
-                    SlashCommand.AGENT, ["off"], "/agent off"
-                )
-                await cli_interface._handle_agent_command(command)
-                mock_manager.disable_agent_mode.assert_called_once_with(
-                    wait_for_completion=True
-                )
+            # Test 'off' command
+            mock_manager.mode.value = "on"
+            command = Command.create_slash_command(
+                SlashCommand.AGENT, ["off"], "/agent off"
+            )
+            await cli_interface._handle_agent_command(command)
+            mock_manager.disable_agent_mode.assert_called_once_with(
+                wait_for_completion=True
+            )
 
 
 class TestPersistentState:
@@ -388,15 +292,8 @@ class TestFullIntegration:
     @pytest.mark.asyncio
     async def test_complete_agent_workflow(self, mock_config_manager, temp_storage):
         """Test complete agent workflow from start to finish."""
-        # Create all components
         agent_manager = AgentModeManager(mock_config_manager, storage_path=temp_storage)
 
-        from rich.console import Console
-
-        console = Console(file=None)
-        agent_ui = AgentProgressUI(agent_manager, console)
-
-        # Create and queue operations
         operations = [
             Operation(
                 type=OperationType.FILE_READ,
@@ -414,32 +311,20 @@ class TestFullIntegration:
             ),
         ]
 
-        # Queue operations
         op_ids = []
         for op in operations:
             op_id = agent_manager.queue_operation(op)
             op_ids.append(op_id)
 
-        # Enable agent mode
         success = await agent_manager.enable_agent_mode(auto_approve=True)
         assert success
 
-        # Verify status
         status = agent_manager.get_status()
         assert status["mode"] == "on"
-        assert status["operations"]["queued"] >= 0  # May have been processed
+        assert status["operations"]["queued"] >= 0
 
-        # Test UI components
-        status_panel = agent_ui.show_status_panel()
-        assert status_panel is not None
-
-        operations_table = agent_ui.show_operations_table()
-        assert operations_table is not None
-
-        # Clean up
         await agent_manager.disable_agent_mode(wait_for_completion=False)
 
-        # Verify final state
         final_status = agent_manager.get_status()
         assert final_status["mode"] == "off"
 

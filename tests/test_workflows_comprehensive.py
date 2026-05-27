@@ -34,9 +34,6 @@ from omnimancer.core.models import (
     ProviderConfig,
 )
 from omnimancer.core.provider_registry import ProviderRegistry
-
-# from omnimancer.core.config_generator import ConfigGenerator  # Removed as over-engineered
-from omnimancer.core.setup_wizard import SetupWizard
 from omnimancer.providers.factory import ProviderFactory
 from tests.conftest import create_chat_response
 
@@ -127,8 +124,6 @@ def integrated_system(temp_workspace, mock_providers):
     # Initialize core components
     config_manager = ConfigManager(str(config_path))
     provider_registry = ProviderRegistry()
-    # config_generator = ConfigGenerator(provider_registry)  # Removed as over-engineered
-    setup_wizard = SetupWizard(config_manager, provider_registry)
     config_validator = ConfigValidator()
     health_monitor = HealthMonitor(provider_registry)
 
@@ -146,8 +141,6 @@ def integrated_system(temp_workspace, mock_providers):
     return {
         "config_manager": config_manager,
         "provider_registry": provider_registry,
-        # 'config_generator': config_generator,  # Removed as over-engineered
-        "setup_wizard": setup_wizard,
         "config_validator": config_validator,
         "health_monitor": health_monitor,
         "provider_factory": provider_factory,
@@ -195,65 +188,6 @@ class TestCompleteSetupWorkflow:
         ):
             health_status = await health_monitor.check_all_providers(config)
             assert health_status.overall_healthy is True
-
-    @pytest.mark.asyncio
-    async def test_interactive_setup_workflow(self, integrated_system):
-        """Test interactive setup wizard workflow."""
-        system = integrated_system
-        setup_wizard = system["setup_wizard"]
-
-        # Mock the individual methods directly
-        with (
-            patch.object(
-                setup_wizard.config_manager, "is_first_run", return_value=True
-            ),
-            patch.object(
-                setup_wizard.provider_setup,
-                "select_provider",
-                return_value="claude",
-            ),
-            patch.object(
-                setup_wizard.provider_setup,
-                "configure_provider",
-                new_callable=AsyncMock,
-            ) as mock_configure,
-            patch.object(
-                setup_wizard.validation,
-                "test_configuration",
-                new_callable=AsyncMock,
-            ) as mock_test_config,
-            patch.object(
-                setup_wizard.provider_setup, "save_configuration"
-            ) as mock_save,
-            patch.object(setup_wizard.ui, "show_welcome"),
-            patch.object(setup_wizard.ui, "show_completion"),
-        ):
-
-            # Mock provider configuration
-            provider_config = ProviderConfig(
-                api_key="sk-ant-test-key-12345",
-                model="claude-3-5-sonnet-20241022",
-            )
-            mock_configure.return_value = provider_config
-
-            # Mock the test configuration to always pass
-            mock_test_config.return_value = True
-
-            # Mock provider factory in setup wizard
-            setup_wizard.provider_factory = system["provider_factory"]
-
-            # Run setup wizard
-            result = await setup_wizard.start_wizard()
-
-            assert result is True
-
-            # Verify methods were called
-            mock_configure.assert_called_once_with("claude")
-            mock_test_config.assert_called_once_with("claude", provider_config)
-            mock_save.assert_called_once_with(
-                "claude", provider_config, system["config_manager"]
-            )
-
 
 class TestProviderSwitchingWorkflows:
     """Test provider switching and model selection workflows."""
@@ -640,64 +574,6 @@ class TestErrorHandlingWorkflows:
 
 class TestCLIIntegrationWorkflows:
     """Test CLI command integration workflows."""
-
-    @pytest.mark.asyncio
-    async def test_cli_setup_workflow(self, integrated_system):
-        """Test CLI setup command workflow."""
-        system = integrated_system
-        setup_wizard = system["setup_wizard"]
-
-        # Mock the individual methods directly
-        with (
-            patch.object(
-                setup_wizard.config_manager, "is_first_run", return_value=True
-            ),
-            patch.object(
-                setup_wizard.provider_setup,
-                "select_provider",
-                return_value="claude",
-            ),
-            patch.object(
-                setup_wizard.provider_setup,
-                "configure_provider",
-                new_callable=AsyncMock,
-            ) as mock_configure,
-            patch.object(
-                setup_wizard.validation,
-                "test_configuration",
-                new_callable=AsyncMock,
-            ) as mock_test_config,
-            patch.object(
-                setup_wizard.provider_setup, "save_configuration"
-            ) as mock_save,
-            patch.object(setup_wizard.ui, "show_welcome"),
-            patch.object(setup_wizard.ui, "show_completion"),
-        ):
-
-            # Mock provider configuration
-            provider_config = ProviderConfig(
-                api_key="sk-ant-test-key", model="claude-3-5-sonnet-20241022"
-            )
-            mock_configure.return_value = provider_config
-
-            # Mock the test configuration to always pass
-            mock_test_config.return_value = True
-
-            # Ensure setup wizard uses the same provider factory as the system
-            with patch.object(
-                setup_wizard, "provider_factory", system["provider_factory"]
-            ):
-                # Run setup through CLI
-                result = await setup_wizard.start_wizard()
-
-                assert result is True
-
-                # Verify methods were called
-                mock_configure.assert_called_once_with("claude")
-                mock_test_config.assert_called_once_with("claude", provider_config)
-                mock_save.assert_called_once_with(
-                    "claude", provider_config, system["config_manager"]
-                )
 
     @pytest.mark.asyncio
     async def test_model_listing_workflow(self, mock_engine):

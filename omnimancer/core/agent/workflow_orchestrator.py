@@ -17,13 +17,8 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from ...cli.batch_approval_display import BatchApprovalPanel
-
-# Import existing UI components
 from ...ui.progress_indicator import OperationType as ProgressOperationType
-from ...ui.progress_indicator import (
-    ProgressIndicator,
-)
+from ...ui.progress_indicator import ProgressIndicator
 from ..agent.approval_manager import EnhancedApprovalManager
 from ..agent.file_system_manager import FileSystemManager
 
@@ -125,9 +120,7 @@ class WorkflowOrchestrator:
         self.current_workflow: Optional[str] = None
         self.context: Optional[WorkflowContext] = None
 
-        # Initialize UI components for clean display
         self.progress_indicator = ProgressIndicator(self.console)
-        self.approval_panel = BatchApprovalPanel(self.console)
 
         # Register built-in workflows
         self._register_builtin_workflows()

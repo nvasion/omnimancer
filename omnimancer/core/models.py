@@ -18,6 +18,16 @@ class MessageRole(Enum):
     SYSTEM = "system"
 
 
+class StreamEventType(Enum):
+    MESSAGE_START = "message_start"
+    TEXT_DELTA = "text_delta"
+    TOOL_USE_START = "tool_use_start"
+    TOOL_USE_DELTA = "tool_use_delta"
+    TOOL_USE_END = "tool_use_end"
+    MESSAGE_COMPLETE = "message_complete"
+    ERROR = "error"
+
+
 @dataclass
 class ChatMessage:
     """Represents a single chat message."""
@@ -110,11 +120,26 @@ class ChatResponse:
     error: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
     tool_results: Optional[List[ToolResult]] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    stop_reason: Optional[str] = None
 
     @property
     def is_success(self) -> bool:
         """Check if the response was successful."""
         return self.error is None
+
+
+@dataclass
+class StreamEvent:
+    type: StreamEventType
+    text: str = ""
+    tool_name: str = ""
+    tool_id: str = ""
+    partial_json: str = ""
+    response: Optional["ChatResponse"] = None
+    model: str = ""
+    error: str = ""
 
 
 @dataclass

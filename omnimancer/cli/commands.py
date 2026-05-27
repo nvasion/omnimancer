@@ -52,21 +52,12 @@ class SlashCommand(Enum):
     PROVIDERS = "/providers"
     TOOLS = "/tools"
     MCP = "/mcp"
-    SETUP = "/setup"
-    VALIDATE = "/validate"
-    HEALTH = "/health"
-    REPAIR = "/repair"
-    DIAGNOSE = "/diagnose"
     HISTORY = "/history"
     ADD_MODEL = "/add-model"
     REMOVE_MODEL = "/remove-model"
     LIST_CUSTOM_MODELS = "/list-custom-models"
     AGENT = "/agent"
-    AGENTS = "/agents"
-    AGENTS_CUSTOM = "/agents-custom"
-    AGENTSTATUS = "/agentstatus"
-    APPROVALS = "/approvals"
-    PERMISSIONS = "/permissions"
+    CONFIG = "/config"
 
     @classmethod
     def from_string(cls, command_str: str) -> Optional["SlashCommand"]:
@@ -415,62 +406,6 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
             ]:
                 raise ValueError(f"{filter_type} filter requires a value")
 
-    elif command == SlashCommand.VALIDATE:
-        # /validate [provider] [--fix]
-        if len(args) > 2:
-            raise ValueError(
-                "Validate command accepts at most two arguments: provider and --fix flag"
-            )
-
-        if args:
-            # First arg should be provider name or --fix
-            if (
-                args[0] not in ["--fix", "--auto-fix"]
-                and not args[0].replace("_", "").replace("-", "").isalnum()
-            ):
-                raise ValueError("Invalid provider name format")
-
-    elif command == SlashCommand.HEALTH:
-        # /health [provider] [--monitor] [--interval]
-        if len(args) > 3:
-            raise ValueError("Health command accepts at most three arguments")
-
-        if args:
-            # Validate provider name if not a flag
-            if (
-                not args[0].startswith("--")
-                and not args[0].replace("_", "").replace("-", "").isalnum()
-            ):
-                raise ValueError("Invalid provider name format")
-
-    elif command == SlashCommand.REPAIR:
-        # /repair [provider] [--auto] [--backup]
-        if len(args) > 3:
-            raise ValueError("Repair command accepts at most three arguments")
-
-        if args:
-            # Validate provider name if not a flag
-            if (
-                not args[0].startswith("--")
-                and not args[0].replace("_", "").replace("-", "").isalnum()
-            ):
-                raise ValueError("Invalid provider name format")
-
-    elif command == SlashCommand.DIAGNOSE:
-        # /diagnose [provider] [--detailed]
-        if len(args) > 2:
-            raise ValueError(
-                "Diagnose command accepts at most two arguments: provider and --detailed flag"
-            )
-
-        if args:
-            # Validate provider name if not a flag
-            if (
-                not args[0].startswith("--")
-                and not args[0].replace("_", "").replace("-", "").isalnum()
-            ):
-                raise ValueError("Invalid provider name format")
-
     elif command == SlashCommand.HISTORY:
         # /history [recent|search|clear|export] [args...]
         if len(args) > 3:
@@ -575,104 +510,6 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
         if args:
             raise ValueError("List-custom-models command does not accept arguments")
 
-    elif command == SlashCommand.AGENTS:
-        # /agents [action] [agent_name] [options]
-        if len(args) > 3:
-            raise ValueError(
-                "Agents command accepts at most three arguments: action, agent_name, and options"
-            )
-
-        if args:
-            action = args[0].lower()
-            valid_actions = [
-                "list",
-                "enable",
-                "disable",
-                "status",
-                "config",
-                "switch",
-                "current",
-                "info",
-            ]
-            if action not in valid_actions:
-                raise ValueError(
-                    f"Invalid agents action. Valid actions: {', '.join(valid_actions)}"
-                )
-
-            # Some actions require an agent name
-            if (
-                action in ["enable", "disable", "config", "switch", "info"]
-                and len(args) < 2
-            ):
-                raise ValueError(f"Action '{action}' requires an agent name")
-
-    elif command == SlashCommand.APPROVALS:
-        # /approvals [action] [signature]
-        if len(args) > 2:
-            raise ValueError(
-                "Approvals command accepts at most two arguments: action and signature"
-            )
-
-        if args:
-            action = args[0].lower()
-            valid_actions = ["list", "revoke", "clear", "stats", "cleanup"]
-            if action not in valid_actions:
-                raise ValueError(
-                    f"Invalid approvals action. Valid actions: {', '.join(valid_actions)}"
-                )
-
-            # Revoke action requires a signature
-            if action == "revoke" and len(args) < 2:
-                raise ValueError("Revoke action requires a signature to revoke")
-
-    elif command == SlashCommand.PERMISSIONS:
-        # /permissions [action] [args...]
-        if len(args) > 4:
-            raise ValueError("Permissions command accepts at most four arguments")
-
-        if args:
-            action = args[0].lower()
-            valid_actions = [
-                "view",
-                "set-level",
-                "add-rule",
-                "remove-rule",
-                "audit",
-                "learn",
-                "clear-learned",
-                "export",
-                "import",
-            ]
-            if action not in valid_actions:
-                raise ValueError(
-                    f"Invalid permissions action. Valid actions: {', '.join(valid_actions)}"
-                )
-
-            # Actions that require additional arguments
-            if action == "set-level" and len(args) < 2:
-                raise ValueError(
-                    "Set-level action requires a security level (auto_approve, ask_always, ask_but_remember)"
-                )
-            elif action in ["add-rule", "remove-rule"] and len(args) < 2:
-                raise ValueError(
-                    f"{action.capitalize()} action requires at least one additional argument"
-                )
-            elif action in ["export", "import"] and len(args) < 2:
-                raise ValueError(f"{action.capitalize()} action requires a file path")
-
-            # Validate security levels for set-level
-            if action == "set-level" and len(args) >= 2:
-                level = args[1].lower()
-                valid_levels = [
-                    "auto_approve",
-                    "ask_always",
-                    "ask_but_remember",
-                ]
-                if level not in valid_levels:
-                    raise ValueError(
-                        f"Invalid security level. Valid levels: {', '.join(valid_levels)}"
-                    )
-
     # Commands that don't accept arguments
     elif command in [
         SlashCommand.CLEAR,
@@ -680,7 +517,6 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
         SlashCommand.STATUS,
         SlashCommand.PROVIDERS,
         SlashCommand.TOOLS,
-        SlashCommand.SETUP,
     ]:
         if args:
             raise ValueError(f"Command {command.value} does not accept arguments")

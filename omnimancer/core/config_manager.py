@@ -15,13 +15,7 @@ from cryptography.fernet import Fernet
 
 from ..utils.errors import ConfigurationError, MCPConfigurationError
 from .config_migration import ConfigMigration, ConfigValidator
-from .models import (
-    Config,
-    ConfigProfile,
-    MCPConfig,
-    MCPServerConfig,
-    ProviderConfig,
-)
+from .models import Config, ConfigProfile, MCPConfig, MCPServerConfig, ProviderConfig
 
 
 class ConfigManager:

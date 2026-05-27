@@ -498,3 +498,93 @@ class TestConfigProfile:
                 default_provider="",
                 providers={"openai": provider_config},
             )
+
+
+class TestStreamEventType:
+    """Test StreamEventType enum."""
+
+    def test_all_event_types_exist(self):
+        from omnimancer.core.models import StreamEventType
+
+        assert StreamEventType.MESSAGE_START.value == "message_start"
+        assert StreamEventType.TEXT_DELTA.value == "text_delta"
+        assert StreamEventType.TOOL_USE_START.value == "tool_use_start"
+        assert StreamEventType.TOOL_USE_DELTA.value == "tool_use_delta"
+        assert StreamEventType.TOOL_USE_END.value == "tool_use_end"
+        assert StreamEventType.MESSAGE_COMPLETE.value == "message_complete"
+        assert StreamEventType.ERROR.value == "error"
+
+    def test_event_type_count(self):
+        from omnimancer.core.models import StreamEventType
+
+        assert len(StreamEventType) == 7
+
+
+class TestStreamEvent:
+    """Test StreamEvent dataclass."""
+
+    def test_defaults(self):
+        from omnimancer.core.models import StreamEvent, StreamEventType
+
+        event = StreamEvent(type=StreamEventType.TEXT_DELTA)
+        assert event.text == ""
+        assert event.tool_name == ""
+        assert event.tool_id == ""
+        assert event.partial_json == ""
+        assert event.response is None
+        assert event.model == ""
+        assert event.error == ""
+
+    def test_text_delta(self):
+        from omnimancer.core.models import StreamEvent, StreamEventType
+
+        event = StreamEvent(type=StreamEventType.TEXT_DELTA, text="Hello")
+        assert event.type == StreamEventType.TEXT_DELTA
+        assert event.text == "Hello"
+
+    def test_message_start(self):
+        from omnimancer.core.models import StreamEvent, StreamEventType
+
+        event = StreamEvent(type=StreamEventType.MESSAGE_START, model="claude-sonnet-4-6")
+        assert event.model == "claude-sonnet-4-6"
+
+    def test_tool_use_start(self):
+        from omnimancer.core.models import StreamEvent, StreamEventType
+
+        event = StreamEvent(
+            type=StreamEventType.TOOL_USE_START,
+            tool_name="file_read",
+            tool_id="toolu_123",
+        )
+        assert event.tool_name == "file_read"
+        assert event.tool_id == "toolu_123"
+
+    def test_tool_use_delta(self):
+        from omnimancer.core.models import StreamEvent, StreamEventType
+
+        event = StreamEvent(
+            type=StreamEventType.TOOL_USE_DELTA,
+            partial_json='{"path": "/src',
+        )
+        assert event.partial_json == '{"path": "/src'
+
+    def test_message_complete_with_response(self):
+        from omnimancer.core.models import ChatResponse, StreamEvent, StreamEventType
+
+        response = ChatResponse(
+            content="Hello!",
+            model_used="claude-sonnet-4-6",
+            tokens_used=50,
+            input_tokens=100,
+            output_tokens=50,
+        )
+        event = StreamEvent(type=StreamEventType.MESSAGE_COMPLETE, response=response)
+        assert event.response is not None
+        assert event.response.content == "Hello!"
+        assert event.response.input_tokens == 100
+
+    def test_error_event(self):
+        from omnimancer.core.models import StreamEvent, StreamEventType
+
+        event = StreamEvent(type=StreamEventType.ERROR, error="Connection lost")
+        assert event.error == "Connection lost"

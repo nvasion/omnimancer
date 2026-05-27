@@ -1,0 +1,291 @@
+name: omnimancer-pipeline
+version: "1.0.0"
+description: CI/CD pipeline for Omnimancer CLI. Lint → test → security → build → approve → deploy → release.
+
+config:
+  timeout: "2h"
+  failure_strategy: fail_fast
+  concurrency: 1
+
+inputs:
+  - name: version
+    type: string
+    required: true
+    default: "0.2.0"
+    description: Release version string (e.g. 1.0.0). Required when publish=true.
+  - name: publish
+    type: string
+    default: "false"
+    description: Set to "true" to run the deploy and release stages.
+  - name: bump
+    type: string
+    default: patch
+    description: "Version bump type — major, minor, or patch."
+
+stages:
+  - id: version
+    name: Version Bump
+    steps:
+      - id: bump-version
+        name: Auto-bump version
+        type: action
+        action_type: bash
+        action: |
+          apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+          pip install --upgrade pip
+          git config user.name "Factory CI Bot"
+          git config user.email "ci@factory.local"
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -q "BREAKING CHANGE\|feat!:"; then
+            BUMP="major"
+          elif echo "$COMMIT_MSG" | grep -q "feat:"; then
+            BUMP="minor"
+          else
+            BUMP="{{ inputs.bump }}"
+          fi
+          export BUMP
+          python - <<'PY'
+          import os
+          from scripts.version_manager import (
+              get_current_version, bump_version, update_version,
+              generate_changelog, update_changelog_file
+          )
+          bump = os.environ.get("BUMP", "patch").lower()
+          curr = get_current_version()
+          new = bump_version(curr, bump)
+          update_version(new)
+          ch = generate_changelog(new)
+          update_changelog_file(ch)
+          print(f"Bumped {curr} -> {new}")
+          PY
+          NEW_VERSION=$(python -c "from scripts.version_manager import get_current_version; print(get_current_version())")
+          git add pyproject.toml CHANGELOG.md || true
+          git commit -m "chore(release): bump version to ${NEW_VERSION}" || echo "No changes to commit"
+          git push origin HEAD
+          git tag -a "v${NEW_VERSION}" -m "Release version ${NEW_VERSION}"
+          git push origin "v${NEW_VERSION}"
+        action_image: "python:3.11-slim"
+        timeout: "10m"
+        environment:
+          GIT_AUTH_TOKEN: "${secret:GIT_AUTH_TOKEN}"
+
+  - id: lint
+    name: Lint
+    parallel: true
+    depends_on: [version]
+    steps:
+      - id: lint-black
+        name: Black formatting check
+        type: action
+        action_type: bash
+        action: |
+          pip install --upgrade pip && pip install -e ".[dev]"
+          black --check omnimancer tests scripts
+        action_image: "python:3.11-slim"
+        timeout: "5m"
+      - id: lint-isort
+        name: isort import order check
+        type: action
+        action_type: bash
+        action: |
+          pip install --upgrade pip && pip install -e ".[dev]"
+          isort --check-only omnimancer tests scripts
+        action_image: "python:3.11-slim"
+        timeout: "5m"
+      - id: lint-flake8
+        name: Flake8 style check
+        type: action
+        action_type: bash
+        action: |
+          pip install --upgrade pip && pip install -e ".[dev]"
+          flake8 omnimancer tests --max-line-length=88 --extend-ignore=E203,W503
+        action_image: "python:3.11-slim"
+        timeout: "5m"
+      - id: lint-mypy
+        name: mypy type check
+        type: action
+        action_type: bash
+        action: |
+          pip install --upgrade pip && pip install -e ".[dev]"
+          mypy omnimancer --ignore-missing-imports
+        action_image: "python:3.11-slim"
+        timeout: "5m"
+
+  - id: test
+    name: Test
+    parallel: true
+    depends_on: [lint]
+    steps:
+      - id: test-py310
+        name: Python 3.10 unit tests
+        type: test
+        test_language: python
+        test_command: |
+          pip install --upgrade pip && pip install -e ".[dev]"
+          pytest tests/ \
+            --cov=omnimancer \
+            --cov-report=xml \
+            --junitxml=junit-3.10.xml \
+            -v
+        test_image: "python:3.10-slim"
+      - id: test-py311
+        name: Python 3.11 unit tests
+        type: test
+        test_language: python
+        test_command: |
+          pip install --upgrade pip && pip install -e ".[dev]"
+          pytest tests/ \
+            --cov=omnimancer \
+            --cov-report=xml \
+            --junitxml=junit-3.11.xml \
+            -v
+        test_image: "python:3.11-slim"
+      - id: test-py312
+        name: Python 3.12 unit tests
+        type: test
+        test_language: python
+        test_command: |
+          pip install --upgrade pip && pip install -e ".[dev]"
+          pytest tests/ \
+            --cov=omnimancer \
+            --cov-report=xml \
+            --junitxml=junit-3.12.xml \
+            -v
+        test_image: "python:3.12-slim"
+
+  - id: integration-test
+    name: Integration Test
+    depends_on: [test]
+    steps:
+      - id: integration
+        name: Integration test suite
+        type: test
+        test_language: python
+        test_command: |
+          pip install --upgrade pip && pip install -e ".[dev]"
+          pytest tests/integration/ \
+            --tb=short \
+            -v \
+            --junitxml=junit-integration.xml
+        test_image: "python:3.11-slim"
+
+  - id: security
+    name: Security Scan
+    parallel: true
+    depends_on: [lint]
+    steps:
+      - id: sast
+        name: SAST — bandit + safety
+        type: action
+        action_type: bash
+        action: |
+          pip install --upgrade pip bandit safety
+          bandit -r omnimancer -f json -o bandit-report.json || true
+          safety check --json > safety-report.json || true
+        action_image: "python:3.11-slim"
+        timeout: "10m"
+      - id: dependency-scan
+        name: Dependency audit — pip-audit
+        type: action
+        action_type: bash
+        action: |
+          pip install --upgrade pip pip-audit
+          pip-audit --desc --format json > dependency-scan.json || true
+        action_image: "python:3.11-slim"
+        timeout: "10m"
+      - id: license-scan
+        name: License scan — pip-licenses
+        type: action
+        action_type: bash
+        action: |
+          pip install --upgrade pip && pip install -e ".[dev]" pip-licenses
+          pip-licenses --format=json --with-urls --with-description > licenses.json
+        action_image: "python:3.11-slim"
+        timeout: "10m"
+
+  - id: build
+    name: Build Package
+    depends_on: [integration-test, security]
+    steps:
+      - id: build-package
+        name: Build Python distribution
+        type: build
+        build_language: python
+        build_command: |
+          pip install --upgrade pip build twine &&
+          pip install -e ".[dev]" &&
+          rm -rf dist/ build/ *.egg-info &&
+          python -m build &&
+          twine check dist/*
+        build_image: "python:3.11-slim"
+
+  - id: approve-deploy
+    name: Approve Deployment
+    depends_on: [build]
+    condition: inputs.publish == 'true'
+    steps:
+      - id: approval
+        name: Approve release to PyPI
+        type: gate
+        gate:
+          type: approval
+          timeout: "24h"
+          timeout_action: fail
+
+  - id: deploy
+    name: Deploy
+    depends_on: [approve-deploy]
+    condition: inputs.publish == 'true'
+    steps:
+      - id: deploy-pypi
+        name: Publish to PyPI
+        type: action
+        action_type: bash
+        action: |
+          pip install twine
+          twine upload \
+            --username __token__ \
+            --password $PYPI_TOKEN \
+            --skip-existing \
+            dist/*
+        action_image: "python:3.11-slim"
+        timeout: "10m"
+        environment:
+          PYPI_TOKEN: "${secret:pypi_token}"
+      - id: deploy-test-pypi
+        name: Publish to Test PyPI
+        type: action
+        action_type: bash
+        action: |
+          pip install twine
+          twine upload \
+            --repository-url https://test.pypi.org/legacy/ \
+            --username __token__ \
+            --password $TEST_PYPI_TOKEN \
+            --skip-existing \
+            dist/*
+        action_image: "python:3.11-slim"
+        timeout: "10m"
+        environment:
+          TEST_PYPI_TOKEN: "${secret:test_pypi_token}"
+
+  - id: release
+    name: Release
+    depends_on: [deploy]
+    condition: "inputs.publish == 'true' && inputs.version != ''"
+    steps:
+      - id: approve-release
+        name: Approve release notes
+        type: gate
+        gate:
+          type: approval
+          timeout: "24h"
+          timeout_action: fail
+      - id: publish-release
+        name: Publish omnimancer-cli to registry
+        type: publish_package
+        package: omnimancer-cli
+        version: "{{ inputs.version }}"
+        artifacts:
+          - source: dist/
+            name: omnimancer-cli-dist
