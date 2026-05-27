@@ -333,7 +333,7 @@ class AgentConfig:
                 if path.suffix == ".json":
                     return json.load(f)  # type: ignore[no-any-return]
                 elif path.suffix == ".toml":
-                    return toml.load(f)
+                    return toml.load(f)  # type: ignore[no-any-return]
                 elif path.suffix in [".yaml", ".yml"]:
                     return yaml.safe_load(f)  # type: ignore[no-any-return]
                 else:
