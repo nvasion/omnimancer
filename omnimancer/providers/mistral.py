@@ -6,7 +6,7 @@ with support for safety settings and advanced parameters.
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List, Union
 
 import httpx
 
@@ -14,6 +14,7 @@ from ..core.models import (
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
+    ModelInfo,
     ToolCall,
     ToolDefinition,
 )
@@ -37,7 +38,7 @@ class MistralProvider(BaseProvider):
 
     BASE_URL = "https://api.mistral.ai/v1"
 
-    def __init__(self, api_key: str, model: str = "", **kwargs):
+    def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
         Initialize Mistral provider.
 
@@ -401,7 +402,7 @@ class MistralProvider(BaseProvider):
             },
         }
 
-        config = model_configs.get(
+        config: Dict[str, Any] = model_configs.get(
             self.model,
             {
                 "description": f"Mistral model {self.model}",
@@ -436,7 +437,7 @@ class MistralProvider(BaseProvider):
 
         return enhanced_info
 
-    def get_available_models(self) -> List[EnhancedModelInfo]:
+    def get_available_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get list of available Mistral models.
         """
@@ -523,7 +524,7 @@ class MistralProvider(BaseProvider):
         for model in models:
             model.update_swe_rating()
 
-        return models
+        return models  # type: ignore[return-value]
 
     def supports_tools(self) -> bool:
         """

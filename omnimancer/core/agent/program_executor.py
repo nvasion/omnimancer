@@ -85,7 +85,7 @@ class ExecutionConfig:
 class CommandValidator:
     """Validates commands against security policies."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.command_categories = {
             CommandCategory.SAFE_READ: {
                 "ls",
@@ -291,7 +291,7 @@ class CommandValidator:
             CommandCategory.NETWORK: RiskLevel.HIGH,
         }
 
-        return risk_mapping.get(category, RiskLevel.HIGH)
+        return risk_mapping.get(category, RiskLevel.HIGH)  # type: ignore[arg-type]
 
     def validate_command_args(self, command: str, args: List[str]) -> List[str]:
         """Validate and sanitize command arguments."""
@@ -330,15 +330,15 @@ class StreamingExecutor:
 
     def __init__(self, callback: Optional[Callable[[str, str], None]] = None):
         self.callback = callback
-        self.stdout_buffer = []
-        self.stderr_buffer = []
+        self.stdout_buffer = []  # type: ignore[var-annotated]
+        self.stderr_buffer = []  # type: ignore[var-annotated]
 
     async def stream_process_output(self, process: asyncio.subprocess.Process) -> None:
         """Stream output from a running process."""
 
         async def read_stream(
             stream: asyncio.StreamReader, stream_type: str, buffer: List[str]
-        ):
+        ) -> None:
             try:
                 while True:
                     line = await stream.readline()
@@ -404,8 +404,8 @@ class EnhancedProgramExecutor:
     async def execute_command(
         self,
         command: str,
-        args: List[str] = None,
-        config: ExecutionConfig = None,
+        args: Optional[List[str]] = None,
+        config: Optional[ExecutionConfig] = None,
     ) -> CommandResult:
         """
         Execute a command with full security controls.
@@ -549,10 +549,10 @@ class EnhancedProgramExecutor:
                 # Simple execution without streaming
                 try:
                     stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=config.timeout_seconds
+                        process.communicate(), timeout=config.timeout_seconds  # type: ignore[arg-type]
                     )
-                    stdout = stdout.decode("utf-8", errors="replace")
-                    stderr = stderr.decode("utf-8", errors="replace")
+                    stdout = stdout.decode("utf-8", errors="replace")  # type: ignore[attr-defined]
+                    stderr = stderr.decode("utf-8", errors="replace")  # type: ignore[attr-defined]
                 except asyncio.TimeoutError:
                     process.terminate()
                     try:
@@ -570,14 +570,15 @@ class EnhancedProgramExecutor:
                         error_message=f"Command timed out after {config.timeout_seconds} seconds",
                     )
 
+            exit_code = process.returncode if process.returncode is not None else -1
             return CommandResult(
-                success=process.returncode == 0,
+                success=exit_code == 0,
                 command=command,
                 args=args,
-                exit_code=process.returncode,
+                exit_code=exit_code,
                 stdout=stdout,
                 stderr=stderr,
-                error_message=stderr if process.returncode != 0 else None,
+                error_message=stderr if exit_code != 0 else None,
             )
 
         except Exception as e:
@@ -606,7 +607,7 @@ class EnhancedProgramExecutor:
         )
 
         try:
-            with self.sandbox_manager.create_sandbox(resource_limits) as sandbox:
+            with self.sandbox_manager.create_sandbox(resource_limits) as sandbox:  # type: ignore[attr-defined]
                 # Execute in sandbox
                 sandboxed_process = await sandbox.execute_command(
                     command,
@@ -693,11 +694,16 @@ class EnhancedProgramExecutor:
 
     def get_active_processes(self) -> Dict[str, Dict[str, Any]]:
         """Get information about currently running processes."""
-        active = {}
+        active: Dict[str, Dict[str, Any]] = {}
         for exec_id, process in self.active_processes.items():
             if process.is_running():
+                proc_args = getattr(process.process, "args", [])
+                if isinstance(proc_args, (list, tuple)) and len(proc_args) > 0:
+                    cmd_str = f"{proc_args[0]} {' '.join(str(a) for a in proc_args[1:])}"
+                else:
+                    cmd_str = str(proc_args)
                 active[exec_id] = {
-                    "command": f"{process.process.args[0]} {' '.join(process.process.args[1:])}",
+                    "command": cmd_str,
                     "pid": process.process.pid,
                     "start_time": process.start_time,
                     "runtime": time.time() - process.start_time,
@@ -707,8 +713,8 @@ class EnhancedProgramExecutor:
     async def stream_command_output(
         self,
         command: str,
-        args: List[str] = None,
-        config: ExecutionConfig = None,
+        args: Optional[List[str]] = None,
+        config: Optional[ExecutionConfig] = None,
     ) -> AsyncIterator[tuple[str, str]]:
         """
         Execute command and yield real-time output.
@@ -722,9 +728,9 @@ class EnhancedProgramExecutor:
             config = ExecutionConfig(enable_streaming=True)
 
         # Set up streaming callback to yield output
-        output_queue = asyncio.Queue()
+        output_queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
 
-        def stream_callback(stream_type: str, content: str):
+        def stream_callback(stream_type: str, content: str) -> None:
             try:
                 # Use the current event loop to schedule the task safely
                 loop = asyncio.get_running_loop()

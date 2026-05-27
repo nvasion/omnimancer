@@ -6,7 +6,7 @@ using the Ollama server API.
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -29,7 +29,7 @@ class OllamaProvider(BaseProvider):
     locally without requiring external API keys.
     """
 
-    def __init__(self, api_key: str = "", model: str = "", **kwargs):
+    def __init__(self, api_key: str = "", model: str = "", **kwargs: Any) -> None:
         """
         Initialize Ollama provider.
 
@@ -173,7 +173,7 @@ class OllamaProvider(BaseProvider):
 
                 if response.status_code == 200:
                     data = response.json()
-                    return data.get("models", [])
+                    return data.get("models", [])  # type: ignore[no-any-return]
                 else:
                     raise NetworkError(
                         f"Failed to fetch models from Ollama server: HTTP {response.status_code}",
@@ -389,7 +389,7 @@ class OllamaProvider(BaseProvider):
             latest_version=False,  # Can't determine without version info
         )
 
-    def get_available_models(self) -> List[ModelInfo]:
+    def get_available_models(self) -> List[ModelInfo]:  # type: ignore[override]
         """
         Get list of available Ollama models.
 
@@ -459,7 +459,7 @@ class OllamaProvider(BaseProvider):
             # Return current model if we can't fetch from server
             return self.get_available_models()
 
-    def _model_supports_multimodal(self, model_name: str = None) -> bool:
+    def _model_supports_multimodal(self, model_name: Optional[str] = None) -> bool:
         """
         Check if a model supports multimodal inputs.
 

@@ -7,7 +7,7 @@ including serialization, file management, and conversation organization.
 
 import json
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from ..utils.errors import ConversationError
 from .models import ChatContext, ChatMessage, MessageRole
@@ -21,7 +21,7 @@ class ConversationManager:
     and managing conversation file organization.
     """
 
-    def __init__(self, storage_path):
+    def __init__(self, storage_path: Any) -> None:
         """
         Initialize the conversation manager.
 

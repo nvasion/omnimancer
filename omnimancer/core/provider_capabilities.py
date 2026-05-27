@@ -59,9 +59,9 @@ class ProviderCapabilities:
     requires_api_key: bool = True
 
     # Provider-specific settings that are commonly used
-    common_settings: Dict[str, Any] = None
+    common_settings: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.common_settings is None:
             self.common_settings = {}
 
@@ -304,7 +304,7 @@ def get_provider_defaults(provider_type: str) -> Dict[str, Any]:
         # Security
         "auth_type": capabilities.auth_type,
         # Provider-specific defaults
-        **capabilities.common_settings,
+        **capabilities.common_settings,  # type: ignore[dict-item]
     }
 
     return defaults

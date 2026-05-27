@@ -189,7 +189,7 @@ class AgentEvent:
     data: Dict[str, Any] = field(default_factory=dict)
     source: str = "unknown"
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Ensure timestamp is always set."""
         if not self.timestamp:
             self.timestamp = datetime.now()
@@ -205,7 +205,7 @@ class StatusStreamEvent:
     retry_count: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Ensure timestamp is set."""
         if not self.timestamp:
             self.timestamp = datetime.now()
@@ -311,7 +311,7 @@ class StatusDisplayConfig:
     panel_borders: bool = True
     panel_titles: bool = True
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate and adjust configuration after initialization."""
         # Ensure update frequency is valid
         if isinstance(self.update_frequency, float):

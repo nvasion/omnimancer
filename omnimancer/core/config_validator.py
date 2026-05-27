@@ -91,7 +91,7 @@ class ConfigValidator:
             # Fallback for mock objects
             return hashlib.md5(str(config).encode()).hexdigest()
 
-    def _validate_config(self, config) -> List[str]:
+    def _validate_config(self, config: Any) -> List[str]:
         """
         Validate configuration.
 
@@ -196,7 +196,7 @@ class ConfigValidator:
         return errors
 
     def validate_provider_config(
-        self, provider_name: str, provider_config
+        self, provider_name: str, provider_config: Any
     ) -> List[str]:
         """
         Validate provider configuration.
@@ -346,7 +346,7 @@ class ConfigValidator:
 
             try:
                 if hasattr(mcp_config, "max_concurrent_servers"):
-                    servers_val = getattr(mcp_config, "max_concurrent_servers", None)
+                    servers_val = getattr(mcp_config, "max_concurrent_servers", None)  # type: ignore[assignment]
                     if servers_val is not None and servers_val <= 0:
                         errors.append(
                             f"Invalid MCP max_concurrent_servers: {servers_val}"
@@ -618,7 +618,7 @@ class ConfigValidator:
             self._cache_ttl = ttl_seconds
         logger.debug(f"Set validation cache TTL to {ttl_seconds} seconds")
 
-    def _validate_providers(self, providers) -> List[str]:
+    def _validate_providers(self, providers: Any) -> List[str]:
         """
         Validate provider configurations.
 
@@ -645,7 +645,7 @@ class ConfigValidator:
             errors.extend(provider_errors)
         return errors
 
-    def _validate_mcp_config(self, mcp_config) -> List[str]:
+    def _validate_mcp_config(self, mcp_config: Any) -> List[str]:
         """
         Validate MCP configuration (internal method for caching tests).
 
@@ -657,7 +657,7 @@ class ConfigValidator:
         """
         return self.validate_mcp_config(mcp_config)
 
-    def _validate_chat_settings(self, chat_settings) -> List[str]:
+    def _validate_chat_settings(self, chat_settings: Any) -> List[str]:
         """
         Validate chat settings (internal method for caching tests).
 
@@ -667,7 +667,7 @@ class ConfigValidator:
         Returns:
             List of validation errors
         """
-        errors = []
+        errors = []  # type: ignore[var-annotated]
 
         # Skip validation for mock objects
         if (
@@ -700,7 +700,7 @@ class ConfigValidator:
 
         return errors
 
-    async def validate_full_config(self, config) -> "ValidationResult":
+    async def validate_full_config(self, config: Any) -> "ValidationResult":
         """
         Validate full configuration asynchronously.
 
@@ -759,9 +759,9 @@ class ValidationResult:
         self,
         is_valid: bool,
         errors: List[str],
-        warnings: List[str] = None,
-        config=None,
-    ):
+        warnings: Optional[List[str]] = None,
+        config: Any = None,
+    ) -> None:
         self.is_valid = is_valid
         self.errors = errors
         self.warnings = warnings or []

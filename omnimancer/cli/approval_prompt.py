@@ -9,11 +9,12 @@ options with proper keyboard input handling.
 import asyncio
 import logging
 import signal
-from dataclasses import dataclass
+import types
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from rich.console import Console
 from rich.panel import Panel
@@ -21,7 +22,10 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from omnimancer.ui.cancellation_handler import get_active_cancellation_handler
+from omnimancer.ui.cancellation_handler import (
+    CancellationHandler,
+    get_active_cancellation_handler,
+)
 
 from ..core.agent.approval_manager import BatchApprovalRequest, ChangePreview
 from ..core.security.approval_workflow import ApprovalRequest
@@ -50,9 +54,9 @@ class ApprovalDecision:
     user_notes: str = ""
     response_time_seconds: float = 0.0
     timeout_occurred: bool = False
-    created_at: datetime = None
+    created_at: Optional[datetime] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.created_at is None:
             self.created_at = datetime.now()
 
@@ -78,12 +82,12 @@ class BatchApprovalDecision:
     """Represents a batch approval decision."""
 
     decision_type: str  # "approve_all", "deny_all", "selective", "individual"
-    approved_indices: List[int] = None
+    approved_indices: Optional[List[int]] = None
     user_notes: str = ""
-    individual_decisions: List[ApprovalDecision] = None
-    created_at: datetime = None
+    individual_decisions: Optional[List[ApprovalDecision]] = None
+    created_at: Optional[datetime] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.created_at is None:
             self.created_at = datetime.now()
         if self.approved_indices is None:
@@ -119,7 +123,12 @@ class CLIApprovalPrompt:
         self.default_timeout_seconds = default_timeout_seconds
 
         # Signal handling for graceful interruption
-        self._original_sigint_handler = None
+        self._original_sigint_handler: Union[
+            Callable[[int, Optional[types.FrameType]], Any],
+            int,
+            signal.Handlers,
+            None,
+        ] = None
         self._interrupted = False
 
         # Valid response mappings
@@ -424,7 +433,7 @@ class CLIApprovalPrompt:
             self._restore_interrupt_handling()
 
     async def _get_user_decision_with_timeout(
-        self, timeout_seconds: int = None
+        self, timeout_seconds: Optional[int] = None
     ) -> ApprovalDecision:
         """Get user decision - waits indefinitely for user response."""
         # Pause the spinner during user interaction
@@ -465,7 +474,7 @@ class CLIApprovalPrompt:
             raise  # Re-raise timeout for upper level handling
 
     async def _get_batch_decision_with_timeout(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: int = None
+        self, batch_request: BatchApprovalRequest, timeout_seconds: Optional[int] = None
     ) -> BatchApprovalDecision:
         """Get batch decision - waits indefinitely for user response."""
         # Wait indefinitely for user input (no timeout like Claude Code)
@@ -513,7 +522,7 @@ class CLIApprovalPrompt:
             return await self._get_batch_decision_with_timeout(batch_request, None)
 
     async def _handle_selective_approval(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: int = None
+        self, batch_request: BatchApprovalRequest, timeout_seconds: Optional[int] = None
     ) -> BatchApprovalDecision:
         """Handle selective operation approval - waits indefinitely for user response."""
         operation_count = len(batch_request.operations)
@@ -543,7 +552,7 @@ class CLIApprovalPrompt:
         )
 
     async def _handle_individual_approval(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: int = None
+        self, batch_request: BatchApprovalRequest, timeout_seconds: Optional[int] = None
     ) -> BatchApprovalDecision:
         """Handle individual operation approval."""
         individual_decisions = []
@@ -596,7 +605,7 @@ class CLIApprovalPrompt:
     ) -> Optional[List[int]]:
         """Parse operation selection string into list of indices."""
         try:
-            indices = set()
+            indices = set()  # type: ignore[var-annotated]
 
             # Replace commas with spaces and split
             parts = response.replace(",", " ").split()
@@ -656,7 +665,7 @@ class CLIApprovalPrompt:
         """Get user input asynchronously."""
 
         # Use asyncio.to_thread for truly async input
-        def get_input():
+        def get_input() -> str:
             return input(prompt_text)
 
         try:
@@ -665,17 +674,17 @@ class CLIApprovalPrompt:
             # Handle Ctrl+C during input
             raise
 
-    def _setup_interrupt_handling(self):
+    def _setup_interrupt_handling(self) -> None:
         """Set up signal handling for graceful interruption."""
 
-        def signal_handler(signum, frame):
+        def signal_handler(signum: int, frame: Optional[types.FrameType]) -> None:
             self._interrupted = True
             # Don't call sys.exit here, let the calling code handle it
             raise KeyboardInterrupt("User interrupted with Ctrl+C")
 
         self._original_sigint_handler = signal.signal(signal.SIGINT, signal_handler)
 
-    def _restore_interrupt_handling(self):
+    def _restore_interrupt_handling(self) -> None:
         """Restore original signal handling."""
         if self._original_sigint_handler is not None:
             signal.signal(signal.SIGINT, self._original_sigint_handler)
@@ -696,7 +705,7 @@ class CLIApprovalPrompt:
         self,
         batch_decision: BatchApprovalDecision,
         batch_request: BatchApprovalRequest,
-    ):
+    ) -> None:
         """Display confirmation of batch decision."""
         if batch_decision.decision_type == "approve_all":
             self.console.print(
@@ -709,7 +718,8 @@ class CLIApprovalPrompt:
             )
 
         elif batch_decision.decision_type == "selective":
-            approved_count = len(batch_decision.approved_indices)
+            approved_indices = batch_decision.approved_indices or []
+            approved_count = len(approved_indices)
             total_count = len(batch_request.operations)
             self.console.print(
                 f"[blue]✅ Approved {approved_count} of {total_count} operations[/blue]"
@@ -717,13 +727,13 @@ class CLIApprovalPrompt:
 
             # Show which operations were approved
             if approved_count > 0:
-                approved_nums = [str(i + 1) for i in batch_decision.approved_indices]
+                approved_nums = [str(i + 1) for i in approved_indices]
                 self.console.print(
                     f"   Approved operations: {', '.join(approved_nums)}"
                 )
 
         elif batch_decision.decision_type == "individual":
-            approved_count = len(batch_decision.approved_indices)
+            approved_count = len(batch_decision.approved_indices or [])
             total_count = len(batch_request.operations)
             self.console.print(
                 f"[blue]✅ Individual review complete: {approved_count} of {total_count} approved[/blue]"
@@ -734,7 +744,7 @@ class CLIApprovalPrompt:
 
     async def _handle_cancellation_cleanup(
         self, approval_request: ApprovalRequest, reason: str
-    ):
+    ) -> None:
         """
         Handle cleanup tasks when an approval is cancelled or times out.
 
@@ -773,7 +783,7 @@ class CLIApprovalPrompt:
             logger.error(f"Error during cancellation cleanup: {e}")
             # Don't re-raise - cleanup errors shouldn't fail the cancellation
 
-    def cleanup_resources(self):
+    def cleanup_resources(self) -> None:
         """
         Clean up any resources held by the approval prompt handler.
 
@@ -795,7 +805,7 @@ class CLIApprovalPrompt:
 
     def _display_file_modification_preview(
         self, review_data: Dict[str, Any], current_model: str
-    ):
+    ) -> None:
         """Display file modification preview using current model name."""
         # Ensure we start on a new line, clearing any spinner artifacts
         self.console.print()
@@ -811,7 +821,7 @@ class CLIApprovalPrompt:
 
     def _display_modification_header(
         self, review_data: Dict[str, Any], current_model: str
-    ):
+    ) -> None:
         """Display header information about the file modification."""
         file_path = review_data["file_path"]
         operation = review_data["operation"]
@@ -835,7 +845,7 @@ class CLIApprovalPrompt:
 
         self.console.print(header_panel)
 
-    def _display_new_file_preview(self, review_data: Dict[str, Any]):
+    def _display_new_file_preview(self, review_data: Dict[str, Any]) -> None:
         """Display preview of new file creation."""
         new_content = self._ensure_string(review_data.get("new_content", ""))
         file_path = Path(review_data["file_path"])
@@ -869,7 +879,7 @@ class CLIApprovalPrompt:
         # Show content statistics
         self._display_content_stats(new_content, is_new=True)
 
-    def _display_modification_preview(self, review_data: Dict[str, Any]):
+    def _display_modification_preview(self, review_data: Dict[str, Any]) -> None:
         """Display preview of file modification."""
         current_content = self._ensure_string(review_data.get("current_content", ""))
         new_content = self._ensure_string(review_data.get("new_content", ""))
@@ -889,7 +899,7 @@ class CLIApprovalPrompt:
         # Show content statistics
         self._display_content_comparison_stats(current_content, new_content)
 
-    def _display_current_content_summary(self, current_content: str):
+    def _display_current_content_summary(self, current_content: str) -> None:
         """Display summary of current file content."""
         current_content = self._ensure_string(current_content)
         lines = current_content.split("\n")
@@ -916,7 +926,7 @@ class CLIApprovalPrompt:
 
         self.console.print(current_panel)
 
-    def _display_diff(self, diff: str):
+    def _display_diff(self, diff: str) -> None:
         """Display unified diff with syntax highlighting."""
         # Color code the diff
         diff_text = Text()
@@ -941,7 +951,7 @@ class CLIApprovalPrompt:
 
         self.console.print(diff_panel)
 
-    def _display_side_by_side_preview(self, current_content: str, new_content: str):
+    def _display_side_by_side_preview(self, current_content: str, new_content: str) -> None:
         """Display side-by-side preview when diff is not available."""
         current_content = self._ensure_string(current_content)
         new_content = self._ensure_string(new_content)
@@ -970,7 +980,7 @@ class CLIApprovalPrompt:
 
         self.console.print(preview_panel)
 
-    def _display_content_stats(self, content: str, is_new: bool = False):
+    def _display_content_stats(self, content: str, is_new: bool = False) -> None:
         """Display content statistics."""
         content = self._ensure_string(content)
         lines = content.split("\n")
@@ -993,7 +1003,7 @@ class CLIApprovalPrompt:
 
         self.console.print(stats_panel)
 
-    def _display_content_comparison_stats(self, current_content: str, new_content: str):
+    def _display_content_comparison_stats(self, current_content: str, new_content: str) -> None:
         """Display comparison statistics between current and new content."""
         current_content = self._ensure_string(current_content)
         new_content = self._ensure_string(new_content)

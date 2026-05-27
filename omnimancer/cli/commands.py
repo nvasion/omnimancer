@@ -164,7 +164,7 @@ class Command:
     @property
     def args(self) -> List[str]:
         """Get command arguments."""
-        return self.parameters.get("args", [])
+        return list(self.parameters.get("args", []))
 
 
 def parse_command(user_input: str) -> Command:

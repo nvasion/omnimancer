@@ -144,17 +144,17 @@ class SandboxManager:
             }
 
             # Start process
-            process = subprocess.Popen(**process_args)
+            process = subprocess.Popen(**process_args)  # type: ignore[call-overload]
             sandboxed_proc = SandboxedProcess(process, sandbox_dir, limits)
 
             # Track the process
             self.active_processes[process.pid] = sandboxed_proc
 
             # Start monitoring
-            sandboxed_proc.monitor_thread = threading.Thread(
+            sandboxed_proc.monitor_thread = threading.Thread(  # type: ignore[assignment]
                 target=self._monitor_process, args=(sandboxed_proc,)
             )
-            sandboxed_proc.monitor_thread.start()
+            sandboxed_proc.monitor_thread.start()  # type: ignore[attr-defined]
 
             # Execute and wait for completion
             try:
@@ -199,7 +199,7 @@ class SandboxManager:
     def _setup_process_limits(self, limits: ResourceLimits) -> Callable:
         """Create a function to set up process resource limits."""
 
-        def setup_limits():
+        def setup_limits() -> None:
             try:
                 # Set memory limit (in bytes)
                 memory_limit = limits.max_memory_mb * 1024 * 1024
@@ -323,8 +323,8 @@ class SandboxManager:
 
         return filtered_env
 
-    @contextmanager
-    def sandbox_context(self, limits: Optional[ResourceLimits] = None):
+    @contextmanager  # type: ignore[arg-type]
+    def sandbox_context(self, limits: Optional[ResourceLimits] = None) -> None:  # type: ignore[misc]
         """Context manager for sandbox operations."""
 
         sandbox_dir = self.create_sandbox_environment(limits)

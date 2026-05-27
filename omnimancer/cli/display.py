@@ -6,6 +6,7 @@ including help text, status display, and message formatting.
 
 import re
 from enum import Enum
+from typing import Any, Dict, Optional
 
 from rich.console import Console
 from rich.panel import Panel
@@ -27,7 +28,7 @@ class DisplayManager:
     def __init__(self, console: Console):
         self.console = console
 
-        self._formats = {
+        self._formats: Dict[MessageType, Dict[str, Any]] = {
             MessageType.SUCCESS: {
                 "text": "[green]✓ {message}[/green]",
                 "panel": None,
@@ -61,7 +62,7 @@ class DisplayManager:
             self.console.print(panel)
 
     def show_panel(
-        self, content: str, title: str, style: str = "blue", icon: str = None
+        self, content: str, title: str, style: str = "blue", icon: Optional[str] = None
     ) -> None:
         display_title = f"{icon} {title}" if icon else title
         panel = Panel(content, title=display_title, border_style=style)
@@ -76,6 +77,10 @@ class DisplayMixin:
         self.display_manager: DisplayManager
         self.engine: CoreEngine
     """
+
+    console: Console
+    display_manager: Any
+    engine: Any
 
     def _show_welcome(self) -> None:
         welcome_text = Text("Welcome to Omnimancer!", style="bold blue")
@@ -254,7 +259,7 @@ Model available: {'Yes' if model_info else 'No'}"""
     def _show_warning(self, message: str) -> None:
         self.display_manager.show_message(message, MessageType.WARNING)
 
-    def _show_token_status(self, response) -> None:
+    def _show_token_status(self, response: Any) -> None:
         input_t = response.input_tokens or 0
         output_t = response.output_tokens or 0
         cost = response.cost_estimate or 0.0

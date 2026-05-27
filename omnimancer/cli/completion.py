@@ -3,9 +3,12 @@
 import atexit
 import logging
 import readline
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 from .commands import SlashCommand, get_command_registry
+
+if TYPE_CHECKING:
+    from ..core.engine import CoreEngine
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +16,7 @@ logger = logging.getLogger(__name__)
 class CompletionManager:
     """Unified completion manager for command completion."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def get_completions(
@@ -59,6 +62,10 @@ class CompletionMixin:
         self.completion_manager: CompletionManager
         self.engine: CoreEngine
     """
+
+    history_manager: Any
+    completion_manager: CompletionManager
+    engine: "CoreEngine"
 
     def _setup_readline_history(self) -> None:
         try:
@@ -146,9 +153,9 @@ class CompletionMixin:
             else:
                 arg_index = len(args) - 1 if args else 0
 
-            return self.completion_manager.get_completions(
+            return list(self.completion_manager.get_completions(
                 command, arg_index, text, args
-            )
+            ))
         except Exception:
             return []
 
@@ -169,7 +176,7 @@ class CompletionMixin:
 
     def _get_model_names(self, provider_name: str, text: str) -> List[str]:
         try:
-            model_names = []
+            model_names: List[str] = []
 
             if (
                 hasattr(self.engine, "providers")
@@ -184,7 +191,7 @@ class CompletionMixin:
                         if models and hasattr(models[0], "name"):
                             model_names.extend([m.name for m in models])
                         else:
-                            model_names.extend(models)
+                            model_names.extend(models)  # type: ignore[arg-type]
 
             if hasattr(self.engine, "config_manager"):
                 custom_models = self.engine.config_manager.get_custom_models()

@@ -52,9 +52,9 @@ class AuditEvent:
     user_id: Optional[str] = None
     session_id: Optional[str] = None
     operation_id: Optional[str] = None
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.metadata is None:
             self.metadata = {}
 
@@ -80,7 +80,7 @@ class AuditEvent:
             filtered_metadata = {
                 k: v for k, v in self.metadata.items() if k != "event_hash"
             }
-            content["metadata"] = filtered_metadata
+            content["metadata"] = filtered_metadata  # type: ignore[assignment]
 
         content_str = json.dumps(content, sort_keys=True, default=str)
         return hashlib.sha256(content_str.encode()).hexdigest()[:16]
@@ -133,14 +133,14 @@ class AuditLogger:
 
         # Async logging setup
         if self.enable_async:
-            self.log_queue = Queue()
+            self.log_queue = Queue()  # type: ignore[var-annotated]
             self.log_thread = threading.Thread(
                 target=self._async_log_worker, daemon=True
             )
             self.log_thread.start()
         else:
-            self.log_queue = None
-            self.log_thread = None
+            self.log_queue = None  # type: ignore[assignment]
+            self.log_thread = None  # type: ignore[assignment]
 
         # Event statistics
         self.event_counts = {event_type: 0 for event_type in AuditEventType}
@@ -310,7 +310,7 @@ class AuditLogger:
         path: Optional[str] = None,
         allowed: bool = True,
         reason: Optional[str] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Log a permission check event."""
 
@@ -342,7 +342,7 @@ class AuditLogger:
         exit_code: Optional[int] = None,
         output: Optional[str] = None,
         sandbox_id: Optional[str] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Log a command execution event."""
 
@@ -376,7 +376,7 @@ class AuditLogger:
         operation: str,
         allowed: bool = True,
         file_size: Optional[int] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Log a file access event."""
 
@@ -402,7 +402,7 @@ class AuditLogger:
         alert_type: str,
         description: str,
         severity: AuditLevel = AuditLevel.WARNING,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Log a security alert."""
 
@@ -503,7 +503,7 @@ class AuditLogger:
             self.log_queue.put(None)
             self.log_thread.join(timeout=5.0)
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor to ensure proper cleanup."""
         try:
             self.shutdown()

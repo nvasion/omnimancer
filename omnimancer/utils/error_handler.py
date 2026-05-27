@@ -7,7 +7,7 @@ and user-friendly error messages with suggested solutions.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .errors import (
     AuthenticationError,
@@ -33,7 +33,7 @@ class ErrorHandler:
     suggesting solutions, and implementing graceful degradation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the error handler."""
         self.error_history: List[Dict[str, Any]] = []
         self.provider_status: Dict[str, Dict[str, Any]] = {}
@@ -43,7 +43,7 @@ class ErrorHandler:
         self,
         error: Exception,
         provider_name: str,
-        available_providers: List[str] = None,
+        available_providers: Optional[List[str]] = None,
     ) -> Tuple[str, List[str], bool]:
         """
         Handle provider-specific errors and suggest solutions.
@@ -201,8 +201,8 @@ class ErrorHandler:
     def handle_mcp_error(
         self,
         error: Exception,
-        server_name: str = None,
-        available_servers: List[str] = None,
+        server_name: Optional[str] = None,
+        available_servers: Optional[List[str]] = None,
     ) -> Tuple[str, List[str], bool]:
         """
         Handle MCP-specific errors and suggest solutions.
@@ -294,7 +294,7 @@ class ErrorHandler:
         self,
         failed_provider: str,
         available_providers: List[str],
-        required_capabilities: List[str] = None,
+        required_capabilities: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Get options for graceful degradation when a provider fails.
@@ -320,32 +320,35 @@ class ErrorHandler:
         else:
             capable_providers = working_providers
 
-        degradation_options = {
-            "fallback_providers": capable_providers,
-            "degraded_functionality": [],
-            "recommendations": [],
-        }
+        degraded_functionality: List[str] = []
+        recommendations: List[str] = []
 
         if not capable_providers:
-            degradation_options["degraded_functionality"].extend(
+            degraded_functionality.extend(
                 [
                     "No alternative providers available",
                     "Some features may be unavailable",
                 ]
             )
-            degradation_options["recommendations"].extend(
+            recommendations.extend(
                 [
                     "Check provider configurations",
                     "Verify API keys and connectivity",
                 ]
             )
         else:
-            degradation_options["recommendations"].extend(
+            recommendations.extend(
                 [
                     f"Switch to: {', '.join(capable_providers[:2])}",
                     "Configure backup providers for reliability",
                 ]
             )
+
+        degradation_options: Dict[str, Any] = {
+            "fallback_providers": capable_providers,
+            "degraded_functionality": degraded_functionality,
+            "recommendations": recommendations,
+        }
 
         return degradation_options
 
@@ -420,9 +423,9 @@ class ErrorHandler:
         ]
 
         # Group errors by type and component
-        error_counts = {}
-        provider_errors = {}
-        mcp_errors = {}
+        error_counts: Dict[str, int] = {}
+        provider_errors: Dict[str, Dict[str, int]] = {}
+        mcp_errors: Dict[str, Dict[str, int]] = {}
 
         for error in recent_errors:
             error_type = error["error_type"]
@@ -457,7 +460,7 @@ class ErrorHandler:
             "most_recent_error": recent_errors[-1] if recent_errors else None,
         }
 
-    def _record_error(self, error: Exception, component_name: str, component_type: str):
+    def _record_error(self, error: Exception, component_name: str, component_type: str) -> None:
         """Record an error in the error history."""
         error_record = {
             "timestamp": datetime.now(),
@@ -475,7 +478,7 @@ class ErrorHandler:
 
         logger.warning(f"Error recorded: {error_record}")
 
-    def _update_provider_status(self, provider_name: str, error: Exception):
+    def _update_provider_status(self, provider_name: str, error: Exception) -> None:
         """Update provider status based on error."""
         if provider_name not in self.provider_status:
             self.provider_status[provider_name] = {
@@ -501,7 +504,7 @@ class ErrorHandler:
         else:
             status["status"] = "error"
 
-    def _update_mcp_status(self, server_name: str, error: Exception):
+    def _update_mcp_status(self, server_name: str, error: Exception) -> None:
         """Update MCP server status based on error."""
         if server_name not in self.mcp_server_status:
             self.mcp_server_status[server_name] = {
@@ -534,11 +537,14 @@ class ErrorHandler:
             # 1. No recent errors, or
             # 2. Recent success after errors, or
             # 3. Only transient errors (network, rate limit)
+            last_error = status.get("last_error")
+            last_success = status.get("last_success")
             if (
-                not status.get("last_error")
+                not last_error
                 or (
-                    status.get("last_success")
-                    and status.get("last_success") > status.get("last_error")
+                    last_success is not None
+                    and last_error is not None
+                    and last_success > last_error
                 )
                 or status.get("status") in ["network_error", "quota_limited"]
             ):
@@ -556,8 +562,8 @@ error_handler = ErrorHandler()
 
 
 def handle_provider_error(
-    error: Exception, provider_name: str, available_providers: List[str] = None
-):
+    error: Exception, provider_name: str, available_providers: Optional[List[str]] = None
+) -> Tuple[str, List[str], bool]:
     """Convenience function for handling provider errors."""
     return error_handler.handle_provider_error(
         error, provider_name, available_providers
@@ -566,14 +572,14 @@ def handle_provider_error(
 
 def handle_mcp_error(
     error: Exception,
-    server_name: str = None,
-    available_servers: List[str] = None,
-):
+    server_name: Optional[str] = None,
+    available_servers: Optional[List[str]] = None,
+) -> Tuple[str, List[str], bool]:
     """Convenience function for handling MCP errors."""
     return error_handler.handle_mcp_error(error, server_name, available_servers)
 
 
-def should_retry_operation(error: Exception, attempt_count: int, max_attempts: int = 3):
+def should_retry_operation(error: Exception, attempt_count: int, max_attempts: int = 3) -> Tuple[bool, float]:
     """Convenience function for retry logic."""
     return error_handler.should_retry_operation(error, attempt_count, max_attempts)
 
@@ -581,8 +587,8 @@ def should_retry_operation(error: Exception, attempt_count: int, max_attempts: i
 def get_graceful_degradation_options(
     failed_provider: str,
     available_providers: List[str],
-    required_capabilities: List[str] = None,
-):
+    required_capabilities: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     """Convenience function for graceful degradation."""
     return error_handler.get_graceful_degradation_options(
         failed_provider, available_providers, required_capabilities

@@ -55,9 +55,9 @@ class ErrorContext:
     recovery_attempted: bool = False
     recovery_strategy: Optional[RecoveryStrategy] = None
     recovery_success: Optional[bool] = None
-    additional_context: Dict[str, Any] = None
+    additional_context: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.additional_context is None:
             self.additional_context = {}
 
@@ -409,7 +409,7 @@ class ReadBeforeWriteErrorHandler:
             "should_abort": True,
         }
 
-    def _log_error(self, error: ReadBeforeWriteError):
+    def _log_error(self, error: ReadBeforeWriteError) -> None:
         """Log error with appropriate severity level."""
         log_message = f"Read-before-write error: {error.message}"
 
@@ -432,8 +432,8 @@ class ReadBeforeWriteErrorHandler:
         if not self.error_history:
             return {"total_errors": 0}
 
-        error_counts = {}
-        recovery_counts = {}
+        error_counts = {}  # type: ignore[var-annotated]
+        recovery_counts = {}  # type: ignore[var-annotated]
 
         for error in self.error_history:
             error_type = error.error_type.value
@@ -463,13 +463,13 @@ class ReadBeforeWriteErrorHandler:
             ),
         }
 
-    def clear_error_history(self):
+    def clear_error_history(self) -> None:
         """Clear the error history."""
         self.error_history.clear()
 
     def set_recovery_strategy(
         self, error_type: ReadBeforeWriteErrorType, strategy: RecoveryStrategy
-    ):
+    ) -> None:
         """Set custom recovery strategy for an error type."""
         self.recovery_strategies[error_type] = strategy
         logger.info(f"Set recovery strategy for {error_type.value}: {strategy.value}")
