@@ -215,7 +215,9 @@ class ProgramExecutor(BaseManager):
 
         # Use backward compatible method for tests
         return await self._execute_command(  # type: ignore[call-arg]
-            command, args, working_dir,
+            command,
+            args,
+            working_dir,
         )
 
     async def preview_operation(self, operation: Operation) -> str:
@@ -230,9 +232,7 @@ class ProgramExecutor(BaseManager):
         validator = CommandValidator()
         risk_level = validator.assess_command_risk(command, args)
 
-        full_command = (
-            f"{command} {' '.join(args)}" if args else command
-        )
+        full_command = f"{command} {' '.join(args)}" if args else command
         return (
             f"Execute command: {full_command}\n"
             f"Execution mode: {execution_mode}\n"
@@ -385,7 +385,9 @@ class WebClient(BaseManager):
         self.last_request_time: float = 0.0
         self.allowed_domains: set[str] = set()  # Empty means all allowed
         self.forbidden_domains: set[str] = {
-            "localhost", "127.0.0.1", "0.0.0.0",
+            "localhost",
+            "127.0.0.1",
+            "0.0.0.0",
         }
 
     async def execute_operation(self, operation: Operation) -> OperationResult:
@@ -489,21 +491,13 @@ class WebClient(BaseManager):
                 user_error = f"Security violation in web request: {e}"
             elif "timeout" in str(e).lower():
                 user_error = (
-                    f"Web request timeout: "
-                    f"The request to {url} took too long"
+                    f"Web request timeout: " f"The request to {url} took too long"
                 )
             elif "connection" in str(e).lower():
+                user_error = f"Connection error: Unable to connect " f"to {url}"
+            elif "ssl" in str(e).lower() or "certificate" in str(e).lower():
                 user_error = (
-                    f"Connection error: Unable to connect "
-                    f"to {url}"
-                )
-            elif (
-                "ssl" in str(e).lower()
-                or "certificate" in str(e).lower()
-            ):
-                user_error = (
-                    "SSL/Certificate error: "
-                    f"Secure connection to {url} failed"
+                    "SSL/Certificate error: " f"Secure connection to {url} failed"
                 )
             else:
                 user_error = f"Web request failed: {e}"
@@ -512,8 +506,7 @@ class WebClient(BaseManager):
                 success=False,
                 error=user_error,
                 details=(
-                    f"URL: {url}, Method: {method}, "
-                    f"Error type: {type(e).__name__}"
+                    f"URL: {url}, Method: {method}, " f"Error type: {type(e).__name__}"
                 ),
             )
 
@@ -823,9 +816,7 @@ class AgentEngine(CoreEngine):
     def set_approval_callbacks(
         self,
         approval_callback: Optional[Callable[..., Any]] = None,
-        batch_approval_callback: Optional[
-            Callable[..., Any]
-        ] = None,
+        batch_approval_callback: Optional[Callable[..., Any]] = None,
     ) -> None:
         """Set custom approval callbacks for user interaction."""
         if approval_callback:
@@ -1398,9 +1389,7 @@ class AgentEngine(CoreEngine):
             ),
         }
 
-    async def generate_operation_preview(
-        self, operation: Operation
-    ) -> str:
+    async def generate_operation_preview(self, operation: Operation) -> str:
         """Generate a detailed preview for an operation."""
         preview = await self.enhanced_approval.generate_operation_preview(operation)
         return preview.format_preview()
@@ -1415,9 +1404,7 @@ class AgentEngine(CoreEngine):
         """Get the current working directory."""
         return self.file_system.get_current_working_directory()
 
-    async def is_git_repository(
-        self, path: Optional[Union[str, Path]] = None
-    ) -> bool:
+    async def is_git_repository(self, path: Optional[Union[str, Path]] = None) -> bool:
         """Check if the given path (or current directory) is a Git repository."""
         return await self.file_system.is_git_repository(path)
 
@@ -1615,6 +1602,7 @@ class AgentEngine(CoreEngine):
 
     def _setup_autonomous_file_workflow(self) -> None:
         """Setup autonomous file modification workflow with simple approval."""
+
         async def autonomous_file_review_callback(
             review_data: Dict[str, Any],
         ) -> Dict[str, Any]:
@@ -1641,8 +1629,10 @@ class AgentEngine(CoreEngine):
                 kwargs["user_review_callback"] = autonomous_file_review_callback
             _write = self.file_system._original_write_file  # type: ignore[attr-defined]
             return await _write(
-                path=path, content=content,
-                encoding=encoding, **kwargs,
+                path=path,
+                content=content,
+                encoding=encoding,
+                **kwargs,
             )
 
         self.file_system.write_file = autonomous_write_file  # type: ignore[assignment]

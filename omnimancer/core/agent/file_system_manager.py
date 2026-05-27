@@ -179,13 +179,11 @@ class FileSystemManager:
                         }
             except Exception as security_error:
                 logger.warning(
-                    f"Security check failed for "
-                    f"{resolved_path}: {security_error}"
+                    f"Security check failed for " f"{resolved_path}: {security_error}"
                 )
                 # Continue despite security error
                 logger.debug(
-                    f"Continuing existence check "
-                    f"despite error: {security_error}"
+                    f"Continuing existence check " f"despite error: {security_error}"
                 )
 
             # Gather additional metadata if file exists
@@ -213,8 +211,7 @@ class FileSystemManager:
             except OSError as os_error:
                 # Can't get metadata (permission issues, etc.)
                 logger.warning(
-                    f"Could not get metadata for "
-                    f"{resolved_path}: {os_error}"
+                    f"Could not get metadata for " f"{resolved_path}: {os_error}"
                 )
                 return {
                     "exists": True,
@@ -224,21 +221,12 @@ class FileSystemManager:
                     "is_symlink": is_symlink,
                     "size": None,
                     "modified_time": None,
-                    "error": (
-                        f"Metadata access failed: {os_error}"
-                    ),
+                    "error": (f"Metadata access failed: {os_error}"),
                 }
 
         except Exception as e:
-            logger.error(
-                f"Error checking file existence "
-                f"for {original_path}: {e}"
-            )
-            _path = (
-                original_path
-                if "original_path" in locals()
-                else path
-            )
+            logger.error(f"Error checking file existence " f"for {original_path}: {e}")
+            _path = original_path if "original_path" in locals() else path
             return {
                 "exists": False,
                 "path": str(_path),
@@ -292,9 +280,7 @@ class FileSystemManager:
             Dictionary with operation result
         """
         original_path = Path(path)
-        _hash = hashlib.md5(
-            str(original_path).encode()
-        ).hexdigest()[:8]
+        _hash = hashlib.md5(str(original_path).encode()).hexdigest()[:8]
         operation_id = f"write_confirm_{_hash}"
 
         try:
@@ -338,21 +324,15 @@ class FileSystemManager:
                         "success": False,
                         "operation_id": operation_id,
                         "path": str(original_path),
-                        "reason": (
-                            f"Confirmation callback error: {e}"
-                        ),
+                        "reason": (f"Confirmation callback error: {e}"),
                         "file_exists": file_info["exists"],
                     }
 
             # Handle symlink replacement if needed
-            if (
-                file_info["exists"]
-                and file_info.get("is_symlink", False)
-            ):
+            if file_info["exists"] and file_info.get("is_symlink", False):
                 # Remove symlink first to create a regular file
                 logger.debug(
-                    f"Removing symlink at {original_path} "
-                    f"before writing new file"
+                    f"Removing symlink at {original_path} " f"before writing new file"
                 )
                 await aiofiles.os.unlink(original_path)
 
@@ -455,9 +435,7 @@ class FileSystemManager:
         """
 
         path = Path(path).resolve()
-        _hash = hashlib.md5(
-            str(path).encode()
-        ).hexdigest()[:8]
+        _hash = hashlib.md5(str(path).encode()).hexdigest()[:8]
         operation_id = f"write_{_hash}"
 
         # If read-before-write is enabled, delegate to that method
@@ -487,11 +465,7 @@ class FileSystemManager:
             content_str = ""
             content_length = 0
         elif isinstance(content, str):
-            content_str = (
-                content[:1000] + "..."
-                if len(content) > 1000
-                else content
-            )
+            content_str = content[:1000] + "..." if len(content) > 1000 else content
             content_length = len(content)
         else:
             # bytes content
@@ -602,20 +576,14 @@ class FileSystemManager:
                     # Log backup failure but continue with write operation
                     logger.warning(f"Backup creation failed for {path}: {e}")
                     if operation_id:
-                        self.active_operations[operation_id][
-                            "backup_warning"
-                        ] = str(e)
+                        self.active_operations[operation_id]["backup_warning"] = str(e)
 
             # Atomic write
             resolved_path = Path(path)
             if atomic:
-                result = await self._atomic_write(
-                    resolved_path, content, encoding
-                )
+                result = await self._atomic_write(resolved_path, content, encoding)
             else:
-                result = await self._direct_write(
-                    resolved_path, content, encoding
-                )
+                result = await self._direct_write(resolved_path, content, encoding)
 
             # Update operation tracking if operation_id provided
             if operation_id:
@@ -623,17 +591,13 @@ class FileSystemManager:
                 self.active_operations[operation_id]["success"] = True
 
             _content_bytes = (
-                content.encode(encoding)
-                if isinstance(content, str)
-                else content
+                content.encode(encoding) if isinstance(content, str) else content
             )
             return {
                 "success": True,
                 "operation_id": operation_id,
                 "path": str(path),
-                "backup_path": (
-                    str(backup_path) if backup_path else None
-                ),
+                "backup_path": (str(backup_path) if backup_path else None),
                 "bytes_written": len(_content_bytes),
                 "atomic": atomic,
                 "approved": approved,
@@ -667,9 +631,7 @@ class FileSystemManager:
         Used internally by read_before_write to avoid loops.
         """
         path = Path(path).resolve()
-        _hash = hashlib.md5(
-            str(path).encode()
-        ).hexdigest()[:8]
+        _hash = hashlib.md5(str(path).encode()).hexdigest()[:8]
         operation_id = f"direct_write_{_hash}"
 
         # Validate content is not None
@@ -927,8 +889,7 @@ class FileSystemManager:
         approved = await self._request_approval_if_needed(operation)
         if not approved:
             raise FileOperationError(
-                "File move operation denied by "
-                f"approval workflow: {src} → {dst}"
+                "File move operation denied by " f"approval workflow: {src} → {dst}"
             )
 
         # Copy first, then delete source
@@ -968,11 +929,7 @@ class FileSystemManager:
                 "created": datetime.fromtimestamp(stat_result.st_ctime),
                 "is_file": path.is_file(),
                 "is_dir": path.is_dir(),
-                "is_binary": (
-                    self._is_binary_file(path)
-                    if path.is_file()
-                    else False
-                ),
+                "is_binary": (self._is_binary_file(path) if path.is_file() else False),
                 "mime_type": mimetypes.guess_type(str(path))[0],
                 "permissions": oct(stat_result.st_mode)[-3:],
             }
@@ -981,9 +938,7 @@ class FileSystemManager:
             if (
                 path.is_file() and stat_result.st_size < 10 * 1024 * 1024
             ):  # Only for files < 10MB
-                raw_content = await self.read_file(
-                    path, binary=True
-                )
+                raw_content = await self.read_file(path, binary=True)
                 content_bytes = (
                     raw_content
                     if isinstance(raw_content, bytes)
@@ -1149,11 +1104,7 @@ class FileSystemManager:
         backup_path = operation.get("backup_path")
         original_path = operation.get("path")
 
-        if (
-            backup_path
-            and original_path
-            and await aiofiles.os.path.exists(backup_path)
-        ):
+        if backup_path and original_path and await aiofiles.os.path.exists(backup_path):
             try:
                 await self._copy_file(Path(backup_path), Path(original_path))
                 return True
@@ -1178,9 +1129,7 @@ class FileSystemManager:
             if not result["success"]:
                 raise FileOperationError("Not in a git repository")
         except Exception:
-            raise FileOperationError(
-                "Git not available or not in a git repository"
-            )
+            raise FileOperationError("Git not available or not in a git repository")
 
         # Add file to git
         try:
@@ -1241,9 +1190,7 @@ class FileSystemManager:
         async with aiofiles.open(path, "rb") as f:
             yield f
 
-    async def get_operation_status(
-        self, operation_id: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_operation_status(self, operation_id: str) -> Optional[Dict[str, Any]]:
         """Get status of a tracked operation."""
         return self.active_operations.get(operation_id)
 
@@ -1458,7 +1405,8 @@ class FileSystemManager:
 
                 rejection_reason = user_decision.get("reason", "User rejected changes")
                 rejection_error = UserRejectionError(
-                    str(path), rejection_reason,  # type: ignore[arg-type]
+                    str(path),
+                    rejection_reason,  # type: ignore[arg-type]
                 )
                 error_result = self.error_handler.handle_error(
                     rejection_error, retry_count, max_retries
@@ -1482,7 +1430,8 @@ class FileSystemManager:
             if user_decision.get("modified_content") is not None:
                 try:
                     self._validate_content(
-                        final_content, str(path),  # type: ignore[arg-type]
+                        final_content,  # type: ignore[arg-type]
+                        str(path),
                     )
                 except Exception as validation_error:
                     content_error = ContentValidationError(
@@ -1702,9 +1651,7 @@ class FileSystemManager:
         """Get the current working directory."""
         return Path.cwd()
 
-    async def is_git_repository(
-        self, path: Optional[Union[str, Path]] = None
-    ) -> bool:
+    async def is_git_repository(self, path: Optional[Union[str, Path]] = None) -> bool:
         """Check if path (or cwd) is a Git repository."""
 
         check_path = (
@@ -1850,9 +1797,7 @@ class FileSystemManager:
         except Exception as e:
             return OperationResult(success=False, error=str(e))
 
-    async def preview_operation(
-        self, operation: Operation
-    ) -> str:
+    async def preview_operation(self, operation: Operation) -> str:
         """Generate a preview of what the operation will do."""
         try:
             if operation.type == OperationType.FILE_READ:
@@ -1865,10 +1810,7 @@ class FileSystemManager:
                 content_preview = _content[:100]
                 if len(content_preview) < len(_content):
                     content_preview += "..."
-                return (
-                    f"{action} file: {path}\n"
-                    f"Content preview: {content_preview}"
-                )
+                return f"{action} file: {path}\n" f"Content preview: {content_preview}"
             elif operation.type == OperationType.FILE_DELETE:
                 return f"Delete file: {operation.data['path']}"
             else:

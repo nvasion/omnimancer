@@ -387,18 +387,9 @@ class IntegrationTestRunner:
             "::TestApprovalFlowEdgeCases"
         )
         critical_tests = [
-            (
-                f"{base}"
-                "::test_single_file_creation_approved"
-            ),
-            (
-                f"{base}"
-                "::test_batch_workflow_mixed_approvals"
-            ),
-            (
-                f"{edge}"
-                "::test_filesystem_permission_errors"
-            ),
+            (f"{base}" "::test_single_file_creation_approved"),
+            (f"{base}" "::test_batch_workflow_mixed_approvals"),
+            (f"{edge}" "::test_filesystem_permission_errors"),
         ]
 
         passed = 0

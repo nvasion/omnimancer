@@ -189,14 +189,9 @@ class CLIApprovalFormatter:
         risk_icon = self.risk_icons.get(approval_request.risk_level, "❓")
         risk_color = self.risk_colors.get(approval_request.risk_level, "white")
 
-        op_title = (
-            approval_request.operation_type
-            .replace("_", " ").title()
-        )
+        op_title = approval_request.operation_type.replace("_", " ").title()
         title = f"{icon} {op_title}"
-        risk_val = (
-            approval_request.risk_level.value.upper()
-        )
+        risk_val = approval_request.risk_level.value.upper()
         risk_text = Text(
             f"{risk_icon} Risk Level: {risk_val}",
             style=risk_color,
@@ -378,21 +373,13 @@ class CLIApprovalFormatter:
 
         # Risk description
         risk_descriptions = {
-            RiskLevel.LOW: (
-                "Low risk operation."
-                " Minimal security impact expected."
-            ),
+            RiskLevel.LOW: ("Low risk operation." " Minimal security impact expected."),
             RiskLevel.MEDIUM: (
-                "Medium risk operation."
-                " Review recommended before approval."
+                "Medium risk operation." " Review recommended before approval."
             ),
-            RiskLevel.HIGH: (
-                "High risk operation."
-                " Careful consideration required."
-            ),
+            RiskLevel.HIGH: ("High risk operation." " Careful consideration required."),
             RiskLevel.CRITICAL: (
-                "Critical risk operation."
-                " High security impact possible."
+                "Critical risk operation." " High security impact possible."
             ),
         }
 
@@ -483,11 +470,15 @@ class CLIApprovalFormatter:
         try:
             # Pretty print metadata as JSON
             metadata_json = json.dumps(
-                filtered_metadata, indent=2, default=str,
+                filtered_metadata,
+                indent=2,
+                default=str,
             )
             syntax = Syntax(
-                metadata_json, "json",
-                theme="monokai", line_numbers=False,
+                metadata_json,
+                "json",
+                theme="monokai",
+                line_numbers=False,
             )
         except Exception:
             # Fallback to simple text display
@@ -506,18 +497,12 @@ class CLIApprovalFormatter:
         time_content = []
 
         # Request time
-        request_time = (
-            approval_request.requested_at
-            .strftime("%Y-%m-%d %H:%M:%S")
-        )
+        request_time = approval_request.requested_at.strftime("%Y-%m-%d %H:%M:%S")
         time_content.append(Text(f"Requested: {request_time}", style="white"))
 
         # Expiration time
         if approval_request.expires_at:
-            expires_time = (
-                approval_request.expires_at
-                .strftime("%Y-%m-%d %H:%M:%S")
-            )
+            expires_time = approval_request.expires_at.strftime("%Y-%m-%d %H:%M:%S")
             time_remaining = approval_request.time_remaining()
 
             if time_remaining and time_remaining.total_seconds() > 0:

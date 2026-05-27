@@ -283,18 +283,14 @@ class ReadBeforeWriteErrorHandler:
             ReadBeforeWriteErrorType.FILE_READ_ERROR: (
                 RecoveryStrategy.FALLBACK_TO_REGULAR_WRITE
             ),
-            ReadBeforeWriteErrorType.FILE_WRITE_ERROR: (
-                RecoveryStrategy.RETRY
-            ),
+            ReadBeforeWriteErrorType.FILE_WRITE_ERROR: (RecoveryStrategy.RETRY),
             ReadBeforeWriteErrorType.USER_INTERFACE_ERROR: (
                 RecoveryStrategy.PROMPT_USER
             ),
             ReadBeforeWriteErrorType.PERMISSION_ERROR: (
                 RecoveryStrategy.ABORT_OPERATION
             ),
-            ReadBeforeWriteErrorType.ENCODING_ERROR: (
-                RecoveryStrategy.PROMPT_USER
-            ),
+            ReadBeforeWriteErrorType.ENCODING_ERROR: (RecoveryStrategy.PROMPT_USER),
             ReadBeforeWriteErrorType.CONTENT_VALIDATION_ERROR: (
                 RecoveryStrategy.PROMPT_USER
             ),
@@ -304,15 +300,9 @@ class ReadBeforeWriteErrorHandler:
             ReadBeforeWriteErrorType.DIFF_GENERATION_ERROR: (
                 RecoveryStrategy.LOG_AND_CONTINUE
             ),
-            ReadBeforeWriteErrorType.PREVIEW_ERROR: (
-                RecoveryStrategy.LOG_AND_CONTINUE
-            ),
-            ReadBeforeWriteErrorType.USER_REJECTION: (
-                RecoveryStrategy.SKIP_OPERATION
-            ),
-            ReadBeforeWriteErrorType.TIMEOUT_ERROR: (
-                RecoveryStrategy.PROMPT_USER
-            ),
+            ReadBeforeWriteErrorType.PREVIEW_ERROR: (RecoveryStrategy.LOG_AND_CONTINUE),
+            ReadBeforeWriteErrorType.USER_REJECTION: (RecoveryStrategy.SKIP_OPERATION),
+            ReadBeforeWriteErrorType.TIMEOUT_ERROR: (RecoveryStrategy.PROMPT_USER),
         }
 
     def handle_error(

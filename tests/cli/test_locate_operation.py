@@ -58,6 +58,7 @@ class TestLocateOperation:
         """Test locating a file with exact filename match."""
         # Change to temp directory
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -75,6 +76,7 @@ class TestLocateOperation:
     async def test_locate_case_insensitive(self, cli_interface, temp_dir):
         """Test locating a file with case-insensitive match."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -91,6 +93,7 @@ class TestLocateOperation:
     async def test_locate_with_spaces(self, cli_interface, temp_dir):
         """Test locating a file with spaces in the filename."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -107,6 +110,7 @@ class TestLocateOperation:
     async def test_locate_fuzzy_match_typo(self, cli_interface, temp_dir):
         """Test locating a file with typo using fuzzy matching."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -125,6 +129,7 @@ class TestLocateOperation:
     async def test_locate_nested_file(self, cli_interface, temp_dir):
         """Test locating a file in subdirectory."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -142,6 +147,7 @@ class TestLocateOperation:
     async def test_locate_file_not_found(self, cli_interface, temp_dir):
         """Test locating a non-existent file."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -159,6 +165,7 @@ class TestLocateOperation:
     async def test_locate_below_similarity_threshold(self, cli_interface, temp_dir):
         """Test that files below 70% similarity threshold are not matched."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -175,6 +182,7 @@ class TestLocateOperation:
     async def test_locate_multiple_operations(self, cli_interface, temp_dir):
         """Test multiple [LOCATE:] operations in one response."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -199,6 +207,7 @@ class TestLocateOperation:
     async def test_locate_with_other_operations(self, cli_interface, temp_dir):
         """Test [LOCATE:] mixed with other operation markers."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -222,6 +231,7 @@ class TestFuzzyFindFileMethod:
     def test_fuzzy_find_exact_match(self, cli_interface, temp_dir):
         """Test exact filename match."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -235,6 +245,7 @@ class TestFuzzyFindFileMethod:
     def test_fuzzy_find_case_insensitive(self, cli_interface, temp_dir):
         """Test case-insensitive matching."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -248,6 +259,7 @@ class TestFuzzyFindFileMethod:
     def test_fuzzy_find_similarity_matching(self, cli_interface, temp_dir):
         """Test fuzzy similarity matching."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -262,6 +274,7 @@ class TestFuzzyFindFileMethod:
     def test_fuzzy_find_not_found(self, cli_interface, temp_dir):
         """Test when no match is found."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -274,6 +287,7 @@ class TestFuzzyFindFileMethod:
     def test_fuzzy_find_nested_file(self, cli_interface, temp_dir):
         """Test finding files in subdirectories."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 
@@ -288,6 +302,7 @@ class TestFuzzyFindFileMethod:
     def test_fuzzy_find_threshold(self, cli_interface, temp_dir):
         """Test that similarity threshold (70%) is enforced."""
         import os
+
         original_cwd = os.getcwd()
         os.chdir(temp_dir)
 

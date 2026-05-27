@@ -405,9 +405,7 @@ class TestAzureProviderModelInfo:
         model_info = azure_provider_minimal.get_model_info()
 
         assert model_info.name == "gpt-35-turbo"
-        assert model_info.description == (
-            "GPT-3.5 Turbo via Azure OpenAI Service"
-        )
+        assert model_info.description == ("GPT-3.5 Turbo via Azure OpenAI Service")
         assert model_info.max_tokens == 4096
         assert model_info.cost_per_million_input == 0.5
         assert model_info.cost_per_million_output == 1.5
@@ -526,8 +524,7 @@ class TestAzureProviderResponseHandling:
         response = azure_provider._handle_response(mock_response)
 
         assert (
-            response.content
-            == "I can help you with a wide range of topics"
+            response.content == "I can help you with a wide range of topics"
             " including programming, writing,"
             " analysis, and more."
         )
@@ -585,9 +582,5 @@ class TestAzureProviderURLConstruction:
         # This test is no longer valid since azure_endpoint
         # is required during initialization. The provider will
         # raise ValueError during __init__ if endpoint is missing
-        with pytest.raises(
-            ValueError, match="azure_endpoint is required"
-        ):
-            AzureProvider(
-                api_key="test-key", model="gpt-4"
-            )
+        with pytest.raises(ValueError, match="azure_endpoint is required"):
+            AzureProvider(api_key="test-key", model="gpt-4")

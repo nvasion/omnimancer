@@ -7,6 +7,7 @@ with various AI providers (Claude, OpenAI, etc.) through a single interface.
 
 try:
     from importlib.metadata import version as _get_version
+
     __version__ = _get_version("omnimancer-cli")
 except Exception:
     with open("pyproject.toml", "r") as f:

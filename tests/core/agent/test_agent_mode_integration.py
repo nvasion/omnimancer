@@ -214,9 +214,7 @@ class TestCLIIntegration:
                 SlashCommand.AGENT, ["on"], "/agent on"
             )
             await cli_interface._handle_agent_command(command)
-            mock_manager.enable_agent_mode.assert_called_once_with(
-                auto_approve=False
-            )
+            mock_manager.enable_agent_mode.assert_called_once_with(auto_approve=False)
 
             # Test 'off' command
             mock_manager.mode.value = "on"

@@ -178,9 +178,7 @@ class BatchApprovalRequest:
 
     def is_expired(self) -> bool:
         """Check if the batch request has expired."""
-        return bool(
-            self.expires_at and datetime.now() > self.expires_at
-        )
+        return bool(self.expires_at and datetime.now() > self.expires_at)
 
     def get_approval_summary(self) -> Dict[str, Any]:
         """Get summary of approval status."""
@@ -365,8 +363,7 @@ class EnhancedApprovalManager:
             operations=operations,
             previews=previews,
             expires_at=(
-                datetime.now()
-                + timedelta(minutes=self.default_timeout_minutes)
+                datetime.now() + timedelta(minutes=self.default_timeout_minutes)
             ),
         )
 

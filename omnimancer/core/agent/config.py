@@ -405,13 +405,9 @@ class AgentConfig:
         if providers_data:
             for provider_id, provider_data in providers_data.items():
                 self.validator.validate_provider_config(provider_data)
-                provider_type = ProviderType(
-                    provider_data["provider_type"]
-                )
+                provider_type = ProviderType(provider_data["provider_type"])
                 filtered = {
-                    k: v
-                    for k, v in provider_data.items()
-                    if k != "provider_type"
+                    k: v for k, v in provider_data.items() if k != "provider_type"
                 }
                 self.providers[provider_id] = ProviderConfig(
                     provider_type=provider_type,
@@ -744,16 +740,10 @@ class AgentConfig:
 
         if "providers" in imported_data:
             for provider_id, provider_data in imported_data["providers"].items():
-                self.validator.validate_provider_config(
-                    provider_data
-                )
-                provider_type = ProviderType(
-                    provider_data["provider_type"]
-                )
+                self.validator.validate_provider_config(provider_data)
+                provider_type = ProviderType(provider_data["provider_type"])
                 filtered = {
-                    k: v
-                    for k, v in provider_data.items()
-                    if k != "provider_type"
+                    k: v for k, v in provider_data.items() if k != "provider_type"
                 }
                 self.providers[provider_id] = ProviderConfig(
                     provider_type=provider_type,

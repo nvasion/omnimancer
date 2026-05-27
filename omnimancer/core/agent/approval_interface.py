@@ -468,9 +468,7 @@ class ApprovalInterface:
 
         if risk_level:
             risk_color = self._get_risk_color(risk_level)
-            risk_text = self._colorize(
-                risk_level.value.upper(), risk_color
-            )
+            risk_text = self._colorize(risk_level.value.upper(), risk_color)
             print(f"Risk Level: {risk_text}")
 
         print(f"Reversible: {'Yes' if operation.reversible else 'No'}")

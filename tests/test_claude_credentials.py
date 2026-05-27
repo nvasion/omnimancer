@@ -362,9 +362,7 @@ class TestSubscription429Detection:
     def test_api_key_429_not_flagged(self):
         from omnimancer.providers.claude import ClaudeProvider
 
-        provider = ClaudeProvider(
-            api_key="sk-key", model="claude-sonnet-4-6"
-        )
+        provider = ClaudeProvider(api_key="sk-key", model="claude-sonnet-4-6")
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "type": "error",

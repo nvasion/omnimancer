@@ -91,9 +91,7 @@ class SecurityManager:
 
         try:
             # Step 1: Basic permission check
-            permission_allowed = (
-                self.permissions.validate_operation(operation)
-            )
+            permission_allowed = self.permissions.validate_operation(operation)
 
             if self.audit:
                 self.audit.log_permission_check(
@@ -106,9 +104,7 @@ class SecurityManager:
                 )
 
             if not permission_allowed:
-                reasons.append(
-                    "Permission denied by security policy"
-                )
+                reasons.append("Permission denied by security policy")
                 return result
 
             # Step 2: Risk assessment and approval workflow
@@ -121,32 +117,23 @@ class SecurityManager:
                 )
 
                 # Check if approval is required
-                if risk_level in [
-                    RiskLevel.HIGH, RiskLevel.CRITICAL
-                ]:
-                    approval_request = (
-                        await self.approval.request_approval(
-                            operation.operation_type,
-                            f"Operation: {operation.operation_type}",
-                            operation.metadata,
-                        )
+                if risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]:
+                    approval_request = await self.approval.request_approval(
+                        operation.operation_type,
+                        f"Operation: {operation.operation_type}",
+                        operation.metadata,
                     )
 
                     if approval_request.status == ApprovalStatus.PENDING:
                         result["approval_required"] = True
-                        result["approval_request_id"] = (
-                            approval_request.id
-                        )
+                        result["approval_request_id"] = approval_request.id
                         reasons.append(
                             "Approval required for"
                             f" {risk_level.value}"
                             " risk operation"
                         )
                         return result
-                    elif (
-                        approval_request.status
-                        != ApprovalStatus.APPROVED
-                    ):
+                    elif approval_request.status != ApprovalStatus.APPROVED:
                         reasons.append(
                             "Operation not approved:"
                             f" {approval_request.status.value}"
@@ -179,16 +166,12 @@ class SecurityManager:
                     operation_id=operation_id,
                     session_id=self.session_id,
                     metadata={
-                        "operation_type": (
-                            operation.operation_type
-                        ),
+                        "operation_type": (operation.operation_type),
                         "error": str(e),
                     },
                 )
 
-            reasons.append(
-                f"Security validation error: {str(e)}"
-            )
+            reasons.append(f"Security validation error: {str(e)}")
             return result
 
     async def execute_secure_command(
@@ -252,11 +235,8 @@ class SecurityManager:
 
             # Handle approval if required
             if validation_result.get("approval_required"):
-                req_id = validation_result['approval_request_id']
-                result["stderr"] = (
-                    f"Approval required. Request ID:"
-                    f" {req_id}"
-                )
+                req_id = validation_result["approval_request_id"]
+                result["stderr"] = f"Approval required. Request ID:" f" {req_id}"
                 return result
 
             # Execute command (with or without sandbox)
@@ -321,12 +301,8 @@ class SecurityManager:
                     ),
                     operation_id=operation_id,
                     session_id=self.session_id,
-                    sandbox_id=sec_info.get(
-                        "sandbox_dir"
-                    ),
-                    metadata={
-                        "validation_result": validation_result
-                    },
+                    sandbox_id=sec_info.get("sandbox_dir"),
+                    metadata={"validation_result": validation_result},
                 )
 
             return result
@@ -392,13 +368,8 @@ class SecurityManager:
 
             # Handle approval if required
             if validation_result.get("approval_required"):
-                req_id = validation_result[
-                    'approval_request_id'
-                ]
-                result["error"] = (
-                    f"Approval required."
-                    f" Request ID: {req_id}"
-                )
+                req_id = validation_result["approval_request_id"]
+                result["error"] = f"Approval required." f" Request ID: {req_id}"
                 return result
 
             # Perform file operation

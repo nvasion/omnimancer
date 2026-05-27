@@ -56,8 +56,7 @@ CODING_AGENT_TOOLS = [
     ToolDefinition(
         name="command_exec",
         description=(
-            "Execute a shell command and return its "
-            "stdout, stderr, and exit code."
+            "Execute a shell command and return its " "stdout, stderr, and exit code."
         ),
         parameters={
             "type": "object",
@@ -83,8 +82,7 @@ CODING_AGENT_TOOLS = [
                 "pattern": {
                     "type": "string",
                     "description": (
-                        "Glob pattern to match "
-                        "(e.g. '**/*.py', 'src/**/*.ts')"
+                        "Glob pattern to match " "(e.g. '**/*.py', 'src/**/*.ts')"
                     ),
                 },
                 "directory": {

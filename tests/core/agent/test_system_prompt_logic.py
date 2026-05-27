@@ -157,8 +157,12 @@ class TestSystemPromptLogic:
         interface.engine.current_provider = None
         interface.engine.send_message = AsyncMock()
         interface.engine.send_message.return_value = Mock(
-            is_success=True, content="Test response", model_used="test-model",
-            input_tokens=0, output_tokens=0, cost_estimate=0.0,
+            is_success=True,
+            content="Test response",
+            model_used="test-model",
+            input_tokens=0,
+            output_tokens=0,
+            cost_estimate=0.0,
         )
         interface._show_assistant_message = Mock()
         interface._show_user_message = Mock()

@@ -49,9 +49,7 @@ class ToolHandler:
             logger.error(f"Tool execution failed: {tool_call.name}: {e}")
             return ToolResult(content="", error=str(e))
 
-    async def execute_tool_calls(
-        self, tool_calls: List[ToolCall]
-    ) -> List[ToolResult]:
+    async def execute_tool_calls(self, tool_calls: List[ToolCall]) -> List[ToolResult]:
         results = []
         for tc in tool_calls:
             result = await self.execute_tool_call(tc)
@@ -142,9 +140,7 @@ class ToolHandler:
 
         return None
 
-    def _operation_result_to_tool_result(
-        self, result: OperationResult
-    ) -> ToolResult:
+    def _operation_result_to_tool_result(self, result: OperationResult) -> ToolResult:
         if result.success:
             content = (
                 result.data

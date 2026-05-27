@@ -104,8 +104,7 @@ class AgentLoopMixin:
 
             if not next_response.is_success:
                 self._show_error(
-                    "Workflow continuation failed:"
-                    f" {next_response.error}"
+                    "Workflow continuation failed:" f" {next_response.error}"
                 )
                 break
 
@@ -137,55 +136,90 @@ class AgentLoopMixin:
             return False
 
         action_verbs = [
-            "analyze", "check", "review", "examine",
-            "look at", "inspect",
-            "fix", "repair", "solve", "resolve",
-            "debug", "troubleshoot",
-            "create", "make", "build", "generate",
-            "write", "add",
-            "update", "modify", "change", "edit",
-            "improve", "optimize",
-            "delete", "remove", "clean", "cleanup",
+            "analyze",
+            "check",
+            "review",
+            "examine",
+            "look at",
+            "inspect",
+            "fix",
+            "repair",
+            "solve",
+            "resolve",
+            "debug",
+            "troubleshoot",
+            "create",
+            "make",
+            "build",
+            "generate",
+            "write",
+            "add",
+            "update",
+            "modify",
+            "change",
+            "edit",
+            "improve",
+            "optimize",
+            "delete",
+            "remove",
+            "clean",
+            "cleanup",
             "refactor",
-            "install", "setup", "configure", "deploy",
-            "run", "execute", "test", "validate", "verify",
-            "scan", "find", "search",
-            "help me", "can you", "could you",
-            "would you", "please",
-            "implement", "develop", "code",
-            "program", "script",
+            "install",
+            "setup",
+            "configure",
+            "deploy",
+            "run",
+            "execute",
+            "test",
+            "validate",
+            "verify",
+            "scan",
+            "find",
+            "search",
+            "help me",
+            "can you",
+            "could you",
+            "would you",
+            "please",
+            "implement",
+            "develop",
+            "code",
+            "program",
+            "script",
         ]
 
-        imperative_patterns = [
-            normalized.startswith(verb)
-            for verb in action_verbs
-        ]
-        contains_action_verb = any(
-            verb in normalized for verb in action_verbs
-        )
+        imperative_patterns = [normalized.startswith(verb) for verb in action_verbs]
+        contains_action_verb = any(verb in normalized for verb in action_verbs)
 
         question_patterns = [
-            "how do i", "how can i", "what should i",
-            "can you help", "could you help", "would you help", "please help",
+            "how do i",
+            "how can i",
+            "what should i",
+            "can you help",
+            "could you help",
+            "would you help",
+            "please help",
         ]
         contains_action_question = any(
             pattern in normalized for pattern in question_patterns
         )
 
         is_action = (
-            any(imperative_patterns)
-            or contains_action_verb
-            or contains_action_question
+            any(imperative_patterns) or contains_action_verb or contains_action_question
         )
 
         pure_question_starters = [
-            "what is", "what are", "who is", "who are",
-            "when is", "when was", "where is", "why",
+            "what is",
+            "what are",
+            "who is",
+            "who are",
+            "when is",
+            "when was",
+            "where is",
+            "why",
         ]
-        is_pure_question = any(
-            normalized.startswith(q)
-            for q in pure_question_starters
-        )
+        is_pure_question = any(normalized.startswith(q) for q in pure_question_starters)
 
         return is_action and not is_pure_question
 
@@ -246,10 +280,9 @@ class AgentLoopMixin:
                             f" '{filename}'"
                             f" ({len(content)} characters)"
                         )
-                        updated_response = (
-                            updated_response.replace(
-                                match.group(0), msg,
-                            )
+                        updated_response = updated_response.replace(
+                            match.group(0),
+                            msg,
                         )
                     else:
                         if result.was_cancelled:
@@ -272,20 +305,15 @@ class AgentLoopMixin:
                             f" '{filename}'"
                             f" ({len(content)} characters)"
                         )
-                        updated_response = (
-                            updated_response.replace(
-                                match.group(0), msg,
-                            )
+                        updated_response = updated_response.replace(
+                            match.group(0),
+                            msg,
                         )
                     except Exception as e:
-                        msg = (
-                            "❌ Failed to create file"
-                            f" '{filename}': {str(e)}"
-                        )
-                        updated_response = (
-                            updated_response.replace(
-                                match.group(0), msg,
-                            )
+                        msg = "❌ Failed to create file" f" '{filename}': {str(e)}"
+                        updated_response = updated_response.replace(
+                            match.group(0),
+                            msg,
                         )
 
             # FILE_READ
@@ -458,9 +486,23 @@ class AgentLoopMixin:
                 command = match.group(1).strip()
 
                 safe_commands = [
-                    "ls", "cat", "head", "tail", "grep", "find", "pwd",
-                    "whoami", "date", "echo", "wc", "sort", "uniq",
-                    "which", "type", "file", "stat",
+                    "ls",
+                    "cat",
+                    "head",
+                    "tail",
+                    "grep",
+                    "find",
+                    "pwd",
+                    "whoami",
+                    "date",
+                    "echo",
+                    "wc",
+                    "sort",
+                    "uniq",
+                    "which",
+                    "type",
+                    "file",
+                    "stat",
                 ]
                 cmd_base = command.split()[0] if command.split() else ""
 
@@ -547,11 +589,9 @@ class AgentLoopMixin:
                                 f" `{command}`\nReason:"
                                 f" {result.error}"
                             )
-                            updated_response = (
-                                updated_response.replace(
-                                    match.group(0),
-                                    deny_msg,
-                                )
+                            updated_response = updated_response.replace(
+                                match.group(0),
+                                deny_msg,
                             )
                         else:
                             output = (

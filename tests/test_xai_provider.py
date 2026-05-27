@@ -569,8 +569,7 @@ class TestXAIProviderModelInfo:
         assert model_info.name == "grok-beta"
         assert model_info.provider == "xai"
         assert model_info.description == (
-            "Grok Beta - Advanced reasoning"
-            " with real-time information"
+            "Grok Beta - Advanced reasoning" " with real-time information"
         )
         assert model_info.max_tokens == 131072
         assert model_info.cost_per_million_input == 5.0
@@ -588,8 +587,7 @@ class TestXAIProviderModelInfo:
 
         assert model_info.name == "grok-vision-beta"
         assert model_info.description == (
-            "Grok Vision Beta - Multimodal model"
-            " with image understanding"
+            "Grok Vision Beta - Multimodal model" " with image understanding"
         )
         assert model_info.max_tokens == 8192
         assert model_info.swe_score == 65.3

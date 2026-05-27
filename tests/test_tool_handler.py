@@ -179,8 +179,8 @@ class TestToolHandlerExecution:
 
     @pytest.mark.asyncio
     async def test_execute_tool_call_exception(self, tool_handler, mock_agent_engine):
-        mock_agent_engine.execute_with_approval.side_effect = (
-            RuntimeError("engine crash")
+        mock_agent_engine.execute_with_approval.side_effect = RuntimeError(
+            "engine crash"
         )
 
         tc = ToolCall(name="file_read", arguments={"path": "/a.py"})
@@ -195,8 +195,12 @@ class TestToolDefinitions:
     def test_all_tools_defined(self):
         tool_names = {t.name for t in CODING_AGENT_TOOLS}
         expected = {
-            "file_read", "file_write", "file_delete",
-            "command_exec", "find_files", "search_text",
+            "file_read",
+            "file_write",
+            "file_delete",
+            "command_exec",
+            "find_files",
+            "search_text",
             "web_request",
         }
         assert tool_names == expected
@@ -210,8 +214,7 @@ class TestToolDefinitions:
 
     def test_auto_approved_tools_match(self):
         auto_approved_from_defs = {
-            t.name for t in CODING_AGENT_TOOLS
-            if t.auto_approved
+            t.name for t in CODING_AGENT_TOOLS if t.auto_approved
         }
         assert auto_approved_from_defs == AUTO_APPROVED_TOOLS
 
@@ -225,6 +228,5 @@ class TestToolDefinitions:
     def test_all_tools_have_operation_mapping(self):
         for tool in CODING_AGENT_TOOLS:
             assert tool.name in TOOL_TO_OPERATION, (
-                f"No operation mapping for tool: "
-                f"{tool.name}"
+                f"No operation mapping for tool: " f"{tool.name}"
             )

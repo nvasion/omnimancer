@@ -56,8 +56,10 @@ except ImportError:
 
 
 class CommandLineInterface(
-    DisplayMixin, CompletionMixin,
-    AgentLoopMixin, CommandDispatchMixin,
+    DisplayMixin,
+    CompletionMixin,
+    AgentLoopMixin,
+    CommandDispatchMixin,
 ):
     """
     Interactive command-line interface for Omnimancer.
@@ -495,54 +497,38 @@ class CommandLineInterface(
     def _setup_file_interaction_integration(self) -> Any:
         """Set up file interaction integration."""
         try:
-            agent_engine = getattr(
-                self.engine, "agent_engine", None
-            )
+            agent_engine = getattr(self.engine, "agent_engine", None)
 
             if agent_engine and hasattr(
                 agent_engine,
                 "set_read_before_write_callback",
             ):
+
                 async def simple_review_callback(
                     review_data: Any,
                 ) -> Any:
                     """Show path and ask for confirm."""
-                    file_path = review_data.get(
-                        "file_path", "unknown"
-                    )
-                    operation = review_data.get(
-                        "operation", "modify"
-                    )
+                    file_path = review_data.get("file_path", "unknown")
+                    operation = review_data.get("operation", "modify")
                     self.console.print(
                         f"\n[yellow]Agent wants to"
                         f" {operation}: {file_path}"
                         f"[/yellow]"
                     )
-                    approved = Confirm.ask(
-                        "Approve?", default=True
-                    )
+                    approved = Confirm.ask("Approve?", default=True)
                     return {
                         "approved": approved,
                         "cancelled": not approved,
                     }
 
-                agent_engine.set_read_before_write_callback(
-                    simple_review_callback
-                )
-                logger.debug(
-                    "File interaction integration"
-                    " set up successfully"
-                )
+                agent_engine.set_read_before_write_callback(simple_review_callback)
+                logger.debug("File interaction integration" " set up successfully")
             else:
                 logger.debug(
-                    "No agent engine available for"
-                    " file interaction integration"
+                    "No agent engine available for" " file interaction integration"
                 )
         except Exception as e:
-            logger.error(
-                "Failed to set up file interaction"
-                f" integration: {e}"
-            )
+            logger.error("Failed to set up file interaction" f" integration: {e}")
 
     def _reset_terminal(self) -> None:
         """Reset terminal to ensure it's in normal mode."""
@@ -659,12 +645,9 @@ class CommandLineInterface(
 
             try:
                 agent_mode = (
-                    self.agent_manager
-                    and self.agent_manager.mode.value == "on"
+                    self.agent_manager and self.agent_manager.mode.value == "on"
                 )
-                use_native_tools = (
-                    agent_mode and self.engine.provider_supports_tools()
-                )
+                use_native_tools = agent_mode and self.engine.provider_supports_tools()
 
                 if agent_mode:
                     await self._complete_approval_integration_setup()
@@ -679,9 +662,7 @@ class CommandLineInterface(
 
                     provider = getattr(self.engine, "current_provider", None)
                     can_stream = (
-                        not agent_mode
-                        and provider
-                        and provider.supports_streaming()
+                        not agent_mode and provider and provider.supports_streaming()
                     )
 
                     if can_stream:
@@ -748,10 +729,7 @@ class CommandLineInterface(
         current_message = f"{agent_prompt}\n\nUser: {user_message}"
 
         provider = getattr(self.engine, "current_provider", None)
-        use_streaming = (
-            provider
-            and provider.supports_streaming()
-        )
+        use_streaming = provider and provider.supports_streaming()
 
         for iteration in range(MAX_TOOL_ITERATIONS):
             if use_streaming:
@@ -761,9 +739,7 @@ class CommandLineInterface(
                     current_message, tools
                 )
                 if response.content:
-                    self._show_assistant_message(
-                        response.content, response.model_used
-                    )
+                    self._show_assistant_message(response.content, response.model_used)
 
             if not response.is_success:
                 self._show_error(f"Failed to get response: {response.error}")
@@ -798,8 +774,7 @@ class CommandLineInterface(
             )
 
         self._show_warning(
-            "Reached maximum tool call iterations"
-            f" ({MAX_TOOL_ITERATIONS})."
+            "Reached maximum tool call iterations" f" ({MAX_TOOL_ITERATIONS})."
         )
 
     async def _stream_tool_response(self, message: str, tools: Any) -> "ChatResponse":
@@ -822,8 +797,7 @@ class CommandLineInterface(
 
         if final_response:
             final_response.tool_calls = (
-                display.tool_calls if display.tool_calls
-                else None
+                display.tool_calls if display.tool_calls else None
             )
             final_response.content = display.accumulated_text
             self.engine.chat_manager.add_user_message(message)
@@ -834,8 +808,10 @@ class CommandLineInterface(
             return final_response
 
         return ChatResponse(
-            content="", model_used="",
-            tokens_used=0, error="Stream failed",
+            content="",
+            model_used="",
+            tokens_used=0,
+            error="Stream failed",
         )
 
     async def _stream_chat_response(self, message: str) -> "ChatResponse":
@@ -864,8 +840,10 @@ class CommandLineInterface(
             return final_response
 
         return ChatResponse(
-            content="", model_used="",
-            tokens_used=0, error="Stream failed",
+            content="",
+            model_used="",
+            tokens_used=0,
+            error="Stream failed",
         )
 
     def _handle_keyboard_interrupt(self) -> None:
@@ -884,11 +862,15 @@ def main() -> None:
 
     @click.command()
     @click.option(
-        "--help", "-h", is_flag=True,
+        "--help",
+        "-h",
+        is_flag=True,
         help="Show this help message and exit",
     )
     @click.option(
-        "--version", "-v", is_flag=True,
+        "--version",
+        "-v",
+        is_flag=True,
         help="Show version information",
     )
     @click.option("--config", "-c", help="Path to configuration file")
@@ -898,17 +880,23 @@ def main() -> None:
         help="Skip approval prompts and auto-approve all operations",
     )
     @click.option(
-        "-p", "--prompt", type=str, default=None,
+        "-p",
+        "--prompt",
+        type=str,
+        default=None,
         help="Run in headless mode with the given prompt",
     )
     @click.option(
-        "--output-format", "output_format",
+        "--output-format",
+        "output_format",
         type=click.Choice(["text", "json", "stream-json"]),
         default="text",
         help="Output format for headless mode",
     )
     @click.option(
-        "--verbose", is_flag=True, default=False,
+        "--verbose",
+        is_flag=True,
+        default=False,
         help="Verbose output in headless mode",
     )
     @click.option(
@@ -918,19 +906,28 @@ def main() -> None:
         help="Auto-approve all tool operations (headless mode)",
     )
     @click.option(
-        "--provider", type=str, default=None,
+        "--provider",
+        type=str,
+        default=None,
         help="AI provider to use",
     )
     @click.option(
-        "--model", type=str, default=None,
+        "--model",
+        type=str,
+        default=None,
         help="Model to use",
     )
     def cli_main(
-        help: Any, version: Any, config: Any,
-        no_approval: Any, prompt: Any,
-        output_format: Any, verbose: Any,
+        help: Any,
+        version: Any,
+        config: Any,
+        no_approval: Any,
+        prompt: Any,
+        output_format: Any,
+        verbose: Any,
         dangerously_skip_permissions: Any,
-        provider: Any, model: Any,
+        provider: Any,
+        model: Any,
     ) -> None:
         """Omnimancer - A multi-model coding agent for the terminal."""
 
@@ -954,15 +951,17 @@ def main() -> None:
 
             from .headless import run_headless
 
-            exit_code = asyncio.run(run_headless(
-                prompt=full_prompt,
-                output_format=output_format,
-                config_path=config,
-                no_approval=no_approval or dangerously_skip_permissions,
-                verbose=verbose,
-                provider=provider,
-                model=model,
-            ))
+            exit_code = asyncio.run(
+                run_headless(
+                    prompt=full_prompt,
+                    output_format=output_format,
+                    config_path=config,
+                    no_approval=no_approval or dangerously_skip_permissions,
+                    verbose=verbose,
+                    provider=provider,
+                    model=model,
+                )
+            )
             sys.exit(exit_code)
 
         # Interactive REPL mode

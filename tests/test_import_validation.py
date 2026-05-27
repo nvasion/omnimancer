@@ -137,9 +137,7 @@ class TestModuleIntegrity:
         for module_name in modules_to_test:
             try:
                 module = importlib.import_module(module_name)
-                assert (
-                    module is not None
-                ), (
+                assert module is not None, (
                     f"Module {module_name} should import"
                     " without circular dependencies"
                 )

@@ -274,9 +274,7 @@ class TestStreamingRouting:
         mock_engine.send_message_with_tools.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_chat_uses_streaming_when_supported(
-        self, interface, mock_engine
-    ):
+    async def test_chat_uses_streaming_when_supported(self, interface, mock_engine):
         """Non-agent chat uses _stream_chat_response."""
         from omnimancer.cli.commands import Command, CommandType
 
@@ -308,15 +306,9 @@ class TestStreamingRouting:
             new_callable=AsyncMock,
             return_value=response,
         ) as mock_stream:
-            with patch.object(
-                interface, "_show_user_message"
-            ):
-                with patch.object(
-                    interface, "_show_token_status"
-                ):
-                    cancel_handler = (
-                        interface.cancellation_handler
-                    )
+            with patch.object(interface, "_show_user_message"):
+                with patch.object(interface, "_show_token_status"):
+                    cancel_handler = interface.cancellation_handler
                     with patch.object(
                         cancel_handler,
                         "start_cancellable_operation",
@@ -326,9 +318,7 @@ class TestStreamingRouting:
                             await kwargs["operation"]()
 
                         mock_cancel.side_effect = run_op
-                        await interface._handle_chat_message(
-                            command
-                        )
+                        await interface._handle_chat_message(command)
 
         mock_stream.assert_called_once_with("Hello")
 
@@ -355,18 +345,10 @@ class TestStreamingRouting:
             raw_input="Hello",
         )
 
-        with patch.object(
-            interface, "_show_user_message"
-        ):
-            with patch.object(
-                interface, "_show_assistant_message"
-            ) as mock_show:
-                with patch.object(
-                    interface, "_show_token_status"
-                ):
-                    cancel_handler = (
-                        interface.cancellation_handler
-                    )
+        with patch.object(interface, "_show_user_message"):
+            with patch.object(interface, "_show_assistant_message") as mock_show:
+                with patch.object(interface, "_show_token_status"):
+                    cancel_handler = interface.cancellation_handler
                     with patch.object(
                         cancel_handler,
                         "start_cancellable_operation",
@@ -376,9 +358,7 @@ class TestStreamingRouting:
                             await kwargs["operation"]()
 
                         mock_cancel.side_effect = run_op
-                        await interface._handle_chat_message(
-                            command
-                        )
+                        await interface._handle_chat_message(command)
 
         mock_engine.send_message.assert_called_once()
         mock_show.assert_called_once_with("Hi", "test-model")

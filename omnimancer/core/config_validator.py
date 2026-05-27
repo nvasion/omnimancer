@@ -474,22 +474,18 @@ class ConfigValidator:
         if config.base_url:
             if not config.base_url.startswith(("http://", "https://")):
                 errors.append(
-                    "Ollama base_url must start with"
-                    " 'http://' or 'https://'"
+                    "Ollama base_url must start with" " 'http://' or 'https://'"
                 )
 
         # Model validation is difficult for Ollama since models are dynamic
         # We'll just ensure it's not empty
         if not config.model:
-            errors.append(
-                "Ollama provider requires a model name"
-            )
+            errors.append("Ollama provider requires a model name")
 
         # Validate timeout for Ollama (can be slower)
         if config.timeout and config.timeout < 10:
             errors.append(
-                "Ollama timeout should be at least"
-                " 10 seconds for local inference"
+                "Ollama timeout should be at least" " 10 seconds for local inference"
             )
 
         return errors

@@ -240,9 +240,7 @@ class XAIProvider(BaseProvider):
             self.grok_mode, self.temperature
         )
 
-    def _convert_tools_to_xai_format(
-        self, tools: List[ToolDefinition]
-    ) -> List[Dict]:
+    def _convert_tools_to_xai_format(self, tools: List[ToolDefinition]) -> List[Dict]:
         """
         Convert tool definitions to xAI API format.
 
@@ -364,8 +362,7 @@ class XAIProvider(BaseProvider):
         model_configs = {
             "grok-beta": {
                 "description": (
-                    "Grok Beta - Advanced reasoning"
-                    " with real-time information"
+                    "Grok Beta - Advanced reasoning" " with real-time information"
                 ),
                 "max_tokens": 131072,
                 "cost_per_million_input": 5.0,
@@ -376,8 +373,7 @@ class XAIProvider(BaseProvider):
             },
             "grok-vision-beta": {
                 "description": (
-                    "Grok Vision Beta - Multimodal model"
-                    " with image understanding"
+                    "Grok Vision Beta - Multimodal model" " with image understanding"
                 ),
                 "max_tokens": 8192,
                 "cost_per_million_input": 5.0,
@@ -432,8 +428,7 @@ class XAIProvider(BaseProvider):
                 name="grok-beta",
                 provider="xai",
                 description=(
-                    "Grok Beta - Advanced reasoning"
-                    " with real-time information"
+                    "Grok Beta - Advanced reasoning" " with real-time information"
                 ),
                 max_tokens=131072,
                 cost_per_million_input=5.0,
@@ -451,8 +446,7 @@ class XAIProvider(BaseProvider):
                 name="grok-vision-beta",
                 provider="xai",
                 description=(
-                    "Grok Vision Beta - Multimodal model"
-                    " with image understanding"
+                    "Grok Vision Beta - Multimodal model" " with image understanding"
                 ),
                 max_tokens=8192,
                 cost_per_million_input=5.0,

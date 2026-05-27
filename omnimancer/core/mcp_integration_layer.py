@@ -106,10 +106,7 @@ class ToolMetrics:
 
         # Bonus for recent success
         recency_bonus = 0.0
-        if (
-            self.last_success_time
-            and time.time() - self.last_success_time < 300
-        ):
+        if self.last_success_time and time.time() - self.last_success_time < 300:
             recency_bonus = 0.1
 
         return max(0.0, min(1.0, base_score - failure_penalty + recency_bonus))
@@ -482,7 +479,8 @@ class EnhancedMCPIntegrator:
                 # Use timeout
                 result = await asyncio.wait_for(
                     self.mcp_manager.execute_tool(  # type: ignore[union-attr]
-                        tool_name, enhanced_args,
+                        tool_name,
+                        enhanced_args,
                     ),
                     timeout=context.timeout_seconds,
                 )
@@ -518,13 +516,9 @@ class EnhancedMCPIntegrator:
 
             except asyncio.TimeoutError:
                 timeout = context.timeout_seconds
-                last_error = (
-                    f"Tool execution timed out after"
-                    f" {timeout}s"
-                )
+                last_error = f"Tool execution timed out after" f" {timeout}s"
                 logger.warning(
-                    f"Tool {tool_name} timed out on"
-                    f" attempt {attempt + 1}"
+                    f"Tool {tool_name} timed out on" f" attempt {attempt + 1}"
                 )
 
             except Exception as e:
@@ -880,9 +874,7 @@ class EnhancedMCPIntegrator:
                 problematic_tools.append(tool_name)
 
         if problematic_tools:
-            health_status[
-                "problematic_tools"
-            ] = problematic_tools
+            health_status["problematic_tools"] = problematic_tools
             if (
                 len(problematic_tools) > len(self.discovered_tools) * 0.3
             ):  # More than 30% problematic

@@ -94,17 +94,11 @@ class DisplayMixin:
             border_style="blue",
         )
         self.console.print(welcome_panel)
-        self.console.print(
-            "Type /help for available commands"
-            " or start chatting!"
-        )
+        self.console.print("Type /help for available commands" " or start chatting!")
         self.console.print()
 
     def _show_goodbye(self) -> None:
-        self.console.print(
-            "\n[blue]Goodbye! Thanks for using"
-            " Omnimancer.[/blue]"
-        )
+        self.console.print("\n[blue]Goodbye! Thanks for using" " Omnimancer.[/blue]")
 
     def _show_help(self) -> None:
         help_text = """Available Commands:
@@ -178,23 +172,14 @@ Tips:
                 "  /help <command> - Show help for a"
                 " specific command"
             ),
-            "quit": (
-                "Exit Omnimancer.\n\nUsage: /quit\n"
-                "Aliases: Ctrl+D, /exit"
-            ),
-            "clear": (
-                "Clear the terminal screen.\n\n"
-                "Usage: /clear"
-            ),
+            "quit": ("Exit Omnimancer.\n\nUsage: /quit\n" "Aliases: Ctrl+D, /exit"),
+            "clear": ("Clear the terminal screen.\n\n" "Usage: /clear"),
             "status": (
                 "Show current session status.\n\n"
                 "Usage: /status\n\nShows: message count,"
                 " provider, model, session ID"
             ),
-            "providers": (
-                "List all AI providers with status.\n\n"
-                "Usage: /providers"
-            ),
+            "providers": ("List all AI providers with status.\n\n" "Usage: /providers"),
             "models": (
                 "List available models.\n\nUsage:"
                 " /models [filter_type] [filter_value]"
@@ -208,27 +193,15 @@ Tips:
                 "Examples:\n  /switch claude\n"
                 "  /switch openai gpt-4o"
             ),
-            "tools": (
-                "List available MCP tools.\n\n"
-                "Usage: /tools"
-            ),
+            "tools": ("List available MCP tools.\n\n" "Usage: /tools"),
             "mcp": (
                 "Manage MCP servers.\n\n"
                 "Usage: /mcp <action>\n"
                 "Actions: status, health, reload, list"
             ),
-            "save": (
-                "Save conversation.\n\n"
-                "Usage: /save [filename]"
-            ),
-            "load": (
-                "Load conversation.\n\n"
-                "Usage: /load <filename>"
-            ),
-            "list": (
-                "List saved conversations.\n\n"
-                "Usage: /list"
-            ),
+            "save": ("Save conversation.\n\n" "Usage: /save [filename]"),
+            "load": ("Load conversation.\n\n" "Usage: /load <filename>"),
+            "list": ("List saved conversations.\n\n" "Usage: /list"),
             "config": (
                 "Configuration management.\n\nUsage:\n"
                 "  /config\n"
@@ -240,10 +213,7 @@ Tips:
                 "Validate provider configurations.\n\n"
                 "Usage: /validate [provider] [--fix]"
             ),
-            "health": (
-                "Check provider health.\n\n"
-                "Usage: /health [provider]"
-            ),
+            "health": ("Check provider health.\n\n" "Usage: /health [provider]"),
             "agent": (
                 "Manage agent mode.\n\nUsage:\n"
                 "  /agent on    - Enable agent mode\n"

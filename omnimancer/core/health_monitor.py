@@ -122,9 +122,9 @@ class HealthMonitor:
             elif credentials_valid:
                 status = "warning"
                 message = (
-                    f'Provider accessible but model'
+                    f"Provider accessible but model"
                     f' "{config.model}" may not be'
-                    f' available'
+                    f" available"
                 )
             else:
                 status = "error"
@@ -411,7 +411,9 @@ class HealthMonitor:
         return health_status
 
     async def check_all_providers(
-        self, config: Any, force: bool = False,
+        self,
+        config: Any,
+        force: bool = False,
     ) -> "HealthResult":
         """
         Check health status for all providers in a config object.

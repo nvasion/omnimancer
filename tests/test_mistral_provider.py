@@ -589,8 +589,7 @@ class TestMistralProviderModelInfo:
         assert model_info.name == "mistral-large-latest"
         assert model_info.provider == "mistral"
         assert model_info.description == (
-            "Mistral Large - Most capable model"
-            " for complex tasks"
+            "Mistral Large - Most capable model" " for complex tasks"
         )
         assert model_info.max_tokens == 128000
         assert model_info.cost_per_million_input == 2.0
@@ -608,8 +607,7 @@ class TestMistralProviderModelInfo:
 
         assert model_info.name == "codestral-latest"
         assert model_info.description == (
-            "Codestral - Specialized for code"
-            " generation and analysis"
+            "Codestral - Specialized for code" " generation and analysis"
         )
         assert model_info.swe_score == 78.2  # Higher SWE score for code model
         assert model_info.supports_tools is True
@@ -620,9 +618,7 @@ class TestMistralProviderModelInfo:
         model_info = provider.get_model_info()
 
         assert model_info.name == "mistral-tiny"
-        assert model_info.description == (
-            "Mistral Tiny - Ultra-fast for simple tasks"
-        )
+        assert model_info.description == ("Mistral Tiny - Ultra-fast for simple tasks")
         assert model_info.swe_score == 35.1
         assert model_info.supports_tools is False  # Tiny doesn't support tools
 

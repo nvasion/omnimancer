@@ -131,9 +131,7 @@ def integrated_system(temp_workspace, mock_providers):
     provider_factory.create_provider.side_effect = (
         lambda name, **kwargs: mock_providers.get(name)
     )
-    provider_factory.get_available_providers.return_value = (
-        list(mock_providers.keys())
-    )
+    provider_factory.get_available_providers.return_value = list(mock_providers.keys())
 
     # Register mock providers
     for name, provider_class in mock_providers.items():

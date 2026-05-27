@@ -68,9 +68,7 @@ class TestWorkflowExecutionIntegration:
         return cli
 
     @pytest.mark.asyncio
-    async def test_simple_chat_message(
-        self, temp_workspace, cli_with_mocked_engine
-    ):
+    async def test_simple_chat_message(self, temp_workspace, cli_with_mocked_engine):
         """Test a simple chat message without agent mode."""
         cli = cli_with_mocked_engine
 
@@ -124,8 +122,7 @@ class TestWorkflowExecutionIntegration:
             response.model_used = "test-model"
             # Response with no operation markers - workflow should exit on first check
             response.content = (
-                "The workspace has been analyzed successfully."
-                " Task is complete."
+                "The workspace has been analyzed successfully." " Task is complete."
             )
             return response
 
@@ -138,9 +135,7 @@ class TestWorkflowExecutionIntegration:
         assert len(parse_calls) > 0, "Operation parsing was not called"
 
     @pytest.mark.asyncio
-    async def test_error_handling(
-        self, temp_workspace, cli_with_mocked_engine
-    ):
+    async def test_error_handling(self, temp_workspace, cli_with_mocked_engine):
         """Test workflow behavior when engine returns error."""
         cli = cli_with_mocked_engine
 

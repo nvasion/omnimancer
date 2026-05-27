@@ -228,9 +228,7 @@ class ProviderInitializer:
         }
         if auth_type_override:
             kwargs["auth_type"] = auth_type_override
-        instance = provider_class(
-            api_key=api_key or "", model=config.model, **kwargs
-        )
+        instance = provider_class(api_key=api_key or "", model=config.model, **kwargs)
 
         return instance
 

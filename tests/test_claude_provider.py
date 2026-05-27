@@ -329,33 +329,23 @@ class TestClaudeProviderToolCalling:
         self, claude_provider, mock_tool_use_response
     ):
         content_blocks = mock_tool_use_response["content"]
-        text, tool_calls = (
-            claude_provider._parse_response_content(content_blocks)
-        )
+        text, tool_calls = claude_provider._parse_response_content(content_blocks)
 
         assert text == "I'll read that file for you."
         assert len(tool_calls) == 1
         assert tool_calls[0].name == "file_read"
         assert tool_calls[0].arguments == {"path": "/src/main.py"}
 
-    def test_parse_text_only_response(
-        self, claude_provider, mock_text_only_response
-    ):
+    def test_parse_text_only_response(self, claude_provider, mock_text_only_response):
         content_blocks = mock_text_only_response["content"]
-        text, tool_calls = (
-            claude_provider._parse_response_content(content_blocks)
-        )
+        text, tool_calls = claude_provider._parse_response_content(content_blocks)
 
         assert text == "Here's what I found."
         assert len(tool_calls) == 0
 
-    def test_parse_multiple_tool_calls(
-        self, claude_provider, mock_multi_tool_response
-    ):
+    def test_parse_multiple_tool_calls(self, claude_provider, mock_multi_tool_response):
         content_blocks = mock_multi_tool_response["content"]
-        text, tool_calls = (
-            claude_provider._parse_response_content(content_blocks)
-        )
+        text, tool_calls = claude_provider._parse_response_content(content_blocks)
 
         assert text == "Let me read the file and run the tests."
         assert len(tool_calls) == 2
@@ -436,27 +426,27 @@ class TestClaudeProviderStreaming:
             '"usage":{"output_tokens":10}}'
         )
         sse_lines = [
-            'event: message_start',
-            f'data: {msg_start_data}',
-            '',
-            'event: content_block_start',
-            f'data: {cb_start_data}',
-            '',
-            'event: content_block_delta',
-            f'data: {cb_delta1}',
-            '',
-            'event: content_block_delta',
-            f'data: {cb_delta2}',
-            '',
-            'event: content_block_stop',
+            "event: message_start",
+            f"data: {msg_start_data}",
+            "",
+            "event: content_block_start",
+            f"data: {cb_start_data}",
+            "",
+            "event: content_block_delta",
+            f"data: {cb_delta1}",
+            "",
+            "event: content_block_delta",
+            f"data: {cb_delta2}",
+            "",
+            "event: content_block_stop",
             'data: {"type":"content_block_stop","index":0}',
-            '',
-            'event: message_delta',
-            f'data: {msg_delta_data}',
-            '',
-            'event: message_stop',
+            "",
+            "event: message_delta",
+            f"data: {msg_delta_data}",
+            "",
+            "event: message_stop",
             'data: {"type":"message_stop"}',
-            '',
+            "",
         ]
 
         mock_response = AsyncMock()
@@ -481,9 +471,7 @@ class TestClaudeProviderStreaming:
             mock_client_cls.return_value = mock_client
 
             events = []
-            stream = streaming_provider.send_message_stream(
-                "Hello", sample_context
-            )
+            stream = streaming_provider.send_message_stream("Hello", sample_context)
             async for event in stream:
                 events.append(event)
 
@@ -549,36 +537,36 @@ class TestClaudeProviderStreaming:
             '"usage":{"output_tokens":30}}'
         )
         sse_lines = [
-            'event: message_start',
-            f'data: {msg_start}',
-            '',
-            'event: content_block_start',
-            f'data: {cb_start_text}',
-            '',
-            'event: content_block_delta',
-            f'data: {cb_delta_text}',
-            '',
-            'event: content_block_stop',
+            "event: message_start",
+            f"data: {msg_start}",
+            "",
+            "event: content_block_start",
+            f"data: {cb_start_text}",
+            "",
+            "event: content_block_delta",
+            f"data: {cb_delta_text}",
+            "",
+            "event: content_block_stop",
             'data: {"type":"content_block_stop","index":0}',
-            '',
-            'event: content_block_start',
-            f'data: {cb_start_tool}',
-            '',
-            'event: content_block_delta',
-            f'data: {cb_delta_json1}',
-            '',
-            'event: content_block_delta',
-            f'data: {cb_delta_json2}',
-            '',
-            'event: content_block_stop',
+            "",
+            "event: content_block_start",
+            f"data: {cb_start_tool}",
+            "",
+            "event: content_block_delta",
+            f"data: {cb_delta_json1}",
+            "",
+            "event: content_block_delta",
+            f"data: {cb_delta_json2}",
+            "",
+            "event: content_block_stop",
             'data: {"type":"content_block_stop","index":1}',
-            '',
-            'event: message_delta',
-            f'data: {msg_delta}',
-            '',
-            'event: message_stop',
+            "",
+            "event: message_delta",
+            f"data: {msg_delta}",
+            "",
+            "event: message_stop",
             'data: {"type":"message_stop"}',
-            '',
+            "",
         ]
 
         mock_response = AsyncMock()
@@ -635,13 +623,7 @@ class TestClaudeProviderStreaming:
             )
             mock_client_cls.return_value = mock_client
 
-            with pytest.raises(
-                NetworkError, match="timed out"
-            ):
-                stream = (
-                    streaming_provider.send_message_stream(
-                        "hi", sample_context
-                    )
-                )
+            with pytest.raises(NetworkError, match="timed out"):
+                stream = streaming_provider.send_message_stream("hi", sample_context)
                 async for _ in stream:
                     pass

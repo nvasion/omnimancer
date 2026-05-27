@@ -298,10 +298,7 @@ class OllamaProvider(BaseProvider):
                 error_data = response.json()
                 error_msg = error_data.get("error", "Bad request")
 
-                if (
-                    "model" in error_msg.lower()
-                    and "not found" in error_msg.lower()
-                ):
+                if "model" in error_msg.lower() and "not found" in error_msg.lower():
                     raise ModelNotFoundError(
                         f"Model '{self.model}' not found."
                         f" Use 'ollama pull {self.model}'"
@@ -310,8 +307,7 @@ class OllamaProvider(BaseProvider):
                         model_name=self.model,
                     )
                 elif (
-                    "invalid" in error_msg.lower()
-                    and "parameter" in error_msg.lower()
+                    "invalid" in error_msg.lower() and "parameter" in error_msg.lower()
                 ):
                     raise ProviderConfigurationError(
                         f"Invalid parameter: {error_msg}",
@@ -354,20 +350,14 @@ class OllamaProvider(BaseProvider):
                 error_data = response.json()
                 error_msg = error_data.get("error", "Internal server error")
 
-                if (
-                    "out of memory" in error_msg.lower()
-                    or "oom" in error_msg.lower()
-                ):
+                if "out of memory" in error_msg.lower() or "oom" in error_msg.lower():
                     raise ProviderError(
                         "Ollama server out of memory. "
                         "Try using a smaller model or "
                         "restart Ollama.",
                         provider="ollama",
                     )
-                elif (
-                    "model" in error_msg.lower()
-                    and "loading" in error_msg.lower()
-                ):
+                elif "model" in error_msg.lower() and "loading" in error_msg.lower():
                     raise ProviderError(
                         f"Model '{self.model}' failed to "
                         "load. Check if model is "

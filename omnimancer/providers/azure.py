@@ -270,9 +270,7 @@ class AzureProvider(BaseProvider):
 
         return messages
 
-    def _convert_tools_to_azure_format(
-        self, tools: List[ToolDefinition]
-    ) -> List[Dict]:
+    def _convert_tools_to_azure_format(self, tools: List[ToolDefinition]) -> List[Dict]:
         """
         Convert tool definitions to Azure OpenAI API format.
 
