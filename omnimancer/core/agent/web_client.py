@@ -201,7 +201,7 @@ class ResponseCache:
                     # Load into memory cache
                     self.memory_cache[cache_key] = entry
                     entry.response.from_cache = True
-                    return entry.response
+                    return entry.response  # type: ignore[no-any-return]
                 else:
                     # Remove expired cache
                     cache_path.unlink()

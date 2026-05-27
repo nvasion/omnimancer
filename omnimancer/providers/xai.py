@@ -236,7 +236,9 @@ class XAIProvider(BaseProvider):
             Temperature value for the current mode
         """
         mode_temperatures = {"precise": 0.1, "balanced": 0.7, "creative": 1.0}
-        return mode_temperatures.get(self.grok_mode, self.temperature)
+        return mode_temperatures.get(  # type: ignore[no-any-return]
+            self.grok_mode, self.temperature
+        )
 
     def _convert_tools_to_xai_format(
         self, tools: List[ToolDefinition]

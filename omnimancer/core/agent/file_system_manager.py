@@ -421,10 +421,10 @@ class FileSystemManager:
             # Regular file read
             if binary or self._is_binary_file(path):
                 async with aiofiles.open(path, "rb") as f:
-                    return await f.read()
+                    return await f.read()  # type: ignore[no-any-return]
             else:
                 async with aiofiles.open(path, "r", encoding=encoding) as f:
-                    return await f.read()
+                    return await f.read()  # type: ignore[no-any-return]
 
         except Exception as e:
             raise FileOperationError(f"Failed to read file {path}: {str(e)}")
