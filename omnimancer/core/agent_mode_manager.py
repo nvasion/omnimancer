@@ -83,7 +83,7 @@ class AgentModeManager:
     - Persistent state management
     """
 
-    def __init__(self, config_manager, storage_path: str = "~/.omnimancer"):
+    def __init__(self, config_manager: Any, storage_path: str = "~/.omnimancer") -> None:
         """
         Initialize the agent mode manager.
 
@@ -212,7 +212,7 @@ class AgentModeManager:
             logger.error(f"Failed to disable agent mode: {e}")
             return False
 
-    async def _start_execution_loop_when_ready(self):
+    async def _start_execution_loop_when_ready(self) -> None:
         """Start execution loop when event loop is ready."""
         try:
             # Wait a bit for initialization to complete
@@ -418,24 +418,24 @@ class AgentModeManager:
 
         return history
 
-    def add_operation_callback(self, callback: Callable[[AgentOperation], None]):
+    def add_operation_callback(self, callback: Callable[[AgentOperation], None]) -> None:
         """Add callback for operation state changes."""
         self.operation_callbacks.append(callback)
 
     def add_mode_change_callback(
         self, callback: Callable[[AgentMode, AgentMode], None]
-    ):
+    ) -> None:
         """Add callback for mode changes."""
         self.mode_change_callbacks.append(callback)
 
-    def update_settings(self, **kwargs):
+    def update_settings(self, **kwargs: Any) -> None:
         """Update agent mode settings."""
         for key, value in kwargs.items():
             if hasattr(self.settings, key):
                 setattr(self.settings, key, value)
         self._save_state()
 
-    async def _execution_loop(self):
+    async def _execution_loop(self) -> None:
         """Main execution loop for processing operations."""
         logger.info("Agent execution loop started")
 
@@ -459,7 +459,7 @@ class AgentModeManager:
         finally:
             logger.info("Agent execution loop stopped")
 
-    async def _process_operations(self):
+    async def _process_operations(self) -> None:
         """Process queued operations."""
         # Remove completed active operations
         completed_ids = []
@@ -496,7 +496,7 @@ class AgentModeManager:
                     op.status = AgentOperationStatus.FAILED
                     op.error = str(e)
 
-    async def _start_operation(self, agent_operation: AgentOperation):
+    async def _start_operation(self, agent_operation: AgentOperation) -> None:
         """Start executing an operation."""
         operation = agent_operation.operation
 
@@ -523,7 +523,7 @@ class AgentModeManager:
         # Execute operation asynchronously
         asyncio.create_task(self._execute_operation(agent_operation))
 
-    async def _execute_operation(self, agent_operation: AgentOperation):
+    async def _execute_operation(self, agent_operation: AgentOperation) -> None:
         """Execute an operation."""
         try:
             # This would be replaced with actual operation execution
@@ -533,7 +533,7 @@ class AgentModeManager:
             # Simulate success
             agent_operation.status = AgentOperationStatus.COMPLETED
             agent_operation.completed_at = datetime.now()
-            agent_operation.result = OperationResult(
+            agent_operation.result = OperationResult(  # type: ignore[call-arg]
                 success=True,
                 data={"message": "Operation completed successfully"},
                 metadata={},
@@ -593,7 +593,7 @@ class AgentModeManager:
                 await self.approval_interface.handle_single_approval(approval_data)
             )
             # Store was_cancelled info in operation metadata for result handling
-            agent_operation.data["was_cancelled"] = was_cancelled
+            agent_operation.data["was_cancelled"] = was_cancelled  # type: ignore[attr-defined]
             return approved
         except Exception as e:
             logger.error(
@@ -621,12 +621,12 @@ class AgentModeManager:
 
         return False
 
-    async def _wait_for_operations(self):
+    async def _wait_for_operations(self) -> None:
         """Wait for all active operations to complete."""
         while self.active_operations:
             await asyncio.sleep(0.5)
 
-    def _cancel_active_operations(self):
+    def _cancel_active_operations(self) -> None:
         """Cancel all active operations."""
         for op in self.active_operations.values():
             op.status = AgentOperationStatus.CANCELLED
@@ -635,7 +635,7 @@ class AgentModeManager:
 
         self.active_operations.clear()
 
-    def _notify_operation_change(self, operation: AgentOperation):
+    def _notify_operation_change(self, operation: AgentOperation) -> None:
         """Notify callbacks of operation state change."""
         for callback in self.operation_callbacks:
             try:
@@ -643,7 +643,7 @@ class AgentModeManager:
             except Exception as e:
                 logger.error(f"Error in operation callback: {e}")
 
-    def _notify_mode_change(self, old_mode: AgentMode, new_mode: AgentMode):
+    def _notify_mode_change(self, old_mode: AgentMode, new_mode: AgentMode) -> None:
         """Notify callbacks of mode change."""
         for callback in self.mode_change_callbacks:
             try:
@@ -651,7 +651,7 @@ class AgentModeManager:
             except Exception as e:
                 logger.error(f"Error in mode change callback: {e}")
 
-    def _save_state(self):
+    def _save_state(self) -> None:
         """Save persistent state to disk."""
         if not self.settings.persist_state:
             return
@@ -682,7 +682,7 @@ class AgentModeManager:
         except Exception as e:
             logger.error(f"Failed to save agent state: {e}")
 
-    def _load_state(self):
+    def _load_state(self) -> None:
         """Load persistent state from disk."""
         try:
             if not self.state_file.exists():

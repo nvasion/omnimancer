@@ -7,11 +7,12 @@ to ensure consistent behavior across different AI services.
 
 import json
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Dict, List
+from typing import Any, AsyncIterator, Dict, List, Union
 
 from ..core.models import (
     ChatContext,
     ChatResponse,
+    EnhancedModelInfo,
     ModelInfo,
     StreamEvent,
     StreamEventType,
@@ -27,7 +28,7 @@ class BaseProvider(ABC):
     the required abstract methods to ensure consistent behavior.
     """
 
-    def __init__(self, api_key: str, model: str, **kwargs):
+    def __init__(self, api_key: str, model: str, **kwargs: Any) -> None:
         """
         Initialize the provider.
 
@@ -70,7 +71,7 @@ class BaseProvider(ABC):
         pass
 
     @abstractmethod
-    def get_model_info(self) -> ModelInfo:
+    def get_model_info(self) -> Union[ModelInfo, EnhancedModelInfo]:
         """
         Get information about the current model.
 
@@ -79,7 +80,7 @@ class BaseProvider(ABC):
         """
         pass
 
-    def get_available_models(self) -> List[ModelInfo]:
+    def get_available_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get list of available models for this provider.
         Uses catalog models if available, otherwise returns static models.
@@ -101,7 +102,7 @@ class BaseProvider(ABC):
         # Otherwise, use the provider's static models
         return self._get_static_models()
 
-    def _get_static_models(self) -> List[ModelInfo]:
+    def _get_static_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get static list of models (when catalog is not available).
         Subclasses should override this to return their default models.
@@ -113,7 +114,7 @@ class BaseProvider(ABC):
         # Subclasses should override this method
         return []
 
-    async def fetch_live_models(self) -> List[ModelInfo]:
+    async def fetch_live_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Fetch live model list from provider API.
 
@@ -278,7 +279,7 @@ class BaseProvider(ABC):
             Estimated cost in USD
         """
         model_info = self.get_model_info()
-        return (input_tokens + output_tokens) * model_info.cost_per_token
+        return (input_tokens + output_tokens) * model_info.cost_per_token  # type: ignore[union-attr]
 
     def prepare_context(self, context: ChatContext) -> List[Dict[str, str]]:
         """

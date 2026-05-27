@@ -98,7 +98,7 @@ class CLIApprovalFormatter:
         components.append(self._format_header(approval_request, preview))
 
         # Separator
-        components.append(Rule(style="dim"))
+        components.append(Rule(style="dim"))  # type: ignore[arg-type]
 
         # Operation details
         components.append(
@@ -119,7 +119,7 @@ class CLIApprovalFormatter:
         # Removed: Time information panel (not critical for approval decision)
 
         # Separator before options
-        components.append(Rule(style="dim"))
+        components.append(Rule(style="dim"))  # type: ignore[arg-type]
 
         # Available options
         components.append(self._format_approval_options())
@@ -142,13 +142,13 @@ class CLIApprovalFormatter:
 
         # Batch header
         components.append(self._format_batch_header(batch_request))
-        components.append(Rule(style="dim"))
+        components.append(Rule(style="dim"))  # type: ignore[arg-type]
 
         # Summary table
         components.append(self._format_batch_summary(batch_request))
 
         # Individual operations
-        components.append(Text("Operations:", style="bold"))
+        components.append(Text("Operations:", style="bold"))  # type: ignore[arg-type]
         for i, (operation, preview) in enumerate(
             zip(batch_request.operations, batch_request.previews)
         ):
@@ -167,7 +167,7 @@ class CLIApprovalFormatter:
             components.append(operation_panel)
 
         # Batch approval options
-        components.append(Rule(style="dim"))
+        components.append(Rule(style="dim"))  # type: ignore[arg-type]
         components.append(
             self._format_batch_approval_options(len(batch_request.operations))
         )
@@ -287,7 +287,7 @@ class CLIApprovalFormatter:
             item_count = preview.metadata.get("item_count", 0)
             attrs_table.add_row("Items Inside", str(item_count))
 
-        preview_content.append(attrs_table)
+        preview_content.append(attrs_table)  # type: ignore[arg-type]
 
         return Panel(
             Group(*preview_content),
@@ -333,7 +333,7 @@ class CLIApprovalFormatter:
             )
         except Exception:
             # Fallback to plain text if syntax highlighting fails
-            syntax = Text(diff_text, style="white")
+            syntax = Text(diff_text, style="white")  # type: ignore[assignment]
 
         return Panel(
             syntax,
@@ -465,7 +465,7 @@ class CLIApprovalFormatter:
         except Exception:
             # Fallback to simple text display
             lines = [f"{k}: {v}" for k, v in filtered_metadata.items()]
-            syntax = Text("\n".join(lines), style="white")
+            syntax = Text("\n".join(lines), style="white")  # type: ignore[assignment]
 
         return Panel(
             syntax,

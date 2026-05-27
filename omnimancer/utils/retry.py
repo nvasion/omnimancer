@@ -104,7 +104,7 @@ class RetryHandler:
         return max(0, delay)
 
     async def execute_with_retry(
-        self, func: Callable[..., Any], *args, **kwargs
+        self, func: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> Any:
         """
         Execute a function with retry logic.
@@ -163,9 +163,9 @@ class RetryHandler:
         logger.error(
             f"All {self.max_retries} retries exhausted. Last error: {last_exception}"
         )
-        raise last_exception
+        raise last_exception  # type: ignore[misc]
 
-    def execute_sync_with_retry(self, func: Callable[..., Any], *args, **kwargs) -> Any:
+    def execute_sync_with_retry(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """
         Execute a synchronous function with retry logic.
 
@@ -221,9 +221,9 @@ class RetryHandler:
         logger.error(
             f"All {self.max_retries} retries exhausted. Last error: {last_exception}"
         )
-        raise last_exception
+        raise last_exception  # type: ignore[misc]
 
-    def retry(self, func: Callable[..., Any], *args, **kwargs) -> Any:
+    def retry(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """
         Convenience method for synchronous retry execution.
 

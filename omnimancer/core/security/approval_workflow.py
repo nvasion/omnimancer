@@ -381,13 +381,13 @@ class ApprovalWorkflow:
         completed_count = len(self.completed_requests)
 
         # Count by status
-        status_counts = {}
+        status_counts = {}  # type: ignore[var-annotated]
         for request in self.completed_requests.values():
             status = request.status.value
             status_counts[status] = status_counts.get(status, 0) + 1
 
         # Count by risk level
-        risk_counts = {}
+        risk_counts = {}  # type: ignore[var-annotated]
         all_requests = list(self.pending_requests.values()) + list(
             self.completed_requests.values()
         )

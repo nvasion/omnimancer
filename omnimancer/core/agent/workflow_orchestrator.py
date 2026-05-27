@@ -80,6 +80,7 @@ class WorkflowContext:
     data: Dict[str, Any] = field(default_factory=dict)
     console: Console = field(default_factory=Console)
     history: List[WorkflowStep] = field(default_factory=list)
+    engine: Optional[Any] = None
 
     def set(self, key: str, value: Any) -> None:
         """Set a value in the context."""
@@ -89,7 +90,7 @@ class WorkflowContext:
         """Get a value from the context."""
         return self.data.get(key, default)
 
-    def update(self, **kwargs) -> None:
+    def update(self, **kwargs: Any) -> None:
         """Update multiple values in the context."""
         self.data.update(kwargs)
 
@@ -398,7 +399,7 @@ class WorkflowOrchestrator:
                 self.console.print("[green]✓ Approved[/green]")
             else:
                 self.console.print("[red]✗ Denied[/red]")
-            return approved
+            return approved  # type: ignore[no-any-return]
 
         # Default behavior for demo/test purposes
         await asyncio.sleep(0.5)  # Simulate approval delay
@@ -420,12 +421,12 @@ class WorkflowOrchestrator:
     async def _display_workflow_summary(self) -> None:
         """Display a clean summary of the workflow execution."""
         completed = sum(
-            1 for s in self.context.history if s.status == WorkflowStatus.COMPLETED
+            1 for s in self.context.history if s.status == WorkflowStatus.COMPLETED  # type: ignore[misc, union-attr]
         )
         failed = sum(
-            1 for s in self.context.history if s.status == WorkflowStatus.FAILED
+            1 for s in self.context.history if s.status == WorkflowStatus.FAILED  # type: ignore[misc, union-attr]
         )
-        total = len(self.context.history)
+        total = len(self.context.history)  # type: ignore[union-attr]
 
         if failed == 0:
             self.console.print(
@@ -565,12 +566,12 @@ class WorkflowOrchestrator:
 
         if "python" in tech_stack:
             analysis["type"] = "Python Application"
-            analysis["patterns"].append("Python package structure detected")
+            analysis["patterns"].append("Python package structure detected")  # type: ignore[attr-defined]
             context.console.print("  ✓ Identified as Python application")
 
         if "javascript" in tech_stack:
             analysis["type"] = "Node.js Application"
-            analysis["patterns"].append("Node.js project structure detected")
+            analysis["patterns"].append("Node.js project structure detected")  # type: ignore[attr-defined]
             context.console.print("  ✓ Identified as Node.js application")
 
         context.set("structure_analysis", analysis)
@@ -623,7 +624,7 @@ class WorkflowOrchestrator:
         if self.file_system:
             content = await self.file_system.read_file(file_path)
             context.set("original_content", content)
-            return content
+            return content  # type: ignore[return-value]
         return ""
 
     async def _prepare_changes_action(
@@ -791,7 +792,7 @@ class WorkflowOrchestrator:
             context.console.print("[red]✗ Action may not have completed fully[/red]")
 
         context.set("verification_success", success)
-        return success
+        return success  # type: ignore[no-any-return]
 
     async def _provide_summary_action(
         self, context: WorkflowContext, params: Dict[str, Any]

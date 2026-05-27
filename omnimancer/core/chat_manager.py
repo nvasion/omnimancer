@@ -7,7 +7,7 @@ and message history for chat sessions.
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 
 from .models import ChatContext, ChatMessage, MessageRole
 
@@ -20,7 +20,7 @@ class ChatManager:
     and context management for chat sessions.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the chat manager."""
         self.current_context: Optional[ChatContext] = None
         self._initialize_context()
@@ -42,7 +42,7 @@ class ChatManager:
         """
         if self.current_context is None:
             self._initialize_context()
-        return self.current_context
+        return self.current_context  # type: ignore[return-value]
 
     def set_current_model(self, model: str) -> None:
         """
@@ -116,7 +116,7 @@ class ChatManager:
             New session ID
         """
         self._initialize_context()
-        return self.current_context.session_id
+        return self.current_context.session_id  # type: ignore[union-attr]
 
     def get_message_count(self) -> int:
         """

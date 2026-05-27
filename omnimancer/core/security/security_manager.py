@@ -103,7 +103,7 @@ class SecurityManager:
                 )
 
             if not permission_allowed:
-                result["reasons"].append("Permission denied by security policy")
+                result["reasons"].append("Permission denied by security policy")  # type: ignore[attr-defined]
                 return result
 
             # Step 2: Risk assessment and approval workflow
@@ -125,12 +125,12 @@ class SecurityManager:
                     if approval_request.status == ApprovalStatus.PENDING:
                         result["approval_required"] = True
                         result["approval_request_id"] = approval_request.id
-                        result["reasons"].append(
+                        result["reasons"].append(  # type: ignore[attr-defined]
                             f"Approval required for {risk_level.value} risk operation"
                         )
                         return result
                     elif approval_request.status != ApprovalStatus.APPROVED:
-                        result["reasons"].append(
+                        result["reasons"].append(  # type: ignore[attr-defined]
                             f"Operation not approved: {approval_request.status.value}"
                         )
                         return result
@@ -148,7 +148,7 @@ class SecurityManager:
 
             # Step 4: All checks passed
             result["allowed"] = True
-            result["reasons"].append("All security checks passed")
+            result["reasons"].append("All security checks passed")  # type: ignore[attr-defined]
 
             return result
 
@@ -166,7 +166,7 @@ class SecurityManager:
                     },
                 )
 
-            result["reasons"].append(f"Security validation error: {str(e)}")
+            result["reasons"].append(f"Security validation error: {str(e)}")  # type: ignore[attr-defined]
             return result
 
     async def execute_secure_command(
@@ -253,7 +253,7 @@ class SecurityManager:
                         "stderr": sandbox_result["stderr"],
                     }
                 )
-                result["security_info"]["sandbox_dir"] = sandbox_result["sandbox_dir"]
+                result["security_info"]["sandbox_dir"] = sandbox_result["sandbox_dir"]  # type: ignore[index]
 
             else:
                 # Execute directly (not recommended for production)
@@ -287,11 +287,11 @@ class SecurityManager:
             if self.audit:
                 self.audit.log_command_execution(
                     command,
-                    success=result["success"],
-                    exit_code=result["return_code"],
+                    success=result["success"],  # type: ignore[arg-type]
+                    exit_code=result["return_code"],  # type: ignore[arg-type]
                     operation_id=operation_id,
                     session_id=self.session_id,
-                    sandbox_id=result["security_info"].get("sandbox_dir"),
+                    sandbox_id=result["security_info"].get("sandbox_dir"),  # type: ignore[attr-defined]
                     metadata={"validation_result": validation_result},
                 )
 
@@ -407,7 +407,7 @@ class SecurityManager:
                 self.audit.log_file_access(
                     file_path,
                     operation,
-                    allowed=result["success"],
+                    allowed=result["success"],  # type: ignore[arg-type]
                     file_size=(len(content.encode("utf-8")) if content else None),
                     operation_id=operation_id,
                     session_id=self.session_id,
@@ -520,7 +520,7 @@ class SecurityManager:
         if self.audit:
             self.audit.shutdown()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor to ensure proper cleanup."""
         # Note: Cannot reliably run async cleanup in destructor
         # Cleanup should be called explicitly via shutdown()

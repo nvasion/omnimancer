@@ -12,7 +12,7 @@ import shlex
 import subprocess
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from ..core.agent.types import Operation, OperationType
 
@@ -26,8 +26,14 @@ class AgentLoopMixin:
     _show_assistant_message (from DisplayMixin).
     """
 
+    engine: Any
+    console: Any
+
+    def _show_assistant_message(self, content: str, model: str) -> None: ...
+    def _show_error(self, message: str) -> None: ...
+
     async def _execute_continuous_workflow(
-        self, original_message: str, initial_response
+        self, original_message: str, initial_response: Any
     ) -> None:
         """Execute a continuous workflow, sending AI responses back for more actions until complete."""
         current_response = initial_response

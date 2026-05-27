@@ -10,7 +10,7 @@ import asyncio
 import logging
 import os
 import signal
-from typing import Set
+from typing import Set, Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class SignalHandler:
     - Force exit on double Ctrl+C
     """
 
-    def __init__(self, agent_engine=None):
+    def __init__(self, agent_engine: Any = None) -> None:
         """
         Initialize the SignalHandler.
 
@@ -57,7 +57,7 @@ class SignalHandler:
             # other than the main thread
             logger.warning(f"Failed to register signal handlers: {e}")
 
-    def _handle_interrupt(self, signum: int, frame) -> None:
+    def _handle_interrupt(self, signum: int, frame: Any) -> None:
         """
         Handle interrupt signals gracefully.
 

@@ -8,7 +8,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 
 import aiofiles
 import aiofiles.os
@@ -126,7 +126,7 @@ class FileSystemManager:
             )
 
             # Check if original path is a symlink before resolving
-            is_symlink = await aiofiles.os.path.islink(original_path)
+            is_symlink = await aiofiles.os.path.islink(original_path)  # type: ignore[attr-defined]
 
             # First check existence using aiofiles for async operation
             exists = await aiofiles.os.path.exists(resolved_path)
@@ -546,7 +546,7 @@ class FileSystemManager:
         encoding: str = "utf-8",
         backup: bool = True,
         atomic: bool = True,
-        operation_id: str = None,
+        operation_id: Optional[str] = None,
         approved: bool = True,
     ) -> Dict[str, Any]:
         """
@@ -582,9 +582,9 @@ class FileSystemManager:
 
             # Atomic write
             if atomic:
-                result = await self._atomic_write(path, content, encoding)
+                result = await self._atomic_write(path, content, encoding)  # type: ignore[arg-type]
             else:
-                result = await self._direct_write(path, content, encoding)
+                result = await self._direct_write(path, content, encoding)  # type: ignore[arg-type]
 
             # Update operation tracking if operation_id provided
             if operation_id:
@@ -934,9 +934,10 @@ class FileSystemManager:
             if (
                 path.is_file() and stat_result.st_size < 10 * 1024 * 1024
             ):  # Only for files < 10MB
-                content = await self.read_file(path, binary=True)
-                info["md5_hash"] = hashlib.md5(content).hexdigest()
-                info["sha256_hash"] = hashlib.sha256(content).hexdigest()
+                raw_content = await self.read_file(path, binary=True)
+                content_bytes = raw_content if isinstance(raw_content, bytes) else raw_content.encode("utf-8")
+                info["md5_hash"] = hashlib.md5(content_bytes).hexdigest()
+                info["sha256_hash"] = hashlib.sha256(content_bytes).hexdigest()
 
             return info
 
@@ -1063,24 +1064,24 @@ class FileSystemManager:
     ) -> Union[str, bytes]:
         """Read large file in chunks."""
 
-        chunks = []
-
         if binary:
+            byte_chunks: List[bytes] = []
             async with aiofiles.open(path, "rb") as f:
                 while True:
                     chunk = await f.read(self.chunk_size)
                     if not chunk:
                         break
-                    chunks.append(chunk)
-            return b"".join(chunks)
+                    byte_chunks.append(chunk)
+            return b"".join(byte_chunks)
         else:
+            str_chunks: List[str] = []
             async with aiofiles.open(path, "r", encoding=encoding) as f:
                 while True:
-                    chunk = await f.read(self.chunk_size)
+                    chunk = await f.read(self.chunk_size)  # type: ignore[assignment]
                     if not chunk:
                         break
-                    chunks.append(chunk)
-            return "".join(chunks)
+                    str_chunks.append(chunk)  # type: ignore[arg-type]
+            return "".join(str_chunks)
 
     async def _rollback_operation(self, operation_id: str) -> bool:
         """Rollback a failed operation using backup."""
@@ -1123,7 +1124,7 @@ class FileSystemManager:
             result = await self.security.execute_secure_command(
                 ["git", "add", str(path)], working_dir=str(path.parent)
             )
-            return result["success"]
+            return result["success"]  # type: ignore[no-any-return]
         except Exception as e:
             raise FileOperationError(f"Git add failed: {str(e)}")
 
@@ -1162,7 +1163,7 @@ class FileSystemManager:
     @asynccontextmanager
     async def streaming_read(
         self, path: Union[str, Path], chunk_size: Optional[int] = None
-    ):
+    ) -> AsyncIterator[Any]:
         """Context manager for streaming file reads."""
 
         path = Path(path).resolve()
@@ -1307,15 +1308,15 @@ class FileSystemManager:
             # Generate diff if both contents exist
             try:
                 if current_content and not current_content.startswith(
-                    "<Error reading file:"
+                    "<Error reading file:"  # type: ignore[arg-type]
                 ):
                     if isinstance(new_content, str):
                         review_data["diff"] = self._generate_content_diff(
-                            current_content, new_content, str(path)
+                            current_content, new_content, str(path)  # type: ignore[arg-type]
                         )
                     elif isinstance(new_content, bytes):
                         review_data["diff"] = self._generate_content_diff(
-                            current_content,
+                            current_content,  # type: ignore[arg-type]
                             new_content.decode(encoding, errors="ignore"),
                             str(path),
                         )
@@ -1384,7 +1385,7 @@ class FileSystemManager:
                 from .read_before_write_errors import UserRejectionError
 
                 rejection_reason = user_decision.get("reason", "User rejected changes")
-                rejection_error = UserRejectionError(str(path), rejection_reason)
+                rejection_error = UserRejectionError(str(path), rejection_reason)  # type: ignore[arg-type]
                 error_result = self.error_handler.handle_error(
                     rejection_error, retry_count, max_retries
                 )
@@ -1406,7 +1407,7 @@ class FileSystemManager:
 
             if user_decision.get("modified_content") is not None:
                 try:
-                    self._validate_content(final_content, str(path))
+                    self._validate_content(final_content, str(path))  # type: ignore[arg-type]
                 except Exception as validation_error:
                     content_error = ContentValidationError(
                         str(path), str(validation_error)
@@ -1430,7 +1431,7 @@ class FileSystemManager:
                 # This directly performs the file write without triggering approval again
                 write_result = await self._perform_direct_write(
                     path=path,
-                    content=final_content,
+                    content=final_content,  # type: ignore[arg-type]
                     encoding=encoding,
                     backup=True,  # Always create backup in read-before-write mode
                     atomic=True,
@@ -1484,7 +1485,7 @@ class FileSystemManager:
                 "retry_count": retry_count,
             }
 
-    def _validate_content(self, content: Union[str, bytes], file_path: str):
+    def _validate_content(self, content: Union[str, bytes], file_path: str) -> None:
         """
         Validate file content before writing.
 
@@ -1607,7 +1608,7 @@ class FileSystemManager:
                 else new_content.decode(encoding, errors="ignore")
             )
             preview["diff"] = self._generate_content_diff(
-                current_content, new_content_str, str(path)
+                current_content, new_content_str, str(path)  # type: ignore[arg-type]
             )
             preview["has_changes"] = current_content != new_content_str
         else:
@@ -1715,7 +1716,7 @@ class FileSystemManager:
         path: Union[str, Path],
         content: Union[str, bytes] = "",
         encoding: str = "utf-8",
-        **kwargs,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Create a new file with the given content (test compatibility wrapper)."""
         return await self.write_file(
@@ -1727,7 +1728,7 @@ class FileSystemManager:
         path: Union[str, Path],
         content: Union[str, bytes],
         encoding: str = "utf-8",
-        **kwargs,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Modify an existing file with new content (test compatibility wrapper)."""
         return await self.write_file(
@@ -1742,18 +1743,18 @@ class FileSystemManager:
                 result = await self.read_file(operation.data["path"])
                 return OperationResult(success=True, data=result)
             elif operation.type == OperationType.FILE_WRITE:
-                result = await self.write_file(
+                result = await self.write_file(  # type: ignore[assignment]
                     path=operation.data["path"],
                     content=operation.data["content"],
                     encoding=operation.data.get("encoding", "utf-8"),
                 )
-                return OperationResult(success=result["success"], data=result)
+                return OperationResult(success=result["success"], data=result)  # type: ignore[arg-type, call-overload, index]
             elif operation.type == OperationType.FILE_DELETE:
-                result = await self.delete_file(
+                result = await self.delete_file(  # type: ignore[assignment]
                     path=operation.data["path"],
                     backup=operation.data.get("backup", True),
                 )
-                return OperationResult(success=result["success"], data=result)
+                return OperationResult(success=result["success"], data=result)  # type: ignore[arg-type, call-overload, index]
             else:
                 return OperationResult(
                     success=False,

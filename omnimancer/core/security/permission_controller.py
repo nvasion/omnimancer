@@ -26,8 +26,8 @@ class PermissionOperation:
         operation_type: str,
         path: Optional[str] = None,
         command: Optional[str] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         self.operation_type = operation_type
         self.path = path
         self.command = command
@@ -37,7 +37,7 @@ class PermissionOperation:
 class PermissionController:
     """Controls and validates permissions for agent operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.restricted_paths = self._get_default_restricted_paths()
         self.allowed_commands = self._get_default_allowed_commands()
         self.permission_rules = self._get_default_permission_rules()

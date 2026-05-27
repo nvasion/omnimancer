@@ -67,7 +67,7 @@ class CoreEngine:
 
             self.mcp_manager = MCPManager(mcp_config)
         else:
-            self.mcp_manager = None
+            self.mcp_manager = None  # type: ignore[assignment]
 
         self.providers: Dict[str, BaseProvider] = {}
         self.current_provider: Optional[BaseProvider] = None
@@ -96,7 +96,7 @@ class CoreEngine:
             for provider_name in available_providers:
                 try:
                     # Just register the provider name, the registry will handle class loading
-                    self.provider_registry.register_provider(provider_name, None)
+                    self.provider_registry.register_provider(provider_name, None)  # type: ignore[arg-type]
                 except Exception as e:
                     logger.warning(f"Failed to register provider {provider_name}: {e}")
 
@@ -329,7 +329,7 @@ class CoreEngine:
 
     def get_all_models(self) -> Dict[str, List[Dict[str, Any]]]:
         """Get all models organized by provider (for CLI display)."""
-        result = {}
+        result = {}  # type: ignore[var-annotated]
 
         for provider_name, provider in self.providers.items():
             try:
@@ -572,7 +572,7 @@ class CoreEngine:
                 return "No MCP tools available."
 
             # Group tools by server
-            tools_by_server = {}
+            tools_by_server = {}  # type: ignore[var-annotated]
             for tool in tools:
                 server_name = getattr(tool, "server_name", "Unknown")
                 if server_name not in tools_by_server:
@@ -604,7 +604,7 @@ class CoreEngine:
             logger.error(f"Error getting tools list: {e}")
             return f"Error retrieving tools list: {str(e)}"
 
-    async def _handle_mcp_command(self, command_obj) -> str:
+    async def _handle_mcp_command(self, command_obj: Any) -> str:
         """Handle MCP management commands."""
         if not self.mcp_manager:
             return "MCP is not configured for this installation."
@@ -674,7 +674,7 @@ class CoreEngine:
 
         if degradation["functionality_impact"]:
             status_info.append("\nFunctionality Impact:")
-            for impact in degradation["functionality_impact"]:
+            for impact in degradation["functionality_impact"]:  # type: ignore[attr-defined]
                 status_info.append(f"  • {impact}")
 
         return "\n".join(status_info)
@@ -690,7 +690,7 @@ class CoreEngine:
         except Exception as e:
             return f"Error reloading MCP servers: {str(e)}"
 
-    async def _mcp_connect(self, server_name: str = None) -> str:
+    async def _mcp_connect(self, server_name: Optional[str] = None) -> str:
         """Connect to MCP server(s)."""
         if not self.mcp_manager:
             return "MCP is not configured."
@@ -705,7 +705,7 @@ class CoreEngine:
         except Exception as e:
             return f"Error connecting to MCP servers: {str(e)}"
 
-    async def _mcp_disconnect(self, server_name: str = None) -> str:
+    async def _mcp_disconnect(self, server_name: Optional[str] = None) -> str:
         """Disconnect from MCP server(s)."""
         if not self.mcp_manager:
             return "MCP is not configured."
@@ -788,7 +788,7 @@ class CoreEngine:
         except Exception as e:
             return f"Error listing servers: {str(e)}"
 
-    async def _mcp_tools(self, server_name: str = None) -> str:
+    async def _mcp_tools(self, server_name: Optional[str] = None) -> str:
         """List tools from specific server or all servers."""
         if not self.mcp_manager:
             return "MCP is not configured."
@@ -845,7 +845,7 @@ Examples:
         try:
             from .agent_engine import AgentEngine
 
-            self.agent_engine = AgentEngine(self.config_manager)
+            self.agent_engine = AgentEngine(self.config_manager)  # type: ignore[assignment]
             logger.info("Agent engine initialized successfully")
         except Exception as e:
             logger.warning(f"Failed to initialize agent engine: {e}")

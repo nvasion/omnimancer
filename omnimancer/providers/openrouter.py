@@ -6,7 +6,7 @@ with support for model aggregation, cost optimization, and access to multiple mo
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List, Union
 
 import certifi
 import httpx
@@ -15,6 +15,7 @@ from ..core.models import (
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
+    ModelInfo,
     ToolCall,
     ToolDefinition,
 )
@@ -38,7 +39,7 @@ class OpenRouterProvider(BaseProvider):
 
     BASE_URL = "https://openrouter.ai/api/v1"
 
-    def __init__(self, api_key: str, model: str = "", **kwargs):
+    def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
         Initialize OpenRouter provider.
 
@@ -103,7 +104,7 @@ class OpenRouterProvider(BaseProvider):
         # Try with SSL verification first, then fall back if needed
         for ssl_verify in [True, certifi.where(), False]:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
                     response = await client.post(
                         f"{self.BASE_URL}/chat/completions",
                         headers=self._get_headers(),
@@ -188,7 +189,7 @@ class OpenRouterProvider(BaseProvider):
         # Try with SSL verification first, then fall back if needed
         for ssl_verify in [True, certifi.where(), False]:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
                     response = await client.post(
                         f"{self.BASE_URL}/chat/completions",
                         headers=self._get_headers(),
@@ -239,7 +240,7 @@ class OpenRouterProvider(BaseProvider):
         # Try different SSL verification methods
         for ssl_verify in [True, certifi.where(), False]:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
                     response = await client.post(
                         f"{self.BASE_URL}/chat/completions",
                         headers=self._get_headers(),
@@ -530,7 +531,7 @@ class OpenRouterProvider(BaseProvider):
             },
         }
 
-        config = model_configs.get(
+        config: Dict[str, Any] = model_configs.get(
             self.model,
             {
                 "description": f"OpenRouter model {self.model}",
@@ -565,7 +566,7 @@ class OpenRouterProvider(BaseProvider):
 
         return enhanced_info
 
-    def get_available_models(self) -> List[EnhancedModelInfo]:
+    def get_available_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get list of popular OpenRouter models.
 
@@ -671,7 +672,7 @@ class OpenRouterProvider(BaseProvider):
         for model in models:
             model.update_swe_rating()
 
-        return models
+        return models  # type: ignore[return-value]
 
     def supports_tools(self) -> bool:
         """

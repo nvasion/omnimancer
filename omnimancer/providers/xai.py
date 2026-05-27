@@ -6,7 +6,7 @@ with support for Grok models, multimodal capabilities, and tool calling.
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List, Union
 
 import httpx
 
@@ -14,6 +14,7 @@ from ..core.models import (
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
+    ModelInfo,
     ToolCall,
     ToolDefinition,
 )
@@ -37,7 +38,7 @@ class XAIProvider(BaseProvider):
 
     BASE_URL = "https://api.x.ai/v1"
 
-    def __init__(self, api_key: str, model: str = "", **kwargs):
+    def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
         Initialize xAI provider.
 
@@ -377,7 +378,7 @@ class XAIProvider(BaseProvider):
             },
         }
 
-        config = model_configs.get(
+        config: Dict[str, Any] = model_configs.get(
             self.model,
             {
                 "description": f"xAI model {self.model}",
@@ -412,7 +413,7 @@ class XAIProvider(BaseProvider):
 
         return enhanced_info
 
-    def get_available_models(self) -> List[EnhancedModelInfo]:
+    def get_available_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get list of available xAI models.
         """
@@ -454,7 +455,7 @@ class XAIProvider(BaseProvider):
         for model in models:
             model.update_swe_rating()
 
-        return models
+        return models  # type: ignore[return-value]
 
     def supports_tools(self) -> bool:
         """

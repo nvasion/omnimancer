@@ -97,7 +97,7 @@ class EnhancedProviderFallback:
     health monitoring, and context preservation.
     """
 
-    def __init__(self, core_engine, health_monitor: Optional[HealthMonitor] = None):
+    def __init__(self, core_engine: Any, health_monitor: Optional[HealthMonitor] = None) -> None:
         """
         Initialize the enhanced fallback manager.
 
@@ -138,7 +138,7 @@ class EnhancedProviderFallback:
         self,
         providers: List[str],
         rankings: Optional[Dict[str, ProviderRank]] = None,
-    ):
+    ) -> None:
         """
         Set the list of fallback providers with optional rankings.
 
@@ -170,9 +170,9 @@ class EnhancedProviderFallback:
     async def execute_with_fallback(
         self,
         operation_func: Callable,
-        *args,
+        *args: Any,
         preserve_context: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """
         Execute operation with intelligent fallback and retry logic.
@@ -272,8 +272,8 @@ class EnhancedProviderFallback:
         else:
             raise ProviderError("No providers available for fallback")
 
-    async def _execute_with_retries(
-        self, operation_func: Callable, provider_name: str, *args, **kwargs
+    async def _execute_with_retries(  # type: ignore[no-untyped-def]
+        self, operation_func: Callable, provider_name: str, *args: Any, **kwargs
     ) -> Any:
         """Execute operation with exponential backoff retry logic."""
         last_error = None
@@ -385,7 +385,7 @@ class EnhancedProviderFallback:
 
         return any(pattern in error_str for pattern in non_retryable_patterns)
 
-    def _record_success(self, provider_name: str, response_time: float):
+    def _record_success(self, provider_name: str, response_time: float) -> None:
         """Record successful operation for provider."""
         if provider_name not in self.provider_stats:
             self.provider_stats[provider_name] = ProviderStats()
@@ -400,7 +400,7 @@ class EnhancedProviderFallback:
 
     def _record_failure(
         self, provider_name: str, reason: FallbackReason, error_msg: str
-    ):
+    ) -> None:
         """Record failed operation for provider."""
         if provider_name not in self.provider_stats:
             self.provider_stats[provider_name] = ProviderStats()
@@ -413,7 +413,7 @@ class EnhancedProviderFallback:
 
         logger.debug(f"Recorded failure for {provider_name}: {reason.value}")
 
-    def _update_response_time(self, provider_name: str, response_time: float):
+    def _update_response_time(self, provider_name: str, response_time: float) -> None:
         """Update average response time for provider."""
         if provider_name not in self.provider_stats:
             self.provider_stats[provider_name] = ProviderStats()
@@ -436,7 +436,7 @@ class EnhancedProviderFallback:
 
         return stats.consecutive_failures >= self.circuit_breaker_threshold
 
-    def _exclude_provider_temporarily(self, provider_name: str):
+    def _exclude_provider_temporarily(self, provider_name: str) -> None:
         """Temporarily exclude provider from fallback list."""
         self.excluded_providers.add(provider_name)
         self.exclusion_expiry[provider_name] = (
@@ -464,7 +464,7 @@ class EnhancedProviderFallback:
 
         return True
 
-    async def _preserve_context(self):
+    async def _preserve_context(self) -> None:
         """Preserve current conversation context."""
         try:
             if hasattr(self.core_engine, "chat_manager"):
@@ -480,7 +480,7 @@ class EnhancedProviderFallback:
         except Exception as e:
             logger.warning(f"Failed to preserve context: {e}")
 
-    async def _restore_context(self):
+    async def _restore_context(self) -> None:
         """Restore preserved conversation context."""
         try:
             if self.preserved_context and hasattr(self.core_engine, "chat_manager"):
@@ -490,7 +490,7 @@ class EnhancedProviderFallback:
         except Exception as e:
             logger.warning(f"Failed to restore context: {e}")
 
-    def _record_fallback_history(self, attempts: List[FallbackAttempt]):
+    def _record_fallback_history(self, attempts: List[FallbackAttempt]) -> None:
         """Record fallback attempts in history."""
         self.fallback_history.extend(attempts)
 
@@ -545,7 +545,7 @@ class EnhancedProviderFallback:
             logger.error(f"Health check failed: {e}")
             return {}
 
-    def reset_provider_stats(self, provider_name: Optional[str] = None):
+    def reset_provider_stats(self, provider_name: Optional[str] = None) -> None:
         """Reset statistics for specific provider or all providers."""
         if provider_name:
             if provider_name in self.provider_stats:
@@ -555,7 +555,7 @@ class EnhancedProviderFallback:
             self.provider_stats.clear()
             logger.info("Reset stats for all providers")
 
-    def configure_circuit_breaker(self, threshold: int = 5, recovery_time: int = 600):
+    def configure_circuit_breaker(self, threshold: int = 5, recovery_time: int = 600) -> None:
         """Configure circuit breaker settings."""
         self.circuit_breaker_threshold = threshold
         self.circuit_breaker_recovery_time = recovery_time

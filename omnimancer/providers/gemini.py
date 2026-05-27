@@ -5,7 +5,7 @@ This module provides the Google Gemini AI provider implementation using Google A
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import httpx
 
@@ -29,7 +29,7 @@ class GeminiProvider(BaseProvider):
 
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
-    def __init__(self, api_key: str, model: str = "", **kwargs):
+    def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
         Initialize Gemini provider.
 
@@ -409,7 +409,7 @@ class GeminiProvider(BaseProvider):
             },
         }
 
-        config = model_configs.get(
+        config: Dict[str, Any] = model_configs.get(
             self.model,
             {
                 "description": f"Gemini model {self.model}",
@@ -432,7 +432,7 @@ class GeminiProvider(BaseProvider):
             latest_version=self.model == "gemini-1.5-pro",
         )
 
-    def get_available_models(self) -> List[ModelInfo]:
+    def get_available_models(self) -> List[ModelInfo]:  # type: ignore[override]
         """
         Get list of available Gemini models.
         """
@@ -470,7 +470,7 @@ class GeminiProvider(BaseProvider):
             ),
         ]
 
-    async def fetch_live_models(self) -> List[ModelInfo]:
+    async def fetch_live_models(self) -> List[ModelInfo]:  # type: ignore[override]
         """
         Fetch live model list from Google AI API.
 

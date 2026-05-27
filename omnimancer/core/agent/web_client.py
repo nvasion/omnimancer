@@ -268,8 +268,9 @@ class ResponseCache:
                 )
 
                 for cache_file in cache_files:
+                    file_size = cache_file.stat().st_size
                     cache_file.unlink()
-                    total_size -= cache_file.stat().st_size
+                    total_size -= file_size
                     if total_size <= max_size_bytes * 0.8:  # Keep 20% buffer
                         break
         except OSError:
@@ -504,7 +505,7 @@ class WebClient:
                 start_time = time.time()
 
                 # Prepare request kwargs
-                kwargs = {}
+                kwargs: Dict[str, Any] = {}
                 if params:
                     kwargs["params"] = params
                 if data:
@@ -540,7 +541,7 @@ class WebClient:
                         encoding = resp.charset or "utf-8"
                         content = content_bytes.decode(encoding, errors="ignore")
                     else:
-                        content = content_bytes
+                        content = content_bytes  # type: ignore[assignment]
                         encoding = "binary"
 
                     # Build response
@@ -551,7 +552,7 @@ class WebClient:
                         content=content,
                         content_type=content_type,
                         encoding=encoding,
-                        cookies=dict(resp.cookies),
+                        cookies={k: v.value for k, v in resp.cookies.items()},
                         history=[str(h.url) for h in resp.history],
                         elapsed=elapsed,
                     )
@@ -562,8 +563,9 @@ class WebClient:
                 last_exception = e
 
                 # Don't retry on client errors (4xx) except specific cases
-                if hasattr(e, "status") and 400 <= e.status < 500:
-                    if e.status not in [429, 408]:  # Rate limit, timeout
+                status = getattr(e, "status", None)
+                if status is not None and 400 <= status < 500:
+                    if status not in [429, 408]:  # Rate limit, timeout
                         break
 
                 if attempt < max_retries:
@@ -577,23 +579,23 @@ class WebClient:
             f"Request failed after {max_retries + 1} attempts: {last_exception}"
         )
 
-    async def get(self, url: str, **kwargs) -> WebResponse:
+    async def get(self, url: str, **kwargs: Any) -> WebResponse:
         """Make GET request."""
         return await self.request(url, RequestMethod.GET, **kwargs)
 
-    async def post(self, url: str, **kwargs) -> WebResponse:
+    async def post(self, url: str, **kwargs: Any) -> WebResponse:
         """Make POST request."""
         return await self.request(url, RequestMethod.POST, **kwargs)
 
-    async def put(self, url: str, **kwargs) -> WebResponse:
+    async def put(self, url: str, **kwargs: Any) -> WebResponse:
         """Make PUT request."""
         return await self.request(url, RequestMethod.PUT, **kwargs)
 
-    async def delete(self, url: str, **kwargs) -> WebResponse:
+    async def delete(self, url: str, **kwargs: Any) -> WebResponse:
         """Make DELETE request."""
         return await self.request(url, RequestMethod.DELETE, **kwargs)
 
-    async def head(self, url: str, **kwargs) -> WebResponse:
+    async def head(self, url: str, **kwargs: Any) -> WebResponse:
         """Make HEAD request."""
         return await self.request(url, RequestMethod.HEAD, **kwargs)
 
@@ -629,11 +631,11 @@ class WebClient:
         title_text = title.get_text().strip() if title else ""
 
         meta_description = soup.find("meta", attrs={"name": "description"})
-        description = (
-            meta_description.get("content", "").strip() if meta_description else ""
-        )
+        description_attr = meta_description.get("content", "") if meta_description else ""  # type: ignore[union-attr]
+        description = str(description_attr).strip() if description_attr else ""
 
         # Extract main content
+        main_soup: Any = soup
         if extract_main_content:
             # Try readability first (use cleaned HTML)
             try:
@@ -641,17 +643,14 @@ class WebClient:
                 doc = Document(cleaned_html)
                 main_content = doc.summary()
                 main_soup = BeautifulSoup(main_content, "html.parser")
-            except:
+            except Exception:
                 # Fallback to common content selectors
-                main_soup = (
+                found = (
                     soup.find("main")
                     or soup.find("article")
                     or soup.find("div", class_=re.compile(r"content|main|article"))
                 )
-                if not main_soup:
-                    main_soup = soup
-        else:
-            main_soup = soup
+                main_soup = found if found else soup
 
         # Convert to text
         if convert_to_markdown:
@@ -662,19 +661,20 @@ class WebClient:
             main_text = main_soup.get_text(separator="\n", strip=True)
 
         # Extract links
-        links = []
+        links: List[Dict[str, str]] = []
         for link in soup.find_all("a", href=True):
-            href = link["href"]
+            href = str(link["href"])
             text = link.get_text().strip()
             if href and text:
                 absolute_url = urljoin(url, href)
                 links.append({"url": absolute_url, "text": text})
 
         # Extract images
-        images = []
+        images: List[Dict[str, str]] = []
         for img in soup.find_all("img", src=True):
-            src = img["src"]
-            alt = img.get("alt", "").strip()
+            src = str(img["src"])
+            alt_attr = img.get("alt", "")
+            alt = str(alt_attr).strip() if alt_attr else ""
             absolute_url = urljoin(url, src)
             images.append({"url": absolute_url, "alt": alt})
 
@@ -736,10 +736,10 @@ class WebClient:
         if self.cache:
             self.cache.memory_cache.clear()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "WebClient":
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit."""
         await self.close()

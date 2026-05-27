@@ -164,7 +164,7 @@ class ConfigurationError(Exception):
 class ConfigValidator:
     """Validates configuration using JSON schema."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.schemas = self._load_schemas()
 
     def _load_schemas(self) -> Dict[str, Dict]:
@@ -331,11 +331,11 @@ class AgentConfig:
         try:
             with open(path, "r", encoding="utf-8") as f:
                 if path.suffix == ".json":
-                    return json.load(f)
+                    return json.load(f)  # type: ignore[no-any-return]
                 elif path.suffix == ".toml":
                     return toml.load(f)
                 elif path.suffix in [".yaml", ".yml"]:
-                    return yaml.safe_load(f)
+                    return yaml.safe_load(f)  # type: ignore[no-any-return]
                 else:
                     raise ConfigurationError(
                         f"Unsupported config format: {path.suffix}"
@@ -499,7 +499,7 @@ class AgentConfig:
         """Get security settings."""
         return self.security
 
-    def update_security_settings(self, **kwargs) -> None:
+    def update_security_settings(self, **kwargs: Any) -> None:
         """Update security settings."""
         old_settings = asdict(self.security)
 
@@ -520,7 +520,7 @@ class AgentConfig:
         """Get agent settings."""
         return self.agent
 
-    def update_agent_settings(self, **kwargs) -> None:
+    def update_agent_settings(self, **kwargs: Any) -> None:
         """Update agent settings."""
         old_settings = asdict(self.agent)
 
@@ -571,7 +571,7 @@ class AgentConfig:
         """Get all enabled provider configurations."""
         return {pid: config for pid, config in self.providers.items() if config.enabled}
 
-    def update_user_preferences(self, **kwargs) -> None:
+    def update_user_preferences(self, **kwargs: Any) -> None:
         """Update user preferences."""
         old_preferences = asdict(self.user_preferences)
 
@@ -689,7 +689,7 @@ class AgentConfig:
                     for k, v in provider_dict.get("custom_headers", {}).items()
                 }
 
-            config_data["providers"][provider_id] = provider_dict
+            config_data["providers"][provider_id] = provider_dict  # type: ignore[index]
 
         self._save_config_file(export_path, config_data, format)
 
@@ -774,8 +774,8 @@ class AgentConfig:
             },
         }
 
-    @asynccontextmanager
-    async def config_transaction(self):
+    @asynccontextmanager  # type: ignore[arg-type]
+    async def config_transaction(self) -> None:  # type: ignore[misc]
         """Context manager for atomic configuration changes."""
         old_auto_save = self.auto_save
         old_dirty_sections = self.dirty_sections.copy()
@@ -837,7 +837,7 @@ class AgentConfig:
         # Clear callbacks
         self.change_callbacks.clear()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()

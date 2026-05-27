@@ -5,6 +5,8 @@ This module defines the exception hierarchy used throughout the application
 to provide clear error handling and user feedback.
 """
 
+from typing import Any, Optional
+
 __all__ = [
     # Base errors
     "OmnimancerError",
@@ -47,7 +49,7 @@ class OmnimancerError(Exception):
     to provide consistent error handling.
     """
 
-    def __init__(self, message: str, details: str = None):
+    def __init__(self, message: str, details: Optional[str] = None):
         """
         Initialize the error.
 
@@ -85,7 +87,7 @@ class ProviderError(OmnimancerError):
     communicating with AI provider APIs.
     """
 
-    def __init__(self, message: str, provider: str = None, details: str = None):
+    def __init__(self, message: str, provider: Optional[str] = None, details: Optional[str] = None):
         """
         Initialize the provider error.
 
@@ -127,9 +129,9 @@ class RateLimitError(ProviderError):
     def __init__(
         self,
         message: str,
-        provider: str = None,
-        retry_after: int = None,
-        details: str = None,
+        provider: Optional[str] = None,
+        retry_after: Optional[int] = None,
+        details: Optional[str] = None,
     ):
         """
         Initialize the rate limit error.
@@ -184,10 +186,10 @@ class ModelNotFoundError(ProviderError):
     def __init__(
         self,
         message: str,
-        provider: str = None,
-        model_name: str = None,
-        available_models: list = None,
-        details: str = None,
+        provider: Optional[str] = None,
+        model_name: Optional[str] = None,
+        available_models: Optional[list[Any]] = None,
+        details: Optional[str] = None,
     ):
         """
         Initialize the model not found error.
@@ -275,7 +277,7 @@ class MCPServerError(MCPError):
     and communication protocol errors.
     """
 
-    def __init__(self, message: str, server_name: str = None, details: str = None):
+    def __init__(self, message: str, server_name: Optional[str] = None, details: Optional[str] = None):
         """
         Initialize the MCP server error.
 
@@ -303,7 +305,7 @@ class MCPToolError(MCPError):
     and invalid tool parameters.
     """
 
-    def __init__(self, message: str, tool_name: str = None, details: str = None):
+    def __init__(self, message: str, tool_name: Optional[str] = None, details: Optional[str] = None):
         """
         Initialize the MCP tool error.
 
@@ -345,10 +347,10 @@ class ProviderUnavailableError(ProviderError):
     def __init__(
         self,
         message: str,
-        provider: str = None,
-        fallback_providers: list = None,
-        estimated_recovery: str = None,
-        details: str = None,
+        provider: Optional[str] = None,
+        fallback_providers: Optional[list[Any]] = None,
+        estimated_recovery: Optional[str] = None,
+        details: Optional[str] = None,
     ):
         """
         Initialize the provider unavailable error.
@@ -391,10 +393,10 @@ class ToolExecutionError(ProviderError):
     def __init__(
         self,
         message: str,
-        provider: str = None,
-        tool_name: str = None,
-        tool_args: dict = None,
-        details: str = None,
+        provider: Optional[str] = None,
+        tool_name: Optional[str] = None,
+        tool_args: Optional[dict[str, Any]] = None,
+        details: Optional[str] = None,
     ):
         """
         Initialize the tool execution error.
@@ -431,10 +433,10 @@ class QuotaExceededError(ProviderError):
     def __init__(
         self,
         message: str,
-        provider: str = None,
-        quota_type: str = None,
-        reset_date: str = None,
-        details: str = None,
+        provider: Optional[str] = None,
+        quota_type: Optional[str] = None,
+        reset_date: Optional[str] = None,
+        details: Optional[str] = None,
     ):
         """
         Initialize the quota exceeded error.
@@ -474,10 +476,10 @@ class ProviderConfigurationError(ProviderError):
     def __init__(
         self,
         message: str,
-        provider: str = None,
-        config_field: str = None,
-        suggested_fix: str = None,
-        details: str = None,
+        provider: Optional[str] = None,
+        config_field: Optional[str] = None,
+        suggested_fix: Optional[str] = None,
+        details: Optional[str] = None,
     ):
         """
         Initialize the provider configuration error.
@@ -517,10 +519,10 @@ class MCPConnectionError(MCPServerError):
     def __init__(
         self,
         message: str,
-        server_name: str = None,
-        connection_type: str = None,
-        retry_suggestion: str = None,
-        details: str = None,
+        server_name: Optional[str] = None,
+        connection_type: Optional[str] = None,
+        retry_suggestion: Optional[str] = None,
+        details: Optional[str] = None,
     ):
         """
         Initialize the MCP connection error.
@@ -560,10 +562,10 @@ class MCPTimeoutError(MCPServerError):
     def __init__(
         self,
         message: str,
-        server_name: str = None,
-        timeout_duration: float = None,
-        operation: str = None,
-        details: str = None,
+        server_name: Optional[str] = None,
+        timeout_duration: Optional[float] = None,
+        operation: Optional[str] = None,
+        details: Optional[str] = None,
     ):
         """
         Initialize the MCP timeout error.
@@ -634,7 +636,7 @@ class ExecutionError(AgentError):
     non-zero exit codes, and other execution-related failures.
     """
 
-    def __init__(self, message: str, details: str = None):
+    def __init__(self, message: str, details: Optional[str] = None):
         """
         Initialize the execution error.
 
@@ -656,7 +658,7 @@ class TimeoutError(AgentError):
     and follows Omnimancer's error handling patterns.
     """
 
-    def __init__(self, message: str, details: str = None):
+    def __init__(self, message: str, details: Optional[str] = None):
         """
         Initialize the timeout error.
 
