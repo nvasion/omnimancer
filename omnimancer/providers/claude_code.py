@@ -8,7 +8,7 @@ with support for opus and sonnet modes with free access.
 import os
 import subprocess
 from datetime import datetime
-from typing import Dict, List, Union, Any
+from typing import Any, Dict, List, Union
 
 from ..core.models import ChatContext, ChatResponse, EnhancedModelInfo, ModelInfo
 from ..utils.errors import (

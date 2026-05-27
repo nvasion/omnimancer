@@ -10,7 +10,7 @@ import asyncio
 import logging
 import os
 import signal
-from typing import Set, Any
+from typing import Any, Set
 
 logger = logging.getLogger(__name__)
 
