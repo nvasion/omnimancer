@@ -410,9 +410,7 @@ class TestCohereProviderMessageSending:
         """Test handling of model not found errors."""
         mock_response = MagicMock()
         mock_response.status_code = 400
-        mock_response.json.return_value = {
-            "message": "model 'invalid-model' not found"
-        }
+        mock_response.json.return_value = {"message": "model 'invalid-model' not found"}
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(

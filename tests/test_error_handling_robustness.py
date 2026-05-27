@@ -109,8 +109,7 @@ class TestAgentErrorHandling(unittest.TestCase):
 
             # Skip: FileSystemManager doesn't have path validation
             self.skipTest(
-                "Path validation not implemented in"
-                " current FileSystemManager"
+                "Path validation not implemented in" " current FileSystemManager"
             )
 
     def test_agent_engine_forbidden_path_detection(self):
@@ -199,8 +198,7 @@ class TestErrorContextAndRecovery(unittest.TestCase):
         stderr_output = "command not found"
 
         details = (
-            f"Command: {command}, Exit code: {exit_code}"
-            f", Stderr: {stderr_output}"
+            f"Command: {command}, Exit code: {exit_code}" f", Stderr: {stderr_output}"
         )
         error = ExecutionError(
             "Command execution failed",

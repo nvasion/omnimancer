@@ -342,9 +342,12 @@ class TestBaseProviderStreamingFallback:
 
             def get_model_info(self):
                 return ModelInfo(
-                    name="fake-model", provider="fake",
-                    description="Fake", max_tokens=4096,
-                    cost_per_token=0.001, available=True,
+                    name="fake-model",
+                    provider="fake",
+                    description="Fake",
+                    max_tokens=4096,
+                    cost_per_token=0.001,
+                    available=True,
                 )
 
             def supports_tools(self):
@@ -366,9 +369,7 @@ class TestBaseProviderStreamingFallback:
         from omnimancer.core.models import StreamEventType
 
         events = []
-        stream = concrete_provider.send_message_stream(
-            "hi", sample_context
-        )
+        stream = concrete_provider.send_message_stream("hi", sample_context)
         async for event in stream:
             events.append(event)
 
@@ -382,9 +383,7 @@ class TestBaseProviderStreamingFallback:
         from omnimancer.core.models import StreamEventType
 
         events = []
-        stream = concrete_provider.send_message_stream(
-            "hi", sample_context
-        )
+        stream = concrete_provider.send_message_stream("hi", sample_context)
         async for event in stream:
             events.append(event)
 
@@ -399,9 +398,7 @@ class TestBaseProviderStreamingFallback:
         from omnimancer.core.models import StreamEventType
 
         events = []
-        stream = concrete_provider.send_message_stream(
-            "hi", sample_context
-        )
+        stream = concrete_provider.send_message_stream("hi", sample_context)
         async for event in stream:
             events.append(event)
 
@@ -411,29 +408,21 @@ class TestBaseProviderStreamingFallback:
         assert events[-1].response.tokens_used == 42
 
     @pytest.mark.asyncio
-    async def test_stream_fallback_event_count(
-        self, concrete_provider, sample_context
-    ):
+    async def test_stream_fallback_event_count(self, concrete_provider, sample_context):
         events = []
-        stream = concrete_provider.send_message_stream(
-            "hi", sample_context
-        )
+        stream = concrete_provider.send_message_stream("hi", sample_context)
         async for event in stream:
             events.append(event)
 
         assert len(events) == 3  # MESSAGE_START, TEXT_DELTA, MESSAGE_COMPLETE
 
     @pytest.mark.asyncio
-    async def test_stream_with_tools_fallback(
-        self, concrete_provider, sample_context
-    ):
+    async def test_stream_with_tools_fallback(self, concrete_provider, sample_context):
         from omnimancer.core.models import StreamEventType
 
         events = []
-        stream = (
-            concrete_provider.send_message_with_tools_stream(
-                "hi", sample_context, []
-            )
+        stream = concrete_provider.send_message_with_tools_stream(
+            "hi", sample_context, []
         )
         async for event in stream:
             events.append(event)

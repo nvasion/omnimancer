@@ -250,8 +250,7 @@ class ProviderRegistry:
             matches = [
                 m
                 for m in models
-                if query_lower in m.name.lower()
-                or query_lower in m.description.lower()
+                if query_lower in m.name.lower() or query_lower in m.description.lower()
             ]
 
             if matches:
@@ -332,22 +331,14 @@ class ProviderRegistry:
             len(models) for models in self.get_multimodal_models().values()
         )
         free_models = sum(len(models) for models in self.get_free_models().values())
-        latest_models = sum(
-            len(models)
-            for models in self.get_latest_models().values()
-        )
+        latest_models = sum(len(models) for models in self.get_latest_models().values())
 
         # Count models by performance tier
         high_perf = sum(
             len(models) for models in self.get_models_by_performance(60.0).values()
         )
         mid_perf = (
-            sum(
-                len(models)
-                for models in self.get_models_by_performance(
-                    40.0
-                ).values()
-            )
+            sum(len(models) for models in self.get_models_by_performance(40.0).values())
             - high_perf
         )
 

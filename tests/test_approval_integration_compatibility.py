@@ -20,8 +20,8 @@ async def test_integration_with_basic_approval_manager():
     mock_approval = MagicMock()
     mock_approval.set_approval_callback = MagicMock()
     # Explicitly don't have set_batch_approval_callback
-    if hasattr(mock_approval, 'set_batch_approval_callback'):
-        delattr(mock_approval, 'set_batch_approval_callback')
+    if hasattr(mock_approval, "set_batch_approval_callback"):
+        delattr(mock_approval, "set_batch_approval_callback")
     mock_agent_engine.approval = mock_approval
 
     # Create mock CLI approval integration
@@ -30,8 +30,7 @@ async def test_integration_with_basic_approval_manager():
 
     # Should not raise AttributeError
     inject_approval_integration_into_agent_engine(
-        mock_agent_engine,
-        mock_cli_integration
+        mock_agent_engine, mock_cli_integration
     )
 
     # Verify single callback was set
@@ -60,8 +59,7 @@ async def test_integration_with_enhanced_approval_manager():
 
     # Should work with both callbacks
     inject_approval_integration_into_agent_engine(
-        mock_agent_engine,
-        mock_cli_integration
+        mock_agent_engine, mock_cli_integration
     )
 
     # Verify both callbacks were set
@@ -85,8 +83,7 @@ async def test_integration_without_approval_manager():
 
     # Should not raise any errors, just log warning
     inject_approval_integration_into_agent_engine(
-        mock_agent_engine,
-        mock_cli_integration
+        mock_agent_engine, mock_cli_integration
     )
 
     # Verify no callbacks were set (since there's no approval manager)

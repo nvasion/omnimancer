@@ -221,15 +221,12 @@ class CLIApprovalPrompt:
 
         except KeyboardInterrupt:
             self.console.print(
-                "\n[red]❌ File modification cancelled"
-                " by user (Ctrl+C)[/red]"
+                "\n[red]❌ File modification cancelled" " by user (Ctrl+C)[/red]"
             )
             return {
                 "approved": False,
                 "reason": "Cancelled by user (Ctrl+C)",
-                "response_time_seconds": (
-                    datetime.now() - start_time
-                ).total_seconds(),
+                "response_time_seconds": (datetime.now() - start_time).total_seconds(),
             }
 
         except asyncio.TimeoutError:
@@ -246,16 +243,11 @@ class CLIApprovalPrompt:
             }
 
         except Exception as e:
-            logger.error(
-                "Error in file modification"
-                f" approval: {e}"
-            )
+            logger.error("Error in file modification" f" approval: {e}")
             return {
                 "approved": False,
                 "reason": f"Error occurred: {str(e)}",
-                "response_time_seconds": (
-                    datetime.now() - start_time
-                ).total_seconds(),
+                "response_time_seconds": (datetime.now() - start_time).total_seconds(),
             }
 
         finally:
@@ -336,8 +328,7 @@ class CLIApprovalPrompt:
             )
 
             self.console.print(
-                "\n[red]❌ Operation cancelled"
-                " by user (Ctrl+C)[/red]"
+                "\n[red]❌ Operation cancelled" " by user (Ctrl+C)[/red]"
             )
 
             # Log cancellation details for debugging
@@ -348,9 +339,7 @@ class CLIApprovalPrompt:
             )
 
             # Perform any necessary cleanup
-            await self._handle_cancellation_cleanup(
-                approval_request, "user_interrupt"
-            )
+            await self._handle_cancellation_cleanup(approval_request, "user_interrupt")
 
             return decision
 
@@ -385,15 +374,10 @@ class CLIApprovalPrompt:
             decision = ApprovalDecision(
                 decision=ApprovalDecisionType.DENIED,
                 user_notes=f"Error occurred: {str(e)}",
-                response_time_seconds=(
-                    datetime.now() - start_time
-                ).total_seconds(),
+                response_time_seconds=(datetime.now() - start_time).total_seconds(),
             )
 
-            self.console.print(
-                f"[red]❌ Error in approval prompt:"
-                f" {e}[/red]"
-            )
+            self.console.print(f"[red]❌ Error in approval prompt:" f" {e}[/red]")
             return decision
 
         finally:
@@ -768,9 +752,7 @@ class CLIApprovalPrompt:
                 )
 
         elif batch_decision.decision_type == "individual":
-            approved_count = len(
-                batch_decision.approved_indices or []
-            )
+            approved_count = len(batch_decision.approved_indices or [])
             total_count = len(batch_request.operations)
             self.console.print(
                 "[blue]✅ Individual review complete:"
@@ -818,10 +800,7 @@ class CLIApprovalPrompt:
             }
 
             # In a full implementation, this could be sent to a metrics system
-            logger.info(
-                "Approval cancellation recorded:"
-                f" {cancellation_data}"
-            )
+            logger.info("Approval cancellation recorded:" f" {cancellation_data}")
 
         except Exception as e:
             logger.error(f"Error during cancellation cleanup: {e}")
@@ -996,7 +975,9 @@ class CLIApprovalPrompt:
         self.console.print(diff_panel)
 
     def _display_side_by_side_preview(
-        self, current_content: str, new_content: str,
+        self,
+        current_content: str,
+        new_content: str,
     ) -> None:
         """Display side-by-side preview when diff is not available."""
         current_content = self._ensure_string(current_content)

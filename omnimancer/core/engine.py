@@ -100,7 +100,8 @@ class CoreEngine:
                     # Register the provider name; the registry
                     # will handle class loading
                     self.provider_registry.register_provider(
-                        provider_name, None,  # type: ignore[arg-type]
+                        provider_name,
+                        None,  # type: ignore[arg-type]
                     )
                 except Exception as e:
                     logger.warning(f"Failed to register provider {provider_name}: {e}")
@@ -137,9 +138,7 @@ class CoreEngine:
         """
         try:
             if provider_name not in self.providers:
-                raise ConfigurationError(
-                    f"Provider '{provider_name}' is not available"
-                )
+                raise ConfigurationError(f"Provider '{provider_name}' is not available")
 
             provider = self.providers[provider_name]
 
@@ -298,9 +297,7 @@ class CoreEngine:
             )
             return
         context = self.chat_manager.get_current_context()
-        async for event in self.current_provider.send_message_stream(
-            message, context
-        ):
+        async for event in self.current_provider.send_message_stream(message, context):
             yield event
 
     async def send_message_with_tools_stream(
@@ -339,8 +336,7 @@ class CoreEngine:
             except Exception as e:
                 provider_name = provider.get_provider_name()
                 logger.warning(
-                    f"Failed to get models from"
-                    f" provider {provider_name}: {e}"
+                    f"Failed to get models from" f" provider {provider_name}: {e}"
                 )
 
         return all_models
@@ -549,8 +545,7 @@ class CoreEngine:
                 logger.info("MCP servers initialized successfully")
             else:
                 logger.info(
-                    "MCP manager not configured"
-                    " - skipping MCP initialization"
+                    "MCP manager not configured" " - skipping MCP initialization"
                 )
         except Exception as e:
             logger.error(f"Failed to initialize MCP: {e}")
@@ -783,13 +778,8 @@ class CoreEngine:
                 health_info.append(f"   Command: {status['command']}")
 
             overall_health = health_status.get("overall_healthy", False)
-            health_text = (
-                "🟢 Healthy" if overall_health
-                else "🔴 Issues detected"
-            )
-            health_info.append(
-                f"\nOverall Health: {health_text}"
-            )
+            health_text = "🟢 Healthy" if overall_health else "🔴 Issues detected"
+            health_info.append(f"\nOverall Health: {health_text}")
 
             return "\n".join(health_info)
 

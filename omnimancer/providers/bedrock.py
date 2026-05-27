@@ -76,9 +76,7 @@ class BedrockProvider(BaseProvider):
         self.top_k = kwargs.get("top_k", 250)
 
         # Build base URL for Bedrock API key authentication
-        self.base_url = (
-            f"https://bedrock-runtime.{self.aws_region}.amazonaws.com"
-        )
+        self.base_url = f"https://bedrock-runtime.{self.aws_region}.amazonaws.com"
 
     def _is_arn(self, model_id: str) -> bool:
         """Check if the model ID is in ARN format."""
@@ -192,18 +190,10 @@ class BedrockProvider(BaseProvider):
             # Build URL - use appropriate endpoint based on model format
             if self._is_arn(self.model):
                 # For ARN format, extract the actual model ID for the URL
-                model_for_url = (
-                    self._extract_model_id_from_arn(self.model)
-                )
-                url = (
-                    f"{self.base_url}/model"
-                    f"/{model_for_url}/converse"
-                )
+                model_for_url = self._extract_model_id_from_arn(self.model)
+                url = f"{self.base_url}/model" f"/{model_for_url}/converse"
             else:
-                url = (
-                    f"{self.base_url}/model"
-                    f"/{self.model}/converse"
-                )
+                url = f"{self.base_url}/model" f"/{self.model}/converse"
 
             # Create headers with Bearer token authentication
             headers = {
@@ -240,8 +230,7 @@ class BedrockProvider(BaseProvider):
         try:
             # Test API key by listing foundation models (not model-specific)
             url = (
-                f"https://bedrock.{self.aws_region}"
-                ".amazonaws.com/foundation-models"
+                f"https://bedrock.{self.aws_region}" ".amazonaws.com/foundation-models"
             )
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -279,18 +268,10 @@ class BedrockProvider(BaseProvider):
 
             # Build URL for validation
             if self._is_arn(self.model):
-                model_for_url = (
-                    self._extract_model_id_from_arn(self.model)
-                )
-                url = (
-                    f"{self.base_url}/model"
-                    f"/{model_for_url}/converse"
-                )
+                model_for_url = self._extract_model_id_from_arn(self.model)
+                url = f"{self.base_url}/model" f"/{model_for_url}/converse"
             else:
-                url = (
-                    f"{self.base_url}/model"
-                    f"/{self.model}/converse"
-                )
+                url = f"{self.base_url}/model" f"/{self.model}/converse"
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -315,10 +296,7 @@ class BedrockProvider(BaseProvider):
                     )
 
                     # Parse different error types
-                    if (
-                        "not authorized" in error_msg
-                        or "explicit deny" in error_msg
-                    ):
+                    if "not authorized" in error_msg or "explicit deny" in error_msg:
                         return self._suggest_arn_conversion(
                             self.model,
                             f"Access denied to model "
@@ -327,8 +305,7 @@ class BedrockProvider(BaseProvider):
                             "regional access issues.",
                         )
                     elif (
-                        "not supported" in error_msg
-                        or "inference profile" in error_msg
+                        "not supported" in error_msg or "inference profile" in error_msg
                     ):
                         if not self._is_arn(self.model):
                             # Suggest ARN format for inference profile access
@@ -385,8 +362,7 @@ class BedrockProvider(BaseProvider):
                     return {
                         "success": False,
                         "message": (
-                            "Model test failed with "
-                            f"HTTP {response.status_code}"
+                            "Model test failed with " f"HTTP {response.status_code}"
                         ),
                     }
 
@@ -470,10 +446,7 @@ class BedrockProvider(BaseProvider):
         # Add tools in Bedrock Converse format
         if tools:
             request_data["toolConfig"] = {
-                "tools": [
-                    self._convert_tool_to_bedrock_format(tool)
-                    for tool in tools
-                ]
+                "tools": [self._convert_tool_to_bedrock_format(tool) for tool in tools]
             }
 
         return json.dumps(request_data)
@@ -530,8 +503,7 @@ class BedrockProvider(BaseProvider):
                     raise ProviderError("Empty content in Bedrock response")
             else:
                 raise ProviderError(
-                    "Invalid response format from "
-                    "Bedrock Converse API"
+                    "Invalid response format from " "Bedrock Converse API"
                 )
 
         elif response.status_code == 401:
@@ -551,15 +523,8 @@ class BedrockProvider(BaseProvider):
                 if error_code:
                     error_msg = f"{error_code}: {error_msg}"
             except Exception:
-                resp_text = (
-                    response.text[:200]
-                    if response.text
-                    else "No response body"
-                )
-                error_msg = (
-                    f"HTTP {response.status_code}: "
-                    f"{resp_text}"
-                )
+                resp_text = response.text[:200] if response.text else "No response body"
+                error_msg = f"HTTP {response.status_code}: " f"{resp_text}"
 
             raise ProviderError(f"AWS Bedrock API error: {error_msg}")
 
@@ -605,8 +570,7 @@ class BedrockProvider(BaseProvider):
                 )
             else:
                 raise ProviderError(
-                    "Invalid response format from "
-                    "Bedrock Converse API"
+                    "Invalid response format from " "Bedrock Converse API"
                 )
         else:
             return self._handle_response(response)

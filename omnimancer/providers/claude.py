@@ -91,9 +91,7 @@ class ClaudeProvider(BaseProvider):
         ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
         for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(
-                    verify=ssl_verify
-                ) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/messages",
                         headers=self._build_headers(),
@@ -115,22 +113,13 @@ class ClaudeProvider(BaseProvider):
                     continue
                 else:
                     # Non-SSL connection error, don't retry
-                    raise NetworkError(
-                        f"Connection error: {e}"
-                    )
+                    raise NetworkError(f"Connection error: {e}")
             except httpx.TimeoutException:
-                raise NetworkError(
-                    "Request to Claude API timed out"
-                )
+                raise NetworkError("Request to Claude API timed out")
             except httpx.RequestError as e:
-                if (
-                    "SSL" not in str(e)
-                    and "certificate" not in str(e)
-                ):
+                if "SSL" not in str(e) and "certificate" not in str(e):
                     # Non-SSL request error, don't retry
-                    raise NetworkError(
-                        f"Network error: {e}"
-                    )
+                    raise NetworkError(f"Network error: {e}")
                 # SSL-related error, try next verification method
                 continue
             except (
@@ -146,9 +135,7 @@ class ClaudeProvider(BaseProvider):
                 raise ProviderError(f"Unexpected error: {e}")
 
         # If we get here, all SSL methods failed
-        raise NetworkError(
-            "Failed to establish SSL connection to Claude API"
-        )
+        raise NetworkError("Failed to establish SSL connection to Claude API")
 
     async def validate_credentials(self) -> bool:
         """
@@ -161,18 +148,14 @@ class ClaudeProvider(BaseProvider):
         ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
         for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(
-                    verify=ssl_verify
-                ) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/messages",
                         headers=self._build_headers(),
                         json={
                             "model": self.model,
                             "max_tokens": 10,
-                            "messages": [
-                                {"role": "user", "content": "Hi"}
-                            ],
+                            "messages": [{"role": "user", "content": "Hi"}],
                         },
                         timeout=10.0,
                     )
@@ -333,9 +316,7 @@ class ClaudeProvider(BaseProvider):
         ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
         for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(
-                    verify=ssl_verify
-                ) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/messages",
                         headers=self._build_headers(),
@@ -346,26 +327,14 @@ class ClaudeProvider(BaseProvider):
                 return self._handle_response_with_tools(response)
 
             except httpx.ConnectError as e:
-                if (
-                    "SSL" in str(e)
-                    or "certificate" in str(e)
-                ):
+                if "SSL" in str(e) or "certificate" in str(e):
                     continue
-                raise NetworkError(
-                    f"Connection error: {e}"
-                )
+                raise NetworkError(f"Connection error: {e}")
             except httpx.TimeoutException:
-                raise NetworkError(
-                    "Request to Claude API timed out"
-                )
+                raise NetworkError("Request to Claude API timed out")
             except httpx.RequestError as e:
-                if (
-                    "SSL" not in str(e)
-                    and "certificate" not in str(e)
-                ):
-                    raise NetworkError(
-                        f"Network error: {e}"
-                    )
+                if "SSL" not in str(e) and "certificate" not in str(e):
+                    raise NetworkError(f"Network error: {e}")
                 continue
             except (
                 AuthenticationError,
@@ -377,9 +346,7 @@ class ClaudeProvider(BaseProvider):
             except Exception as e:
                 raise ProviderError(f"Unexpected error: {e}")
 
-        raise NetworkError(
-            "Failed to establish SSL connection to Claude API"
-        )
+        raise NetworkError("Failed to establish SSL connection to Claude API")
 
     def _is_subscription_429(self, response: httpx.Response) -> bool:
         if not self._is_subscription_token() or self._is_haiku():
@@ -409,9 +376,7 @@ class ClaudeProvider(BaseProvider):
             for tool in tools
         ]
 
-    def _parse_response_content(
-        self, content_blocks: List[Dict]
-    ) -> tuple:
+    def _parse_response_content(self, content_blocks: List[Dict]) -> tuple:
         text_parts = []
         tool_calls = []
 
@@ -485,15 +450,11 @@ class ClaudeProvider(BaseProvider):
         async for event in self._stream_request(request_body):
             yield event
 
-    async def _stream_request(
-        self, request_body: dict
-    ) -> AsyncIterator[StreamEvent]:
+    async def _stream_request(self, request_body: dict) -> AsyncIterator[StreamEvent]:
         ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
         for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(
-                    verify=ssl_verify
-                ) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:
                     async with client.stream(
                         "POST",
                         f"{self.BASE_URL}/messages",
@@ -528,10 +489,7 @@ class ClaudeProvider(BaseProvider):
             ):
                 raise
 
-        raise NetworkError(
-            "Failed to establish SSL connection "
-            "to Claude API"
-        )
+        raise NetworkError("Failed to establish SSL connection " "to Claude API")
 
     async def _parse_sse_stream(
         self, response: httpx.Response

@@ -110,9 +110,7 @@ async def test_handle_single_approval_maps_operation_types():
             f"expected {expected_change_type.value}, "
             f"got {change_preview.change_type.value}"
         )
-        assert (
-            change_preview.change_type == expected_change_type
-        ), msg
+        assert change_preview.change_type == expected_change_type, msg
 
 
 @pytest.mark.asyncio

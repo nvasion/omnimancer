@@ -193,8 +193,7 @@ class CohereProvider(BaseProvider):
                 if "model" in error_msg.lower() or "not found" in error_msg.lower():
                     available_models = [m.name for m in self.get_available_models()]
                     raise ModelNotFoundError(
-                        f"Cohere model '{self.model}'"
-                        " not found or not accessible",
+                        f"Cohere model '{self.model}'" " not found or not accessible",
                         provider="cohere",
                         model_name=self.model,
                         available_models=available_models,
@@ -231,10 +230,7 @@ class CohereProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("message", "")
-                if (
-                    "billing" in error_msg.lower()
-                    or "payment" in error_msg.lower()
-                ):
+                if "billing" in error_msg.lower() or "payment" in error_msg.lower():
                     raise QuotaExceededError(
                         "Cohere API access restricted due to billing issues",
                         provider="cohere",
@@ -268,10 +264,7 @@ class CohereProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("message", "")
-                if (
-                    "quota" in error_msg.lower()
-                    or "usage" in error_msg.lower()
-                ):
+                if "quota" in error_msg.lower() or "usage" in error_msg.lower():
                     raise QuotaExceededError(
                         "Cohere API usage quota exceeded", provider="cohere"
                     )
@@ -319,16 +312,14 @@ class CohereProvider(BaseProvider):
             },
             "command-r-plus": {
                 "description": (
-                    "Command R+ - Enhanced version"
-                    " with improved capabilities"
+                    "Command R+ - Enhanced version" " with improved capabilities"
                 ),
                 "max_tokens": 128000,
                 "cost_per_token": 0.000003,
             },
             "command-light": {
                 "description": (
-                    "Command Light - Fast and efficient"
-                    " model for simple tasks"
+                    "Command Light - Fast and efficient" " model for simple tasks"
                 ),
                 "max_tokens": 4096,
                 "cost_per_token": 0.0000003,

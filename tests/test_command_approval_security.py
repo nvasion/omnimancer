@@ -24,8 +24,7 @@ async def test_command_exec_requires_approval():
     # Mock execute_with_approval to track if it was called
     mock_agent_engine.execute_with_approval = AsyncMock(
         return_value=OperationResult(
-            success=False,
-            error="Operation not approved by user"
+            success=False, error="Operation not approved by user"
         )
     )
 
@@ -88,8 +87,7 @@ async def test_file_write_requires_approval():
     # Mock execute_with_approval
     mock_agent_engine.execute_with_approval = AsyncMock(
         return_value=OperationResult(
-            success=False,
-            error="Operation not approved by user"
+            success=False, error="Operation not approved by user"
         )
     )
 
@@ -97,7 +95,7 @@ async def test_file_write_requires_approval():
     cli = CommandLineInterface(engine=mock_engine)
 
     # Test file write
-    response_content = '[FILE_WRITE:/etc/passwd] malicious content [/FILE_WRITE]'
+    response_content = "[FILE_WRITE:/etc/passwd] malicious content [/FILE_WRITE]"
 
     # Parse and execute
     await cli._parse_and_execute_operations(response_content)
@@ -131,7 +129,7 @@ async def test_no_subprocess_fallback_for_commands():
     cli = CommandLineInterface(engine=mock_engine)
 
     # Patch subprocess.run to detect if it's called
-    with patch('subprocess.run') as mock_subprocess:
+    with patch("subprocess.run") as mock_subprocess:
         response_content = "[COMMAND_EXEC] echo 'test' [/COMMAND_EXEC]"
 
         # Parse and execute

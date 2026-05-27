@@ -76,17 +76,10 @@ class TestSecurityValidation:
         config_str = str(config)
 
         # Verify that full API keys are not exposed
-        full_openai_key = (
-            "sk-1234567890abcdef"
-            "1234567890abcdef"
-            "1234567890abcdef"
-        )
+        full_openai_key = "sk-1234567890abcdef" "1234567890abcdef" "1234567890abcdef"
         assert full_openai_key not in config_str
         full_claude_key = (
-            "sk-ant-api03-"
-            "1234567890abcdef"
-            "1234567890abcdef"
-            "1234567890abcdef"
+            "sk-ant-api03-" "1234567890abcdef" "1234567890abcdef" "1234567890abcdef"
         )
         assert full_claude_key not in config_str
         assert "azure-key-1234567890abcdef" not in config_str
@@ -283,24 +276,15 @@ class TestSecurityValidation:
 
         test_env_vars = {
             "OPENAI_API_KEY": (
-                "sk-env-1234567890abcdef"
-                "1234567890abcdef"
-                "1234567890abcdef"
+                "sk-env-1234567890abcdef" "1234567890abcdef" "1234567890abcdef"
             ),
             "CLAUDE_API_KEY": (
-                "sk-ant-env-1234567890abcdef"
-                "1234567890abcdef"
-                "1234567890abcdef"
+                "sk-ant-env-1234567890abcdef" "1234567890abcdef" "1234567890abcdef"
             ),
-            "AZURE_OPENAI_KEY": (
-                "azure-env-key-1234567890abcdef"
-            ),
-            "AWS_ACCESS_KEY_ID": (
-                "AKIA-ENV-1234567890ABCDEF"
-            ),
+            "AZURE_OPENAI_KEY": ("azure-env-key-1234567890abcdef"),
+            "AWS_ACCESS_KEY_ID": ("AKIA-ENV-1234567890ABCDEF"),
             "AWS_SECRET_ACCESS_KEY": (
-                "env-secret-1234567890abcdef"
-                "1234567890abcdef12"
+                "env-secret-1234567890abcdef" "1234567890abcdef12"
             ),
         }
 
@@ -486,19 +470,12 @@ class TestSecurityValidation:
                     "1234567890abcdef"
                     "1234567890abcdef"
                 ),
-                "expected_safe_error": (
-                    "Invalid API key: sk-1***"
-                ),
+                "expected_safe_error": ("Invalid API key: sk-1***"),
             },
             {
                 "error_type": "AWS Credentials Error",
-                "raw_error": (
-                    "Access denied for key"
-                    " AKIA1234567890ABCDEF"
-                ),
-                "expected_safe_error": (
-                    "Access denied for key AKIA***"
-                ),
+                "raw_error": ("Access denied for key" " AKIA1234567890ABCDEF"),
+                "expected_safe_error": ("Access denied for key AKIA***"),
             },
             {
                 "error_type": "Configuration Error",
@@ -507,10 +484,7 @@ class TestSecurityValidation:
                     "abcdef1234567890"
                     "abcdef1234567890abcdef12"
                 ),
-                "expected_safe_error": (
-                    "Failed to load config"
-                    " with secret: ***"
-                ),
+                "expected_safe_error": ("Failed to load config" " with secret: ***"),
             },
         ]
 
@@ -539,17 +513,10 @@ class TestSecurityValidation:
             sanitized = sanitize_error_message(scenario["raw_error"])
 
             # Verify sensitive data is removed
-            full_key = (
-                "sk-1234567890abcdef"
-                "1234567890abcdef"
-                "1234567890abcdef"
-            )
+            full_key = "sk-1234567890abcdef" "1234567890abcdef" "1234567890abcdef"
             assert full_key not in sanitized
             assert "AKIA1234567890ABCDEF" not in sanitized
-            secret = (
-                "abcdef1234567890"
-                "abcdef1234567890abcdef12"
-            )
+            secret = "abcdef1234567890" "abcdef1234567890abcdef12"
             assert secret not in sanitized
 
             # Verify masking is present
@@ -588,10 +555,7 @@ if __name__ == "__main__":
 
             print("\n" + "=" * 60)
             print("🎉 All Security Validation Tests Passed!")
-            print(
-                "Task 11.3 - Final validation and"
-                " security review completed"
-            )
+            print("Task 11.3 - Final validation and" " security review completed")
             print("\n🔒 Security Summary:")
             print("   • API key storage and masking validated")
             print("   • Provider authentication security reviewed")

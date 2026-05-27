@@ -453,11 +453,7 @@ class MCPClient:
     @property
     def is_connected(self) -> bool:
         """Check if client is connected to the server."""
-        return bool(
-            self.connected
-            and self.process
-            and self.process.poll() is None
-        )
+        return bool(self.connected and self.process and self.process.poll() is None)
 
     @property
     def server_name(self) -> str:

@@ -253,10 +253,7 @@ class SandboxManager:
                     memory_mb = proc_info.memory_info().rss / (1024 * 1024)
                     if memory_mb > sandboxed_proc.limits.max_memory_mb:
                         pid = sandboxed_proc.process.pid
-                        print(
-                            f"Process {pid} exceeded"
-                            " memory limit"
-                        )
+                        print(f"Process {pid} exceeded" " memory limit")
                         sandboxed_proc.terminate()
                         break
 
@@ -265,10 +262,7 @@ class SandboxManager:
                     cpu_time = cpu_times.user + cpu_times.system
                     if cpu_time > sandboxed_proc.limits.max_cpu_seconds:
                         pid = sandboxed_proc.process.pid
-                        print(
-                            f"Process {pid} exceeded"
-                            " CPU time limit"
-                        )
+                        print(f"Process {pid} exceeded" " CPU time limit")
                         sandboxed_proc.terminate()
                         break
 
@@ -276,10 +270,7 @@ class SandboxManager:
                     runtime = time.time() - sandboxed_proc.start_time
                     if runtime > sandboxed_proc.limits.timeout_seconds:
                         pid = sandboxed_proc.process.pid
-                        print(
-                            f"Process {pid} exceeded"
-                            " runtime limit"
-                        )
+                        print(f"Process {pid} exceeded" " runtime limit")
                         sandboxed_proc.terminate()
                         break
 
@@ -333,7 +324,8 @@ class SandboxManager:
 
     @contextmanager  # type: ignore[arg-type]
     def sandbox_context(  # type: ignore[misc]
-        self, limits: Optional[ResourceLimits] = None,
+        self,
+        limits: Optional[ResourceLimits] = None,
     ) -> None:
         """Context manager for sandbox operations."""
 

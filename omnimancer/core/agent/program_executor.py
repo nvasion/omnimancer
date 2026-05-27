@@ -299,15 +299,15 @@ class CommandValidator:
 
         # Define dangerous shell metacharacters and patterns
         dangerous_patterns = [
-            r';',           # Command separator
-            r'\|',          # Pipe
-            r'&',           # Background/AND
-            r'\$\(',        # Command substitution
-            r'`',           # Backtick command substitution
-            r'>',           # Redirect
-            r'<',           # Redirect
-            r'\n',          # Newline
-            r'\r',          # Carriage return
+            r";",  # Command separator
+            r"\|",  # Pipe
+            r"&",  # Background/AND
+            r"\$\(",  # Command substitution
+            r"`",  # Backtick command substitution
+            r">",  # Redirect
+            r"<",  # Redirect
+            r"\n",  # Newline
+            r"\r",  # Carriage return
         ]
 
         sanitized_args = []
@@ -333,9 +333,7 @@ class StreamingExecutor:
         self.stdout_buffer = []  # type: ignore[var-annotated]
         self.stderr_buffer = []  # type: ignore[var-annotated]
 
-    async def stream_process_output(
-        self, process: asyncio.subprocess.Process
-    ) -> None:
+    async def stream_process_output(self, process: asyncio.subprocess.Process) -> None:
         """Stream output from a running process."""
 
         async def read_stream(
@@ -561,12 +559,8 @@ class EnhancedProgramExecutor:
                         process.communicate(),
                         timeout=float(config.timeout_seconds or 300),
                     )
-                    stdout = raw_stdout.decode(
-                        "utf-8", errors="replace"
-                    )
-                    stderr = raw_stderr.decode(
-                        "utf-8", errors="replace"
-                    )
+                    stdout = raw_stdout.decode("utf-8", errors="replace")
+                    stderr = raw_stderr.decode("utf-8", errors="replace")
                 except asyncio.TimeoutError:
                     process.terminate()
                     try:
@@ -718,9 +712,7 @@ class EnhancedProgramExecutor:
             if process.is_running():
                 proc_args = getattr(process.process, "args", [])
                 if isinstance(proc_args, (list, tuple)) and len(proc_args) > 0:
-                    rest = ' '.join(
-                        str(a) for a in proc_args[1:]
-                    )
+                    rest = " ".join(str(a) for a in proc_args[1:])
                     cmd_str = f"{proc_args[0]} {rest}"
                 else:
                     cmd_str = str(proc_args)

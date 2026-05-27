@@ -106,14 +106,10 @@ class ClaudeCodeProvider(BaseProvider):
             raise ProviderError("Claude command timed out")
         except FileNotFoundError:
             raise ProviderError(
-                f"Claude executable not found: "
-                f"{self.claude_code_path}"
+                f"Claude executable not found: " f"{self.claude_code_path}"
             )
         except Exception as e:
-            raise ProviderError(
-                "Error validating Claude "
-                f"installation: {e}"
-            )
+            raise ProviderError("Error validating Claude " f"installation: {e}")
 
     async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
@@ -135,10 +131,7 @@ class ClaudeCodeProvider(BaseProvider):
             return response
 
         except Exception as e:
-            raise ProviderError(
-                "Error communicating with "
-                f"Claude-code: {e}"
-            )
+            raise ProviderError("Error communicating with " f"Claude-code: {e}")
 
     async def validate_credentials(self) -> bool:
         """
@@ -150,10 +143,7 @@ class ClaudeCodeProvider(BaseProvider):
         try:
             # Test with a simple message
             test_result = await self._execute_claude_code("Hi")
-            return (
-                test_result.returncode == 0
-                and test_result.stdout.strip() != ""
-            )
+            return test_result.returncode == 0 and test_result.stdout.strip() != ""
         except Exception:
             return False
 
@@ -271,13 +261,9 @@ class ClaudeCodeProvider(BaseProvider):
             error_msg = result.stderr.strip() if result.stderr else "Unknown error"
 
             # Check for common error patterns
-            if (
-                "authentication" in error_msg.lower()
-                or "api key" in error_msg.lower()
-            ):
+            if "authentication" in error_msg.lower() or "api key" in error_msg.lower():
                 raise AuthenticationError(
-                    "Claude-code authentication "
-                    f"error: {error_msg}"
+                    "Claude-code authentication " f"error: {error_msg}"
                 )
             elif "rate limit" in error_msg.lower():
                 raise RateLimitError(f"Claude-code rate limit: {error_msg}")

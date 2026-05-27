@@ -288,9 +288,7 @@ class EnhancedModelInfo:
             latest_version=model_info.latest_version,
             deprecated=model_info.deprecated,
             context_window=model_info.max_tokens,
-            is_free=(
-                model_info.cost_per_token == 0  # type: ignore[union-attr]
-            ),
+            is_free=(model_info.cost_per_token == 0),  # type: ignore[union-attr]
             **kwargs,
         )
 
@@ -984,11 +982,7 @@ class MCPConfig(BaseModel):
 
     def get_enabled_servers(self) -> Dict[str, MCPServerConfig]:
         """Get only enabled MCP servers."""
-        return {
-            name: config
-            for name, config in self.servers.items()
-            if config.enabled
-        }
+        return {name: config for name, config in self.servers.items() if config.enabled}
 
     def get_server_by_name(self, name: str) -> Optional[MCPServerConfig]:
         """Get a specific MCP server configuration by name."""

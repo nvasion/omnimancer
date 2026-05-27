@@ -27,9 +27,7 @@ class TestStreamingDisplayEventHandling:
         assert display.model == "claude-sonnet-4-6"
 
     def test_text_delta_accumulates(self, display):
-        display.handle_event(StreamEvent(
-            type=StreamEventType.TEXT_DELTA, text="Hello"
-        ))
+        display.handle_event(StreamEvent(type=StreamEventType.TEXT_DELTA, text="Hello"))
         display.handle_event(
             StreamEvent(type=StreamEventType.TEXT_DELTA, text=" world")
         )

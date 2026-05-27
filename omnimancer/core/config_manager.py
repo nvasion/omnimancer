@@ -295,10 +295,7 @@ class ConfigManager:
         # Check if model already exists (by name and provider)
         existing_model = None
         for i, model in enumerate(config.custom_models):
-            if (
-                model.name == model_info.name
-                and model.provider == model_info.provider
-            ):
+            if model.name == model_info.name and model.provider == model_info.provider:
                 existing_model = i
                 break
 
@@ -455,12 +452,8 @@ class ConfigManager:
             providers[provider_name] = ProviderConfig(
                 api_key=self._encrypt_api_key(config_data["api_key"]),
                 model=config_data["model"],
-                max_tokens=config_data.get(  # type: ignore[arg-type]
-                    "max_tokens"
-                ),
-                temperature=config_data.get(  # type: ignore[arg-type]
-                    "temperature"
-                ),
+                max_tokens=config_data.get("max_tokens"),  # type: ignore[arg-type]
+                temperature=config_data.get("temperature"),  # type: ignore[arg-type]
             )
 
         # Create and save configuration
@@ -583,9 +576,7 @@ class ConfigManager:
         """
         server_config = self.get_mcp_server_config(server_name)
         if not server_config:
-            raise MCPConfigurationError(
-                f"MCP server '{server_name}' is not configured"
-            )
+            raise MCPConfigurationError(f"MCP server '{server_name}' is not configured")
 
         server_config.enabled = True
         self.save_config()
@@ -602,9 +593,7 @@ class ConfigManager:
         """
         server_config = self.get_mcp_server_config(server_name)
         if not server_config:
-            raise MCPConfigurationError(
-                f"MCP server '{server_name}' is not configured"
-            )
+            raise MCPConfigurationError(f"MCP server '{server_name}' is not configured")
 
         server_config.enabled = False
         self.save_config()
@@ -661,9 +650,7 @@ class ConfigManager:
         try:
             config_path = Path(mcp_config_path).expanduser()
             if not config_path.exists():
-                raise MCPConfigurationError(
-                    f"MCP config file not found: {config_path}"
-                )
+                raise MCPConfigurationError(f"MCP config file not found: {config_path}")
 
             with open(config_path, "r") as f:
                 mcp_data = json.load(f)
@@ -677,9 +664,7 @@ class ConfigManager:
             self.save_config()
 
         except json.JSONDecodeError as e:
-            raise MCPConfigurationError(
-                f"Invalid JSON in MCP config file: {e}"
-            )
+            raise MCPConfigurationError(f"Invalid JSON in MCP config file: {e}")
         except Exception as e:
             raise MCPConfigurationError(f"Failed to load MCP configuration: {e}")
 
@@ -871,8 +856,7 @@ class ConfigManager:
         if config.base_url:
             if not config.base_url.startswith(("http://", "https://")):
                 errors.append(
-                    "Ollama base_url must start with"
-                    " 'http://' or 'https://'"
+                    "Ollama base_url must start with" " 'http://' or 'https://'"
                 )
 
         # Model validation is difficult for Ollama since models are dynamic
@@ -1093,9 +1077,7 @@ class ConfigManager:
         # Map CLI arguments to configuration fields
         cli_mapping = {
             "provider": "default_provider",
-            "model": lambda: self._set_provider_model(
-                config, cli_args.get("model")
-            ),
+            "model": lambda: self._set_provider_model(config, cli_args.get("model")),
             "temperature": lambda: self._set_provider_temperature(
                 config, cli_args.get("temperature")
             ),
@@ -1112,12 +1094,8 @@ class ConfigManager:
                     config_path()
                 else:
                     assert isinstance(config_path, str)
-                    setattr(
-                        config, config_path, cli_args[cli_arg]
-                    )
-                    config.config_sources[
-                        config_path
-                    ] = f"cli:{cli_arg}"
+                    setattr(config, config_path, cli_args[cli_arg])
+                    config.config_sources[config_path] = f"cli:{cli_arg}"
 
     def _set_provider_model(self, config: Config, model: Optional[str]) -> None:
         """Set model for the default provider."""

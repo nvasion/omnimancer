@@ -93,8 +93,9 @@ class CLIApprovalIntegration:
 
             # Use the enhanced approval manager
             approved, was_cancelled = (
-                await self.approval_manager  # type: ignore[misc]
-                .request_single_approval(operation)
+                await self.approval_manager.request_single_approval(
+                    operation
+                )  # type: ignore[misc]
             )
 
             # Log the decision
@@ -250,9 +251,7 @@ class CLIApprovalIntegration:
             elif batch_decision.decision_type == "individual":
                 # Handle individual decisions with potential "remember" actions
                 approved_indices = []
-                for i, decision in enumerate(
-                    batch_decision.individual_decisions or []
-                ):
+                for i, decision in enumerate(batch_decision.individual_decisions or []):
                     if decision.is_approved:
                         approved_indices.append(i)
 
@@ -305,8 +304,7 @@ class CLIApprovalIntegration:
 
             # Check permission controller for matching approvals
             has_permission = (
-                await self.permission_controller
-                .check_operation_permission(
+                await self.permission_controller.check_operation_permission(
                     operation.type.value,
                     operation_signature,
                     operation.data,
@@ -343,9 +341,7 @@ class CLIApprovalIntegration:
         """
         try:
             # Generate operation signature
-            operation_signature = (
-                self._generate_operation_signature(operation)
-            )
+            operation_signature = self._generate_operation_signature(operation)
 
             # Store in permission controller
             await self.permission_controller.grant_operation_permission(
@@ -369,12 +365,12 @@ class CLIApprovalIntegration:
         except Exception as e:
             logger.error(f"Error storing approval pattern: {e}")
             self.console.print(
-                "[yellow]⚠️  Failed to store approval"
-                f" pattern: {e}[/yellow]"
+                "[yellow]⚠️  Failed to store approval" f" pattern: {e}[/yellow]"
             )
 
     def _generate_operation_signature(
-        self, operation: Operation,
+        self,
+        operation: Operation,
     ) -> str:
         """
         Generate a signature for operation pattern matching.
@@ -397,39 +393,25 @@ class CLIApprovalIntegration:
             if "path" in operation.data:
                 path = Path(operation.data["path"])
                 # Use directory for pattern matching
-                signature_parts.append(
-                    f"dir:{path.parent}"
-                )
+                signature_parts.append(f"dir:{path.parent}")
                 # Include file extension for type matching
                 if path.suffix:
-                    signature_parts.append(
-                        f"ext:{path.suffix}"
-                    )
+                    signature_parts.append(f"ext:{path.suffix}")
 
         elif operation.type == OperationType.COMMAND_EXECUTE:
             if "command" in operation.data:
                 command = operation.data["command"]
                 # Use base command name for matching
-                base_command = (
-                    command.split()[0]
-                    if command.split()
-                    else command
-                )
-                signature_parts.append(
-                    f"cmd:{base_command}"
-                )
+                base_command = command.split()[0] if command.split() else command
+                signature_parts.append(f"cmd:{base_command}")
 
         elif operation.type == OperationType.WEB_REQUEST:
             if "url" in operation.data:
                 from urllib.parse import urlparse
 
-                parsed_url = urlparse(
-                    operation.data["url"]
-                )
+                parsed_url = urlparse(operation.data["url"])
                 # Use domain for matching
-                signature_parts.append(
-                    f"domain:{parsed_url.netloc}"
-                )
+                signature_parts.append(f"domain:{parsed_url.netloc}")
                 # Include method
                 method = operation.data.get("method", "GET")
                 signature_parts.append(f"method:{method}")
@@ -437,21 +419,19 @@ class CLIApprovalIntegration:
         return "|".join(signature_parts)
 
     def _log_approval_decision(
-        self, operation: Operation, approved: bool,
+        self,
+        operation: Operation,
+        approved: bool,
     ) -> None:
         """Log approval decision for audit trail."""
         log_entry = {
             "timestamp": (
-                operation.created_at.isoformat()
-                if operation.created_at
-                else None
+                operation.created_at.isoformat() if operation.created_at else None
             ),
             "operation_type": operation.type.value,
             "operation_description": operation.description,
             "approved": approved,
-            "operation_signature": (
-                self._generate_operation_signature(operation)
-            ),
+            "operation_signature": (self._generate_operation_signature(operation)),
         }
 
         self.approval_session_log.append(log_entry)
@@ -490,18 +470,12 @@ class CLIApprovalIntegration:
         """Record detailed session decision information."""
         decision_record = {
             "operation_type": operation.type.value,
-            "operation_description": (
-                operation.description
-            ),
+            "operation_description": (operation.description),
             "decision_type": decision.decision.value,
             "approved": decision.is_approved,
             "remember": decision.should_remember,
-            "response_time_seconds": (
-                decision.response_time_seconds
-            ),
-            "timeout_occurred": (
-                decision.timeout_occurred
-            ),
+            "response_time_seconds": (decision.response_time_seconds),
+            "timeout_occurred": (decision.timeout_occurred),
             "user_notes": decision.user_notes,
             "timestamp": decision.created_at.isoformat(),  # type: ignore[union-attr]
         }

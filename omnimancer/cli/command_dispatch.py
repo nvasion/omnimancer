@@ -117,9 +117,7 @@ class CommandDispatchMixin:
         elif slash_cmd == SlashCommand.CONFIG:
             await self._handle_config_command(command)
         elif slash_cmd is not None:
-            self._show_info(
-                f"Command {slash_cmd.value} is not yet implemented"
-            )
+            self._show_info(f"Command {slash_cmd.value} is not yet implemented")
 
     async def _handle_dynamic_command(self, command: Command) -> None:
         """
@@ -492,18 +490,14 @@ class CommandDispatchMixin:
                                 or m.lower() in model_name.lower()
                             ]
                             if suggestions:
-                                models_str = ", ".join(
-                                    suggestions[:5]
-                                )
+                                models_str = ", ".join(suggestions[:5])
                                 self._show_info(
                                     "Available models for"
                                     f" {provider_name}:"
                                     f" {models_str}"
                                 )
                             else:
-                                models_str = ", ".join(
-                                    all_model_names[:5]
-                                )
+                                models_str = ", ".join(all_model_names[:5])
                                 self._show_info(
                                     "Available models for"
                                     f" {provider_name}:"
@@ -757,10 +751,9 @@ class CommandDispatchMixin:
 
                 lines.append(f"  📄 {conv['filename']}")
                 lines.append(f"     Created: {created}")
-                model = conv.get('current_model', 'Unknown')
+                model = conv.get("current_model", "Unknown")
                 lines.append(
-                    f"     Messages: {conv['message_count']},"
-                    f" Model: {model}"
+                    f"     Messages: {conv['message_count']}," f" Model: {model}"
                 )
                 lines.append("")
 
@@ -917,11 +910,12 @@ class CommandDispatchMixin:
                 ops = status.get("operations", {})
                 in_prog = ops.get("in_progress", 0)
                 mode = status.get("mode", "unknown")
-                self.console.print(Panel(
-                    f"Mode: {mode}\n"
-                    f"Operations in progress: {in_prog}",
-                    title="Agent Status",
-                ))
+                self.console.print(
+                    Panel(
+                        f"Mode: {mode}\n" f"Operations in progress: {in_prog}",
+                        title="Agent Status",
+                    )
+                )
 
             elif subcommand == "pause":
                 success = self.agent_manager.pause_agent_mode()
@@ -945,9 +939,7 @@ class CommandDispatchMixin:
 
             else:
                 self._show_error(f"Unknown agent subcommand: {subcommand}")
-                self._show_info(
-                    "Available commands: on, off, status, pause, resume"
-                )
+                self._show_info("Available commands: on, off, status, pause, resume")
 
         except Exception as e:
             self._show_error(f"Agent command failed: {e}")
@@ -994,9 +986,7 @@ class CommandDispatchMixin:
                     return
 
                 count = len(recent_commands)
-                table = Table(
-                    title=f"Recent Commands (Last {count})"
-                )
+                table = Table(title=f"Recent Commands (Last {count})")
                 table.add_column("Index", style="dim", width=6)
                 table.add_column("Time", style="cyan", width=16)
                 table.add_column("Command", style="white")
@@ -1277,9 +1267,7 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
             for model in custom_models:
                 cost_in = model.cost_per_million_input
                 cost_out = model.cost_per_million_output
-                cost_display = (
-                    f"${cost_in:.1f}/${cost_out:.1f}"
-                )
+                cost_display = f"${cost_in:.1f}/${cost_out:.1f}"
                 swe_display = f"{model.swe_score:.1f}" if model.swe_score else "N/A"
                 tools_display = "✓" if model.supports_tools else "✗"
                 mm_display = "✓" if model.supports_multimodal else "✗"

@@ -61,11 +61,13 @@ class HeadlessOutputEmitter:
 
     def emit_init(self, model: str) -> None:
         if self._format == OutputFormat.STREAM_JSON:
-            self._write_json_line({
-                "type": "system",
-                "subtype": "init",
-                "model": model,
-            })
+            self._write_json_line(
+                {
+                    "type": "system",
+                    "subtype": "init",
+                    "model": model,
+                }
+            )
 
     def emit_assistant(
         self,
@@ -78,29 +80,33 @@ class HeadlessOutputEmitter:
             self._stdout.write(content + "\n")
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
-            self._write_json_line({
-                "type": "assistant",
-                "message": {
-                    "model": model,
-                    "content": content,
-                    "stop_reason": stop_reason,
-                },
-            })
+            self._write_json_line(
+                {
+                    "type": "assistant",
+                    "message": {
+                        "model": model,
+                        "content": content,
+                        "stop_reason": stop_reason,
+                    },
+                }
+            )
 
     def emit_tool_use(
-        self, name: str, arguments: dict,
+        self,
+        name: str,
+        arguments: dict,
     ) -> None:
         if self._format == OutputFormat.TEXT and self._verbose:
             args_json = json.dumps(arguments)
-            self._stdout.write(
-                f"[tool] {name} {args_json}\n"
-            )
+            self._stdout.write(f"[tool] {name} {args_json}\n")
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
-            self._write_json_line({
-                "type": "tool_use",
-                "tool": {"name": name, "arguments": arguments},
-            })
+            self._write_json_line(
+                {
+                    "type": "tool_use",
+                    "tool": {"name": name, "arguments": arguments},
+                }
+            )
 
     def emit_tool_result(
         self,
@@ -113,14 +119,16 @@ class HeadlessOutputEmitter:
             self._stdout.write(f"[result] {name}: {status}\n")
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
-            self._write_json_line({
-                "type": "tool_result",
-                "tool": {
-                    "name": name,
-                    "content": content,
-                    "error": error,
-                },
-            })
+            self._write_json_line(
+                {
+                    "type": "tool_result",
+                    "tool": {
+                        "name": name,
+                        "content": content,
+                        "error": error,
+                    },
+                }
+            )
 
     def emit_result(
         self,
@@ -146,14 +154,16 @@ class HeadlessOutputEmitter:
             self._stdout.write(json.dumps(blob, default=str) + "\n")
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
-            self._write_json_line({
-                "type": "result",
-                "result": content,
-                "model": model,
-                "usage": usage,
-                "total_cost_usd": cost,
-                "stop_reason": stop_reason,
-            })
+            self._write_json_line(
+                {
+                    "type": "result",
+                    "result": content,
+                    "model": model,
+                    "usage": usage,
+                    "total_cost_usd": cost,
+                    "stop_reason": stop_reason,
+                }
+            )
 
     def emit_error(self, message: str) -> None:
         self._stderr.write(f"Error: {message}\n")
@@ -227,9 +237,7 @@ class HeadlessRunner:
             for tc in response.tool_calls:
                 self._emitter.emit_tool_use(tc.name, tc.arguments)
 
-                result = await tool_handler.execute_tool_call(
-                    tc
-                )
+                result = await tool_handler.execute_tool_call(tc)
                 self._emitter.emit_tool_result(
                     tc.name,
                     result.content or "",

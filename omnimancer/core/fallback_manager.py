@@ -563,7 +563,9 @@ class EnhancedProviderFallback:
             logger.info("Reset stats for all providers")
 
     def configure_circuit_breaker(
-        self, threshold: int = 5, recovery_time: int = 600,
+        self,
+        threshold: int = 5,
+        recovery_time: int = 600,
     ) -> None:
         """Configure circuit breaker settings."""
         self.circuit_breaker_threshold = threshold

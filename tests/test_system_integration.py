@@ -164,14 +164,8 @@ class TestSystemIntegrationSimple:
                 provider_name in available_providers
             ), f"Provider {provider_name} not registered"
 
-        print(
-            f"All {len(expected_providers)} providers"
-            " registered in factory"
-        )
-        print(
-            "Available providers: "
-            f"{', '.join(sorted(available_providers))}"
-        )
+        print(f"All {len(expected_providers)} providers" " registered in factory")
+        print("Available providers: " f"{', '.join(sorted(available_providers))}")
 
     @pytest.mark.asyncio
     async def test_provider_model_information_retrieval(self):
@@ -238,9 +232,7 @@ class TestSystemIntegrationSimple:
         assert (
             tool_provider_count >= 3
         ), f"Expected at least 3 providers with tool support, got {tool_provider_count}"
-        assert (
-            multimodal_provider_count >= 2
-        ), (
+        assert multimodal_provider_count >= 2, (
             "Expected at least 2 providers with multimodal"
             f" support, got {multimodal_provider_count}"
         )
@@ -429,10 +421,7 @@ class TestSystemIntegrationSimple:
 
                 print(f"✅ Switched to {provider_name}: {response.content}")
 
-        print(
-            f"Simulated switching between "
-            f"{switch_count} providers"
-        )
+        print(f"Simulated switching between " f"{switch_count} providers")
         assert (
             switch_count >= 5
         ), f"Expected at least 5 provider switches, got {switch_count}"
@@ -471,12 +460,8 @@ class TestSystemIntegrationSimple:
             if capabilities.get("supports_multimodal", False):
                 providers_with_multimodal += 1
 
-            tools = capabilities.get(
-                'supports_tools', False
-            )
-            mm = capabilities.get(
-                'supports_multimodal', False
-            )
+            tools = capabilities.get("supports_tools", False)
+            mm = capabilities.get("supports_multimodal", False)
             print(
                 f"{provider_name}: "
                 f"{len(models)} models, "
@@ -499,9 +484,7 @@ class TestSystemIntegrationSimple:
         assert (
             total_models >= 20
         ), f"Expected at least 20 total models, got {total_models}"
-        assert (
-            providers_with_tools >= 5
-        ), (
+        assert providers_with_tools >= 5, (
             "Expected at least 5 providers with tool"
             f" support, got {providers_with_tools}"
         )
@@ -549,10 +532,7 @@ class TestSystemIntegrationSimple:
         assert len(restored_config.providers) == len(config.providers)
 
         print("✅ Configuration integration test passed")
-        print(
-            f"All {len(expected_providers)}"
-            " providers properly configured"
-        )
+        print(f"All {len(expected_providers)}" " providers properly configured")
         print("✅ Configuration serialization/deserialization works")
 
 
@@ -580,10 +560,7 @@ if __name__ == "__main__":
 
             print("\n" + "=" * 60)
             print("🎉 All System Integration Tests Passed!")
-            print(
-                "Task 11.2 - System integration"
-                " testing completed"
-            )
+            print("Task 11.2 - System integration" " testing completed")
 
         except Exception as e:
             print(f"\n❌ Test failed: {e}")

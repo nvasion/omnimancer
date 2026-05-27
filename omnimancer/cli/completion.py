@@ -153,9 +153,9 @@ class CompletionMixin:
             else:
                 arg_index = len(args) - 1 if args else 0
 
-            return list(self.completion_manager.get_completions(
-                command, arg_index, text, args
-            ))
+            return list(
+                self.completion_manager.get_completions(command, arg_index, text, args)
+            )
         except Exception:
             return []
 
@@ -165,9 +165,18 @@ class CompletionMixin:
                 provider_names = list(self.engine.providers.keys())
             else:
                 provider_names = [
-                    "openai", "claude", "gemini", "openrouter", "azure",
-                    "bedrock", "mistral", "perplexity", "cohere", "xai",
-                    "ollama", "vertex",
+                    "openai",
+                    "claude",
+                    "gemini",
+                    "openrouter",
+                    "azure",
+                    "bedrock",
+                    "mistral",
+                    "perplexity",
+                    "cohere",
+                    "xai",
+                    "ollama",
+                    "vertex",
                 ]
 
             return [name for name in provider_names if name.startswith(text)]

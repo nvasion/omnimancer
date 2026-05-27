@@ -51,15 +51,11 @@ class TestToolCallingFlowIntegration:
     """Test the _handle_tool_calling_flow method."""
 
     @pytest.mark.asyncio
-    async def test_simple_tool_call_round_trip(
-        self, interface, mock_engine
-    ):
+    async def test_simple_tool_call_round_trip(self, interface, mock_engine):
         """Provider returns tool call; we execute and finish."""
         agent_engine = MagicMock()
         agent_engine.execute_with_approval = AsyncMock(
-            return_value=OperationResult(
-                success=True, data="print('hello world')"
-            )
+            return_value=OperationResult(success=True, data="print('hello world')")
         )
         mock_engine.agent_engine = agent_engine
 
@@ -69,9 +65,7 @@ class TestToolCallingFlowIntegration:
             model_used="claude-sonnet-4",
             tokens_used=50,
             timestamp=datetime.now(),
-            tool_calls=[
-                ToolCall(name="file_read", arguments={"path": "/src/main.py"})
-            ],
+            tool_calls=[ToolCall(name="file_read", arguments={"path": "/src/main.py"})],
         )
 
         # Second call: provider finishes (no more tool calls)
@@ -218,9 +212,7 @@ class TestToolCallingFlowIntegration:
         assert "Permission denied" in second_call_msg
 
     @pytest.mark.asyncio
-    async def test_max_iterations_guard(
-        self, interface, mock_engine
-    ):
+    async def test_max_iterations_guard(self, interface, mock_engine):
         """Flow stops after MAX_TOOL_ITERATIONS."""
         agent_engine = MagicMock()
         agent_engine.execute_with_approval = AsyncMock(
@@ -233,14 +225,10 @@ class TestToolCallingFlowIntegration:
             model_used="claude-sonnet-4",
             tokens_used=10,
             timestamp=datetime.now(),
-            tool_calls=[
-                ToolCall(name="file_read", arguments={"path": "/loop.py"})
-            ],
+            tool_calls=[ToolCall(name="file_read", arguments={"path": "/loop.py"})],
         )
 
-        mock_engine.send_message_with_tools = AsyncMock(
-            return_value=infinite_response
-        )
+        mock_engine.send_message_with_tools = AsyncMock(return_value=infinite_response)
 
         with patch.object(interface, "_show_assistant_message"):
             with patch.object(interface, "_show_warning") as mock_warn:
@@ -267,9 +255,7 @@ class TestChatMessageRouting:
     """Test _handle_chat_message routes between tool calling and markers."""
 
     @pytest.mark.asyncio
-    async def test_agent_mode_with_tools_uses_tool_flow(
-        self, interface, mock_engine
-    ):
+    async def test_agent_mode_with_tools_uses_tool_flow(self, interface, mock_engine):
         """When agent mode is on and provider supports tools, use tool calling."""
         from omnimancer.cli.commands import Command, CommandType
 
@@ -294,12 +280,8 @@ class TestChatMessageRouting:
                 "_complete_approval_integration_setup",
                 new_callable=AsyncMock,
             ):
-                with patch.object(
-                    interface, "_show_user_message"
-                ):
-                    cancel_handler = (
-                        interface.cancellation_handler
-                    )
+                with patch.object(interface, "_show_user_message"):
+                    cancel_handler = interface.cancellation_handler
                     with patch.object(
                         cancel_handler,
                         "start_cancellable_operation",
@@ -310,13 +292,9 @@ class TestChatMessageRouting:
 
                         mock_cancel.side_effect = run_op
 
-                        await interface._handle_chat_message(
-                            command
-                        )
+                        await interface._handle_chat_message(command)
 
-        mock_tool_flow.assert_called_once_with(
-            "Read main.py"
-        )
+        mock_tool_flow.assert_called_once_with("Read main.py")
 
     @pytest.mark.asyncio
     async def test_agent_mode_without_tools_uses_markers(self, interface, mock_engine):
@@ -355,12 +333,8 @@ class TestChatMessageRouting:
                     "_complete_approval_integration_setup",
                     new_callable=AsyncMock,
                 ):
-                    with patch.object(
-                        interface, "_show_user_message"
-                    ):
-                        cancel_handler = (
-                            interface.cancellation_handler
-                        )
+                    with patch.object(interface, "_show_user_message"):
+                        cancel_handler = interface.cancellation_handler
                         with patch.object(
                             cancel_handler,
                             "start_cancellable_operation",
@@ -371,9 +345,7 @@ class TestChatMessageRouting:
 
                             mock_cancel.side_effect = run_op
 
-                            await interface._handle_chat_message(
-                                command
-                            )
+                            await interface._handle_chat_message(command)
 
         mock_tool_flow.assert_not_called()
         mock_workflow.assert_called_once()
@@ -398,18 +370,10 @@ class TestChatMessageRouting:
         mock_response.model_used = "test-model"
         mock_engine.send_message = AsyncMock(return_value=mock_response)
 
-        with patch.object(
-            interface, "_show_user_message"
-        ):
-            with patch.object(
-                interface, "_show_assistant_message"
-            ) as mock_show:
-                with patch.object(
-                    interface, "_show_token_status"
-                ):
-                    cancel_handler = (
-                        interface.cancellation_handler
-                    )
+        with patch.object(interface, "_show_user_message"):
+            with patch.object(interface, "_show_assistant_message") as mock_show:
+                with patch.object(interface, "_show_token_status"):
+                    cancel_handler = interface.cancellation_handler
                     with patch.object(
                         cancel_handler,
                         "start_cancellable_operation",
@@ -420,10 +384,6 @@ class TestChatMessageRouting:
 
                         mock_cancel.side_effect = run_op
 
-                        await interface._handle_chat_message(
-                            command
-                        )
+                        await interface._handle_chat_message(command)
 
-        mock_show.assert_called_once_with(
-            "Hi there!", "test-model"
-        )
+        mock_show.assert_called_once_with("Hi there!", "test-model")

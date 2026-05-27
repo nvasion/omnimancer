@@ -71,14 +71,26 @@ class TestTokenAccumulator:
         from omnimancer.cli.headless import TokenAccumulator
 
         acc = TokenAccumulator()
-        acc.add(ChatResponse(
-            content="a", model_used="m", tokens_used=10,
-            input_tokens=6, output_tokens=4, cost_estimate=0.001,
-        ))
-        acc.add(ChatResponse(
-            content="b", model_used="m", tokens_used=20,
-            input_tokens=12, output_tokens=8, cost_estimate=0.002,
-        ))
+        acc.add(
+            ChatResponse(
+                content="a",
+                model_used="m",
+                tokens_used=10,
+                input_tokens=6,
+                output_tokens=4,
+                cost_estimate=0.001,
+            )
+        )
+        acc.add(
+            ChatResponse(
+                content="b",
+                model_used="m",
+                tokens_used=20,
+                input_tokens=12,
+                output_tokens=8,
+                cost_estimate=0.002,
+            )
+        )
 
         total = acc.total
         assert total["input_tokens"] == 18
@@ -127,9 +139,11 @@ class TestHeadlessOutputEmitterText:
         emitter._stdout = buf
 
         emitter.emit_result(
-            "Final answer", "claude",
+            "Final answer",
+            "claude",
             {"input_tokens": 10, "output_tokens": 5},
-            0.001, "end_turn",
+            0.001,
+            "end_turn",
         )
         assert "Final answer" in buf.getvalue()
 
@@ -167,9 +181,11 @@ class TestHeadlessOutputEmitterJSON:
 
         emitter.emit_assistant("intermediate", "claude", None)
         emitter.emit_result(
-            "Final", "claude",
+            "Final",
+            "claude",
             {"input_tokens": 10, "output_tokens": 5},
-            0.001, "end_turn",
+            0.001,
+            "end_turn",
         )
 
         output = json.loads(buf.getvalue())
@@ -287,9 +303,11 @@ class TestHeadlessOutputEmitterStreamJSON:
         emitter._stdout = buf
 
         emitter.emit_result(
-            "Done", "claude",
+            "Done",
+            "claude",
             {"input_tokens": 50, "output_tokens": 25},
-            0.005, "end_turn",
+            0.005,
+            "end_turn",
         )
 
         line = json.loads(buf.getvalue().strip())
@@ -526,9 +544,7 @@ class TestHeadlessRunner:
 
         mock_engine = MagicMock()
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
-        mock_engine.send_message_with_tools = AsyncMock(
-            return_value=infinite_response
-        )
+        mock_engine.send_message_with_tools = AsyncMock(return_value=infinite_response)
 
         mock_agent_engine = MagicMock()
         mock_agent_engine.execute_with_approval = AsyncMock(

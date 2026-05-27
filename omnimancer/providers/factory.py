@@ -86,14 +86,9 @@ class ProviderFactory:
     ) -> BaseProvider:
         """Get or create a cached provider instance."""
         config_hash = hash(str(config.model_dump()))
-        cache_key = (
-            f"{provider_name}:{config.model}:{config_hash}"
-        )
+        cache_key = f"{provider_name}:{config.model}:{config_hash}"
 
-        if (
-            cache_key in cls._provider_instances
-            and cls._is_cache_valid(cache_key)
-        ):
+        if cache_key in cls._provider_instances and cls._is_cache_valid(cache_key):
             return cls._provider_instances[cache_key]
 
         # Create new instance
@@ -140,17 +135,13 @@ class ProviderFactory:
             if enhanced:
                 # Convert to EnhancedModelInfo if needed
                 enhanced_models: List[EnhancedModelInfo]
-                if raw_models and isinstance(
-                    raw_models[0], ModelInfo
-                ):
+                if raw_models and isinstance(raw_models[0], ModelInfo):
                     enhanced_models = [
-                        EnhancedModelInfo.from_model_info(model)
-                        for model in raw_models
+                        EnhancedModelInfo.from_model_info(model) for model in raw_models
                     ]
                 else:
                     enhanced_models = [
-                        EnhancedModelInfo.from_model_info(model)
-                        for model in raw_models
+                        EnhancedModelInfo.from_model_info(model) for model in raw_models
                     ]
                 cls._enhanced_model_cache[provider_name] = enhanced_models
                 cls._cache_timestamps[provider_name] = time.time()
@@ -158,18 +149,14 @@ class ProviderFactory:
             else:
                 # Convert to ModelInfo if needed
                 basic_models: List[ModelInfo]
-                if raw_models and isinstance(
-                    raw_models[0], EnhancedModelInfo
-                ):
+                if raw_models and isinstance(raw_models[0], EnhancedModelInfo):
                     basic_models = [
                         m.to_model_info()
                         for m in raw_models
                         if isinstance(m, EnhancedModelInfo)
                     ]
                 else:
-                    basic_models = [
-                        m for m in raw_models if isinstance(m, ModelInfo)
-                    ]
+                    basic_models = [m for m in raw_models if isinstance(m, ModelInfo)]
                 cls._model_cache[provider_name] = basic_models
                 cls._cache_timestamps[provider_name] = time.time()
                 return basic_models
@@ -639,9 +626,7 @@ class ProviderFactory:
                     filtered_models = [m for m in enhanced_models if m.supports_tools]
                 elif capability == "multimodal":
                     filtered_models = [
-                        m
-                        for m in enhanced_models
-                        if m.supports_multimodal
+                        m for m in enhanced_models if m.supports_multimodal
                     ]
                 elif capability == "streaming":
                     # For streaming, check provider capability

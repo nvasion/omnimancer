@@ -224,9 +224,7 @@ class BaseProvider(ABC):
         context: ChatContext,
         available_tools: List[ToolDefinition],
     ) -> AsyncIterator[StreamEvent]:
-        response = await self.send_message_with_tools(
-            message, context, available_tools
-        )
+        response = await self.send_message_with_tools(message, context, available_tools)
         yield StreamEvent(type=StreamEventType.MESSAGE_START, model=self.model)
         if response.content:
             yield StreamEvent(type=StreamEventType.TEXT_DELTA, text=response.content)

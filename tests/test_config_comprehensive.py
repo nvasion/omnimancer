@@ -56,13 +56,9 @@ class TestConfigValidator:
             mcp=MCPConfig(),
         )
 
-        with patch(
-            "omnimancer.core.config_validator.Path"
-        ) as mock_path:
+        with patch("omnimancer.core.config_validator.Path") as mock_path:
             expanded = mock_path.return_value.expanduser
-            expanded.return_value.parent.exists.return_value = (
-                True
-            )
+            expanded.return_value.parent.exists.return_value = True
 
             errors = self.validator.validate_config(config)
 
@@ -113,13 +109,9 @@ class TestConfigValidator:
             mcp=MCPConfig(),
         )
 
-        with patch(
-            "omnimancer.core.config_validator.Path"
-        ) as mock_path:
+        with patch("omnimancer.core.config_validator.Path") as mock_path:
             expanded = mock_path.return_value.expanduser
-            expanded.return_value.parent.exists.return_value = (
-                True
-            )
+            expanded.return_value.parent.exists.return_value = True
 
             # First call
             errors1 = self.validator.validate_config(config)
@@ -262,9 +254,7 @@ class TestConfigRepair:
 
         assert isinstance(issues, list)
         # Should have minimal issues for valid config
-        error_issues = [
-            i for i in issues if i["severity"] == "error"
-        ]
+        error_issues = [i for i in issues if i["severity"] == "error"]
         assert len(error_issues) == 0
 
     def test_is_error_fixable(self):
@@ -380,16 +370,11 @@ class TestConfigTemplateManager:
 
         for template in templates:
             if template.mcp_servers:
-                for sname, sconfig in (
-                    template.mcp_servers.items()
-                ):
+                for sname, sconfig in template.mcp_servers.items():
                     desc = sconfig.get("description", "")
                     if desc:
-                        assert (
-                            "uvx" in desc.lower()
-                        ), (
-                            f"Server {sname} description"
-                            " should mention uvx"
+                        assert "uvx" in desc.lower(), (
+                            f"Server {sname} description" " should mention uvx"
                         )
 
 
@@ -474,9 +459,7 @@ class TestConfigTemplate:
         assert template.mcp_servers["filesystem"]["command"] == "fs-server"
 
 
-@pytest.mark.skip(
-    reason="ConfigGenerator/ConfigRepair removed"
-)
+@pytest.mark.skip(reason="ConfigGenerator/ConfigRepair removed")
 class TestConfigIntegration:
     """Integration tests for config components."""
 
@@ -513,21 +496,15 @@ class TestConfigIntegration:
         )
 
         # 4. Validate config
-        with patch(
-            "omnimancer.core.config_validator.Path"
-        ) as mock_path:
+        with patch("omnimancer.core.config_validator.Path") as mock_path:
             expanded = mock_path.return_value.expanduser
-            expanded.return_value.parent.exists.return_value = (
-                True
-            )
+            expanded.return_value.parent.exists.return_value = True
             errors = self.validator.validate_config(config)
             assert len(errors) == 0
 
         # 5. Analyze for issues (removed as over-engineered)
         issues = []
-        error_issues = [
-            i for i in issues if i["severity"] == "error"
-        ]
+        error_issues = [i for i in issues if i["severity"] == "error"]
         assert len(error_issues) == 0
 
         # 6. Test migration detection
@@ -608,13 +585,9 @@ class TestConfigIntegration:
             mcp=MCPConfig(),
         )
 
-        with patch(
-            "omnimancer.core.config_validator.Path"
-        ) as mock_path:
+        with patch("omnimancer.core.config_validator.Path") as mock_path:
             expanded = mock_path.return_value.expanduser
-            expanded.return_value.parent.exists.return_value = (
-                True
-            )
+            expanded.return_value.parent.exists.return_value = True
             errors = self.validator.validate_config(config)
             assert len(errors) == 0
 

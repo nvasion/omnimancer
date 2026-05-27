@@ -107,9 +107,7 @@ class OpenRouterProvider(BaseProvider):
         ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
         for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(
-                    verify=ssl_verify
-                ) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/chat/completions",
                         headers=self._get_headers(),
@@ -126,13 +124,9 @@ class OpenRouterProvider(BaseProvider):
                     continue
                 else:
                     # Non-SSL connection error, don't retry
-                    raise NetworkError(
-                        f"Connection error: {e}"
-                    )
+                    raise NetworkError(f"Connection error: {e}")
             except httpx.TimeoutException:
-                raise NetworkError(
-                    "Request to OpenRouter API timed out"
-                )
+                raise NetworkError("Request to OpenRouter API timed out")
             except httpx.RequestError as e:
                 if "SSL" not in str(e) and "certificate" not in str(e):
                     # Non-SSL request error, don't retry
@@ -152,10 +146,7 @@ class OpenRouterProvider(BaseProvider):
                 raise ProviderError(f"Unexpected error: {e}")
 
         # If we get here, all SSL methods failed
-        raise NetworkError(
-            "Failed to establish SSL connection "
-            "to OpenRouter API"
-        )
+        raise NetworkError("Failed to establish SSL connection " "to OpenRouter API")
 
     async def send_message_with_tools(
         self,
@@ -202,9 +193,7 @@ class OpenRouterProvider(BaseProvider):
         ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
         for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(
-                    verify=ssl_verify
-                ) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/chat/completions",
                         headers=self._get_headers(),
@@ -221,13 +210,9 @@ class OpenRouterProvider(BaseProvider):
                     continue
                 else:
                     # Non-SSL connection error, don't retry
-                    raise NetworkError(
-                        f"Connection error: {e}"
-                    )
+                    raise NetworkError(f"Connection error: {e}")
             except httpx.TimeoutException:
-                raise NetworkError(
-                    "Request to OpenRouter API timed out"
-                )
+                raise NetworkError("Request to OpenRouter API timed out")
             except httpx.RequestError as e:
                 if "SSL" not in str(e) and "certificate" not in str(e):
                     # Non-SSL request error, don't retry
@@ -247,10 +232,7 @@ class OpenRouterProvider(BaseProvider):
                 raise ProviderError(f"Unexpected error: {e}")
 
         # If we get here, all SSL methods failed
-        raise NetworkError(
-            "Failed to establish SSL connection "
-            "to OpenRouter API"
-        )
+        raise NetworkError("Failed to establish SSL connection " "to OpenRouter API")
 
     async def validate_credentials(self) -> bool:
         """
@@ -263,9 +245,7 @@ class OpenRouterProvider(BaseProvider):
         ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
         for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(
-                    verify=ssl_verify
-                ) as client:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/chat/completions",
                         headers=self._get_headers(),
@@ -421,9 +401,7 @@ class OpenRouterProvider(BaseProvider):
                             " be unavailable or "
                             "overloaded)\n\n"
                         )
-                        final_content = (
-                            fallback_warning + content
-                        )
+                        final_content = fallback_warning + content
 
                 return ChatResponse(
                     content=final_content,
@@ -432,14 +410,10 @@ class OpenRouterProvider(BaseProvider):
                     timestamp=datetime.now(),
                 )
             else:
-                raise ProviderError(
-                    "Empty response from OpenRouter API"
-                )
+                raise ProviderError("Empty response from OpenRouter API")
 
         elif response.status_code == 401:
-            raise AuthenticationError(
-                "Invalid OpenRouter API key"
-            )
+            raise AuthenticationError("Invalid OpenRouter API key")
         elif response.status_code == 429:
             raise RateLimitError("OpenRouter API rate limit exceeded")
         elif response.status_code == 404:
@@ -509,9 +483,7 @@ class OpenRouterProvider(BaseProvider):
                             " be unavailable or "
                             "overloaded)\n\n"
                         )
-                        final_content = (
-                            fallback_warning + content
-                        )
+                        final_content = fallback_warning + content
 
                 return ChatResponse(
                     content=final_content,
@@ -521,9 +493,7 @@ class OpenRouterProvider(BaseProvider):
                     timestamp=datetime.now(),
                 )
             else:
-                raise ProviderError(
-                    "Empty response from OpenRouter API"
-                )
+                raise ProviderError("Empty response from OpenRouter API")
         else:
             return self._handle_response(response)
 

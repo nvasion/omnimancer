@@ -86,13 +86,10 @@ class VertexAIProvider(BaseProvider):
         if self.service_account_path:
             # Use service account file
             if os.path.exists(self.service_account_path):
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-                    self.service_account_path
-                )
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.service_account_path
             else:
                 raise ValueError(
-                    "Service account file not found: "
-                    f"{self.service_account_path}"
+                    "Service account file not found: " f"{self.service_account_path}"
                 )
         elif self.api_key and self.api_key != "":
             # Use API key (for testing or specific configurations)
@@ -107,10 +104,7 @@ class VertexAIProvider(BaseProvider):
                     " must be provided for Vertex AI"
                 )
             except Exception as e:
-                raise ValueError(
-                    "Failed to set up Vertex AI "
-                    f"authentication: {e}"
-                )
+                raise ValueError("Failed to set up Vertex AI " f"authentication: {e}")
 
     async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """

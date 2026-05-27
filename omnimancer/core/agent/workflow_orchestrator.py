@@ -381,15 +381,12 @@ class WorkflowOrchestrator:
     async def _request_approval(self, step: WorkflowStep) -> bool:
         """Request approval for a step that requires it."""
         self.console.print(
-            f"\n[yellow]⚠ Step '{step.name}' "
-            "requires approval[/yellow]"
+            f"\n[yellow]⚠ Step '{step.name}' " "requires approval[/yellow]"
         )
         self.console.print(f"Description: {step.description}")
 
         # Use the approval manager if available
-        if self.approval_manager and hasattr(
-            self.approval_manager, "request_approval"
-        ):
+        if self.approval_manager and hasattr(self.approval_manager, "request_approval"):
             # Create a basic operation object for the approval manager
             from .types import Operation, OperationType
 
@@ -429,16 +426,8 @@ class WorkflowOrchestrator:
         """Display a clean summary of the workflow execution."""
         assert self.context is not None
         history = self.context.history
-        completed = sum(
-            1
-            for s in history
-            if s.status == WorkflowStatus.COMPLETED
-        )
-        failed = sum(
-            1
-            for s in history
-            if s.status == WorkflowStatus.FAILED
-        )
+        completed = sum(1 for s in history if s.status == WorkflowStatus.COMPLETED)
+        failed = sum(1 for s in history if s.status == WorkflowStatus.FAILED)
         total = len(history)
 
         if failed == 0:
@@ -502,10 +491,7 @@ class WorkflowOrchestrator:
         files = context.get("project_files", [])
 
         # Check for common tech indicators
-        file_names = [
-            f.replace("📄 ", "").replace("📁 ", "").strip("/")
-            for f in files
-        ]
+        file_names = [f.replace("📄 ", "").replace("📁 ", "").strip("/") for f in files]
 
         if "package.json" in file_names:
             tech_stack["javascript"] = "Node.js/npm"
@@ -547,10 +533,7 @@ class WorkflowOrchestrator:
 
         config_files = {}
         files = context.get("project_files", [])
-        file_names = [
-            f.replace("📄 ", "").replace("📁 ", "").strip("/")
-            for f in files
-        ]
+        file_names = [f.replace("📄 ", "").replace("📁 ", "").strip("/") for f in files]
 
         config_patterns = {
             ".env": "Environment variables",
@@ -709,8 +692,7 @@ class WorkflowOrchestrator:
 
         # Simulate analyzing the request
         context.console.print(
-            f"[cyan]📝 Analyzing request: "
-            f"'{user_request}'[/cyan]"
+            f"[cyan]📝 Analyzing request: " f"'{user_request}'[/cyan]"
         )
 
         # Parse the request to understand intent and extract key information
@@ -835,18 +817,14 @@ class WorkflowOrchestrator:
             if "ai_response" in result:
                 # Don't show summary if we have the actual
                 # AI response - it will be shown in interface
-                summary = (
-                    "✅ Successfully completed: "
-                    f"{user_request}"
-                )
+                summary = "✅ Successfully completed: " f"{user_request}"
                 context.console.print(
-                    "[bold green]📋 Summary:"
-                    f"[/bold green] {summary}"
+                    "[bold green]📋 Summary:" f"[/bold green] {summary}"
                 )
             else:
                 action = result.get(
-                    'action_taken',
-                    'Autonomous workflow execution',
+                    "action_taken",
+                    "Autonomous workflow execution",
                 )
                 summary = (
                     f"✅ Successfully completed: "
@@ -863,8 +841,7 @@ class WorkflowOrchestrator:
                 "occurred during execution"
             )
             context.console.print(
-                "[bold yellow]📋 Summary:"
-                f"[/bold yellow]\n{summary}"
+                "[bold yellow]📋 Summary:" f"[/bold yellow]\n{summary}"
             )
 
         context.set("final_summary", summary)

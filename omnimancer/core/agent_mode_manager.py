@@ -84,7 +84,8 @@ class AgentModeManager:
     """
 
     def __init__(
-        self, config_manager: Any,
+        self,
+        config_manager: Any,
         storage_path: str = "~/.omnimancer",
     ) -> None:
         """
@@ -279,9 +280,7 @@ class AgentModeManager:
             "settings": {
                 "auto_approve_low_risk": self.settings.auto_approve_low_risk,
                 "auto_approve_read_only": self.settings.auto_approve_read_only,
-                "max_concurrent_operations": (
-                    self.settings.max_concurrent_operations
-                ),
+                "max_concurrent_operations": (self.settings.max_concurrent_operations),
                 "operation_timeout": self.settings.operation_timeout,
                 "enable_batch_approval": self.settings.enable_batch_approval,
             },
@@ -527,8 +526,7 @@ class AgentModeManager:
         self._notify_operation_change(agent_operation)
 
         logger.info(
-            f"Starting operation {agent_operation.id}: "
-            f"{operation.description}"
+            f"Starting operation {agent_operation.id}: " f"{operation.description}"
         )
 
         # Execute operation asynchronously
