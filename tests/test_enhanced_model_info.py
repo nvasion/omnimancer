@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "."))
 
 
-from omnimancer.core.models import EnhancedModelInfo, ModelInfo
+from omnimancer.core.models import EnhancedModelInfo, ModelInfo  # noqa: E402
 
 
 def test_enhanced_model_info():
@@ -50,8 +50,8 @@ def test_enhanced_model_info():
     assert cost_tier == "💰💰"  # Average cost is 9.0, should be 2 coins
 
     # Test validation
-    assert model.validate_pricing() == True
-    assert model.validate_swe_score() == True
+    assert model.validate_pricing() is True
+    assert model.validate_swe_score() is True
 
     # Test free model
     free_model = EnhancedModelInfo(
@@ -66,7 +66,7 @@ def test_enhanced_model_info():
 
     assert free_model.get_cost_display() == "Free"
     assert free_model.get_cost_tier() == "Free"
-    assert free_model.validate_pricing() == True
+    assert free_model.validate_pricing() is True
 
     # Test conversion to/from ModelInfo
     legacy_model = ModelInfo(

@@ -5,7 +5,7 @@ import json
 import pytest
 from rich.console import Console
 
-from omnimancer.core.models import ChatResponse, StreamEvent, StreamEventType, ToolCall
+from omnimancer.core.models import StreamEvent, StreamEventType
 from omnimancer.ui.streaming_display import StreamingDisplay
 
 
@@ -27,8 +27,12 @@ class TestStreamingDisplayEventHandling:
         assert display.model == "claude-sonnet-4-6"
 
     def test_text_delta_accumulates(self, display):
-        display.handle_event(StreamEvent(type=StreamEventType.TEXT_DELTA, text="Hello"))
-        display.handle_event(StreamEvent(type=StreamEventType.TEXT_DELTA, text=" world"))
+        display.handle_event(StreamEvent(
+            type=StreamEventType.TEXT_DELTA, text="Hello"
+        ))
+        display.handle_event(
+            StreamEvent(type=StreamEventType.TEXT_DELTA, text=" world")
+        )
         assert display.accumulated_text == "Hello world"
 
     def test_tool_use_collected(self, display):
@@ -52,12 +56,22 @@ class TestStreamingDisplayEventHandling:
         assert display.tool_calls[0].arguments == {"path": "/main.py"}
 
     def test_multiple_tool_calls(self, display):
-        for name, args in [("file_read", {"path": "a.py"}), ("command_exec", {"command": "ls"})]:
+        tool_pairs = [
+            ("file_read", {"path": "a.py"}),
+            ("command_exec", {"command": "ls"}),
+        ]
+        for name, args in tool_pairs:
             display.handle_event(
-                StreamEvent(type=StreamEventType.TOOL_USE_START, tool_name=name)
+                StreamEvent(
+                    type=StreamEventType.TOOL_USE_START,
+                    tool_name=name,
+                )
             )
             display.handle_event(
-                StreamEvent(type=StreamEventType.TOOL_USE_DELTA, partial_json=json.dumps(args))
+                StreamEvent(
+                    type=StreamEventType.TOOL_USE_DELTA,
+                    partial_json=json.dumps(args),
+                )
             )
             display.handle_event(StreamEvent(type=StreamEventType.TOOL_USE_END))
 
@@ -70,7 +84,10 @@ class TestStreamingDisplayEventHandling:
             StreamEvent(type=StreamEventType.TOOL_USE_START, tool_name="broken")
         )
         display.handle_event(
-            StreamEvent(type=StreamEventType.TOOL_USE_DELTA, partial_json="not valid json{")
+            StreamEvent(
+                type=StreamEventType.TOOL_USE_DELTA,
+                partial_json="not valid json{",
+            )
         )
         display.handle_event(StreamEvent(type=StreamEventType.TOOL_USE_END))
 

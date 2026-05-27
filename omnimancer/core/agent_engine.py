@@ -190,7 +190,11 @@ class ProgramExecutor(BaseManager):
         ):
             return OperationResult(
                 success=False,
-                error="SECURITY: Operation requires approval but was not approved. This operation cannot be executed.",
+                error=(
+                    "SECURITY: Operation requires approval "
+                    "but was not approved. "
+                    "This operation cannot be executed."
+                ),
             )
 
         # Create execution config from operation data
@@ -210,7 +214,9 @@ class ProgramExecutor(BaseManager):
         )
 
         # Use backward compatible method for tests
-        return await self._execute_command(command, args, working_dir)  # type: ignore[call-arg]
+        return await self._execute_command(  # type: ignore[call-arg]
+            command, args, working_dir,
+        )
 
     async def preview_operation(self, operation: Operation) -> str:
         """Generate preview of command execution."""
@@ -224,10 +230,18 @@ class ProgramExecutor(BaseManager):
         validator = CommandValidator()
         risk_level = validator.assess_command_risk(command, args)
 
-        full_command = f"{command} {' '.join(args)}" if args else command
-        return f"Execute command: {full_command}\nExecution mode: {execution_mode}\nRisk level: {risk_level.value}"
+        full_command = (
+            f"{command} {' '.join(args)}" if args else command
+        )
+        return (
+            f"Execute command: {full_command}\n"
+            f"Execution mode: {execution_mode}\n"
+            f"Risk level: {risk_level.value}"
+        )
 
-    async def stream_command_output(self, operation: Operation) -> AsyncIterator[Tuple[str, str]]:
+    async def stream_command_output(
+        self, operation: Operation
+    ) -> AsyncIterator[Tuple[str, str]]:
         """Stream command output in real-time."""
         from .agent.program_executor import ExecutionConfig
 
@@ -297,7 +311,10 @@ class ProgramExecutor(BaseManager):
         return True
 
     async def _execute_command(
-        self, command: str, args: Optional[List[str]] = None, working_dir: Optional[str] = None  # type: ignore[valid-type]
+        self,
+        command: str,
+        args: Optional[List[str]] = None,
+        working_dir: Optional[str] = None,  # type: ignore[valid-type]
     ) -> OperationResult:
         """
         Execute command for backward compatibility with tests.
@@ -350,7 +367,10 @@ class ProgramExecutor(BaseManager):
             )
 
         except asyncio.TimeoutError:
-            return OperationResult(success=False, error="Command execution timed out")
+            return OperationResult(
+                success=False,
+                error="Command execution timed out",
+            )
         except Exception as e:
             return OperationResult(success=False, error=str(e))
 
@@ -364,7 +384,9 @@ class WebClient(BaseManager):
         self.rate_limit_delay: float = 1.0  # seconds between requests
         self.last_request_time: float = 0.0
         self.allowed_domains: set[str] = set()  # Empty means all allowed
-        self.forbidden_domains: set[str] = {"localhost", "127.0.0.1", "0.0.0.0"}
+        self.forbidden_domains: set[str] = {
+            "localhost", "127.0.0.1", "0.0.0.0",
+        }
 
     async def execute_operation(self, operation: Operation) -> OperationResult:
         """Execute web request operation."""
@@ -466,18 +488,33 @@ class WebClient(BaseManager):
             if isinstance(e, SecurityError):
                 user_error = f"Security violation in web request: {e}"
             elif "timeout" in str(e).lower():
-                user_error = f"Web request timeout: The request to {url} took too long to complete"
+                user_error = (
+                    f"Web request timeout: "
+                    f"The request to {url} took too long"
+                )
             elif "connection" in str(e).lower():
-                user_error = f"Connection error: Unable to connect to {url}"
-            elif "ssl" in str(e).lower() or "certificate" in str(e).lower():
-                user_error = f"SSL/Certificate error: Secure connection to {url} failed"
+                user_error = (
+                    f"Connection error: Unable to connect "
+                    f"to {url}"
+                )
+            elif (
+                "ssl" in str(e).lower()
+                or "certificate" in str(e).lower()
+            ):
+                user_error = (
+                    "SSL/Certificate error: "
+                    f"Secure connection to {url} failed"
+                )
             else:
                 user_error = f"Web request failed: {e}"
 
             return OperationResult(
                 success=False,
                 error=user_error,
-                details=f"URL: {url}, Method: {method}, Error type: {type(e).__name__}",
+                details=(
+                    f"URL: {url}, Method: {method}, "
+                    f"Error type: {type(e).__name__}"
+                ),
             )
 
 
@@ -549,7 +586,8 @@ class MCPIntegrator(BaseManager):
         context: ToolExecutionContext,
     ) -> OperationResult:
         """Call MCP tool using enhanced integrator with fallback to basic method."""
-        # For tests and when enhanced integrator is problematic, fallback to basic method
+        # For tests and when enhanced integrator is problematic,
+        # fallback to basic method
         if not self.mcp_manager or hasattr(self.mcp_manager, "_mock_name"):
             return await self._call_tool(tool_name, arguments)
 
@@ -648,7 +686,8 @@ class ApprovalManager:
     """Manages user approval workflows for operations."""
 
     def __init__(self) -> None:
-        self.auto_approve_types: set[OperationType] = set()  # Operation types that don't need approval
+        # Operation types that don't need approval
+        self.auto_approve_types: set[OperationType] = set()
         self.approval_callback: Optional[Callable[[Operation], Any]] = None
 
     def set_approval_callback(self, callback: Callable[[Operation], Any]) -> None:
@@ -694,7 +733,12 @@ class ProviderFallback:
         self.retry_attempts: int = 3
         self.retry_delay: float = 1.0
 
-    async def execute_with_fallback(self, operation_func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    async def execute_with_fallback(
+        self,
+        operation_func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         """Execute operation with provider fallback (delegates to enhanced version)."""
         return await self.enhanced_fallback.execute_with_fallback(
             operation_func, *args, **kwargs
@@ -716,13 +760,18 @@ class AgentEngine(CoreEngine):
     MCP tool integration, approval workflows, and provider fallback to the base engine.
     """
 
-    def __init__(self, config_manager: ConfigManager, base_path: Optional[Path] = None):
+    def __init__(
+        self,
+        config_manager: ConfigManager,
+        base_path: Optional[Path] = None,
+    ):
         """
         Initialize the agent engine.
 
         Args:
             config_manager: Configuration manager instance
-            base_path: Base path for file system operations (defaults to current directory)
+            base_path: Base path for file system operations
+                (defaults to current directory)
         """
         super().__init__(config_manager)
 
@@ -772,7 +821,11 @@ class AgentEngine(CoreEngine):
         self.enhanced_approval.max_batch_size = max_batch_size
 
     def set_approval_callbacks(
-        self, approval_callback: Optional[Callable[..., Any]] = None, batch_approval_callback: Optional[Callable[..., Any]] = None
+        self,
+        approval_callback: Optional[Callable[..., Any]] = None,
+        batch_approval_callback: Optional[
+            Callable[..., Any]
+        ] = None,
     ) -> None:
         """Set custom approval callbacks for user interaction."""
         if approval_callback:
@@ -799,7 +852,8 @@ class AgentEngine(CoreEngine):
             if operation.requires_approval:
                 approval_result = await self.approval.request_approval(operation)
 
-                # Handle both old bool return and new tuple return for backward compatibility
+                # Handle both old bool and new tuple return
+                # for backward compatibility
                 if isinstance(approval_result, tuple):
                     approved, was_cancelled = approval_result
                 else:
@@ -866,7 +920,7 @@ class AgentEngine(CoreEngine):
                 user_error = f"Permission denied: {e}"
             elif "timeout" in str(e).lower():
                 user_error = (
-                    f"Operation timeout: The operation took too long to complete"
+                    "Operation timeout: The operation took too long to complete"
                 )
             else:
                 user_error = f"Operation execution failed: {e}"
@@ -874,14 +928,17 @@ class AgentEngine(CoreEngine):
             return OperationResult(
                 success=False,
                 error=user_error,
-                details=f"Operation: {operation.type}, Error type: {type(e).__name__}, Context: {error_context}",
+                details=(
+                    f"Operation: {operation.type}, "
+                    f"Error type: {type(e).__name__}, "
+                    f"Context: {error_context}"
+                ),
             )
 
     async def execute_with_enhanced_approval(
         self, operation: Operation
     ) -> OperationResult:
-        """
-        Execute operation with enhanced approval workflow including preview and diff visualization.
+        """Execute operation with enhanced approval workflow.
 
         Args:
             operation: Operation to execute
@@ -945,7 +1002,11 @@ class AgentEngine(CoreEngine):
             return OperationResult(
                 success=False,
                 error=user_error,
-                details=f"Operation: {operation.type}, Error type: {type(e).__name__}, Context: {error_context}",
+                details=(
+                    f"Operation: {operation.type}, "
+                    f"Error type: {type(e).__name__}, "
+                    f"Context: {error_context}"
+                ),
             )
 
     async def execute_batch_with_approval(
@@ -1039,7 +1100,10 @@ class AgentEngine(CoreEngine):
                 OperationResult(
                     success=False,
                     error=user_error,
-                    details=f"Batch error: {type(e).__name__}, Total operations: {len(operations)}",
+                    details=(
+                        f"Batch error: {type(e).__name__}, "
+                        f"Total operations: {len(operations)}"
+                    ),
                 )
                 for _ in operations
             ]
@@ -1062,7 +1126,9 @@ class AgentEngine(CoreEngine):
 
         return await manager.execute_operation(operation)
 
-    def _get_manager_for_operation(self, operation: Operation) -> Optional[Union[BaseManager, EnhancedFileSystemManager]]:
+    def _get_manager_for_operation(
+        self, operation: Operation
+    ) -> Optional[Union[BaseManager, EnhancedFileSystemManager]]:
         """Get appropriate manager for operation type."""
         if operation.type in [
             OperationType.FILE_READ,
@@ -1193,7 +1259,9 @@ class AgentEngine(CoreEngine):
         self.fallback.enhanced_fallback.reset_provider_stats(provider_name)
         logger.info(f"Reset fallback stats for {provider_name or 'all providers'}")
 
-    def configure_circuit_breaker(self, threshold: int = 5, recovery_time: int = 600) -> None:
+    def configure_circuit_breaker(
+        self, threshold: int = 5, recovery_time: int = 600
+    ) -> None:
         """
         Configure circuit breaker for provider fallback.
 
@@ -1205,7 +1273,9 @@ class AgentEngine(CoreEngine):
             threshold, recovery_time
         )
         logger.info(
-            f"Configured circuit breaker: threshold={threshold}, recovery_time={recovery_time}s"
+            "Configured circuit breaker: "
+            f"threshold={threshold}, "
+            f"recovery_time={recovery_time}s"
         )
 
     async def health_check_providers(self) -> Dict[str, Dict[str, Any]]:
@@ -1305,14 +1375,17 @@ class AgentEngine(CoreEngine):
         self.approval_interface.set_auto_show_diff(auto_show_diff)
         self.approval_interface.set_max_diff_lines(max_diff_lines)
 
-    def enable_batch_approval(self, enabled: bool = True, max_batch_size: int = 10) -> None:
+    def enable_batch_approval(
+        self, enabled: bool = True, max_batch_size: int = 10
+    ) -> None:
         """Enable or disable batch approval functionality."""
         self.enhanced_approval.enable_batch_approval = enabled
         self.enhanced_approval.max_batch_size = max_batch_size
 
     def cleanup_expired_approval_requests(self) -> int:
         """Clean up expired approval requests and return count of cleaned items."""
-        return self.enhanced_approval.cleanup_expired_requests()  # type: ignore[no-any-return]
+        result = self.enhanced_approval.cleanup_expired_requests()
+        return result  # type: ignore[no-any-return]
 
     def get_pending_approval_requests(self) -> Dict[str, Any]:
         """Get information about pending approval requests."""
@@ -1325,8 +1398,10 @@ class AgentEngine(CoreEngine):
             ),
         }
 
-    async def generate_operation_preview(self, operation: Operation) -> str:
-        """Generate a detailed preview for an operation using the enhanced approval system."""
+    async def generate_operation_preview(
+        self, operation: Operation
+    ) -> str:
+        """Generate a detailed preview for an operation."""
         preview = await self.enhanced_approval.generate_operation_preview(operation)
         return preview.format_preview()
 
@@ -1340,7 +1415,9 @@ class AgentEngine(CoreEngine):
         """Get the current working directory."""
         return self.file_system.get_current_working_directory()
 
-    async def is_git_repository(self, path: Optional[Union[str, Path]] = None) -> bool:
+    async def is_git_repository(
+        self, path: Optional[Union[str, Path]] = None
+    ) -> bool:
         """Check if the given path (or current directory) is a Git repository."""
         return await self.file_system.is_git_repository(path)
 
@@ -1353,7 +1430,7 @@ class AgentEngine(CoreEngine):
     async def get_directory_context(
         self, path: Optional[Union[str, Path]] = None
     ) -> Dict[str, Any]:
-        """Get comprehensive directory context including working directory and repository status."""
+        """Get comprehensive directory context."""
         return await self.file_system.get_directory_context(path)
 
     # Continuous workflow execution methods
@@ -1548,15 +1625,24 @@ class AgentEngine(CoreEngine):
 
         self.set_read_before_write_callback(autonomous_file_review_callback)
 
-        self.file_system._original_write_file = self.file_system.write_file  # type: ignore[attr-defined]
+        self.file_system._original_write_file = (  # type: ignore[attr-defined]
+            self.file_system.write_file
+        )
 
-        async def autonomous_write_file(path: Union[str, Path], content: Union[str, bytes], encoding: str = "utf-8", **kwargs: Any) -> Any:
+        async def autonomous_write_file(
+            path: Union[str, Path],
+            content: Union[str, bytes],
+            encoding: str = "utf-8",
+            **kwargs: Any,
+        ) -> Any:
             autonomous_mode = kwargs.pop("autonomous_mode", True)
             if autonomous_mode:
                 kwargs["read_before_write"] = True
                 kwargs["user_review_callback"] = autonomous_file_review_callback
-            return await self.file_system._original_write_file(  # type: ignore[attr-defined]
-                path=path, content=content, encoding=encoding, **kwargs
+            _write = self.file_system._original_write_file  # type: ignore[attr-defined]
+            return await _write(
+                path=path, content=content,
+                encoding=encoding, **kwargs,
             )
 
         self.file_system.write_file = autonomous_write_file  # type: ignore[assignment]

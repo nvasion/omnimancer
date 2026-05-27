@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from ..utils.errors import ConfigurationError
-from .models import Config, ProviderConfig
+from .models import Config, ConfigProfile, ProviderConfig
 
 
 class ConfigMigration:
@@ -177,7 +177,7 @@ class ConfigMigration:
         Returns:
             List of backup information dictionaries
         """
-        backups = []  # type: ignore[var-annotated]
+        backups: List[Dict[str, Any]] = []
 
         if not self.backup_dir.exists():
             return backups
@@ -198,7 +198,9 @@ class ConfigMigration:
                 continue
 
         # Sort by creation time, newest first
-        backups.sort(key=lambda x: x["created"], reverse=True)  # type: ignore[arg-type, return-value]
+        backups.sort(
+            key=lambda x: x["created"], reverse=True
+        )
         return backups
 
     def cleanup_old_backups(self, keep_count: int = 10) -> int:
@@ -302,9 +304,15 @@ class ConfigMigration:
             new_config["mcp"].update(
                 {
                     "enabled": old_mcp.get("enabled", True),
-                    "servers": self._migrate_mcp_servers_v1(old_mcp.get("servers", {})),
-                    "auto_approve_timeout": old_mcp.get("auto_approve_timeout", 30),
-                    "max_concurrent_servers": old_mcp.get("max_concurrent_servers", 10),
+                    "servers": self._migrate_mcp_servers_v1(
+                        old_mcp.get("servers", {})
+                    ),
+                    "auto_approve_timeout": old_mcp.get(
+                        "auto_approve_timeout", 30
+                    ),
+                    "max_concurrent_servers": old_mcp.get(
+                        "max_concurrent_servers", 10
+                    ),
                 }
             )
 
@@ -328,7 +336,9 @@ class ConfigMigration:
 
         new_config = {
             "api_key": old_config.get("api_key"),
-            "model": old_config.get("model", provider_defaults.get("model", "default")),
+            "model": old_config.get(
+                "model", provider_defaults.get("model", "default")
+            ),
             "max_tokens": old_config.get("max_tokens"),
             "temperature": old_config.get("temperature"),
             "base_url": old_config.get("base_url"),
@@ -483,7 +493,10 @@ class ConfigMigration:
             List of migration messages
         """
         return [
-            "Added new provider capability flags (supports_tools, supports_multimodal, etc.)",
+            (
+                "Added new provider capability flags"
+                " (supports_tools, supports_multimodal, etc.)"
+            ),
             "Added provider priority and health check settings",
             "Added MCP (Model Context Protocol) configuration section",
             "Added configuration profiles support",
@@ -540,7 +553,7 @@ class ConfigValidator:
         Returns:
             Dictionary mapping validation categories to error lists
         """
-        validation_results = {  # type: ignore[var-annotated]
+        validation_results: Dict[str, Any] = {
             "general": [],
             "providers": {},
             "mcp": [],
@@ -556,7 +569,9 @@ class ConfigValidator:
         for provider_name, provider_config in self.config.providers.items():
             provider_errors = self._validate_provider(provider_name, provider_config)
             if provider_errors:
-                validation_results["providers"][provider_name] = provider_errors  # type: ignore[index]
+                validation_results["providers"][
+                    provider_name
+                ] = provider_errors
 
         # MCP validation
         validation_results["mcp"] = self._validate_mcp()
@@ -565,7 +580,9 @@ class ConfigValidator:
         for profile_name, profile in self.config.profiles.items():
             profile_errors = self._validate_profile(profile_name, profile)
             if profile_errors:
-                validation_results["profiles"][profile_name] = profile_errors  # type: ignore[index]
+                validation_results["profiles"][
+                    profile_name
+                ] = profile_errors
 
         # Security validation
         validation_results["security"] = self._validate_security()
@@ -597,7 +614,8 @@ class ConfigValidator:
                 storage_path = Path(self.config.storage_path).expanduser()
                 if not storage_path.parent.exists():
                     errors.append(
-                        f"Storage path parent directory does not exist: {storage_path.parent}"
+                        "Storage path parent directory does"
+                        f" not exist: {storage_path.parent}"
                     )
             except Exception as e:
                 errors.append(f"Invalid storage path: {e}")
@@ -641,8 +659,10 @@ class ConfigValidator:
             "claude-3-5-sonnet-20241022",
         ]
         if config.model not in valid_models:
+            valid = ', '.join(valid_models)
             errors.append(
-                f"Unknown Claude model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Claude model '{config.model}'."
+                f" Valid models: {valid}"
             )
 
         return errors
@@ -660,8 +680,10 @@ class ConfigValidator:
             "gpt-3.5-turbo-16k",
         ]
         if config.model not in valid_models:
+            valid = ', '.join(valid_models)
             errors.append(
-                f"Unknown OpenAI model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown OpenAI model '{config.model}'."
+                f" Valid models: {valid}"
             )
 
         return errors
@@ -672,8 +694,10 @@ class ConfigValidator:
 
         valid_models = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"]
         if config.model not in valid_models:
+            valid = ', '.join(valid_models)
             errors.append(
-                f"Unknown Gemini model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Gemini model '{config.model}'."
+                f" Valid models: {valid}"
             )
 
         return errors
@@ -689,8 +713,10 @@ class ConfigValidator:
             "command",
         ]
         if config.model not in valid_models:
+            valid = ', '.join(valid_models)
             errors.append(
-                f"Unknown Cohere model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Cohere model '{config.model}'."
+                f" Valid models: {valid}"
             )
 
         return errors
@@ -699,7 +725,9 @@ class ConfigValidator:
         """Validate Ollama provider configuration."""
         errors = []
 
-        if config.base_url and not config.base_url.startswith(("http://", "https://")):
+        if config.base_url and not config.base_url.startswith(
+            ("http://", "https://")
+        ):
             errors.append("Ollama base_url must start with 'http://' or 'https://'")
 
         return errors
@@ -717,7 +745,7 @@ class ConfigValidator:
         return errors
 
     def _validate_profile(
-        self, profile_name: str, profile: "ConfigProfile"  # type: ignore[name-defined]
+        self, profile_name: str, profile: "ConfigProfile"
     ) -> List[str]:
         """Validate a configuration profile."""
         errors = []

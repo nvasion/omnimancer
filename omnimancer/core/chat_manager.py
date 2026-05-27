@@ -7,7 +7,7 @@ and message history for chat sessions.
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 from .models import ChatContext, ChatMessage, MessageRole
 

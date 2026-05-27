@@ -46,8 +46,10 @@ class CLIApprovalIntegration:
             approval_manager: Enhanced approval manager instance
             permission_controller: Permission controller for storing decisions
             console: Rich console for display
-            enable_auto_approval: Whether to enable auto-approval for remembered decisions
-            approval_timeout_seconds: Default timeout for approval prompts
+            enable_auto_approval: Whether to enable
+                auto-approval for remembered decisions
+            approval_timeout_seconds: Default timeout
+                for approval prompts
         """
         self.approval_manager = approval_manager or EnhancedApprovalManager()
         self.permission_controller = permission_controller or PermissionController()
@@ -89,9 +91,10 @@ class CLIApprovalIntegration:
                 if auto_approval is not None:
                     return (auto_approval, False)
 
-            # Use the enhanced approval manager for full workflow
+            # Use the enhanced approval manager
             approved, was_cancelled = (
-                await self.approval_manager.request_single_approval(operation)  # type: ignore[misc]
+                await self.approval_manager  # type: ignore[misc]
+                .request_single_approval(operation)
             )
 
             # Log the decision
@@ -181,7 +184,8 @@ class CLIApprovalIntegration:
             change_preview = ChangePreview(
                 change_type=change_type,
                 description=operation.description,
-                proposed_state=operation.preview,  # Use the string preview as proposed_state
+                # Use string preview as proposed_state
+                proposed_state=operation.preview,
                 metadata=operation.data,
                 reversible=operation.reversible,
             )
@@ -246,7 +250,9 @@ class CLIApprovalIntegration:
             elif batch_decision.decision_type == "individual":
                 # Handle individual decisions with potential "remember" actions
                 approved_indices = []
-                for i, decision in enumerate(batch_decision.individual_decisions):  # type: ignore[arg-type]
+                for i, decision in enumerate(
+                    batch_decision.individual_decisions or []
+                ):
                     if decision.is_approved:
                         approved_indices.append(i)
 
@@ -266,7 +272,11 @@ class CLIApprovalIntegration:
                 # Cancelled or timeout
                 return {
                     "deny_all": True,
-                    "reason": f"Batch approval {batch_decision.decision_type}: {batch_decision.user_notes}",
+                    "reason": (
+                        "Batch approval"
+                        f" {batch_decision.decision_type}"
+                        f": {batch_decision.user_notes}"
+                    ),
                 }
 
         except Exception as e:
@@ -295,15 +305,21 @@ class CLIApprovalIntegration:
 
             # Check permission controller for matching approvals
             has_permission = (
-                await self.permission_controller.check_operation_permission(
-                    operation.type.value, operation_signature, operation.data
+                await self.permission_controller
+                .check_operation_permission(
+                    operation.type.value,
+                    operation_signature,
+                    operation.data,
                 )
             )
 
             if has_permission:
                 # Show auto-approval message
                 self.console.print(
-                    f"[green]✅ Auto-approved: {operation.description} (remembered decision)[/green]"
+                    "[green]✅ Auto-approved:"
+                    f" {operation.description}"
+                    " (remembered decision)"
+                    "[/green]"
                 )
                 return True
 
@@ -314,7 +330,9 @@ class CLIApprovalIntegration:
             return None
 
     async def _store_approval_pattern(
-        self, operation: Operation, approval_request: ApprovalRequest
+        self,
+        operation: Operation,
+        approval_request: ApprovalRequest,
     ) -> None:
         """
         Store approval pattern for future auto-approval.
@@ -325,7 +343,9 @@ class CLIApprovalIntegration:
         """
         try:
             # Generate operation signature
-            operation_signature = self._generate_operation_signature(operation)
+            operation_signature = (
+                self._generate_operation_signature(operation)
+            )
 
             # Store in permission controller
             await self.permission_controller.grant_operation_permission(
@@ -341,16 +361,21 @@ class CLIApprovalIntegration:
             )
 
             self.console.print(
-                f"[blue]🧠 Stored approval pattern for similar '{operation.type.value}' operations[/blue]"
+                "🧠 Stored approval pattern for"
+                f" similar '{operation.type.value}'"
+                " operations"
             )
 
         except Exception as e:
             logger.error(f"Error storing approval pattern: {e}")
             self.console.print(
-                f"[yellow]⚠️  Failed to store approval pattern: {e}[/yellow]"
+                "[yellow]⚠️  Failed to store approval"
+                f" pattern: {e}[/yellow]"
             )
 
-    def _generate_operation_signature(self, operation: Operation) -> str:
+    def _generate_operation_signature(
+        self, operation: Operation,
+    ) -> str:
         """
         Generate a signature for operation pattern matching.
 
@@ -360,7 +385,7 @@ class CLIApprovalIntegration:
         Returns:
             String signature for pattern matching
         """
-        # Create signature based on operation type and key parameters
+        # Create signature based on operation type and key params
         signature_parts = [operation.type.value]
 
         # Add type-specific signature components
@@ -371,42 +396,62 @@ class CLIApprovalIntegration:
         ]:
             if "path" in operation.data:
                 path = Path(operation.data["path"])
-                # Use directory for pattern matching (allows similar files)
-                signature_parts.append(f"dir:{path.parent}")
-                # Also include file extension for type matching
+                # Use directory for pattern matching
+                signature_parts.append(
+                    f"dir:{path.parent}"
+                )
+                # Include file extension for type matching
                 if path.suffix:
-                    signature_parts.append(f"ext:{path.suffix}")
+                    signature_parts.append(
+                        f"ext:{path.suffix}"
+                    )
 
         elif operation.type == OperationType.COMMAND_EXECUTE:
             if "command" in operation.data:
                 command = operation.data["command"]
                 # Use base command name for matching
-                base_command = command.split()[0] if command.split() else command
-                signature_parts.append(f"cmd:{base_command}")
+                base_command = (
+                    command.split()[0]
+                    if command.split()
+                    else command
+                )
+                signature_parts.append(
+                    f"cmd:{base_command}"
+                )
 
         elif operation.type == OperationType.WEB_REQUEST:
             if "url" in operation.data:
                 from urllib.parse import urlparse
 
-                parsed_url = urlparse(operation.data["url"])
+                parsed_url = urlparse(
+                    operation.data["url"]
+                )
                 # Use domain for matching
-                signature_parts.append(f"domain:{parsed_url.netloc}")
+                signature_parts.append(
+                    f"domain:{parsed_url.netloc}"
+                )
                 # Include method
                 method = operation.data.get("method", "GET")
                 signature_parts.append(f"method:{method}")
 
         return "|".join(signature_parts)
 
-    def _log_approval_decision(self, operation: Operation, approved: bool) -> None:
+    def _log_approval_decision(
+        self, operation: Operation, approved: bool,
+    ) -> None:
         """Log approval decision for audit trail."""
         log_entry = {
             "timestamp": (
-                operation.created_at.isoformat() if operation.created_at else None
+                operation.created_at.isoformat()
+                if operation.created_at
+                else None
             ),
             "operation_type": operation.type.value,
             "operation_description": operation.description,
             "approved": approved,
-            "operation_signature": self._generate_operation_signature(operation),
+            "operation_signature": (
+                self._generate_operation_signature(operation)
+            ),
         }
 
         self.approval_session_log.append(log_entry)
@@ -416,7 +461,9 @@ class CLIApprovalIntegration:
             self.approval_session_log = self.approval_session_log[-100:]
 
     def _log_batch_approval_decision(
-        self, operations: List[Operation], batch_request: BatchApprovalRequest
+        self,
+        operations: List[Operation],
+        batch_request: BatchApprovalRequest,
     ) -> None:
         """Log batch approval decision for audit trail."""
         summary = batch_request.get_approval_summary()
@@ -443,12 +490,18 @@ class CLIApprovalIntegration:
         """Record detailed session decision information."""
         decision_record = {
             "operation_type": operation.type.value,
-            "operation_description": operation.description,
+            "operation_description": (
+                operation.description
+            ),
             "decision_type": decision.decision.value,
             "approved": decision.is_approved,
             "remember": decision.should_remember,
-            "response_time_seconds": decision.response_time_seconds,
-            "timeout_occurred": decision.timeout_occurred,
+            "response_time_seconds": (
+                decision.response_time_seconds
+            ),
+            "timeout_occurred": (
+                decision.timeout_occurred
+            ),
             "user_notes": decision.user_notes,
             "timestamp": decision.created_at.isoformat(),  # type: ignore[union-attr]
         }
@@ -516,10 +569,14 @@ class CLIApprovalIntegration:
         """
         if no_approval_enabled:
             self.console.print(
-                "[yellow]⚠️  WARNING: Approval system bypassed with --no-approval flag[/yellow]"
+                "[yellow]⚠️  WARNING: Approval system"
+                " bypassed with"
+                " --no-approval flag[/yellow]"
             )
             self.console.print(
-                "[yellow]   All operations will be executed without user confirmation[/yellow]"
+                "[yellow]   All operations will be"
+                " executed without user"
+                " confirmation[/yellow]"
             )
 
             # Set approval manager to auto-approve everything
@@ -536,7 +593,8 @@ class CLIApprovalIntegration:
             if len(self.approval_session_log) > 0:
                 stats = self.get_session_statistics()
                 logger.info(
-                    f"Approval session completed with {stats['total_decisions']} decisions"
+                    "Approval session completed with"
+                    f" {stats['total_decisions']} decisions"
                 )
 
             # Clean up approval manager resources
@@ -635,7 +693,11 @@ class CLIApprovalIntegration:
             cancellation_log_entry = {
                 "timestamp": datetime.now().isoformat(),
                 "operation_type": "batch_cancellation",
-                "operation_description": f'Cancelled batch of {len(getattr(batch_request, "operations", []))} operations',
+                "operation_description": (
+                    "Cancelled batch of"
+                    f" {len(getattr(batch_request, 'operations', []))}"
+                    " operations"
+                ),
                 "approved": False,
                 "batch_id": getattr(batch_request, "id", "unknown"),
                 "cancellation_reason": "System shutdown",

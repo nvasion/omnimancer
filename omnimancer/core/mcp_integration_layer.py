@@ -106,7 +106,10 @@ class ToolMetrics:
 
         # Bonus for recent success
         recency_bonus = 0.0
-        if self.last_success_time and time.time() - self.last_success_time < 300:
+        if (
+            self.last_success_time
+            and time.time() - self.last_success_time < 300
+        ):
             recency_bonus = 0.1
 
         return max(0.0, min(1.0, base_score - failure_penalty + recency_bonus))
@@ -115,7 +118,8 @@ class ToolMetrics:
 class EnhancedMCPIntegrator:
     """
     Enhanced MCP integration layer with advanced capabilities including
-    tool discovery, capability matching, context-aware execution, and performance monitoring.
+    tool discovery, capability matching, context-aware
+    execution, and performance monitoring.
     """
 
     def __init__(self, mcp_manager: Optional[MCPManager] = None):
@@ -477,7 +481,9 @@ class EnhancedMCPIntegrator:
 
                 # Use timeout
                 result = await asyncio.wait_for(
-                    self.mcp_manager.execute_tool(tool_name, enhanced_args),  # type: ignore[union-attr]
+                    self.mcp_manager.execute_tool(  # type: ignore[union-attr]
+                        tool_name, enhanced_args,
+                    ),
                     timeout=context.timeout_seconds,
                 )
 
@@ -511,10 +517,15 @@ class EnhancedMCPIntegrator:
                 return success_result
 
             except asyncio.TimeoutError:
+                timeout = context.timeout_seconds
                 last_error = (
-                    f"Tool execution timed out after {context.timeout_seconds}s"
+                    f"Tool execution timed out after"
+                    f" {timeout}s"
                 )
-                logger.warning(f"Tool {tool_name} timed out on attempt {attempt + 1}")
+                logger.warning(
+                    f"Tool {tool_name} timed out on"
+                    f" attempt {attempt + 1}"
+                )
 
             except Exception as e:
                 last_error = str(e)
@@ -844,7 +855,7 @@ class EnhancedMCPIntegrator:
 
     async def health_check(self) -> Dict[str, Any]:
         """Perform health check on the MCP integration layer."""
-        health_status = {
+        health_status: Dict[str, Any] = {
             "integrator_healthy": True,
             "mcp_manager_available": bool(self.mcp_manager),
             "mcp_manager_initialized": bool(
@@ -869,7 +880,9 @@ class EnhancedMCPIntegrator:
                 problematic_tools.append(tool_name)
 
         if problematic_tools:
-            health_status["problematic_tools"] = problematic_tools  # type: ignore[assignment]
+            health_status[
+                "problematic_tools"
+            ] = problematic_tools
             if (
                 len(problematic_tools) > len(self.discovered_tools) * 0.3
             ):  # More than 30% problematic

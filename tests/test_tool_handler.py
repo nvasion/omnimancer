@@ -1,6 +1,5 @@
 """Tests for the native tool call handler."""
 
-import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -12,8 +11,8 @@ from omnimancer.cli.tool_handler import (
     ToolHandler,
 )
 from omnimancer.core.agent.tool_definitions import CODING_AGENT_TOOLS
-from omnimancer.core.agent.types import Operation, OperationResult, OperationType
-from omnimancer.core.models import ToolCall, ToolResult
+from omnimancer.core.agent.types import OperationResult, OperationType
+from omnimancer.core.models import ToolCall
 
 
 @pytest.fixture
@@ -43,7 +42,13 @@ class TestToolHandlerMapping:
         assert op.requires_approval is False
 
     def test_file_write_mapping(self, tool_handler):
-        tc = ToolCall(name="file_write", arguments={"path": "/src/new.py", "content": "print('hello')"})
+        tc = ToolCall(
+            name="file_write",
+            arguments={
+                "path": "/src/new.py",
+                "content": "print('hello')",
+            },
+        )
         op = tool_handler._tool_call_to_operation(tc)
 
         assert op.type == OperationType.FILE_WRITE
@@ -75,7 +80,13 @@ class TestToolHandlerMapping:
         assert op.requires_approval is False
 
     def test_search_text_mapping(self, tool_handler):
-        tc = ToolCall(name="search_text", arguments={"pattern": "def main", "file_pattern": "*.py"})
+        tc = ToolCall(
+            name="search_text",
+            arguments={
+                "pattern": "def main",
+                "file_pattern": "*.py",
+            },
+        )
         op = tool_handler._tool_call_to_operation(tc)
 
         assert op.type == OperationType.COMMAND_EXECUTE
@@ -92,7 +103,13 @@ class TestToolHandlerMapping:
         assert op.requires_approval is False
 
     def test_web_request_post_mapping(self, tool_handler):
-        tc = ToolCall(name="web_request", arguments={"url": "https://api.example.com", "method": "POST"})
+        tc = ToolCall(
+            name="web_request",
+            arguments={
+                "url": "https://api.example.com",
+                "method": "POST",
+            },
+        )
         op = tool_handler._tool_call_to_operation(tc)
 
         assert op.requires_approval is True
@@ -122,7 +139,10 @@ class TestToolHandlerExecution:
             success=False, error="Permission denied"
         )
 
-        tc = ToolCall(name="file_write", arguments={"path": "/etc/passwd", "content": "bad"})
+        tc = ToolCall(
+            name="file_write",
+            arguments={"path": "/etc/passwd", "content": "bad"},
+        )
         result = await tool_handler.execute_tool_call(tc)
 
         assert result.error == "Permission denied"
@@ -159,7 +179,9 @@ class TestToolHandlerExecution:
 
     @pytest.mark.asyncio
     async def test_execute_tool_call_exception(self, tool_handler, mock_agent_engine):
-        mock_agent_engine.execute_with_approval.side_effect = RuntimeError("engine crash")
+        mock_agent_engine.execute_with_approval.side_effect = (
+            RuntimeError("engine crash")
+        )
 
         tc = ToolCall(name="file_read", arguments={"path": "/a.py"})
         result = await tool_handler.execute_tool_call(tc)
@@ -172,7 +194,11 @@ class TestToolDefinitions:
 
     def test_all_tools_defined(self):
         tool_names = {t.name for t in CODING_AGENT_TOOLS}
-        expected = {"file_read", "file_write", "file_delete", "command_exec", "find_files", "search_text", "web_request"}
+        expected = {
+            "file_read", "file_write", "file_delete",
+            "command_exec", "find_files", "search_text",
+            "web_request",
+        }
         assert tool_names == expected
 
     def test_tool_definitions_have_required_fields(self):
@@ -183,7 +209,10 @@ class TestToolDefinitions:
             assert "properties" in tool.parameters
 
     def test_auto_approved_tools_match(self):
-        auto_approved_from_defs = {t.name for t in CODING_AGENT_TOOLS if t.auto_approved}
+        auto_approved_from_defs = {
+            t.name for t in CODING_AGENT_TOOLS
+            if t.auto_approved
+        }
         assert auto_approved_from_defs == AUTO_APPROVED_TOOLS
 
     def test_get_tool_definitions(self, tool_handler):
@@ -195,4 +224,7 @@ class TestToolDefinitions:
 
     def test_all_tools_have_operation_mapping(self):
         for tool in CODING_AGENT_TOOLS:
-            assert tool.name in TOOL_TO_OPERATION, f"No operation mapping for tool: {tool.name}"
+            assert tool.name in TOOL_TO_OPERATION, (
+                f"No operation mapping for tool: "
+                f"{tool.name}"
+            )

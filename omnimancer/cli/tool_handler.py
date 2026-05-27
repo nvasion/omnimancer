@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from ..core.agent.tool_definitions import CODING_AGENT_TOOLS
 from ..core.agent.types import Operation, OperationResult, OperationType
@@ -64,7 +64,7 @@ class ToolHandler:
             return None
 
         args = tool_call.arguments
-        auto_approve = tool_call.name in AUTO_APPROVED_TOOLS
+        tool_call.name in AUTO_APPROVED_TOOLS
 
         if tool_call.name == "file_read":
             return Operation(
@@ -146,7 +146,11 @@ class ToolHandler:
         self, result: OperationResult
     ) -> ToolResult:
         if result.success:
-            content = result.data if isinstance(result.data, str) else json.dumps(result.data, default=str)
+            content = (
+                result.data
+                if isinstance(result.data, str)
+                else json.dumps(result.data, default=str)
+            )
             return ToolResult(content=content or "OK")
         else:
             error_msg = result.error or "Operation failed"

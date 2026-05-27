@@ -230,14 +230,18 @@ def _parse_slash_command(user_input: str) -> Command:
     if slash_cmd:
         # Validate command-specific arguments
         validated_args = _validate_command_args(slash_cmd, args)
-        return Command.create_slash_command(slash_cmd, validated_args, user_input)
+        return Command.create_slash_command(
+            slash_cmd, validated_args, user_input,
+        )
 
     # Check for dynamic commands
     registry = get_command_registry()
     dynamic_cmd = registry.get_command(command_str)
     if dynamic_cmd:
         # No validation for dynamic commands yet - let handler manage it
-        return Command.create_dynamic_command(dynamic_cmd, args, user_input)
+        return Command.create_dynamic_command(
+            dynamic_cmd, args, user_input,
+        )
 
     # Unknown slash command, treat as chat message
     return Command.create_chat_message(user_input)
@@ -264,21 +268,24 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
             )
         if len(args) > 2:
             raise ValueError(
-                "Switch command accepts at most two arguments: provider and model"
+                "Switch command accepts at most two"
+                " arguments: provider and model"
             )
 
         # Validate provider name (alphanumeric and underscores only)
         provider = args[0]
         if not provider.replace("_", "").isalnum():
             raise ValueError(
-                "Provider name must contain only letters, numbers, and underscores"
+                "Provider name must contain only"
+                " letters, numbers, and underscores"
             )
 
         # Validate model name if provided
         if len(args) == 2:
             model = args[1]
-            # Allow model IDs with common formats: org/model:variant, model-name, model.version, etc.
-            # Only restrict dangerous characters that could cause issues
+            # Allow model IDs with common formats:
+            # org/model:variant, model-name, etc.
+            # Only restrict dangerous characters
             invalid_model_chars = [
                 "\0",
                 "\n",
@@ -301,8 +308,14 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
                 ">",
                 "$",
             ]
-            if any(char in model for char in invalid_model_chars):
-                raise ValueError("Model name contains invalid characters")
+            if any(
+                char in model
+                for char in invalid_model_chars
+            ):
+                raise ValueError(
+                    "Model name contains invalid"
+                    " characters"
+                )
 
     elif command == SlashCommand.SAVE:
         if len(args) > 1:
@@ -330,7 +343,8 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
     elif command == SlashCommand.MCP:
         if len(args) > 2:
             raise ValueError(
-                "MCP command accepts at most two arguments: action and server name"
+                "MCP command accepts at most two"
+                " arguments: action and server name"
             )
 
         if args:
@@ -343,8 +357,10 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
                 "health",
             ]
             if action not in valid_actions:
+                valid_str = ", ".join(valid_actions)
                 raise ValueError(
-                    f"Invalid MCP action. Valid actions: {', '.join(valid_actions)}"
+                    "Invalid MCP action. Valid"
+                    f" actions: {valid_str}"
                 )
 
     elif command in [
@@ -360,7 +376,9 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
         # /models [filter_type] [filter_value]
         if len(args) > 2:
             raise ValueError(
-                "Models command accepts at most two arguments: filter type and filter value"
+                "Models command accepts at most two"
+                " arguments: filter type and"
+                " filter value"
             )
 
         if args:
@@ -374,8 +392,10 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
                 "latest",
             ]
             if filter_type not in valid_filters:
+                filters_str = ", ".join(valid_filters)
                 raise ValueError(
-                    f"Invalid filter type. Valid filters: {', '.join(valid_filters)}"
+                    "Invalid filter type. Valid"
+                    f" filters: {filters_str}"
                 )
 
             # Validate second argument based on filter type
@@ -383,8 +403,13 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
                 if filter_type == "capability":
                     valid_capabilities = ["tools", "multimodal"]
                     if args[1].lower() not in valid_capabilities:
+                        caps = ", ".join(
+                            valid_capabilities
+                        )
                         raise ValueError(
-                            f"Invalid capability. Valid capabilities: {', '.join(valid_capabilities)}"
+                            "Invalid capability."
+                            " Valid capabilities:"
+                            f" {caps}"
                         )
                 elif filter_type == "price":
                     try:
@@ -423,17 +448,23 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
         # /add-model <name> <provider> [description] [other_params...]
         if len(args) < 2:
             raise ValueError(
-                "Add-model command requires at least two arguments: model name and provider"
+                "Add-model command requires at least"
+                " two arguments: model name and"
+                " provider"
             )
         if len(args) > 10:
-            raise ValueError("Add-model command accepts at most 10 arguments total")
+            raise ValueError(
+                "Add-model command accepts at most"
+                " 10 arguments total"
+            )
 
         # Validate model name and provider
         model_name = args[0]
         provider = args[1]
 
-        # Allow model IDs with common formats: org/model:variant, model-name, model.version, etc.
-        # Only restrict dangerous characters that could cause issues
+        # Allow model IDs with common formats:
+        # org/model:variant, model-name, etc.
+        # Only restrict dangerous characters
         invalid_model_chars = [
             "\0",
             "\n",
@@ -456,26 +487,40 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
             ">",
             "$",
         ]
-        if any(char in model_name for char in invalid_model_chars):
-            raise ValueError("Model name contains invalid characters")
+        if any(
+            char in model_name
+            for char in invalid_model_chars
+        ):
+            raise ValueError(
+                "Model name contains invalid"
+                " characters"
+            )
 
-        # Validate provider name (more restrictive since it's used internally)
-        if not provider.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Provider name contains invalid characters")
+        # Validate provider name (more restrictive)
+        if not provider.replace("_", "").replace(
+            "-", ""
+        ).isalnum():
+            raise ValueError(
+                "Provider name contains invalid"
+                " characters"
+            )
 
     elif command == SlashCommand.REMOVE_MODEL:
         # /remove-model <name> <provider>
         if len(args) != 2:
             raise ValueError(
-                "Remove-model command requires exactly two arguments: model name and provider"
+                "Remove-model command requires"
+                " exactly two arguments: model"
+                " name and provider"
             )
 
         # Validate model name and provider
         model_name = args[0]
         provider = args[1]
 
-        # Allow model IDs with common formats: org/model:variant, model-name, model.version, etc.
-        # Only restrict dangerous characters that could cause issues
+        # Allow model IDs with common formats:
+        # org/model:variant, model-name, etc.
+        # Only restrict dangerous characters
         invalid_model_chars = [
             "\0",
             "\n",
@@ -498,17 +543,31 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
             ">",
             "$",
         ]
-        if any(char in model_name for char in invalid_model_chars):
-            raise ValueError("Model name contains invalid characters")
+        if any(
+            char in model_name
+            for char in invalid_model_chars
+        ):
+            raise ValueError(
+                "Model name contains invalid"
+                " characters"
+            )
 
-        # Validate provider name (more restrictive since it's used internally)
-        if not provider.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Provider name contains invalid characters")
+        # Validate provider name (more restrictive)
+        if not provider.replace("_", "").replace(
+            "-", ""
+        ).isalnum():
+            raise ValueError(
+                "Provider name contains invalid"
+                " characters"
+            )
 
     elif command == SlashCommand.LIST_CUSTOM_MODELS:
         # /list-custom-models
         if args:
-            raise ValueError("List-custom-models command does not accept arguments")
+            raise ValueError(
+                "List-custom-models command"
+                " does not accept arguments"
+            )
 
     # Commands that don't accept arguments
     elif command in [

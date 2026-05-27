@@ -35,7 +35,8 @@ class OllamaProvider(BaseProvider):
 
         Args:
             api_key: Not used for Ollama (local server)
-            model: Ollama model to use (e.g., 'llama2', 'llama3', 'mistral', 'codellama')
+            model: Ollama model to use
+                (e.g., 'llama2', 'llama3', 'mistral')
             **kwargs: Additional configuration including base_url
         """
         # Ollama doesn't require an API key, but we maintain the interface
@@ -85,8 +86,10 @@ class OllamaProvider(BaseProvider):
 
         except httpx.TimeoutException:
             raise NetworkError(
-                f"Request to Ollama server timed out after {self.timeout}s. "
-                "Local inference can take longer than cloud APIs.",
+                "Request to Ollama server timed out "
+                f"after {self.timeout}s. "
+                "Local inference can take longer "
+                "than cloud APIs.",
                 provider="ollama",
             )
         except httpx.ConnectError:
@@ -103,7 +106,10 @@ class OllamaProvider(BaseProvider):
             # Re-raise our custom errors without wrapping them
             raise
         except Exception as e:
-            raise ProviderError(f"Unexpected error with Ollama: {e}", provider="ollama")
+            raise ProviderError(
+                f"Unexpected error with Ollama: {e}",
+                provider="ollama",
+            )
 
     async def validate_credentials(self) -> bool:
         """
@@ -176,7 +182,9 @@ class OllamaProvider(BaseProvider):
                     return data.get("models", [])  # type: ignore[no-any-return]
                 else:
                     raise NetworkError(
-                        f"Failed to fetch models from Ollama server: HTTP {response.status_code}",
+                        "Failed to fetch models from "
+                        "Ollama server: "
+                        f"HTTP {response.status_code}",
                         provider="ollama",
                     )
 
@@ -231,7 +239,9 @@ class OllamaProvider(BaseProvider):
                     error_msg = data["error"]
                     if "not found" in error_msg.lower():
                         raise ModelNotFoundError(
-                            f"Model '{self.model}' not found. Use 'ollama pull {self.model}' to download it.",
+                            f"Model '{self.model}' not found. "
+                            f"Use 'ollama pull {self.model}'"
+                            " to download it.",
                             provider="ollama",
                             model_name=self.model,
                         )
@@ -248,7 +258,9 @@ class OllamaProvider(BaseProvider):
                     # Check if model is still loading
                     if data.get("done", True) is False:
                         raise ProviderError(
-                            f"Model '{self.model}' is still loading. Please wait and try again.",
+                            f"Model '{self.model}' is still "
+                            "loading. Please wait and "
+                            "try again.",
                             provider="ollama",
                         )
                     else:
@@ -260,7 +272,8 @@ class OllamaProvider(BaseProvider):
                 done = data.get("done", True)
                 if not done:
                     raise ProviderError(
-                        "Incomplete response from Ollama. The model may be overloaded.",
+                        "Incomplete response from Ollama."
+                        " The model may be overloaded.",
                         provider="ollama",
                     )
 
@@ -285,14 +298,20 @@ class OllamaProvider(BaseProvider):
                 error_data = response.json()
                 error_msg = error_data.get("error", "Bad request")
 
-                if "model" in error_msg.lower() and "not found" in error_msg.lower():
+                if (
+                    "model" in error_msg.lower()
+                    and "not found" in error_msg.lower()
+                ):
                     raise ModelNotFoundError(
-                        f"Model '{self.model}' not found. Use 'ollama pull {self.model}' to download it.",
+                        f"Model '{self.model}' not found."
+                        f" Use 'ollama pull {self.model}'"
+                        " to download it.",
                         provider="ollama",
                         model_name=self.model,
                     )
                 elif (
-                    "invalid" in error_msg.lower() and "parameter" in error_msg.lower()
+                    "invalid" in error_msg.lower()
+                    and "parameter" in error_msg.lower()
                 ):
                     raise ProviderConfigurationError(
                         f"Invalid parameter: {error_msg}",
@@ -304,7 +323,9 @@ class OllamaProvider(BaseProvider):
                     or "token" in error_msg.lower()
                 ):
                     raise ProviderError(
-                        f"Context too long: {error_msg}. Try reducing conversation history.",
+                        f"Context too long: {error_msg}."
+                        " Try reducing conversation "
+                        "history.",
                         provider="ollama",
                     )
                 else:
@@ -319,7 +340,7 @@ class OllamaProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", f"Model '{self.model}' not found")
-            except:
+            except Exception:
                 error_msg = f"Model '{self.model}' not found"
 
             raise ModelNotFoundError(
@@ -333,14 +354,24 @@ class OllamaProvider(BaseProvider):
                 error_data = response.json()
                 error_msg = error_data.get("error", "Internal server error")
 
-                if "out of memory" in error_msg.lower() or "oom" in error_msg.lower():
+                if (
+                    "out of memory" in error_msg.lower()
+                    or "oom" in error_msg.lower()
+                ):
                     raise ProviderError(
-                        "Ollama server out of memory. Try using a smaller model or restart Ollama.",
+                        "Ollama server out of memory. "
+                        "Try using a smaller model or "
+                        "restart Ollama.",
                         provider="ollama",
                     )
-                elif "model" in error_msg.lower() and "loading" in error_msg.lower():
+                elif (
+                    "model" in error_msg.lower()
+                    and "loading" in error_msg.lower()
+                ):
                     raise ProviderError(
-                        f"Model '{self.model}' failed to load. Check if model is corrupted.",
+                        f"Model '{self.model}' failed to "
+                        "load. Check if model is "
+                        "corrupted.",
                         provider="ollama",
                     )
                 else:
@@ -350,7 +381,9 @@ class OllamaProvider(BaseProvider):
 
         elif response.status_code == 503:
             raise ProviderUnavailableError(
-                "Ollama server is overloaded or starting up. Please wait and try again.",
+                "Ollama server is overloaded or "
+                "starting up. Please wait and try "
+                "again.",
                 provider="ollama",
                 estimated_recovery="1-2 minutes",
             )
@@ -359,7 +392,7 @@ class OllamaProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             if response.status_code >= 500:

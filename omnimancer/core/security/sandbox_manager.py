@@ -43,7 +43,7 @@ class SandboxedProcess:
         self.temp_dir = temp_dir
         self.limits = limits
         self.start_time = time.time()
-        self.monitor_thread = None
+        self.monitor_thread: Optional[threading.Thread] = None
         self.terminated = False
 
     def is_running(self) -> bool:
@@ -151,10 +151,11 @@ class SandboxManager:
             self.active_processes[process.pid] = sandboxed_proc
 
             # Start monitoring
-            sandboxed_proc.monitor_thread = threading.Thread(  # type: ignore[assignment]
-                target=self._monitor_process, args=(sandboxed_proc,)
+            sandboxed_proc.monitor_thread = threading.Thread(
+                target=self._monitor_process,
+                args=(sandboxed_proc,),
             )
-            sandboxed_proc.monitor_thread.start()  # type: ignore[attr-defined]
+            sandboxed_proc.monitor_thread.start()
 
             # Execute and wait for completion
             try:
@@ -251,17 +252,22 @@ class SandboxManager:
                     # Check memory usage
                     memory_mb = proc_info.memory_info().rss / (1024 * 1024)
                     if memory_mb > sandboxed_proc.limits.max_memory_mb:
+                        pid = sandboxed_proc.process.pid
                         print(
-                            f"Process {sandboxed_proc.process.pid} exceeded memory limit"
+                            f"Process {pid} exceeded"
+                            " memory limit"
                         )
                         sandboxed_proc.terminate()
                         break
 
                     # Check CPU time
-                    cpu_time = proc_info.cpu_times().user + proc_info.cpu_times().system
+                    cpu_times = proc_info.cpu_times()
+                    cpu_time = cpu_times.user + cpu_times.system
                     if cpu_time > sandboxed_proc.limits.max_cpu_seconds:
+                        pid = sandboxed_proc.process.pid
                         print(
-                            f"Process {sandboxed_proc.process.pid} exceeded CPU time limit"
+                            f"Process {pid} exceeded"
+                            " CPU time limit"
                         )
                         sandboxed_proc.terminate()
                         break
@@ -269,8 +275,10 @@ class SandboxManager:
                     # Check total runtime
                     runtime = time.time() - sandboxed_proc.start_time
                     if runtime > sandboxed_proc.limits.timeout_seconds:
+                        pid = sandboxed_proc.process.pid
                         print(
-                            f"Process {sandboxed_proc.process.pid} exceeded runtime limit"
+                            f"Process {pid} exceeded"
+                            " runtime limit"
                         )
                         sandboxed_proc.terminate()
                         break
@@ -324,7 +332,9 @@ class SandboxManager:
         return filtered_env
 
     @contextmanager  # type: ignore[arg-type]
-    def sandbox_context(self, limits: Optional[ResourceLimits] = None) -> None:  # type: ignore[misc]
+    def sandbox_context(  # type: ignore[misc]
+        self, limits: Optional[ResourceLimits] = None,
+    ) -> None:
         """Context manager for sandbox operations."""
 
         sandbox_dir = self.create_sandbox_environment(limits)

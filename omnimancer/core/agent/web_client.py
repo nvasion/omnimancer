@@ -1,4 +1,5 @@
-"""Web client for HTTP requests, API interactions, and web scraping with security features."""
+"""Web client for HTTP requests, API interactions,
+and web scraping with security features."""
 
 import asyncio
 import hashlib
@@ -631,7 +632,11 @@ class WebClient:
         title_text = title.get_text().strip() if title else ""
 
         meta_description = soup.find("meta", attrs={"name": "description"})
-        description_attr = meta_description.get("content", "") if meta_description else ""  # type: ignore[union-attr]
+        description_attr = (
+            meta_description.get("content", "")
+            if meta_description and hasattr(meta_description, "get")
+            else ""
+        )
         description = str(description_attr).strip() if description_attr else ""
 
         # Extract main content

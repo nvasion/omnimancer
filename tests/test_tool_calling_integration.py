@@ -11,16 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from omnimancer.cli.interface import CommandLineInterface
-from omnimancer.cli.tool_handler import MAX_TOOL_ITERATIONS, ToolHandler
-from omnimancer.core.agent.types import Operation, OperationResult, OperationType
+from omnimancer.cli.tool_handler import MAX_TOOL_ITERATIONS
+from omnimancer.core.agent.types import OperationResult
 from omnimancer.core.config_manager import ConfigManager
 from omnimancer.core.engine import CoreEngine
-from omnimancer.core.models import (
-    ChatResponse,
-    ProviderConfig,
-    ToolCall,
-    ToolDefinition,
-)
+from omnimancer.core.models import ChatResponse, ProviderConfig, ToolCall
 
 
 @pytest.fixture
@@ -56,11 +51,15 @@ class TestToolCallingFlowIntegration:
     """Test the _handle_tool_calling_flow method."""
 
     @pytest.mark.asyncio
-    async def test_simple_tool_call_round_trip(self, interface, mock_engine):
-        """Provider returns a tool call, we execute it, send result back, provider finishes."""
+    async def test_simple_tool_call_round_trip(
+        self, interface, mock_engine
+    ):
+        """Provider returns tool call; we execute and finish."""
         agent_engine = MagicMock()
         agent_engine.execute_with_approval = AsyncMock(
-            return_value=OperationResult(success=True, data="print('hello world')")
+            return_value=OperationResult(
+                success=True, data="print('hello world')"
+            )
         )
         mock_engine.agent_engine = agent_engine
 
@@ -219,8 +218,10 @@ class TestToolCallingFlowIntegration:
         assert "Permission denied" in second_call_msg
 
     @pytest.mark.asyncio
-    async def test_max_iterations_guard(self, interface, mock_engine):
-        """Flow stops after MAX_TOOL_ITERATIONS even if provider keeps requesting tools."""
+    async def test_max_iterations_guard(
+        self, interface, mock_engine
+    ):
+        """Flow stops after MAX_TOOL_ITERATIONS."""
         agent_engine = MagicMock()
         agent_engine.execute_with_approval = AsyncMock(
             return_value=OperationResult(success=True, data="OK")
@@ -263,10 +264,12 @@ class TestToolCallingFlowIntegration:
 
 
 class TestChatMessageRouting:
-    """Test that _handle_chat_message routes correctly between tool calling and markers."""
+    """Test _handle_chat_message routes between tool calling and markers."""
 
     @pytest.mark.asyncio
-    async def test_agent_mode_with_tools_uses_tool_flow(self, interface, mock_engine):
+    async def test_agent_mode_with_tools_uses_tool_flow(
+        self, interface, mock_engine
+    ):
         """When agent mode is on and provider supports tools, use tool calling."""
         from omnimancer.cli.commands import Command, CommandType
 
@@ -282,21 +285,38 @@ class TestChatMessageRouting:
         )
 
         with patch.object(
-            interface, "_handle_tool_calling_flow", new_callable=AsyncMock
+            interface,
+            "_handle_tool_calling_flow",
+            new_callable=AsyncMock,
         ) as mock_tool_flow:
             with patch.object(
-                interface, "_complete_approval_integration_setup", new_callable=AsyncMock
+                interface,
+                "_complete_approval_integration_setup",
+                new_callable=AsyncMock,
             ):
-                with patch.object(interface, "_show_user_message"):
-                    with patch.object(interface.cancellation_handler, "start_cancellable_operation") as mock_cancel:
-                        # Make the cancellation handler just run the operation directly
+                with patch.object(
+                    interface, "_show_user_message"
+                ):
+                    cancel_handler = (
+                        interface.cancellation_handler
+                    )
+                    with patch.object(
+                        cancel_handler,
+                        "start_cancellable_operation",
+                    ) as mock_cancel:
+
                         async def run_op(**kwargs):
                             await kwargs["operation"]()
+
                         mock_cancel.side_effect = run_op
 
-                        await interface._handle_chat_message(command)
+                        await interface._handle_chat_message(
+                            command
+                        )
 
-        mock_tool_flow.assert_called_once_with("Read main.py")
+        mock_tool_flow.assert_called_once_with(
+            "Read main.py"
+        )
 
     @pytest.mark.asyncio
     async def test_agent_mode_without_tools_uses_markers(self, interface, mock_engine):
@@ -321,21 +341,39 @@ class TestChatMessageRouting:
         mock_engine.send_message = AsyncMock(return_value=mock_response)
 
         with patch.object(
-            interface, "_handle_tool_calling_flow", new_callable=AsyncMock
+            interface,
+            "_handle_tool_calling_flow",
+            new_callable=AsyncMock,
         ) as mock_tool_flow:
             with patch.object(
-                interface, "_execute_continuous_workflow", new_callable=AsyncMock
+                interface,
+                "_execute_continuous_workflow",
+                new_callable=AsyncMock,
             ) as mock_workflow:
                 with patch.object(
-                    interface, "_complete_approval_integration_setup", new_callable=AsyncMock
+                    interface,
+                    "_complete_approval_integration_setup",
+                    new_callable=AsyncMock,
                 ):
-                    with patch.object(interface, "_show_user_message"):
-                        with patch.object(interface.cancellation_handler, "start_cancellable_operation") as mock_cancel:
+                    with patch.object(
+                        interface, "_show_user_message"
+                    ):
+                        cancel_handler = (
+                            interface.cancellation_handler
+                        )
+                        with patch.object(
+                            cancel_handler,
+                            "start_cancellable_operation",
+                        ) as mock_cancel:
+
                             async def run_op(**kwargs):
                                 await kwargs["operation"]()
+
                             mock_cancel.side_effect = run_op
 
-                            await interface._handle_chat_message(command)
+                            await interface._handle_chat_message(
+                                command
+                            )
 
         mock_tool_flow.assert_not_called()
         mock_workflow.assert_called_once()
@@ -360,14 +398,32 @@ class TestChatMessageRouting:
         mock_response.model_used = "test-model"
         mock_engine.send_message = AsyncMock(return_value=mock_response)
 
-        with patch.object(interface, "_show_user_message"):
-            with patch.object(interface, "_show_assistant_message") as mock_show:
-                with patch.object(interface, "_show_token_status"):
-                    with patch.object(interface.cancellation_handler, "start_cancellable_operation") as mock_cancel:
+        with patch.object(
+            interface, "_show_user_message"
+        ):
+            with patch.object(
+                interface, "_show_assistant_message"
+            ) as mock_show:
+                with patch.object(
+                    interface, "_show_token_status"
+                ):
+                    cancel_handler = (
+                        interface.cancellation_handler
+                    )
+                    with patch.object(
+                        cancel_handler,
+                        "start_cancellable_operation",
+                    ) as mock_cancel:
+
                         async def run_op(**kwargs):
                             await kwargs["operation"]()
+
                         mock_cancel.side_effect = run_op
 
-                        await interface._handle_chat_message(command)
+                        await interface._handle_chat_message(
+                            command
+                        )
 
-        mock_show.assert_called_once_with("Hi there!", "test-model")
+        mock_show.assert_called_once_with(
+            "Hi there!", "test-model"
+        )

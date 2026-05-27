@@ -30,10 +30,10 @@ class TestPermissionController:
     def test_validate_safe_path_access(self):
         """Test validation of safe path access."""
         # Test reading from current directory
-        assert self.controller.validate_path_access("./test.txt", "read") == True
+        assert self.controller.validate_path_access("./test.txt", "read") is True
 
         # Test writing to current directory
-        assert self.controller.validate_path_access("./output.txt", "write") == True
+        assert self.controller.validate_path_access("./output.txt", "write") is True
 
     def test_block_restricted_paths(self):
         """Test blocking of restricted paths."""
@@ -46,8 +46,8 @@ class TestPermissionController:
         ]
 
         for path in restricted_paths:
-            assert self.controller.validate_path_access(path, "read") == False
-            assert self.controller.validate_path_access(path, "write") == False
+            assert self.controller.validate_path_access(path, "read") is False
+            assert self.controller.validate_path_access(path, "write") is False
 
     def test_validate_allowed_commands(self):
         """Test validation of allowed commands."""
@@ -60,7 +60,7 @@ class TestPermissionController:
         ]
 
         for command in allowed_commands:
-            assert self.controller.validate_command(command) == True
+            assert self.controller.validate_command(command) is True
 
     def test_block_dangerous_commands(self):
         """Test blocking of dangerous commands."""
@@ -78,7 +78,7 @@ class TestPermissionController:
         ]
 
         for command in dangerous_commands:
-            assert self.controller.validate_command(command) == False
+            assert self.controller.validate_command(command) is False
 
     def test_operation_validation(self):
         """Test complete operation validation."""
@@ -86,11 +86,11 @@ class TestPermissionController:
         safe_op = PermissionOperation(
             operation_type="file_read", path="./safe_file.txt"
         )
-        assert self.controller.validate_operation(safe_op) == True
+        assert self.controller.validate_operation(safe_op) is True
 
         # Unsafe operation
         unsafe_op = PermissionOperation(operation_type="file_write", path="/etc/passwd")
-        assert self.controller.validate_operation(unsafe_op) == False
+        assert self.controller.validate_operation(unsafe_op) is False
 
     def test_add_remove_restrictions(self):
         """Test adding and removing path restrictions."""
@@ -99,7 +99,7 @@ class TestPermissionController:
         # Add restriction
         self.controller.add_restricted_path(test_path)
         assert test_path in self.controller.get_restricted_paths()
-        assert self.controller.validate_path_access(test_path, "read") == False
+        assert self.controller.validate_path_access(test_path, "read") is False
 
         # Remove restriction
         self.controller.remove_restricted_path(test_path)
@@ -136,7 +136,7 @@ class TestSandboxManager:
             limits=ResourceLimits(timeout_seconds=10),
         )
 
-        assert result["success"] == True
+        assert result["success"] is True
         assert result["return_code"] == 0
         assert "Hello, World!" in result["stdout"]
         assert result["stderr"] == ""
@@ -147,7 +147,7 @@ class TestSandboxManager:
             ["sleep", "5"], limits=ResourceLimits(timeout_seconds=1)
         )
 
-        assert result["success"] == False
+        assert result["success"] is False
         assert "timed out" in result["stderr"].lower()
 
     def test_resource_limits(self):
@@ -239,7 +239,7 @@ class TestApprovalWorkflow:
             request.id, "admin", "Approved after review"
         )
 
-        assert success == True
+        assert success is True
         assert request.id not in self.workflow.pending_requests
         assert request.id in self.workflow.completed_requests
         assert (
@@ -261,7 +261,7 @@ class TestApprovalWorkflow:
         # Deny it
         success = self.workflow.deny_request(request.id, "admin", "Too risky")
 
-        assert success == True
+        assert success is True
         assert request.id not in self.workflow.pending_requests
         assert request.id in self.workflow.completed_requests
         assert (
@@ -413,7 +413,7 @@ class TestSecurityManager:
 
         result = await self.manager.validate_operation(operation)
 
-        assert result["allowed"] == True
+        assert result["allowed"] is True
         assert result["operation_id"] is not None
         assert result["session_id"] == self.manager.session_id
 
@@ -424,7 +424,7 @@ class TestSecurityManager:
 
         result = await self.manager.validate_operation(operation)
 
-        assert result["allowed"] == False
+        assert result["allowed"] is False
         assert len(result["reasons"]) > 0
         assert "Permission denied" in result["reasons"][0]
 
@@ -433,7 +433,7 @@ class TestSecurityManager:
         """Test secure command execution."""
         result = await self.manager.execute_secure_command("echo 'Hello, Security!'")
 
-        assert result["success"] == True
+        assert result["success"] is True
         assert result["return_code"] == 0
         assert "Hello, Security!" in result["stdout"]
         assert result["operation_id"] is not None
@@ -443,7 +443,7 @@ class TestSecurityManager:
         """Test blocking of dangerous commands."""
         result = await self.manager.execute_secure_command("rm -rf /")
 
-        assert result["success"] == False
+        assert result["success"] is False
         assert "blocked" in result["stderr"].lower()
 
     @pytest.mark.asyncio
@@ -457,13 +457,13 @@ class TestSecurityManager:
             test_file, "write", test_content
         )
 
-        assert write_result["success"] == True
+        assert write_result["success"] is True
         assert os.path.exists(test_file)
 
         # Test file read
         read_result = await self.manager.secure_file_access(test_file, "read")
 
-        assert read_result["success"] == True
+        assert read_result["success"] is True
         assert read_result["content"] == test_content
 
     @pytest.mark.asyncio
@@ -471,7 +471,7 @@ class TestSecurityManager:
         """Test blocking of restricted file access."""
         result = await self.manager.secure_file_access(".env", "read")
 
-        assert result["success"] == False
+        assert result["success"] is False
         assert "blocked" in result["error"].lower()
 
     def test_get_security_status(self):
@@ -481,21 +481,21 @@ class TestSecurityManager:
         assert "session_id" in status
         assert "components" in status
         assert "policies" in status
-        assert status["components"]["permissions"] == True
-        assert status["components"]["sandbox"] == True
-        assert status["components"]["approval_workflow"] == True
-        assert status["components"]["audit_logging"] == True
+        assert status["components"]["permissions"] is True
+        assert status["components"]["sandbox"] is True
+        assert status["components"]["approval_workflow"] is True
+        assert status["components"]["audit_logging"] is True
 
     def test_update_security_policy(self):
         """Test updating security policies."""
         success = self.manager.update_security_policy("max_command_timeout", 600)
 
-        assert success == True
+        assert success is True
         assert self.manager.security_policies["max_command_timeout"] == 600
 
         # Test invalid policy
         success = self.manager.update_security_policy("invalid_policy", "value")
-        assert success == False
+        assert success is False
 
 
 class TestSecurityIntegration:
@@ -522,7 +522,7 @@ class TestSecurityIntegration:
             test_file, "write", test_content
         )
 
-        assert write_result["success"] == True
+        assert write_result["success"] is True
 
         # Verify file was created
         assert os.path.exists(test_file)
@@ -530,13 +530,13 @@ class TestSecurityIntegration:
         # Read file back
         read_result = await self.manager.secure_file_access(test_file, "read")
 
-        assert read_result["success"] == True
+        assert read_result["success"] is True
         assert read_result["content"] == test_content
 
         # Delete file
         delete_result = await self.manager.secure_file_access(test_file, "delete")
 
-        assert delete_result["success"] == True
+        assert delete_result["success"] is True
         assert not os.path.exists(test_file)
 
     @pytest.mark.asyncio
@@ -550,7 +550,7 @@ class TestSecurityIntegration:
         # Execute a safe command
         result = await self.manager.execute_secure_command("ls /tmp")
 
-        assert result["success"] == True
+        assert result["success"] is True
 
         # Check that audit events were created
         if self.manager.audit:
@@ -584,7 +584,7 @@ class TestSecurityIntegration:
             test_file, "write", large_content
         )
 
-        assert result["success"] == False
+        assert result["success"] is False
         assert "exceeds maximum file size" in result["error"]
 
 

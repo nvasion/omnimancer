@@ -246,7 +246,8 @@ class PermissionController:
         # Expand user home directory
         pattern = os.path.expanduser(pattern)
 
-        # Handle relative patterns (like .ssh, .env) by checking if they appear in the path
+        # Handle relative patterns (like .ssh, .env)
+        # by checking if they appear in the path
         if not pattern.startswith("/") and not pattern.startswith("~"):
             # For relative patterns, check if the pattern matches any part of the path
             path_parts = path.split("/")
@@ -255,7 +256,8 @@ class PermissionController:
                     # Exact match for directory/file name
                     if part == pattern:
                         return True
-                    # Check if any part of the path ends with the pattern (for files in directories)
+                    # Check if any part of the path ends
+                    # with the pattern (for files in dirs)
                     remaining_path = "/".join(path_parts[i:])
                     if (
                         remaining_path.startswith(pattern + "/")

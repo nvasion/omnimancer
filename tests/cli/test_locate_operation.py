@@ -5,10 +5,9 @@ This module tests the file location functionality that uses fuzzy matching
 to find files by name.
 """
 
-import asyncio
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 

@@ -1,14 +1,12 @@
 """Tests for headless pipe mode (omn -p)."""
 
 import json
-import sys
-from datetime import datetime
 from io import StringIO
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from omnimancer.core.models import ChatResponse, ToolCall, ToolResult
+from omnimancer.core.models import ChatResponse, ToolCall
 
 
 class TestChatResponseNewFields:
@@ -128,7 +126,11 @@ class TestHeadlessOutputEmitterText:
         emitter = HeadlessOutputEmitter(OutputFormat.TEXT, "sess-1", verbose=False)
         emitter._stdout = buf
 
-        emitter.emit_result("Final answer", "claude", {"input_tokens": 10, "output_tokens": 5}, 0.001, "end_turn")
+        emitter.emit_result(
+            "Final answer", "claude",
+            {"input_tokens": 10, "output_tokens": 5},
+            0.001, "end_turn",
+        )
         assert "Final answer" in buf.getvalue()
 
     def test_tool_events_hidden_without_verbose(self):
@@ -164,7 +166,11 @@ class TestHeadlessOutputEmitterJSON:
         emitter._stdout = buf
 
         emitter.emit_assistant("intermediate", "claude", None)
-        emitter.emit_result("Final", "claude", {"input_tokens": 10, "output_tokens": 5}, 0.001, "end_turn")
+        emitter.emit_result(
+            "Final", "claude",
+            {"input_tokens": 10, "output_tokens": 5},
+            0.001, "end_turn",
+        )
 
         output = json.loads(buf.getvalue())
         assert output["result"] == "Final"
@@ -195,7 +201,9 @@ class TestHeadlessOutputEmitterStreamJSON:
         from omnimancer.cli.headless import HeadlessOutputEmitter, OutputFormat
 
         buf = StringIO()
-        emitter = HeadlessOutputEmitter(OutputFormat.STREAM_JSON, "sess-1", verbose=False)
+        emitter = HeadlessOutputEmitter(
+            OutputFormat.STREAM_JSON, "sess-1", verbose=False
+        )
         emitter._stdout = buf
 
         emitter.emit_init("claude-sonnet")
@@ -210,7 +218,9 @@ class TestHeadlessOutputEmitterStreamJSON:
         from omnimancer.cli.headless import HeadlessOutputEmitter, OutputFormat
 
         buf = StringIO()
-        emitter = HeadlessOutputEmitter(OutputFormat.STREAM_JSON, "sess-1", verbose=False)
+        emitter = HeadlessOutputEmitter(
+            OutputFormat.STREAM_JSON, "sess-1", verbose=False
+        )
         emitter._stdout = buf
 
         emitter.emit_assistant("Hello", "claude", "end_turn")
@@ -224,7 +234,9 @@ class TestHeadlessOutputEmitterStreamJSON:
         from omnimancer.cli.headless import HeadlessOutputEmitter, OutputFormat
 
         buf = StringIO()
-        emitter = HeadlessOutputEmitter(OutputFormat.STREAM_JSON, "sess-1", verbose=False)
+        emitter = HeadlessOutputEmitter(
+            OutputFormat.STREAM_JSON, "sess-1", verbose=False
+        )
         emitter._stdout = buf
 
         emitter.emit_tool_use("file_read", {"path": "/src/main.py"})
@@ -238,7 +250,9 @@ class TestHeadlessOutputEmitterStreamJSON:
         from omnimancer.cli.headless import HeadlessOutputEmitter, OutputFormat
 
         buf = StringIO()
-        emitter = HeadlessOutputEmitter(OutputFormat.STREAM_JSON, "sess-1", verbose=False)
+        emitter = HeadlessOutputEmitter(
+            OutputFormat.STREAM_JSON, "sess-1", verbose=False
+        )
         emitter._stdout = buf
 
         emitter.emit_tool_result("file_read", "print('hi')", None)
@@ -253,7 +267,9 @@ class TestHeadlessOutputEmitterStreamJSON:
         from omnimancer.cli.headless import HeadlessOutputEmitter, OutputFormat
 
         buf = StringIO()
-        emitter = HeadlessOutputEmitter(OutputFormat.STREAM_JSON, "sess-1", verbose=False)
+        emitter = HeadlessOutputEmitter(
+            OutputFormat.STREAM_JSON, "sess-1", verbose=False
+        )
         emitter._stdout = buf
 
         emitter.emit_tool_result("file_read", "", "File not found")
@@ -265,10 +281,16 @@ class TestHeadlessOutputEmitterStreamJSON:
         from omnimancer.cli.headless import HeadlessOutputEmitter, OutputFormat
 
         buf = StringIO()
-        emitter = HeadlessOutputEmitter(OutputFormat.STREAM_JSON, "sess-1", verbose=False)
+        emitter = HeadlessOutputEmitter(
+            OutputFormat.STREAM_JSON, "sess-1", verbose=False
+        )
         emitter._stdout = buf
 
-        emitter.emit_result("Done", "claude", {"input_tokens": 50, "output_tokens": 25}, 0.005, "end_turn")
+        emitter.emit_result(
+            "Done", "claude",
+            {"input_tokens": 50, "output_tokens": 25},
+            0.005, "end_turn",
+        )
 
         line = json.loads(buf.getvalue().strip())
         assert line["type"] == "result"
@@ -279,7 +301,9 @@ class TestHeadlessOutputEmitterStreamJSON:
         from omnimancer.cli.headless import HeadlessOutputEmitter, OutputFormat
 
         buf = StringIO()
-        emitter = HeadlessOutputEmitter(OutputFormat.STREAM_JSON, "sess-42", verbose=False)
+        emitter = HeadlessOutputEmitter(
+            OutputFormat.STREAM_JSON, "sess-42", verbose=False
+        )
         emitter._stdout = buf
 
         emitter.emit_init("m")
@@ -288,7 +312,7 @@ class TestHeadlessOutputEmitterStreamJSON:
         emitter.emit_tool_result("t", "ok", None)
         emitter.emit_result("done", "m", {}, 0, "end_turn")
 
-        lines = [json.loads(l) for l in buf.getvalue().strip().split("\n")]
+        lines = [json.loads(line) for line in buf.getvalue().strip().split("\n")]
         assert len(lines) == 5
         for line in lines:
             assert line["session_id"] == "sess-42"
@@ -312,7 +336,9 @@ class TestHeadlessOutputEmitterError:
 
         stdout_buf = StringIO()
         stderr_buf = StringIO()
-        emitter = HeadlessOutputEmitter(OutputFormat.STREAM_JSON, "sess-1", verbose=False)
+        emitter = HeadlessOutputEmitter(
+            OutputFormat.STREAM_JSON, "sess-1", verbose=False
+        )
         emitter._stdout = stdout_buf
         emitter._stderr = stderr_buf
 
@@ -332,15 +358,17 @@ class TestHeadlessRunner:
 
         mock_engine = MagicMock()
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
-        mock_engine.send_message_with_tools = AsyncMock(return_value=ChatResponse(
-            content="Hello from the AI",
-            model_used="test-model",
-            tokens_used=15,
-            input_tokens=10,
-            output_tokens=5,
-            stop_reason="end_turn",
-            tool_calls=None,
-        ))
+        mock_engine.send_message_with_tools = AsyncMock(
+            return_value=ChatResponse(
+                content="Hello from the AI",
+                model_used="test-model",
+                tokens_used=15,
+                input_tokens=10,
+                output_tokens=5,
+                stop_reason="end_turn",
+                tool_calls=None,
+            )
+        )
 
         mock_agent_engine = MagicMock()
         mock_engine.agent_engine = mock_agent_engine
@@ -383,12 +411,19 @@ class TestHeadlessRunner:
 
         mock_engine = MagicMock()
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
-        mock_engine.send_message_with_tools = AsyncMock(side_effect=[first_response, second_response])
+        mock_engine.send_message_with_tools = AsyncMock(
+            side_effect=[first_response, second_response]
+        )
 
         mock_agent_engine = MagicMock()
-        mock_agent_engine.execute_with_approval = AsyncMock(return_value=MagicMock(
-            success=True, data="print('hello')", error=None, was_cancelled=False,
-        ))
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=MagicMock(
+                success=True,
+                data="print('hello')",
+                error=None,
+                was_cancelled=False,
+            )
+        )
         mock_engine.agent_engine = mock_agent_engine
 
         stdout_buf = StringIO()
@@ -403,8 +438,8 @@ class TestHeadlessRunner:
         exit_code = await runner.run("read main.py")
         assert exit_code == 0
 
-        lines = [json.loads(l) for l in stdout_buf.getvalue().strip().split("\n")]
-        types = [l["type"] for l in lines]
+        lines = [json.loads(line) for line in stdout_buf.getvalue().strip().split("\n")]
+        types = [line["type"] for line in lines]
         assert "system" in types
         assert "tool_use" in types
         assert "tool_result" in types
@@ -416,16 +451,18 @@ class TestHeadlessRunner:
 
         mock_engine = MagicMock()
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
-        mock_engine.send_message_with_tools = AsyncMock(return_value=ChatResponse(
-            content="Answer",
-            model_used="claude",
-            tokens_used=15,
-            input_tokens=10,
-            output_tokens=5,
-            cost_estimate=0.001,
-            stop_reason="end_turn",
-            tool_calls=None,
-        ))
+        mock_engine.send_message_with_tools = AsyncMock(
+            return_value=ChatResponse(
+                content="Answer",
+                model_used="claude",
+                tokens_used=15,
+                input_tokens=10,
+                output_tokens=5,
+                cost_estimate=0.001,
+                stop_reason="end_turn",
+                tool_calls=None,
+            )
+        )
         mock_engine.agent_engine = MagicMock()
 
         stdout_buf = StringIO()
@@ -451,12 +488,14 @@ class TestHeadlessRunner:
 
         mock_engine = MagicMock()
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
-        mock_engine.send_message_with_tools = AsyncMock(return_value=ChatResponse(
-            content="",
-            model_used="",
-            tokens_used=0,
-            error="Rate limit exceeded",
-        ))
+        mock_engine.send_message_with_tools = AsyncMock(
+            return_value=ChatResponse(
+                content="",
+                model_used="",
+                tokens_used=0,
+                error="Rate limit exceeded",
+            )
+        )
         mock_engine.agent_engine = MagicMock()
 
         stderr_buf = StringIO()
@@ -487,12 +526,19 @@ class TestHeadlessRunner:
 
         mock_engine = MagicMock()
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
-        mock_engine.send_message_with_tools = AsyncMock(return_value=infinite_response)
+        mock_engine.send_message_with_tools = AsyncMock(
+            return_value=infinite_response
+        )
 
         mock_agent_engine = MagicMock()
-        mock_agent_engine.execute_with_approval = AsyncMock(return_value=MagicMock(
-            success=True, data="ok", error=None, was_cancelled=False,
-        ))
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=MagicMock(
+                success=True,
+                data="ok",
+                error=None,
+                was_cancelled=False,
+            )
+        )
         mock_engine.agent_engine = mock_agent_engine
 
         stdout_buf = StringIO()

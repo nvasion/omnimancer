@@ -45,7 +45,9 @@ class OpenRouterProvider(BaseProvider):
 
         Args:
             api_key: OpenRouter API key
-            model: OpenRouter model ID to use (e.g., 'anthropic/claude-3.5-sonnet', 'openai/gpt-4', 'meta-llama/llama-3.1-70b-instruct')
+            model: OpenRouter model ID to use
+                (e.g., 'anthropic/claude-3.5-sonnet',
+                'openai/gpt-4')
             **kwargs: Additional configuration including OpenRouter-specific settings
         """
         super().__init__(api_key, model or "anthropic/claude-3.5-sonnet", **kwargs)
@@ -102,9 +104,12 @@ class OpenRouterProvider(BaseProvider):
             payload["route"] = "fallback"
 
         # Try with SSL verification first, then fall back if needed
-        for ssl_verify in [True, certifi.where(), False]:
+        ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
+        for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
+                async with httpx.AsyncClient(
+                    verify=ssl_verify
+                ) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/chat/completions",
                         headers=self._get_headers(),
@@ -121,9 +126,13 @@ class OpenRouterProvider(BaseProvider):
                     continue
                 else:
                     # Non-SSL connection error, don't retry
-                    raise NetworkError(f"Connection error: {e}")
+                    raise NetworkError(
+                        f"Connection error: {e}"
+                    )
             except httpx.TimeoutException:
-                raise NetworkError("Request to OpenRouter API timed out")
+                raise NetworkError(
+                    "Request to OpenRouter API timed out"
+                )
             except httpx.RequestError as e:
                 if "SSL" not in str(e) and "certificate" not in str(e):
                     # Non-SSL request error, don't retry
@@ -143,7 +152,10 @@ class OpenRouterProvider(BaseProvider):
                 raise ProviderError(f"Unexpected error: {e}")
 
         # If we get here, all SSL methods failed
-        raise NetworkError("Failed to establish SSL connection to OpenRouter API")
+        raise NetworkError(
+            "Failed to establish SSL connection "
+            "to OpenRouter API"
+        )
 
     async def send_message_with_tools(
         self,
@@ -187,9 +199,12 @@ class OpenRouterProvider(BaseProvider):
             payload["route"] = "fallback"
 
         # Try with SSL verification first, then fall back if needed
-        for ssl_verify in [True, certifi.where(), False]:
+        ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
+        for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
+                async with httpx.AsyncClient(
+                    verify=ssl_verify
+                ) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/chat/completions",
                         headers=self._get_headers(),
@@ -206,9 +221,13 @@ class OpenRouterProvider(BaseProvider):
                     continue
                 else:
                     # Non-SSL connection error, don't retry
-                    raise NetworkError(f"Connection error: {e}")
+                    raise NetworkError(
+                        f"Connection error: {e}"
+                    )
             except httpx.TimeoutException:
-                raise NetworkError("Request to OpenRouter API timed out")
+                raise NetworkError(
+                    "Request to OpenRouter API timed out"
+                )
             except httpx.RequestError as e:
                 if "SSL" not in str(e) and "certificate" not in str(e):
                     # Non-SSL request error, don't retry
@@ -228,7 +247,10 @@ class OpenRouterProvider(BaseProvider):
                 raise ProviderError(f"Unexpected error: {e}")
 
         # If we get here, all SSL methods failed
-        raise NetworkError("Failed to establish SSL connection to OpenRouter API")
+        raise NetworkError(
+            "Failed to establish SSL connection "
+            "to OpenRouter API"
+        )
 
     async def validate_credentials(self) -> bool:
         """
@@ -238,15 +260,23 @@ class OpenRouterProvider(BaseProvider):
             True if credentials are valid
         """
         # Try different SSL verification methods
-        for ssl_verify in [True, certifi.where(), False]:
+        ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
+        for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
+                async with httpx.AsyncClient(
+                    verify=ssl_verify
+                ) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/chat/completions",
                         headers=self._get_headers(),
                         json={
                             "model": self.model,
-                            "messages": [{"role": "user", "content": "Hi"}],
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": "Hi",
+                                }
+                            ],
                             "max_tokens": 10,
                         },
                         timeout=10.0,
@@ -376,13 +406,24 @@ class OpenRouterProvider(BaseProvider):
                     # Always log the fallback for debugging
                     logger = __import__("logging").getLogger(__name__)
                     logger.warning(
-                        f"OpenRouter model fallback: requested '{self.model}' but got '{model_used}'"
+                        "OpenRouter model fallback: "
+                        f"requested '{self.model}' "
+                        f"but got '{model_used}'"
                     )
 
                     # Add user warning if enabled
                     if self.show_fallback_warnings:
-                        fallback_warning = f"⚠️  **Model Fallback Notice**: Requested '{self.model}' but OpenRouter routed to '{model_used}' (model may be unavailable or overloaded)\n\n"
-                        final_content = fallback_warning + content
+                        fallback_warning = (
+                            "**Model Fallback Notice**:"
+                            f" Requested '{self.model}'"
+                            " but OpenRouter routed to"
+                            f" '{model_used}' (model may"
+                            " be unavailable or "
+                            "overloaded)\n\n"
+                        )
+                        final_content = (
+                            fallback_warning + content
+                        )
 
                 return ChatResponse(
                     content=final_content,
@@ -391,10 +432,14 @@ class OpenRouterProvider(BaseProvider):
                     timestamp=datetime.now(),
                 )
             else:
-                raise ProviderError("Empty response from OpenRouter API")
+                raise ProviderError(
+                    "Empty response from OpenRouter API"
+                )
 
         elif response.status_code == 401:
-            raise AuthenticationError("Invalid OpenRouter API key")
+            raise AuthenticationError(
+                "Invalid OpenRouter API key"
+            )
         elif response.status_code == 429:
             raise RateLimitError("OpenRouter API rate limit exceeded")
         elif response.status_code == 404:
@@ -403,7 +448,7 @@ class OpenRouterProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"OpenRouter API error: {error_msg}")
@@ -449,13 +494,24 @@ class OpenRouterProvider(BaseProvider):
                     # Always log the fallback for debugging
                     logger = __import__("logging").getLogger(__name__)
                     logger.warning(
-                        f"OpenRouter model fallback: requested '{self.model}' but got '{model_used}'"
+                        "OpenRouter model fallback: "
+                        f"requested '{self.model}' "
+                        f"but got '{model_used}'"
                     )
 
                     # Add user warning if enabled
                     if self.show_fallback_warnings:
-                        fallback_warning = f"⚠️  **Model Fallback Notice**: Requested '{self.model}' but OpenRouter routed to '{model_used}' (model may be unavailable or overloaded)\n\n"
-                        final_content = fallback_warning + content
+                        fallback_warning = (
+                            "**Model Fallback Notice**:"
+                            f" Requested '{self.model}'"
+                            " but OpenRouter routed to"
+                            f" '{model_used}' (model may"
+                            " be unavailable or "
+                            "overloaded)\n\n"
+                        )
+                        final_content = (
+                            fallback_warning + content
+                        )
 
                 return ChatResponse(
                     content=final_content,
@@ -465,7 +521,9 @@ class OpenRouterProvider(BaseProvider):
                     timestamp=datetime.now(),
                 )
             else:
-                raise ProviderError("Empty response from OpenRouter API")
+                raise ProviderError(
+                    "Empty response from OpenRouter API"
+                )
         else:
             return self._handle_response(response)
 

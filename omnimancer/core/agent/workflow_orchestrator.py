@@ -380,11 +380,16 @@ class WorkflowOrchestrator:
 
     async def _request_approval(self, step: WorkflowStep) -> bool:
         """Request approval for a step that requires it."""
-        self.console.print(f"\n[yellow]⚠ Step '{step.name}' requires approval[/yellow]")
+        self.console.print(
+            f"\n[yellow]⚠ Step '{step.name}' "
+            "requires approval[/yellow]"
+        )
         self.console.print(f"Description: {step.description}")
 
         # Use the approval manager if available
-        if self.approval_manager and hasattr(self.approval_manager, "request_approval"):
+        if self.approval_manager and hasattr(
+            self.approval_manager, "request_approval"
+        ):
             # Create a basic operation object for the approval manager
             from .types import Operation, OperationType
 
@@ -412,7 +417,9 @@ class WorkflowOrchestrator:
         status_color = "green" if step.status == WorkflowStatus.COMPLETED else "red"
 
         self.console.print(
-            f"[{status_color}]{status_symbol}[/{status_color}] {step.name}: {step.description}"
+            f"[{status_color}]{status_symbol}"
+            f"[/{status_color}] {step.name}: "
+            f"{step.description}"
         )
 
         if step.error:
@@ -420,17 +427,23 @@ class WorkflowOrchestrator:
 
     async def _display_workflow_summary(self) -> None:
         """Display a clean summary of the workflow execution."""
+        assert self.context is not None
+        history = self.context.history
         completed = sum(
-            1 for s in self.context.history if s.status == WorkflowStatus.COMPLETED  # type: ignore[misc, union-attr]
+            1
+            for s in history
+            if s.status == WorkflowStatus.COMPLETED
         )
         failed = sum(
-            1 for s in self.context.history if s.status == WorkflowStatus.FAILED  # type: ignore[misc, union-attr]
+            1
+            for s in history
+            if s.status == WorkflowStatus.FAILED
         )
-        total = len(self.context.history)  # type: ignore[union-attr]
+        total = len(history)
 
         if failed == 0:
             self.console.print(
-                f"\n[bold green]✅ Workflow completed successfully![/bold green]"
+                "\n[bold green]✅ Workflow completed successfully![/bold green]"
             )
         else:
             self.console.print(
@@ -489,7 +502,10 @@ class WorkflowOrchestrator:
         files = context.get("project_files", [])
 
         # Check for common tech indicators
-        file_names = [f.replace("📄 ", "").replace("📁 ", "").strip("/") for f in files]
+        file_names = [
+            f.replace("📄 ", "").replace("📁 ", "").strip("/")
+            for f in files
+        ]
 
         if "package.json" in file_names:
             tech_stack["javascript"] = "Node.js/npm"
@@ -531,7 +547,10 @@ class WorkflowOrchestrator:
 
         config_files = {}
         files = context.get("project_files", [])
-        file_names = [f.replace("📄 ", "").replace("📁 ", "").strip("/") for f in files]
+        file_names = [
+            f.replace("📄 ", "").replace("📁 ", "").strip("/")
+            for f in files
+        ]
 
         config_patterns = {
             ".env": "Environment variables",
@@ -566,12 +585,16 @@ class WorkflowOrchestrator:
 
         if "python" in tech_stack:
             analysis["type"] = "Python Application"
-            analysis["patterns"].append("Python package structure detected")  # type: ignore[attr-defined]
+            analysis["patterns"].append(  # type: ignore[attr-defined]
+                "Python package structure detected"
+            )
             context.console.print("  ✓ Identified as Python application")
 
         if "javascript" in tech_stack:
             analysis["type"] = "Node.js Application"
-            analysis["patterns"].append("Node.js project structure detected")  # type: ignore[attr-defined]
+            analysis["patterns"].append(  # type: ignore[attr-defined]
+                "Node.js project structure detected"
+            )
             context.console.print("  ✓ Identified as Node.js application")
 
         context.set("structure_analysis", analysis)
@@ -685,7 +708,10 @@ class WorkflowOrchestrator:
         user_request = params.get("user_request", context.get("user_request", ""))
 
         # Simulate analyzing the request
-        context.console.print(f"[cyan]📝 Analyzing request: '{user_request}'[/cyan]")
+        context.console.print(
+            f"[cyan]📝 Analyzing request: "
+            f"'{user_request}'[/cyan]"
+        )
 
         # Parse the request to understand intent and extract key information
         analysis = {
@@ -729,7 +755,7 @@ class WorkflowOrchestrator:
         """Execute the planned action autonomously."""
         user_request = context.get("user_request", "")
 
-        context.console.print(f"[cyan]🚀 Executing autonomous action...[/cyan]")
+        context.console.print("[cyan]🚀 Executing autonomous action...[/cyan]")
 
         # Actually execute the user request with AI provider if available
         try:
@@ -759,7 +785,10 @@ class WorkflowOrchestrator:
                 result = {
                     "status": "completed",
                     "action_taken": f"Processed request: {user_request}",
-                    "details": "Action executed using autonomous workflow system (simulated)",
+                    "details": (
+                        "Action executed using autonomous "
+                        "workflow system (simulated)"
+                    ),
                     "timestamp": "just now",
                 }
 
@@ -804,17 +833,39 @@ class WorkflowOrchestrator:
 
         if success:
             if "ai_response" in result:
-                # Don't show summary if we have the actual AI response - it will be shown in interface
-                summary = f"✅ Successfully completed: {user_request}"
-                context.console.print(f"[bold green]📋 Summary:[/bold green] {summary}")
+                # Don't show summary if we have the actual
+                # AI response - it will be shown in interface
+                summary = (
+                    "✅ Successfully completed: "
+                    f"{user_request}"
+                )
+                context.console.print(
+                    "[bold green]📋 Summary:"
+                    f"[/bold green] {summary}"
+                )
             else:
-                summary = f"✅ Successfully completed: {user_request}\n\nAction taken: {result.get('action_taken', 'Autonomous workflow execution')}"
+                action = result.get(
+                    'action_taken',
+                    'Autonomous workflow execution',
+                )
+                summary = (
+                    f"✅ Successfully completed: "
+                    f"{user_request}\n\n"
+                    f"Action taken: {action}"
+                )
                 context.console.print(
                     f"[bold green]📋 Summary:[/bold green]\n{summary}"
                 )
         else:
-            summary = f"⚠️ Partially completed: {user_request}\n\nStatus: Some issues may have occurred during execution"
-            context.console.print(f"[bold yellow]📋 Summary:[/bold yellow]\n{summary}")
+            summary = (
+                f"⚠️ Partially completed: {user_request}"
+                "\n\nStatus: Some issues may have "
+                "occurred during execution"
+            )
+            context.console.print(
+                "[bold yellow]📋 Summary:"
+                f"[/bold yellow]\n{summary}"
+            )
 
         context.set("final_summary", summary)
         return summary

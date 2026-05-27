@@ -1,8 +1,9 @@
 """
 Claude-code provider implementation for Omnimancer.
 
-This module provides the Claude-code provider implementation for local Claude-code integration
-with support for opus and sonnet modes with free access.
+This module provides the Claude-code provider implementation for
+local Claude-code integration with support for opus and sonnet
+modes with free access.
 """
 
 import os
@@ -34,7 +35,9 @@ class ClaudeCodeProvider(BaseProvider):
 
         Args:
             api_key: Not used for Claude-code (local installation), defaults to "local"
-            model: Claude-code model mode (e.g., 'claude-code-sonnet', 'claude-code-opus', 'claude-code-haiku')
+            model: Claude-code model mode
+                (e.g., 'claude-code-sonnet',
+                'claude-code-opus')
             **kwargs: Additional configuration including Claude-code specific settings
         """
         super().__init__(api_key or "local", model or "claude-code-sonnet", **kwargs)
@@ -94,15 +97,23 @@ class ClaudeCodeProvider(BaseProvider):
 
                 if result.returncode != 0:
                     raise ProviderError(
-                        f"Claude command not found or not working at: {self.claude_code_path}"
+                        "Claude command not found or "
+                        "not working at: "
+                        f"{self.claude_code_path}"
                     )
 
         except subprocess.TimeoutExpired:
             raise ProviderError("Claude command timed out")
         except FileNotFoundError:
-            raise ProviderError(f"Claude executable not found: {self.claude_code_path}")
+            raise ProviderError(
+                f"Claude executable not found: "
+                f"{self.claude_code_path}"
+            )
         except Exception as e:
-            raise ProviderError(f"Error validating Claude installation: {e}")
+            raise ProviderError(
+                "Error validating Claude "
+                f"installation: {e}"
+            )
 
     async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
@@ -124,7 +135,10 @@ class ClaudeCodeProvider(BaseProvider):
             return response
 
         except Exception as e:
-            raise ProviderError(f"Error communicating with Claude-code: {e}")
+            raise ProviderError(
+                "Error communicating with "
+                f"Claude-code: {e}"
+            )
 
     async def validate_credentials(self) -> bool:
         """
@@ -136,7 +150,10 @@ class ClaudeCodeProvider(BaseProvider):
         try:
             # Test with a simple message
             test_result = await self._execute_claude_code("Hi")
-            return test_result.returncode == 0 and test_result.stdout.strip() != ""
+            return (
+                test_result.returncode == 0
+                and test_result.stdout.strip() != ""
+            )
         except Exception:
             return False
 
@@ -254,9 +271,13 @@ class ClaudeCodeProvider(BaseProvider):
             error_msg = result.stderr.strip() if result.stderr else "Unknown error"
 
             # Check for common error patterns
-            if "authentication" in error_msg.lower() or "api key" in error_msg.lower():
+            if (
+                "authentication" in error_msg.lower()
+                or "api key" in error_msg.lower()
+            ):
                 raise AuthenticationError(
-                    f"Claude-code authentication error: {error_msg}"
+                    "Claude-code authentication "
+                    f"error: {error_msg}"
                 )
             elif "rate limit" in error_msg.lower():
                 raise RateLimitError(f"Claude-code rate limit: {error_msg}")
@@ -292,7 +313,7 @@ class ClaudeCodeProvider(BaseProvider):
                 "supports_multimodal": True,
             },
             "claude-code-sonnet": {
-                "description": "Claude-code Sonnet - Local free access to Claude Sonnet",
+                "description": "Claude-code Sonnet - Free access to Sonnet",
                 "max_tokens": 200000,
                 "swe_score": 73.0,
                 "supports_tools": False,

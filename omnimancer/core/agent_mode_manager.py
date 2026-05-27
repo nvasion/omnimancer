@@ -83,7 +83,10 @@ class AgentModeManager:
     - Persistent state management
     """
 
-    def __init__(self, config_manager: Any, storage_path: str = "~/.omnimancer") -> None:
+    def __init__(
+        self, config_manager: Any,
+        storage_path: str = "~/.omnimancer",
+    ) -> None:
         """
         Initialize the agent mode manager.
 
@@ -178,7 +181,8 @@ class AgentModeManager:
 
             if wait_for_completion and self.active_operations:
                 logger.info(
-                    f"Waiting for {len(self.active_operations)} active operations to complete..."
+                    f"Waiting for {len(self.active_operations)}"
+                    " active operations to complete..."
                 )
                 # Wait with timeout
                 try:
@@ -275,7 +279,9 @@ class AgentModeManager:
             "settings": {
                 "auto_approve_low_risk": self.settings.auto_approve_low_risk,
                 "auto_approve_read_only": self.settings.auto_approve_read_only,
-                "max_concurrent_operations": self.settings.max_concurrent_operations,
+                "max_concurrent_operations": (
+                    self.settings.max_concurrent_operations
+                ),
                 "operation_timeout": self.settings.operation_timeout,
                 "enable_batch_approval": self.settings.enable_batch_approval,
             },
@@ -418,7 +424,9 @@ class AgentModeManager:
 
         return history
 
-    def add_operation_callback(self, callback: Callable[[AgentOperation], None]) -> None:
+    def add_operation_callback(
+        self, callback: Callable[[AgentOperation], None]
+    ) -> None:
         """Add callback for operation state changes."""
         self.operation_callbacks.append(callback)
 
@@ -518,7 +526,10 @@ class AgentModeManager:
         # Notify callbacks
         self._notify_operation_change(agent_operation)
 
-        logger.info(f"Starting operation {agent_operation.id}: {operation.description}")
+        logger.info(
+            f"Starting operation {agent_operation.id}: "
+            f"{operation.description}"
+        )
 
         # Execute operation asynchronously
         asyncio.create_task(self._execute_operation(agent_operation))
@@ -560,7 +571,10 @@ class AgentModeManager:
                 del self.active_operations[agent_operation.id]
 
                 logger.info(
-                    f"Queued operation {agent_operation.id} for retry ({agent_operation.retry_count}/{agent_operation.max_retries})"
+                    f"Queued operation {agent_operation.id}"
+                    f" for retry "
+                    f"({agent_operation.retry_count}"
+                    f"/{agent_operation.max_retries})"
                 )
 
         finally:
@@ -592,8 +606,10 @@ class AgentModeManager:
             approved, was_cancelled = (
                 await self.approval_interface.handle_single_approval(approval_data)
             )
-            # Store was_cancelled info in operation metadata for result handling
-            agent_operation.data["was_cancelled"] = was_cancelled  # type: ignore[attr-defined]
+            # Store was_cancelled info in operation metadata
+            agent_operation.data[  # type: ignore[attr-defined]
+                "was_cancelled"
+            ] = was_cancelled
             return approved
         except Exception as e:
             logger.error(
@@ -664,7 +680,9 @@ class AgentModeManager:
                 "settings": {
                     "auto_approve_low_risk": self.settings.auto_approve_low_risk,
                     "auto_approve_read_only": self.settings.auto_approve_read_only,
-                    "max_concurrent_operations": self.settings.max_concurrent_operations,
+                    "max_concurrent_operations": (
+                        self.settings.max_concurrent_operations
+                    ),
                     "operation_timeout": self.settings.operation_timeout,
                     "retry_delay": self.settings.retry_delay,
                     "enable_batch_approval": self.settings.enable_batch_approval,

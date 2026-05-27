@@ -44,7 +44,9 @@ class MistralProvider(BaseProvider):
 
         Args:
             api_key: Mistral API key
-            model: Mistral model to use (e.g., 'mistral-large-latest', 'mistral-small-latest', 'open-mistral-7b')
+            model: Mistral model to use
+                (e.g., 'mistral-large-latest',
+                'mistral-small-latest')
             **kwargs: Additional configuration including Mistral-specific settings
         """
         super().__init__(api_key, model or "mistral-large-latest", **kwargs)
@@ -301,7 +303,7 @@ class MistralProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Mistral API error: {error_msg}")
@@ -356,7 +358,10 @@ class MistralProvider(BaseProvider):
         """
         model_configs = {
             "mistral-large-latest": {
-                "description": "Mistral Large - Most capable model for complex tasks",
+                "description": (
+                    "Mistral Large - Most capable model"
+                    " for complex tasks"
+                ),
                 "max_tokens": 128000,
                 "cost_per_million_input": 2.0,
                 "cost_per_million_output": 6.0,
@@ -392,7 +397,10 @@ class MistralProvider(BaseProvider):
                 "supports_multimodal": False,
             },
             "codestral-latest": {
-                "description": "Codestral - Specialized for code generation and analysis",
+                "description": (
+                    "Codestral - Specialized for code"
+                    " generation and analysis"
+                ),
                 "max_tokens": 32000,
                 "cost_per_million_input": 0.2,
                 "cost_per_million_output": 0.6,
@@ -445,7 +453,10 @@ class MistralProvider(BaseProvider):
             EnhancedModelInfo(
                 name="mistral-large-latest",
                 provider="mistral",
-                description="Mistral Large - Most capable model for complex tasks",
+                description=(
+                    "Mistral Large - Most capable model"
+                    " for complex tasks"
+                ),
                 max_tokens=128000,
                 cost_per_million_input=2.0,
                 cost_per_million_output=6.0,
@@ -506,7 +517,10 @@ class MistralProvider(BaseProvider):
             EnhancedModelInfo(
                 name="codestral-latest",
                 provider="mistral",
-                description="Codestral - Specialized for code generation and analysis",
+                description=(
+                    "Codestral - Specialized for code"
+                    " generation and analysis"
+                ),
                 max_tokens=32000,
                 cost_per_million_input=0.2,
                 cost_per_million_output=0.6,

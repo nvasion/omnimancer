@@ -63,7 +63,12 @@ def load_claude_subscription_token() -> Optional[dict]:
             return {"access_token": creds.access_token, "auth_type": "bearer"}
         elif creds and creds.is_expired:
             logger.debug("Claude subscription token is expired, needs refresh")
-            return {"access_token": creds.access_token, "auth_type": "bearer", "expired": True, "creds": creds}
+            return {
+                "access_token": creds.access_token,
+                "auth_type": "bearer",
+                "expired": True,
+                "creds": creds,
+            }
     except Exception as e:
         logger.debug(f"Could not load Claude subscription credentials: {e}")
     return None

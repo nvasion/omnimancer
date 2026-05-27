@@ -1,8 +1,9 @@
 """
 Google Vertex AI provider implementation for Omnimancer.
 
-This module provides the Google Vertex AI provider implementation using Vertex AI's API
-with support for Google Cloud project configuration, location settings, and service account authentication.
+This module provides the Google Vertex AI provider implementation
+using Vertex AI's API with support for Google Cloud project
+configuration, location settings, and service account authentication.
 """
 
 import os
@@ -43,7 +44,9 @@ class VertexAIProvider(BaseProvider):
 
         Args:
             api_key: Google Cloud API key or service account key
-            model: Vertex AI model to use (e.g., 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro')
+            model: Vertex AI model to use
+                (e.g., 'gemini-1.5-pro',
+                'gemini-1.5-flash')
             **kwargs: Additional configuration including Vertex AI-specific settings
         """
         super().__init__(api_key, model or "gemini-1.5-pro", **kwargs)
@@ -70,17 +73,26 @@ class VertexAIProvider(BaseProvider):
         self._setup_authentication()
 
         # Build base URL
-        self.base_url = f"https://{self.vertex_location}-aiplatform.googleapis.com/v1/projects/{self.vertex_project}/locations/{self.vertex_location}/publishers/google/models"
+        self.base_url = (
+            f"https://{self.vertex_location}"
+            "-aiplatform.googleapis.com/v1"
+            f"/projects/{self.vertex_project}"
+            f"/locations/{self.vertex_location}"
+            "/publishers/google/models"
+        )
 
     def _setup_authentication(self) -> None:
         """Set up Google Cloud authentication."""
         if self.service_account_path:
             # Use service account file
             if os.path.exists(self.service_account_path):
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.service_account_path
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
+                    self.service_account_path
+                )
             else:
                 raise ValueError(
-                    f"Service account file not found: {self.service_account_path}"
+                    "Service account file not found: "
+                    f"{self.service_account_path}"
                 )
         elif self.api_key and self.api_key != "":
             # Use API key (for testing or specific configurations)
@@ -91,10 +103,14 @@ class VertexAIProvider(BaseProvider):
                 # This would normally use Google's auth libraries
                 # For now, we'll require explicit configuration
                 raise ValueError(
-                    "Either service_account_path or api_key must be provided for Vertex AI"
+                    "Either service_account_path or api_key"
+                    " must be provided for Vertex AI"
                 )
             except Exception as e:
-                raise ValueError(f"Failed to set up Vertex AI authentication: {e}")
+                raise ValueError(
+                    "Failed to set up Vertex AI "
+                    f"authentication: {e}"
+                )
 
     async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
@@ -377,7 +393,7 @@ class VertexAIProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Vertex AI API error: {error_msg}")

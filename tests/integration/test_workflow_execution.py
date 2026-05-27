@@ -4,7 +4,7 @@ Integration tests for end-to-end workflow execution - SIMPLIFIED VERSION.
 
 import os
 import tempfile
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -78,7 +78,11 @@ class TestWorkflowExecutionIntegration:
             response = Mock()
             response.is_success = True
             response.model_used = "test-model"
-            response.content = "I've analyzed the workspace. It contains a Python project with README, main.py, and config.json files."
+            response.content = (
+                "I've analyzed the workspace. It contains a"
+                " Python project with README, main.py,"
+                " and config.json files."
+            )
             return response
 
         cli.engine.send_message = AsyncMock(side_effect=mock_send_message)
@@ -103,7 +107,7 @@ class TestWorkflowExecutionIntegration:
         cli.engine.provider_supports_tools = Mock(return_value=False)
 
         # Mock _parse_and_execute_operations to track calls
-        original_method = cli._parse_and_execute_operations
+        cli._parse_and_execute_operations  # save reference before mocking
         parse_calls = []
 
         async def mock_parse(content):
@@ -119,7 +123,10 @@ class TestWorkflowExecutionIntegration:
             response.is_success = True
             response.model_used = "test-model"
             # Response with no operation markers - workflow should exit on first check
-            response.content = "The workspace has been analyzed successfully. Task is complete."
+            response.content = (
+                "The workspace has been analyzed successfully."
+                " Task is complete."
+            )
             return response
 
         cli.engine.send_message = AsyncMock(side_effect=mock_send_message)

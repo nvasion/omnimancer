@@ -133,7 +133,7 @@ class CancellationHandler:
             if self.status_display:
                 try:
                     self.status_display.stop()
-                except:
+                except Exception:
                     pass
             # Clear the line and print cancellation message
             self.console.print("\r" + " " * 80 + "\r", end="")
@@ -147,7 +147,7 @@ class CancellationHandler:
                     self.status_display.stop()
                     # Clear any remaining spinner artifacts
                     self.console.print("\r" + " " * 80 + "\r", end="")
-                except:
+                except Exception:
                     pass
             self.active_operation = None
             self.status_display = None
@@ -189,7 +189,7 @@ class CancellationHandler:
                 self.status_display.stop()
                 # Clear the line where the spinner was displayed
                 self.console.print("\r" + " " * 80 + "\r", end="")
-            except:
+            except Exception:
                 pass
             logger.debug("Status display paused for user interaction")
 
@@ -201,7 +201,7 @@ class CancellationHandler:
             self.is_paused = False
             try:
                 self.status_display.start()
-            except:
+            except Exception:
                 pass
             logger.debug("Status display resumed after user interaction")
 
@@ -232,7 +232,9 @@ class EnhancedStatusDisplay:
         enhanced_message = (
             f"[bold green]{message}... (Press Ctrl+C to cancel)[/bold green]"
         )
-        return self.console.status(enhanced_message, spinner="dots")  # type: ignore[return-value]
+        return self.console.status(  # type: ignore[return-value]
+            enhanced_message, spinner="dots"
+        )
 
     def show_cancellation_notice(self, message: str = "Operation cancelled") -> None:
         """

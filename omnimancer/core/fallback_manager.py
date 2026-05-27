@@ -97,7 +97,11 @@ class EnhancedProviderFallback:
     health monitoring, and context preservation.
     """
 
-    def __init__(self, core_engine: Any, health_monitor: Optional[HealthMonitor] = None) -> None:
+    def __init__(
+        self,
+        core_engine: Any,
+        health_monitor: Optional[HealthMonitor] = None,
+    ) -> None:
         """
         Initialize the enhanced fallback manager.
 
@@ -307,7 +311,8 @@ class EnhancedProviderFallback:
                     delay += jitter
 
                     logger.debug(
-                        f"Retrying {provider_name} in {delay:.2f}s (attempt {attempt + 1})"
+                        f"Retrying {provider_name} in {delay:.2f}s"
+                        f" (attempt {attempt + 1})"
                     )
                     await asyncio.sleep(delay)
 
@@ -444,7 +449,9 @@ class EnhancedProviderFallback:
         )
 
         logger.warning(
-            f"Temporarily excluded provider {provider_name} due to consecutive failures"
+            f"Temporarily excluded provider"
+            f" {provider_name} due to consecutive"
+            " failures"
         )
 
     def _is_provider_excluded(self, provider_name: str) -> bool:
@@ -555,10 +562,13 @@ class EnhancedProviderFallback:
             self.provider_stats.clear()
             logger.info("Reset stats for all providers")
 
-    def configure_circuit_breaker(self, threshold: int = 5, recovery_time: int = 600) -> None:
+    def configure_circuit_breaker(
+        self, threshold: int = 5, recovery_time: int = 600,
+    ) -> None:
         """Configure circuit breaker settings."""
         self.circuit_breaker_threshold = threshold
         self.circuit_breaker_recovery_time = recovery_time
         logger.info(
-            f"Circuit breaker configured: threshold={threshold}, recovery_time={recovery_time}s"
+            f"Circuit breaker configured: threshold={threshold},"
+            f" recovery_time={recovery_time}s"
         )

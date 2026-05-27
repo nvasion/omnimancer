@@ -8,13 +8,10 @@ to keep the main interface module manageable.
 # Standard library imports
 import asyncio
 import inspect
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, List, Optional
-
-logger = logging.getLogger(__name__)
 
 # Third-party imports
 from rich.panel import Panel
@@ -22,12 +19,13 @@ from rich.prompt import Confirm
 from rich.table import Table
 
 # Internal imports - Core
-from ..core.config_manager import ConfigManager
 from ..core.models import EnhancedModelInfo
 from ..providers.factory import ProviderFactory
 
 # Internal imports - CLI
-from .commands import Command, CommandType, SlashCommand
+from .commands import Command, SlashCommand
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -118,8 +116,10 @@ class CommandDispatchMixin:
             await self._handle_agent_command(command)
         elif slash_cmd == SlashCommand.CONFIG:
             await self._handle_config_command(command)
-        else:
-            self._show_info(f"Command {slash_cmd.value} is not yet implemented")  # type: ignore[attr-defined]
+        elif slash_cmd is not None:
+            self._show_info(
+                f"Command {slash_cmd.value} is not yet implemented"
+            )
 
     async def _handle_dynamic_command(self, command: Command) -> None:
         """
@@ -168,9 +168,13 @@ class CommandDispatchMixin:
 
         # Check if handler is async
         if inspect.iscoroutinefunction(handler):
-            return await handler(args, engine=self.engine, console=self.console)  # type: ignore[no-any-return]
+            return await handler(  # type: ignore[no-any-return]
+                args, engine=self.engine, console=self.console
+            )
         else:
-            return handler(args, engine=self.engine, console=self.console)  # type: ignore[no-any-return]
+            return handler(  # type: ignore[no-any-return]
+                args, engine=self.engine, console=self.console
+            )
 
     async def _execute_dynamic_script(
         self, script_path: Path, args: List[str]
@@ -211,7 +215,6 @@ class CommandDispatchMixin:
         """
         if command.content == "quit":
             self.stop()
-
 
     # Display methods are in cli/display.py (DisplayMixin)
 
@@ -320,8 +323,10 @@ class CommandDispatchMixin:
                 current_marker = (
                     " (active)" if provider_name == current_provider_name else ""
                 )
+                pname = provider_name.upper()
                 output_lines.append(
-                    f"\n[bold cyan]{provider_name.upper()}[/bold cyan] {provider_status}{current_marker}:"
+                    f"\n[bold cyan]{pname}[/bold cyan]"
+                    f" {provider_status}{current_marker}:"
                 )
 
                 # List models in simple format
@@ -390,7 +395,9 @@ class CommandDispatchMixin:
 
             # Add simple legend
             output_lines.append(
-                "\nLegend: ● Current | ✓ Available | ✗ Unavailable | NEW Latest | 🔧 Tools | 🖼️ Multimodal"
+                "\nLegend: ● Current | ✓ Available"
+                " | ✗ Unavailable | NEW Latest"
+                " | 🔧 Tools | 🖼️ Multimodal"
             )
 
             return "\n".join(output_lines)
@@ -424,10 +431,13 @@ class CommandDispatchMixin:
                 if provider_name not in self.engine.providers:
                     if provider_name in available_providers:
                         self._show_error(
-                            f"Provider '{provider_name}' is available but not configured."
+                            f"Provider '{provider_name}' is"
+                            " available but not configured."
                         )
                         self._show_info(
-                            "Configure it in your settings first, then try switching again."
+                            "Configure it in your settings"
+                            " first, then try switching"
+                            " again."
                         )
                         return
                     else:
@@ -439,7 +449,9 @@ class CommandDispatchMixin:
                         ]
                         if suggestions:
                             self._show_error(
-                                f"Provider '{provider_name}' not found. Did you mean: {', '.join(suggestions)}?"
+                                f"Provider '{provider_name}'"
+                                " not found. Did you mean:"
+                                f" {', '.join(suggestions)}?"
                             )
                         else:
                             self._show_error(f"Provider '{provider_name}' not found.")
@@ -467,7 +479,9 @@ class CommandDispatchMixin:
 
                     if model_name not in all_model_names:
                         self._show_error(
-                            f"Model '{model_name}' not available for provider '{provider_name}'."
+                            f"Model '{model_name}' not"
+                            " available for provider"
+                            f" '{provider_name}'."
                         )
                         if all_model_names:
                             # Show suggestions for similar model names
@@ -478,12 +492,22 @@ class CommandDispatchMixin:
                                 or m.lower() in model_name.lower()
                             ]
                             if suggestions:
+                                models_str = ", ".join(
+                                    suggestions[:5]
+                                )
                                 self._show_info(
-                                    f"Available models for {provider_name}: {', '.join(suggestions[:5])}"
+                                    "Available models for"
+                                    f" {provider_name}:"
+                                    f" {models_str}"
                                 )
                             else:
+                                models_str = ", ".join(
+                                    all_model_names[:5]
+                                )
                                 self._show_info(
-                                    f"Available models for {provider_name}: {', '.join(all_model_names[:5])}"
+                                    "Available models for"
+                                    f" {provider_name}:"
+                                    f" {models_str}"
                                 )
                         return
 
@@ -518,14 +542,16 @@ class CommandDispatchMixin:
                     detail_text = (
                         f" | {' | '.join(model_details)}" if model_details else ""
                     )
-                except:
+                except Exception:
                     detail_text = ""
 
                 capability_text = (
                     f" ({', '.join(capabilities)})" if capabilities else ""
                 )
                 self._show_info(
-                    f"✓ Switched to {provider_name}:{current_model}{capability_text}{detail_text}"
+                    f"✓ Switched to {provider_name}:"
+                    f"{current_model}"
+                    f"{capability_text}{detail_text}"
                 )
 
                 # Show MCP tool availability if provider supports tools
@@ -539,9 +565,11 @@ class CommandDispatchMixin:
                             )
                         else:
                             self._show_info(
-                                "🔧 Tool calling supported (no MCP tools currently available)"
+                                "🔧 Tool calling supported"
+                                " (no MCP tools currently"
+                                " available)"
                             )
-                    except:
+                    except Exception:
                         pass
             else:
                 self._show_error("Failed to switch provider/model")
@@ -724,13 +752,15 @@ class CommandDispatchMixin:
                             created.replace("Z", "+00:00")
                         )
                         created = created_dt.strftime("%Y-%m-%d %H:%M")
-                    except:
+                    except Exception:
                         pass
 
                 lines.append(f"  📄 {conv['filename']}")
                 lines.append(f"     Created: {created}")
+                model = conv.get('current_model', 'Unknown')
                 lines.append(
-                    f"     Messages: {conv['message_count']}, Model: {conv.get('current_model', 'Unknown')}"
+                    f"     Messages: {conv['message_count']},"
+                    f" Model: {model}"
                 )
                 lines.append("")
 
@@ -884,9 +914,12 @@ class CommandDispatchMixin:
 
             elif subcommand == "status":
                 status = self.agent_manager.get_status()
+                ops = status.get("operations", {})
+                in_prog = ops.get("in_progress", 0)
+                mode = status.get("mode", "unknown")
                 self.console.print(Panel(
-                    f"Mode: {status.get('mode', 'unknown')}\n"
-                    f"Operations in progress: {status.get('operations', {}).get('in_progress', 0)}",
+                    f"Mode: {mode}\n"
+                    f"Operations in progress: {in_prog}",
                     title="Agent Status",
                 ))
 
@@ -949,7 +982,9 @@ class CommandDispatchMixin:
                         count = max(1, min(count, 100))  # Limit between 1-100
                     except ValueError:
                         self._show_error(
-                            "Invalid count for recent commands. Using default (20)."
+                            "Invalid count for recent"
+                            " commands. Using default"
+                            " (20)."
                         )
 
                 recent_commands = self.history_manager.get_recent_commands(count)
@@ -958,7 +993,10 @@ class CommandDispatchMixin:
                     self._show_info("No command history available.")
                     return
 
-                table = Table(title=f"Recent Commands (Last {len(recent_commands)})")
+                count = len(recent_commands)
+                table = Table(
+                    title=f"Recent Commands (Last {count})"
+                )
                 table.add_column("Index", style="dim", width=6)
                 table.add_column("Time", style="cyan", width=16)
                 table.add_column("Command", style="white")
@@ -1045,7 +1083,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
             elif action == "export":
                 if len(args) < 2:
                     self._show_error(
-                        "Export requires a filename. Usage: /history export <file> [format]"
+                        "Export requires a filename."
+                        " Usage: /history export"
+                        " <file> [format]"
                     )
                     return
 
@@ -1235,7 +1275,11 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
             table.add_column("MM", justify="center", style="purple", width=4)
 
             for model in custom_models:
-                cost_display = f"${model.cost_per_million_input:.1f}/${model.cost_per_million_output:.1f}"
+                cost_in = model.cost_per_million_input
+                cost_out = model.cost_per_million_output
+                cost_display = (
+                    f"${cost_in:.1f}/${cost_out:.1f}"
+                )
                 swe_display = f"{model.swe_score:.1f}" if model.swe_score else "N/A"
                 tools_display = "✓" if model.supports_tools else "✗"
                 mm_display = "✓" if model.supports_multimodal else "✗"

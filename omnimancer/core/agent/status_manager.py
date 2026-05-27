@@ -168,7 +168,9 @@ class UnifiedStatusManager:
 
         # Start background processing tasks
         self._event_processor_task = asyncio.create_task(self._process_events())
-        self._stream_processor_task = asyncio.create_task(self._process_stream_events())
+        self._stream_processor_task = asyncio.create_task(
+            self._process_stream_events()
+        )
         self._distributor_task = asyncio.create_task(self._distribute_events())
 
         logger.info("UnifiedStatusManager initialized and started")
@@ -269,7 +271,9 @@ class UnifiedStatusManager:
         """
         async with self._lock:
             operation.status = OperationStatus.RUNNING
-            operation.start_time = operation.start_time or time.time()  # type: ignore[assignment]
+            operation.start_time = (
+                operation.start_time or datetime.now()
+            )
 
             self.active_operations[operation.operation_id] = operation
 

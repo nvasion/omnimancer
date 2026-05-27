@@ -104,7 +104,8 @@ class TestHttpxCompatibility:
         main_text = doc.summary()
         assert "Main Article Title" in main_text
         assert "main content that should be extracted" in main_text
-        # Note: readability-lxml's behavior may vary, so we're testing core functionality
+        # Note: readability-lxml's behavior may vary,
+        # so we're testing core functionality
         # The important thing is that it processes the content without errors
 
     @pytest.mark.asyncio

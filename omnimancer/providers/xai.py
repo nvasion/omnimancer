@@ -238,7 +238,9 @@ class XAIProvider(BaseProvider):
         mode_temperatures = {"precise": 0.1, "balanced": 0.7, "creative": 1.0}
         return mode_temperatures.get(self.grok_mode, self.temperature)
 
-    def _convert_tools_to_xai_format(self, tools: List[ToolDefinition]) -> List[Dict]:
+    def _convert_tools_to_xai_format(
+        self, tools: List[ToolDefinition]
+    ) -> List[Dict]:
         """
         Convert tool definitions to xAI API format.
 
@@ -304,7 +306,7 @@ class XAIProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"xAI API error: {error_msg}")
@@ -359,7 +361,10 @@ class XAIProvider(BaseProvider):
         """
         model_configs = {
             "grok-beta": {
-                "description": "Grok Beta - Advanced reasoning with real-time information",
+                "description": (
+                    "Grok Beta - Advanced reasoning"
+                    " with real-time information"
+                ),
                 "max_tokens": 131072,
                 "cost_per_million_input": 5.0,
                 "cost_per_million_output": 15.0,
@@ -368,7 +373,10 @@ class XAIProvider(BaseProvider):
                 "supports_multimodal": True,
             },
             "grok-vision-beta": {
-                "description": "Grok Vision Beta - Multimodal model with image understanding",
+                "description": (
+                    "Grok Vision Beta - Multimodal model"
+                    " with image understanding"
+                ),
                 "max_tokens": 8192,
                 "cost_per_million_input": 5.0,
                 "cost_per_million_output": 15.0,
@@ -421,7 +429,10 @@ class XAIProvider(BaseProvider):
             EnhancedModelInfo(
                 name="grok-beta",
                 provider="xai",
-                description="Grok Beta - Advanced reasoning with real-time information",
+                description=(
+                    "Grok Beta - Advanced reasoning"
+                    " with real-time information"
+                ),
                 max_tokens=131072,
                 cost_per_million_input=5.0,
                 cost_per_million_output=15.0,
@@ -437,7 +448,10 @@ class XAIProvider(BaseProvider):
             EnhancedModelInfo(
                 name="grok-vision-beta",
                 provider="xai",
-                description="Grok Vision Beta - Multimodal model with image understanding",
+                description=(
+                    "Grok Vision Beta - Multimodal model"
+                    " with image understanding"
+                ),
                 max_tokens=8192,
                 cost_per_million_input=5.0,
                 cost_per_million_output=15.0,

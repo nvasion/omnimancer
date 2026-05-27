@@ -74,7 +74,11 @@ def sample_chat_context():
         ),
         ChatMessage(
             role=MessageRole.ASSISTANT,
-            content="Machine learning is a subset of AI that enables systems to learn from data.",
+            content=(
+                "Machine learning is a subset of AI"
+                " that enables systems to learn"
+                " from data."
+            ),
             timestamp=datetime.now(),
             model_used="mistral-large-latest",
         ),
@@ -130,7 +134,12 @@ def mock_successful_response():
             {
                 "message": {
                     "role": "assistant",
-                    "content": "Machine learning algorithms can be categorized into supervised, unsupervised, and reinforcement learning.",
+                    "content": (
+                        "Machine learning algorithms"
+                        " can be categorized into"
+                        " supervised, unsupervised,"
+                        " and reinforcement learning."
+                    ),
                 }
             }
         ],
@@ -156,7 +165,12 @@ def mock_tool_response():
                             "type": "function",
                             "function": {
                                 "name": "code_interpreter",
-                                "arguments": '{"code": "print(\\"Hello, World!\\")\\nresult = 2 + 2\\nprint(f\\"2 + 2 = {result}\\")"}',
+                                "arguments": (
+                                    '{"code": "print(\\"Hello,'
+                                    ' World!\\")\\nresult = 2'
+                                    ' + 2\\nprint(f\\"2 + 2'
+                                    ' = {result}\\")"}'
+                                ),
                             },
                         }
                     ],
@@ -227,10 +241,13 @@ class TestMistralProviderMessageSending:
                 "Explain ML types", sample_chat_context
             )
 
-            assert (
-                response.content
-                == "Machine learning algorithms can be categorized into supervised, unsupervised, and reinforcement learning."
+            expected = (
+                "Machine learning algorithms can be"
+                " categorized into supervised,"
+                " unsupervised, and reinforcement"
+                " learning."
             )
+            assert response.content == expected
             assert response.model_used == "mistral-large-latest"
             assert response.tokens_used == 45
             assert response.timestamp is not None
@@ -571,9 +588,9 @@ class TestMistralProviderModelInfo:
         assert isinstance(model_info, EnhancedModelInfo)
         assert model_info.name == "mistral-large-latest"
         assert model_info.provider == "mistral"
-        assert (
-            model_info.description
-            == "Mistral Large - Most capable model for complex tasks"
+        assert model_info.description == (
+            "Mistral Large - Most capable model"
+            " for complex tasks"
         )
         assert model_info.max_tokens == 128000
         assert model_info.cost_per_million_input == 2.0
@@ -590,9 +607,9 @@ class TestMistralProviderModelInfo:
         model_info = provider.get_model_info()
 
         assert model_info.name == "codestral-latest"
-        assert (
-            model_info.description
-            == "Codestral - Specialized for code generation and analysis"
+        assert model_info.description == (
+            "Codestral - Specialized for code"
+            " generation and analysis"
         )
         assert model_info.swe_score == 78.2  # Higher SWE score for code model
         assert model_info.supports_tools is True
@@ -603,7 +620,9 @@ class TestMistralProviderModelInfo:
         model_info = provider.get_model_info()
 
         assert model_info.name == "mistral-tiny"
-        assert model_info.description == "Mistral Tiny - Ultra-fast for simple tasks"
+        assert model_info.description == (
+            "Mistral Tiny - Ultra-fast for simple tasks"
+        )
         assert model_info.swe_score == 35.1
         assert model_info.supports_tools is False  # Tiny doesn't support tools
 
@@ -675,10 +694,12 @@ class TestMistralProviderMessagePreparation:
         assert messages[0]["role"] == "user"
         assert messages[0]["content"] == "Explain machine learning concepts"
         assert messages[1]["role"] == "assistant"
-        assert (
-            messages[1]["content"]
-            == "Machine learning is a subset of AI that enables systems to learn from data."
+        expected_msg = (
+            "Machine learning is a subset of AI"
+            " that enables systems to learn"
+            " from data."
         )
+        assert messages[1]["content"] == expected_msg
 
         # Check new message
         assert messages[2]["role"] == "user"
@@ -710,10 +731,13 @@ class TestMistralProviderResponseHandling:
 
         response = mistral_provider._handle_response(mock_response)
 
-        assert (
-            response.content
-            == "Machine learning algorithms can be categorized into supervised, unsupervised, and reinforcement learning."
+        expected = (
+            "Machine learning algorithms can be"
+            " categorized into supervised,"
+            " unsupervised, and reinforcement"
+            " learning."
         )
+        assert response.content == expected
         assert response.model_used == "mistral-large-latest"
         assert response.tokens_used == 45
         assert response.timestamp is not None

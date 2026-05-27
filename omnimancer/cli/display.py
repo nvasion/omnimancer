@@ -62,7 +62,11 @@ class DisplayManager:
             self.console.print(panel)
 
     def show_panel(
-        self, content: str, title: str, style: str = "blue", icon: Optional[str] = None
+        self,
+        content: str,
+        title: str,
+        style: str = "blue",
+        icon: Optional[str] = None,
     ) -> None:
         display_title = f"{icon} {title}" if icon else title
         panel = Panel(content, title=display_title, border_style=style)
@@ -84,13 +88,23 @@ class DisplayMixin:
 
     def _show_welcome(self) -> None:
         welcome_text = Text("Welcome to Omnimancer!", style="bold blue")
-        welcome_panel = Panel(welcome_text, title="Omnimancer CLI", border_style="blue")
+        welcome_panel = Panel(
+            welcome_text,
+            title="Omnimancer CLI",
+            border_style="blue",
+        )
         self.console.print(welcome_panel)
-        self.console.print("Type /help for available commands or start chatting!")
+        self.console.print(
+            "Type /help for available commands"
+            " or start chatting!"
+        )
         self.console.print()
 
     def _show_goodbye(self) -> None:
-        self.console.print("\n[blue]Goodbye! Thanks for using Omnimancer.[/blue]")
+        self.console.print(
+            "\n[blue]Goodbye! Thanks for using"
+            " Omnimancer.[/blue]"
+        )
 
     def _show_help(self) -> None:
         help_text = """Available Commands:
@@ -150,27 +164,92 @@ Tips:
         else:
             self._show_error(f"No help available for command: /{command_name}")
             self._show_info(
-                "Available commands: /help, /quit, /clear, /status, /models, /providers, /switch, /tools, /mcp, /save, /load, /list, /config"
+                "Available commands: /help, /quit,"
+                " /clear, /status, /models,"
+                " /providers, /switch, /tools,"
+                " /mcp, /save, /load, /list, /config"
             )
 
     def _get_command_help_content(self, command_name: str) -> str:
         help_content = {
-            "help": "Show help information.\n\nUsage:\n  /help           - Show all commands\n  /help <command> - Show help for a specific command",
-            "quit": "Exit Omnimancer.\n\nUsage: /quit\nAliases: Ctrl+D, /exit",
-            "clear": "Clear the terminal screen.\n\nUsage: /clear",
-            "status": "Show current session status.\n\nUsage: /status\n\nShows: message count, provider, model, session ID",
-            "providers": "List all AI providers with status.\n\nUsage: /providers",
-            "models": "List available models.\n\nUsage: /models [filter_type] [filter_value]\n\nExamples:\n  /models\n  /models provider claude",
-            "switch": "Switch AI provider/model.\n\nUsage:\n  /switch <provider>\n  /switch <provider> <model>\n\nExamples:\n  /switch claude\n  /switch openai gpt-4o",
-            "tools": "List available MCP tools.\n\nUsage: /tools",
-            "mcp": "Manage MCP servers.\n\nUsage: /mcp <action>\nActions: status, health, reload, list",
-            "save": "Save conversation.\n\nUsage: /save [filename]",
-            "load": "Load conversation.\n\nUsage: /load <filename>",
-            "list": "List saved conversations.\n\nUsage: /list",
-            "config": "Configuration management.\n\nUsage:\n  /config\n  /config set <key> <value>\n  /config get <key>\n  /config validate [provider]",
-            "validate": "Validate provider configurations.\n\nUsage: /validate [provider] [--fix]",
-            "health": "Check provider health.\n\nUsage: /health [provider]",
-            "agent": "Manage agent mode.\n\nUsage:\n  /agent on    - Enable agent mode\n  /agent off   - Disable agent mode\n  /agent status - Show agent status",
+            "help": (
+                "Show help information.\n\nUsage:\n"
+                "  /help           - Show all commands\n"
+                "  /help <command> - Show help for a"
+                " specific command"
+            ),
+            "quit": (
+                "Exit Omnimancer.\n\nUsage: /quit\n"
+                "Aliases: Ctrl+D, /exit"
+            ),
+            "clear": (
+                "Clear the terminal screen.\n\n"
+                "Usage: /clear"
+            ),
+            "status": (
+                "Show current session status.\n\n"
+                "Usage: /status\n\nShows: message count,"
+                " provider, model, session ID"
+            ),
+            "providers": (
+                "List all AI providers with status.\n\n"
+                "Usage: /providers"
+            ),
+            "models": (
+                "List available models.\n\nUsage:"
+                " /models [filter_type] [filter_value]"
+                "\n\nExamples:\n  /models\n"
+                "  /models provider claude"
+            ),
+            "switch": (
+                "Switch AI provider/model.\n\nUsage:\n"
+                "  /switch <provider>\n"
+                "  /switch <provider> <model>\n\n"
+                "Examples:\n  /switch claude\n"
+                "  /switch openai gpt-4o"
+            ),
+            "tools": (
+                "List available MCP tools.\n\n"
+                "Usage: /tools"
+            ),
+            "mcp": (
+                "Manage MCP servers.\n\n"
+                "Usage: /mcp <action>\n"
+                "Actions: status, health, reload, list"
+            ),
+            "save": (
+                "Save conversation.\n\n"
+                "Usage: /save [filename]"
+            ),
+            "load": (
+                "Load conversation.\n\n"
+                "Usage: /load <filename>"
+            ),
+            "list": (
+                "List saved conversations.\n\n"
+                "Usage: /list"
+            ),
+            "config": (
+                "Configuration management.\n\nUsage:\n"
+                "  /config\n"
+                "  /config set <key> <value>\n"
+                "  /config get <key>\n"
+                "  /config validate [provider]"
+            ),
+            "validate": (
+                "Validate provider configurations.\n\n"
+                "Usage: /validate [provider] [--fix]"
+            ),
+            "health": (
+                "Check provider health.\n\n"
+                "Usage: /health [provider]"
+            ),
+            "agent": (
+                "Manage agent mode.\n\nUsage:\n"
+                "  /agent on    - Enable agent mode\n"
+                "  /agent off   - Disable agent mode\n"
+                "  /agent status - Show agent status"
+            ),
         }
 
         return help_content.get(command_name, "")
@@ -179,11 +258,42 @@ Tips:
         provider_name = provider_name.lower()
 
         provider_help = {
-            "claude": "Claude (Anthropic)\n\nSetup: Get API key from https://console.anthropic.com/\nModels: claude-sonnet-4, claude-opus-4, claude-3-5-sonnet\nFeatures: Tool calling, multimodal, 200K context",
-            "openai": "OpenAI\n\nSetup: Get API key from https://platform.openai.com/\nModels: gpt-4o, gpt-4-turbo, gpt-3.5-turbo\nFeatures: Tool calling, multimodal, function calling",
-            "gemini": "Google Gemini\n\nSetup: Get API key from https://aistudio.google.com/\nModels: gemini-1.5-pro, gemini-1.5-flash\nFeatures: Tool calling, multimodal, up to 2M context",
-            "ollama": "Ollama (Local)\n\nSetup: Install from https://ollama.ai/, run 'ollama serve'\nModels: llama3.1, codellama, mistral\nFeatures: Local, private, no API costs",
-            "bedrock": "AWS Bedrock\n\nSetup: Enable in AWS console, configure credentials\nModels: anthropic.claude-3-5-sonnet, amazon.titan\nFeatures: AWS native, enterprise security",
+            "claude": (
+                "Claude (Anthropic)\n\nSetup: Get API"
+                " key from"
+                " https://console.anthropic.com/\n"
+                "Models: claude-sonnet-4, claude-opus-4,"
+                " claude-3-5-sonnet\nFeatures: Tool"
+                " calling, multimodal, 200K context"
+            ),
+            "openai": (
+                "OpenAI\n\nSetup: Get API key from"
+                " https://platform.openai.com/\n"
+                "Models: gpt-4o, gpt-4-turbo,"
+                " gpt-3.5-turbo\nFeatures: Tool"
+                " calling, multimodal, function calling"
+            ),
+            "gemini": (
+                "Google Gemini\n\nSetup: Get API key"
+                " from https://aistudio.google.com/\n"
+                "Models: gemini-1.5-pro,"
+                " gemini-1.5-flash\nFeatures: Tool"
+                " calling, multimodal, up to 2M context"
+            ),
+            "ollama": (
+                "Ollama (Local)\n\nSetup: Install from"
+                " https://ollama.ai/, run"
+                " 'ollama serve'\nModels: llama3.1,"
+                " codellama, mistral\nFeatures: Local,"
+                " private, no API costs"
+            ),
+            "bedrock": (
+                "AWS Bedrock\n\nSetup: Enable in AWS"
+                " console, configure credentials\n"
+                "Models: anthropic.claude-3-5-sonnet,"
+                " amazon.titan\nFeatures: AWS native,"
+                " enterprise security"
+            ),
         }
 
         help_content = provider_help.get(provider_name)
@@ -243,7 +353,9 @@ Model available: {'Yes' if model_info else 'No'}"""
             )
 
         assistant_panel = Panel(
-            escaped_message, title=f"Assistant ({model})", border_style="blue"
+            escaped_message,
+            title=f"Assistant ({model})",
+            border_style="blue",
         )
         self.console.print(assistant_panel)
 
@@ -265,7 +377,9 @@ Model available: {'Yes' if model_info else 'No'}"""
         cost = response.cost_estimate or 0.0
         if input_t or output_t:
             self.console.print(
-                f"[dim]  tokens: {input_t} in / {output_t} out | ~${cost:.4f}[/dim]"
+                f"[dim]  tokens: {input_t} in /"
+                f" {output_t} out"
+                f" | ~${cost:.4f}[/dim]"
             )
 
     def _clear_screen(self) -> None:

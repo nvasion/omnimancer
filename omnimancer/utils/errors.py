@@ -87,7 +87,12 @@ class ProviderError(OmnimancerError):
     communicating with AI provider APIs.
     """
 
-    def __init__(self, message: str, provider: Optional[str] = None, details: Optional[str] = None):
+    def __init__(
+        self,
+        message: str,
+        provider: Optional[str] = None,
+        details: Optional[str] = None,
+    ):
         """
         Initialize the provider error.
 
@@ -277,7 +282,12 @@ class MCPServerError(MCPError):
     and communication protocol errors.
     """
 
-    def __init__(self, message: str, server_name: Optional[str] = None, details: Optional[str] = None):
+    def __init__(
+        self,
+        message: str,
+        server_name: Optional[str] = None,
+        details: Optional[str] = None,
+    ):
         """
         Initialize the MCP server error.
 
@@ -305,7 +315,12 @@ class MCPToolError(MCPError):
     and invalid tool parameters.
     """
 
-    def __init__(self, message: str, tool_name: Optional[str] = None, details: Optional[str] = None):
+    def __init__(
+        self,
+        message: str,
+        tool_name: Optional[str] = None,
+        details: Optional[str] = None,
+    ):
         """
         Initialize the MCP tool error.
 

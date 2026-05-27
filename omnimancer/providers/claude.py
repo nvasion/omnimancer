@@ -6,7 +6,7 @@ This module provides the Claude AI provider implementation using Anthropic's API
 
 import json as json_module
 from datetime import datetime
-from typing import Any, AsyncIterator, Dict, List
+from typing import Any, AsyncIterator, Dict, List, Union
 
 import certifi
 import httpx
@@ -43,7 +43,8 @@ class ClaudeProvider(BaseProvider):
 
         Args:
             api_key: Anthropic API key or OAuth bearer token
-            model: Claude model to use (e.g., 'claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022')
+            model: Claude model to use
+                (e.g., 'claude-sonnet-4-20250514')
             **kwargs: Additional configuration (auth_type="bearer" for OAuth)
         """
         super().__init__(api_key, model or "claude-sonnet-4-6", **kwargs)
@@ -87,9 +88,12 @@ class ClaudeProvider(BaseProvider):
         messages = self._prepare_messages(message, context)
 
         # Try with SSL verification first, then fall back if needed
-        for ssl_verify in [True, certifi.where(), False]:
+        ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
+        for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
+                async with httpx.AsyncClient(
+                    verify=ssl_verify
+                ) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/messages",
                         headers=self._build_headers(),
@@ -111,13 +115,22 @@ class ClaudeProvider(BaseProvider):
                     continue
                 else:
                     # Non-SSL connection error, don't retry
-                    raise NetworkError(f"Connection error: {e}")
+                    raise NetworkError(
+                        f"Connection error: {e}"
+                    )
             except httpx.TimeoutException:
-                raise NetworkError("Request to Claude API timed out")
+                raise NetworkError(
+                    "Request to Claude API timed out"
+                )
             except httpx.RequestError as e:
-                if "SSL" not in str(e) and "certificate" not in str(e):
+                if (
+                    "SSL" not in str(e)
+                    and "certificate" not in str(e)
+                ):
                     # Non-SSL request error, don't retry
-                    raise NetworkError(f"Network error: {e}")
+                    raise NetworkError(
+                        f"Network error: {e}"
+                    )
                 # SSL-related error, try next verification method
                 continue
             except (
@@ -133,7 +146,9 @@ class ClaudeProvider(BaseProvider):
                 raise ProviderError(f"Unexpected error: {e}")
 
         # If we get here, all SSL methods failed
-        raise NetworkError("Failed to establish SSL connection to Claude API")
+        raise NetworkError(
+            "Failed to establish SSL connection to Claude API"
+        )
 
     async def validate_credentials(self) -> bool:
         """
@@ -143,16 +158,21 @@ class ClaudeProvider(BaseProvider):
             True if credentials are valid
         """
         # Try different SSL verification methods
-        for ssl_verify in [True, certifi.where(), False]:
+        ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
+        for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
+                async with httpx.AsyncClient(
+                    verify=ssl_verify
+                ) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/messages",
                         headers=self._build_headers(),
                         json={
                             "model": self.model,
                             "max_tokens": 10,
-                            "messages": [{"role": "user", "content": "Hi"}],
+                            "messages": [
+                                {"role": "user", "content": "Hi"}
+                            ],
                         },
                         timeout=10.0,
                     )
@@ -172,13 +192,16 @@ class ClaudeProvider(BaseProvider):
                         # If it's an authentication error, API key is invalid
                         if error_type == "authentication_error":
                             return False
-                        # If it's other errors (like invalid model), API key is probably valid
+                        # Other errors (like invalid model),
+                        # API key is probably valid
                         return True
-                    except:
-                        # Can't parse error, assume API key is valid if we got a response
+                    except Exception:
+                        # Can't parse error, assume valid
+                        # if we got a response
                         return True
                 else:
-                    # Other status codes - if we got a response, API key is probably valid
+                    # Other status codes - if we got a response,
+                    # API key is probably valid
                     return True
 
             except httpx.ConnectError as e:
@@ -270,9 +293,12 @@ class ClaudeProvider(BaseProvider):
         elif response.status_code == 429:
             if self._is_subscription_429(response):
                 raise ProviderError(
-                    f"Claude subscription tokens only support Haiku for direct API access. "
-                    f"Model '{self.model}' requires an Anthropic API key. "
-                    f"Set ANTHROPIC_API_KEY or configure an API key in Omnimancer."
+                    "Claude subscription tokens only "
+                    "support Haiku for direct API "
+                    f"access. Model '{self.model}' "
+                    "requires an Anthropic API key. "
+                    "Set ANTHROPIC_API_KEY or configure"
+                    " an API key in Omnimancer."
                 )
             raise RateLimitError("Claude API rate limit exceeded")
         elif response.status_code == 404:
@@ -281,7 +307,7 @@ class ClaudeProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Claude API error: {error_msg}")
@@ -304,9 +330,12 @@ class ClaudeProvider(BaseProvider):
         if tools:
             request_body["tools"] = tools
 
-        for ssl_verify in [True, certifi.where(), False]:
+        ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
+        for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
+                async with httpx.AsyncClient(
+                    verify=ssl_verify
+                ) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/messages",
                         headers=self._build_headers(),
@@ -317,14 +346,26 @@ class ClaudeProvider(BaseProvider):
                 return self._handle_response_with_tools(response)
 
             except httpx.ConnectError as e:
-                if "SSL" in str(e) or "certificate" in str(e):
+                if (
+                    "SSL" in str(e)
+                    or "certificate" in str(e)
+                ):
                     continue
-                raise NetworkError(f"Connection error: {e}")
+                raise NetworkError(
+                    f"Connection error: {e}"
+                )
             except httpx.TimeoutException:
-                raise NetworkError("Request to Claude API timed out")
+                raise NetworkError(
+                    "Request to Claude API timed out"
+                )
             except httpx.RequestError as e:
-                if "SSL" not in str(e) and "certificate" not in str(e):
-                    raise NetworkError(f"Network error: {e}")
+                if (
+                    "SSL" not in str(e)
+                    and "certificate" not in str(e)
+                ):
+                    raise NetworkError(
+                        f"Network error: {e}"
+                    )
                 continue
             except (
                 AuthenticationError,
@@ -336,7 +377,9 @@ class ClaudeProvider(BaseProvider):
             except Exception as e:
                 raise ProviderError(f"Unexpected error: {e}")
 
-        raise NetworkError("Failed to establish SSL connection to Claude API")
+        raise NetworkError(
+            "Failed to establish SSL connection to Claude API"
+        )
 
     def _is_subscription_429(self, response: httpx.Response) -> bool:
         if not self._is_subscription_token() or self._is_haiku():
@@ -445,9 +488,12 @@ class ClaudeProvider(BaseProvider):
     async def _stream_request(
         self, request_body: dict
     ) -> AsyncIterator[StreamEvent]:
-        for ssl_verify in [True, certifi.where(), False]:
+        ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
+        for ssl_verify in ssl_options:
             try:
-                async with httpx.AsyncClient(verify=ssl_verify) as client:  # type: ignore[arg-type]
+                async with httpx.AsyncClient(
+                    verify=ssl_verify
+                ) as client:
                     async with client.stream(
                         "POST",
                         f"{self.BASE_URL}/messages",
@@ -474,10 +520,18 @@ class ClaudeProvider(BaseProvider):
                 if "SSL" not in str(e) and "certificate" not in str(e):
                     raise NetworkError(f"Network error: {e}")
                 continue
-            except (AuthenticationError, RateLimitError, ModelNotFoundError, ProviderError):
+            except (
+                AuthenticationError,
+                RateLimitError,
+                ModelNotFoundError,
+                ProviderError,
+            ):
                 raise
 
-        raise NetworkError("Failed to establish SSL connection to Claude API")
+        raise NetworkError(
+            "Failed to establish SSL connection "
+            "to Claude API"
+        )
 
     async def _parse_sse_stream(
         self, response: httpx.Response
@@ -541,10 +595,19 @@ class ClaudeProvider(BaseProvider):
             elif event_type == "content_block_stop":
                 if current_tool_name:
                     try:
-                        args = json_module.loads(current_tool_json) if current_tool_json else {}
+                        args = (
+                            json_module.loads(current_tool_json)
+                            if current_tool_json
+                            else {}
+                        )
                     except json_module.JSONDecodeError:
                         args = {}
-                    tool_calls.append(ToolCall(name=current_tool_name, arguments=args))
+                    tool_calls.append(
+                        ToolCall(
+                            name=current_tool_name,
+                            arguments=args,
+                        )
+                    )
                     yield StreamEvent(type=StreamEventType.TOOL_USE_END)
                     current_tool_name = ""
                     current_tool_id = ""
@@ -566,7 +629,10 @@ class ClaudeProvider(BaseProvider):
             stop_reason=stop_reason or "end_turn",
             tool_calls=tool_calls if tool_calls else None,
         )
-        yield StreamEvent(type=StreamEventType.MESSAGE_COMPLETE, response=final_response)
+        yield StreamEvent(
+            type=StreamEventType.MESSAGE_COMPLETE,
+            response=final_response,
+        )
 
     def get_model_info(self) -> ModelInfo:
         """

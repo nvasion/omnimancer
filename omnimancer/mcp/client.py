@@ -60,7 +60,9 @@ class MCPClient:
 
         try:
             logger.info(
-                f"Connecting to MCP server: {self.server_config.name} (attempt {retry_count + 1})"
+                f"Connecting to MCP server: "
+                f"{self.server_config.name} "
+                f"(attempt {retry_count + 1})"
             )
 
             # Validate server configuration
@@ -82,13 +84,16 @@ class MCPClient:
                 )
             except FileNotFoundError:
                 raise MCPConnectionError(
-                    f"Failed to start MCP server: {self.server_config.command} not found",
+                    "Failed to start MCP server: "
+                    f"{self.server_config.command} not found",
                     server_name=self.server_config.name,
                     connection_type="stdio",
                 )
             except PermissionError:
                 raise MCPConnectionError(
-                    f"Failed to start MCP server: Permission denied for {self.server_config.command}",
+                    "Failed to start MCP server: "
+                    "Permission denied for "
+                    f"{self.server_config.command}",
                     server_name=self.server_config.name,
                     connection_type="stdio",
                 )
@@ -103,7 +108,7 @@ class MCPClient:
                 if self.process.stderr:
                     try:
                         stderr_output = self.process.stderr.read()
-                    except:
+                    except Exception:
                         stderr_output = "Unable to read stderr"
 
                 # Analyze stderr for specific error types
@@ -119,7 +124,8 @@ class MCPClient:
                     )
                 elif "permission denied" in stderr_output.lower():
                     raise MCPConfigurationError(  # type: ignore[call-arg]
-                        f"Permission denied for MCP server: {self.server_config.command}",
+                        "Permission denied for MCP server: "
+                        f"{self.server_config.command}",
                         server_name=self.server_config.name,
                         details="Check file permissions",
                     )
@@ -128,7 +134,8 @@ class MCPClient:
                     or "importerror" in stderr_output.lower()
                 ):
                     raise MCPConfigurationError(  # type: ignore[call-arg]
-                        f"Missing dependencies for MCP server: {self.server_config.name}",
+                        "Missing dependencies for MCP "
+                        f"server: {self.server_config.name}",
                         server_name=self.server_config.name,
                         details="Install required Python packages or dependencies",
                     )
@@ -153,7 +160,8 @@ class MCPClient:
                     return await self.connect(retry_count + 1, max_retries)
                 else:
                     raise MCPTimeoutError(
-                        f"Connection initialization timed out for server '{self.server_config.name}'",
+                        "Connection initialization timed out"
+                        f" for server '{self.server_config.name}'",
                         server_name=self.server_config.name,
                         timeout_duration=self.server_config.timeout,
                         operation="initialization",
@@ -271,7 +279,8 @@ class MCPClient:
             if "error" in response:
                 error_info = response["error"]
                 raise MCPToolError(
-                    f"Tool '{name}' execution failed: {error_info.get('message', 'Unknown error')}"
+                    f"Tool '{name}' execution failed: "
+                    f"{error_info.get('message', 'Unknown error')}"
                 )
 
             result_data = response.get("result", {})
@@ -359,7 +368,8 @@ class MCPClient:
             self.tools[tool_def.name] = tool_def
 
         logger.info(
-            f"Discovered {len(self.tools)} tools from server '{self.server_config.name}'"
+            f"Discovered {len(self.tools)} tools from "
+            f"server '{self.server_config.name}'"
         )
 
     async def _send_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
@@ -443,7 +453,11 @@ class MCPClient:
     @property
     def is_connected(self) -> bool:
         """Check if client is connected to the server."""
-        return self.connected and self.process and self.process.poll() is None  # type: ignore[return-value]
+        return bool(
+            self.connected
+            and self.process
+            and self.process.poll() is None
+        )
 
     @property
     def server_name(self) -> str:
@@ -631,7 +645,9 @@ class MCPClient:
             for param in required_params:
                 if param not in tool_call.arguments:
                     raise MCPToolError(
-                        f"Missing required parameter '{param}' for tool '{tool_call.name}'"
+                        f"Missing required parameter "
+                        f"'{param}' for tool "
+                        f"'{tool_call.name}'"
                     )
 
         # Parameter type validation
@@ -644,11 +660,17 @@ class MCPClient:
                         param_value, (int, float)
                     ):
                         raise MCPToolError(
-                            f"Invalid parameter type for '{param_name}': expected number, got {type(param_value).__name__}"
+                            "Invalid parameter type for "
+                            f"'{param_name}': expected "
+                            "number, got "
+                            f"{type(param_value).__name__}"
                         )
                     elif expected_type == "string" and not isinstance(param_value, str):
                         raise MCPToolError(
-                            f"Invalid parameter type for '{param_name}': expected string, got {type(param_value).__name__}"
+                            "Invalid parameter type for "
+                            f"'{param_name}': expected "
+                            "string, got "
+                            f"{type(param_value).__name__}"
                         )
 
     async def call_tool_with_retry(

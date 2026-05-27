@@ -507,5 +507,5 @@ class AuditLogger:
         """Destructor to ensure proper cleanup."""
         try:
             self.shutdown()
-        except:
+        except Exception:
             pass

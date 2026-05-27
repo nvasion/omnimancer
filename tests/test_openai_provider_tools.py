@@ -5,13 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from omnimancer.core.models import (
-    ChatContext,
-    ChatMessage,
-    MessageRole,
-    ToolCall,
-    ToolDefinition,
-)
+from omnimancer.core.models import ChatContext, ChatMessage, MessageRole, ToolDefinition
 from omnimancer.providers.openai import OpenAIProvider
 from omnimancer.utils.errors import NetworkError
 
@@ -104,7 +98,11 @@ class TestOpenAIToolCalling:
 
     @pytest.mark.asyncio
     async def test_send_message_with_tools_returns_tool_calls(
-        self, openai_provider, sample_chat_context, sample_tools, mock_tool_call_response
+        self,
+        openai_provider,
+        sample_chat_context,
+        sample_tools,
+        mock_tool_call_response,
     ):
         mock_response = MagicMock()
         mock_response.status_code = 200
