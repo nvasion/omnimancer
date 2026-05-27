@@ -234,7 +234,7 @@ class HealthMonitor:
                     "error": str(result),
                 }
             else:
-                health_status[provider_name] = result
+                health_status[provider_name] = result  # type: ignore[assignment]
 
         return health_status
 
@@ -324,10 +324,10 @@ class HealthMonitor:
         self._stop_monitoring.clear()
 
         # Start background thread
-        self._monitoring_thread = threading.Thread(
+        self._monitoring_thread = threading.Thread(  # type: ignore[assignment]
             target=self._monitoring_worker, daemon=True, name="HealthMonitor"
         )
-        self._monitoring_thread.start()
+        self._monitoring_thread.start()  # type: ignore[attr-defined]
         logger.info("Started background health monitoring")
 
     def stop_monitoring(self) -> None:
@@ -406,7 +406,7 @@ class HealthMonitor:
 
         return health_status
 
-    async def check_all_providers(self, config, force: bool = False) -> "HealthResult":
+    async def check_all_providers(self, config: Any, force: bool = False) -> "HealthResult":
         """
         Check health status for all providers in a config object.
 

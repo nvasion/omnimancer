@@ -8,8 +8,9 @@ including provider settings, API keys, and user preferences.
 import base64
 import json
 import os
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from cryptography.fernet import Fernet
 
@@ -273,7 +274,7 @@ class ConfigManager:
 
         self.save_config()
 
-    def add_custom_model(self, model_info: "EnhancedModelInfo") -> None:
+    def add_custom_model(self, model_info: "EnhancedModelInfo") -> None:  # type: ignore[name-defined]
         """
         Add a custom model to the configuration.
 
@@ -319,7 +320,7 @@ class ConfigManager:
 
         return False
 
-    def get_custom_models(self) -> List["EnhancedModelInfo"]:
+    def get_custom_models(self) -> List["EnhancedModelInfo"]:  # type: ignore[name-defined]
         """
         Get list of custom models from configuration.
 
@@ -441,8 +442,8 @@ class ConfigManager:
             providers[provider_name] = ProviderConfig(
                 api_key=self._encrypt_api_key(config_data["api_key"]),
                 model=config_data["model"],
-                max_tokens=config_data.get("max_tokens"),
-                temperature=config_data.get("temperature"),
+                max_tokens=config_data.get("max_tokens"),  # type: ignore[arg-type]
+                temperature=config_data.get("temperature"),  # type: ignore[arg-type]
             )
 
         # Create and save configuration
@@ -454,7 +455,7 @@ class ConfigManager:
 
         self.save_config()
 
-    def update_provider_settings(self, provider_name: str, **kwargs) -> None:
+    def update_provider_settings(self, provider_name: str, **kwargs: Any) -> None:
         """
         Update settings for a specific provider.
 
@@ -852,7 +853,7 @@ class ConfigManager:
 
         return errors
 
-    def get_provider_defaults(self, provider_name: str) -> Dict[str, any]:
+    def get_provider_defaults(self, provider_name: str) -> Dict[str, Any]:
         """
         Get default configuration values for a provider.
 
@@ -998,7 +999,7 @@ class ConfigManager:
         )
 
     def create_provider_config(
-        self, provider_name: str, api_key: str = None, **kwargs
+        self, provider_name: str, api_key: Optional[str] = None, **kwargs: Any
     ) -> ProviderConfig:
         """
         Create a provider configuration with defaults.
@@ -1073,10 +1074,10 @@ class ConfigManager:
                 if callable(config_path):
                     config_path()
                 else:
-                    setattr(config, config_path, cli_args[cli_arg])
-                    config.config_sources[config_path] = f"cli:{cli_arg}"
+                    setattr(config, config_path, cli_args[cli_arg])  # type: ignore[arg-type]
+                    config.config_sources[config_path] = f"cli:{cli_arg}"  # type: ignore[index]
 
-    def _set_provider_model(self, config: Config, model: str) -> None:
+    def _set_provider_model(self, config: Config, model: Optional[str]) -> None:
         """Set model for the default provider."""
         if model and config.default_provider in config.providers:
             config.providers[config.default_provider].model = model
@@ -1084,7 +1085,7 @@ class ConfigManager:
                 "cli:model"
             )
 
-    def _set_provider_temperature(self, config: Config, temperature: float) -> None:
+    def _set_provider_temperature(self, config: Config, temperature: Optional[float]) -> None:
         """Set temperature for the default provider."""
         if temperature is not None and config.default_provider in config.providers:
             config.providers[config.default_provider].temperature = temperature
@@ -1092,94 +1093,13 @@ class ConfigManager:
                 f"providers.{config.default_provider}.temperature"
             ] = "cli:temperature"
 
-    def _set_provider_max_tokens(self, config: Config, max_tokens: int) -> None:
+    def _set_provider_max_tokens(self, config: Config, max_tokens: Optional[int]) -> None:
         """Set max_tokens for the default provider."""
         if max_tokens is not None and config.default_provider in config.providers:
             config.providers[config.default_provider].max_tokens = max_tokens
             config.config_sources[f"providers.{config.default_provider}.max_tokens"] = (
                 "cli:max_tokens"
             )
-
-    def get_effective_config(self) -> Config:
-        """
-        Get the effective configuration (considering active profile).
-
-        Returns:
-            The active configuration
-        """
-        config = self.get_config()
-        return config.get_active_config()
-
-    def create_profile(
-        self,
-        name: str,
-        description: Optional[str] = None,
-        copy_from_current: bool = True,
-    ) -> ConfigProfile:
-        """
-        Create a new configuration profile.
-
-        Args:
-            name: Profile name
-            description: Optional profile description
-            copy_from_current: Whether to copy current settings
-
-        Returns:
-            Created ConfigProfile
-        """
-        config = self.get_config()
-
-        if copy_from_current:
-            profile = config.create_profile(name, description)
-        else:
-            # Create empty profile with minimal settings
-            profile = ConfigProfile(
-                name=name,
-                description=description,
-                default_provider="claude",
-                providers={},
-            )
-            config.profiles[name] = profile
-
-        self.save_config()
-        return profile
-
-    def switch_profile(self, profile_name: str) -> None:
-        """
-        Switch to a different configuration profile.
-
-        Args:
-            profile_name: Name of the profile to switch to
-        """
-        config = self.get_config()
-        config.switch_profile(profile_name)
-        self.save_config()
-
-    def delete_profile(self, profile_name: str) -> bool:
-        """
-        Delete a configuration profile.
-
-        Args:
-            profile_name: Name of the profile to delete
-
-        Returns:
-            True if profile was deleted
-        """
-        config = self.get_config()
-        result = config.delete_profile(profile_name)
-        if result:
-            self.save_config()
-        return result
-
-    def list_profiles(self) -> List[str]:
-        """
-        List all available configuration profiles.
-
-        Returns:
-            List of profile names
-        """
-        config = self.get_config()
-        return list(config.profiles.keys())
 
     def get_profile(self, profile_name: str) -> Optional[ConfigProfile]:
         """
@@ -1193,67 +1113,6 @@ class ConfigManager:
         """
         config = self.get_config()
         return config.profiles.get(profile_name)
-
-    def backup_config(self, backup_path: Optional[str] = None) -> str:
-        """
-        Create a backup of the current configuration.
-
-        Args:
-            backup_path: Optional path for backup file
-
-        Returns:
-            Path to the backup file
-        """
-        if not backup_path:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = str(
-                self.config_path.parent / f"config_backup_{timestamp}.json"
-            )
-
-        backup_path = Path(backup_path)
-        backup_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Copy current config to backup location
-        if self.config_path.exists():
-            import shutil
-
-            shutil.copy2(self.config_path, backup_path)
-
-        return str(backup_path)
-
-    def restore_config(self, backup_path: str) -> None:
-        """
-        Restore configuration from a backup.
-
-        Args:
-            backup_path: Path to the backup file
-
-        Raises:
-            ConfigurationError: If restore fails
-        """
-        backup_path = Path(backup_path)
-        if not backup_path.exists():
-            raise ConfigurationError(f"Backup file not found: {backup_path}")
-
-        try:
-            # Validate backup file first
-            with open(backup_path, "r") as f:
-                backup_data = json.load(f)
-
-            # Try to create Config object to validate
-            Config(**backup_data)
-
-            # If validation passes, restore the backup
-            import shutil
-
-            shutil.copy2(backup_path, self.config_path)
-
-            # Reload configuration
-            self.config = None
-            self.load_config()
-
-        except Exception as e:
-            raise ConfigurationError(f"Failed to restore configuration: {e}")
 
     def get_config_info(self) -> Dict[str, Any]:
         """
@@ -1283,38 +1142,8 @@ class ConfigManager:
             "storage_path": config.storage_path,
             "config_sources": config.config_sources,
         }
-        """
-        Load configuration from multiple sources (file, environment, CLI args).
-        
-        Args:
-            env_vars: Environment variables to merge
-            cli_args: CLI arguments to merge
-            
-        Returns:
-            Loaded Config object with merged settings
-        """
-        # Start with file-based configuration
-        config = self.load_config()
 
-        # Merge environment variables
-        if env_vars:
-            config.merge_from_env(env_vars)
-
-        # Merge CLI arguments (highest priority)
-        if cli_args:
-            self._merge_cli_args(config, cli_args)
-
-        # Update timestamps
-        from datetime import datetime
-
-        if not config.created_at:
-            config.created_at = datetime.now()
-        config.updated_at = datetime.now()
-
-        self.config = config
-        return config
-
-    def _merge_cli_args(self, config: Config, cli_args: Dict[str, Any]) -> None:
+    def _merge_cli_args2(self, config: Config, cli_args: Dict[str, Any]) -> None:
         """
         Merge CLI arguments into configuration.
 
@@ -1388,9 +1217,9 @@ class ConfigManager:
                         "on",
                     )
                 elif isinstance(current_value, int):
-                    converted_value = int(value)
+                    converted_value = int(value)  # type: ignore[assignment]
                 elif isinstance(current_value, float):
-                    converted_value = float(value)
+                    converted_value = float(value)  # type: ignore[assignment]
                 else:
                     converted_value = value
                 setattr(obj, final_key, converted_value)
@@ -1399,271 +1228,6 @@ class ConfigManager:
                 setattr(obj, final_key, value)
         elif isinstance(obj, dict):
             obj[final_key] = value
-
-    def create_profile(
-        self, name: str, description: Optional[str] = None
-    ) -> ConfigProfile:
-        """
-        Create a new configuration profile.
-
-        Args:
-            name: Profile name
-            description: Optional profile description
-
-        Returns:
-            Created ConfigProfile
-        """
-        config = self.get_config()
-        profile = config.create_profile(name, description)
-        self.save_config()
-        return profile
-
-    def list_profiles(self) -> Dict[str, str]:
-        """
-        List all configuration profiles.
-
-        Returns:
-            Dictionary mapping profile names to descriptions
-        """
-        config = self.get_config()
-        return {
-            name: profile.description or "" for name, profile in config.profiles.items()
-        }
-
-    def switch_profile(self, profile_name: str) -> None:
-        """
-        Switch to a different configuration profile.
-
-        Args:
-            profile_name: Name of the profile to switch to
-
-        Raises:
-            ConfigurationError: If profile doesn't exist
-        """
-        config = self.get_config()
-        if profile_name not in config.profiles:
-            raise ConfigurationError(f"Profile '{profile_name}' not found")
-
-        config.switch_profile(profile_name)
-        self.save_config()
-
-    def get_active_profile_name(self) -> Optional[str]:
-        """
-        Get the name of the active profile.
-
-        Returns:
-            Active profile name or None if no profile is active
-        """
-        config = self.get_config()
-        return config.active_profile
-
-    def delete_profile(self, profile_name: str) -> bool:
-        """
-        Delete a configuration profile.
-
-        Args:
-            profile_name: Name of the profile to delete
-
-        Returns:
-            True if profile was deleted, False if not found
-        """
-        config = self.get_config()
-        result = config.delete_profile(profile_name)
-        if result:
-            self.save_config()
-        return result
-
-    def update_profile_provider_settings(
-        self, profile_name: str, provider_name: str, **kwargs
-    ) -> None:
-        """
-        Update provider settings in a specific profile.
-
-        Args:
-            profile_name: Name of the profile
-            provider_name: Name of the provider
-            **kwargs: Settings to update
-
-        Raises:
-            ConfigurationError: If profile doesn't exist
-        """
-        config = self.get_config()
-        if profile_name not in config.profiles:
-            raise ConfigurationError(f"Profile '{profile_name}' not found")
-
-        profile = config.profiles[profile_name]
-
-        if provider_name not in profile.providers:
-            profile.providers[provider_name] = self.create_provider_config(
-                provider_name
-            )
-
-        provider_config = profile.providers[provider_name]
-
-        # Update settings
-        for key, value in kwargs.items():
-            if hasattr(provider_config, key):
-                setattr(provider_config, key, value)
-
-        self.save_config()
-
-    def get_effective_config(self) -> Config:
-        """
-        Get the effective configuration (considering active profile).
-
-        Returns:
-            Effective Config object
-        """
-        config = self.get_config()
-        return config.get_active_config()
-
-    def migrate_config_format(self) -> bool:
-        """
-        Migrate configuration from older format to current format.
-
-        Returns:
-            True if migration was performed, False if not needed
-        """
-        if not self.config_path.exists():
-            return False
-
-        try:
-            with open(self.config_path, "r") as f:
-                config_data = json.load(f)
-
-            # Check if migration is needed
-            if config_data.get("config_version") == "2.0":
-                return False  # Already current version
-
-            # Backup original config
-            self.backup_config()
-
-            # Migrate provider configurations
-            if "providers" in config_data:
-                for provider_name, provider_data in config_data["providers"].items():
-                    # Add provider_type if missing
-                    if "provider_type" not in provider_data:
-                        provider_data["provider_type"] = provider_name
-
-                    # Add capability flags based on provider type
-                    defaults = self.get_provider_defaults(provider_name)
-                    for key in [
-                        "supports_tools",
-                        "supports_multimodal",
-                        "supports_streaming",
-                    ]:
-                        if key not in provider_data:
-                            provider_data[key] = defaults.get(key, False)
-
-            # Add new fields
-            config_data["config_version"] = "2.0"
-            config_data["profiles"] = config_data.get("profiles", {})
-            config_data["active_profile"] = config_data.get("active_profile")
-            config_data["config_sources"] = config_data.get("config_sources", {})
-
-            from datetime import datetime
-
-            config_data["created_at"] = config_data.get(
-                "created_at", datetime.now().isoformat()
-            )
-            config_data["updated_at"] = datetime.now().isoformat()
-
-            # Save migrated config
-            with open(self.config_path, "w") as f:
-                json.dump(config_data, f, indent=2)
-
-            # Reload config
-            self.config = None
-            self.load_config()
-
-            return True
-
-        except Exception as e:
-            raise ConfigurationError(f"Failed to migrate configuration: {e}")
-
-    def backup_config(self) -> str:
-        """
-        Create a backup of the current configuration.
-
-        Returns:
-            Path to the backup file
-        """
-        if not self.config_path.exists():
-            raise ConfigurationError("No configuration file to backup")
-
-        from datetime import datetime
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = self.config_path.parent / f"config_backup_{timestamp}.json"
-
-        import shutil
-
-        shutil.copy2(self.config_path, backup_path)
-
-        return str(backup_path)
-
-    def restore_config(self, backup_path: str) -> None:
-        """
-        Restore configuration from a backup file.
-
-        Args:
-            backup_path: Path to the backup file
-
-        Raises:
-            ConfigurationError: If restore fails
-        """
-        backup_file = Path(backup_path)
-        if not backup_file.exists():
-            raise ConfigurationError(f"Backup file not found: {backup_path}")
-
-        try:
-            import shutil
-
-            shutil.copy2(backup_file, self.config_path)
-
-            # Clear cached config and reload
-            self.config = None
-            self.load_config()
-
-        except Exception as e:
-            raise ConfigurationError(f"Failed to restore configuration: {e}")
-
-    def get_config_summary(self) -> Dict[str, Any]:
-        """
-        Get a summary of the current configuration.
-
-        Returns:
-            Dictionary with configuration summary
-        """
-        config = self.get_config()
-
-        # Provider capabilities
-        provider_capabilities = {}
-        for provider_name, provider_config in config.providers.items():
-            provider_capabilities[provider_name] = {
-                "supports_tools": getattr(provider_config, "supports_tools", False),
-                "supports_multimodal": getattr(
-                    provider_config, "supports_multimodal", False
-                ),
-                "supports_streaming": getattr(
-                    provider_config, "supports_streaming", True
-                ),
-                "provider_type": getattr(
-                    provider_config, "provider_type", provider_name
-                ),
-            }
-
-        return {
-            "default_provider": config.default_provider,
-            "providers": list(config.providers.keys()),
-            "profiles": list(config.profiles.keys()),
-            "active_profile": config.active_profile,
-            "mcp_enabled": config.mcp.enabled,
-            "mcp_servers": len(config.mcp.servers),
-            "provider_capabilities": provider_capabilities,
-            "config_version": config.config_version,
-            "storage_path": config.storage_path,
-        }
 
     def _set_nested_config_value(self, config: Config, path: str, value: Any) -> None:
         """
@@ -1787,7 +1351,7 @@ class ConfigManager:
         return config.get_active_config()
 
     def update_profile_provider_settings(
-        self, profile_name: str, provider_name: str, **kwargs
+        self, profile_name: str, provider_name: str, **kwargs: Any
     ) -> None:
         """
         Update provider settings for a specific profile.
@@ -1881,8 +1445,6 @@ class ConfigManager:
                     migrated = True
 
         # Add timestamps
-        from datetime import datetime
-
         if "created_at" not in raw_config or not raw_config["created_at"]:
             raw_config["created_at"] = datetime.now().isoformat()
             migrated = True
@@ -1913,23 +1475,21 @@ class ConfigManager:
             Path to the backup file
         """
         if not backup_path:
-            from datetime import datetime
-
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = str(
                 self.config_path.parent / f"config_backup_{timestamp}.json"
             )
 
-        backup_path = Path(backup_path)
-        backup_path.parent.mkdir(parents=True, exist_ok=True)
+        backup_path_obj = Path(backup_path)
+        backup_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
         # Copy current config to backup location
         if self.config_path.exists():
             import shutil
 
-            shutil.copy2(self.config_path, backup_path)
+            shutil.copy2(self.config_path, backup_path_obj)
 
-        return str(backup_path)
+        return str(backup_path_obj)
 
     def restore_config(self, backup_path: str) -> None:
         """
@@ -1941,14 +1501,14 @@ class ConfigManager:
         Raises:
             ConfigurationError: If restore fails
         """
-        backup_path = Path(backup_path)
+        backup_path_obj = Path(backup_path)
 
-        if not backup_path.exists():
+        if not backup_path_obj.exists():
             raise ConfigurationError(f"Backup file not found: {backup_path}")
 
         try:
             # Validate backup file
-            with open(backup_path, "r") as f:
+            with open(backup_path_obj, "r") as f:
                 backup_data = json.load(f)
 
             # Test that we can create a Config object from backup data
@@ -1957,7 +1517,6 @@ class ConfigManager:
             # Create backup of current config before restore
             if self.config_path.exists():
                 import time
-                from datetime import datetime
 
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 # Add milliseconds to avoid filename collision
@@ -1973,7 +1532,7 @@ class ConfigManager:
             # Copy backup to current config location
             import shutil
 
-            shutil.copy2(backup_path, self.config_path)
+            shutil.copy2(backup_path_obj, self.config_path)
 
             # Clear cached config and reload
             self.config = None

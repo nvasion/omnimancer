@@ -12,7 +12,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,14 @@ from ..providers.factory import ProviderFactory
 # Internal imports - CLI
 from .commands import Command, CommandType, SlashCommand
 
+if TYPE_CHECKING:
+    from rich.console import Console
+
+    from ..core.agent_mode_manager import AgentModeManager
+    from ..core.history_manager import HistoryManager
+    from .approval_integration import CLIApprovalIntegration
+    from .display import DisplayManager
+
 
 class CommandDispatchMixin:
     """
@@ -40,6 +48,26 @@ class CommandDispatchMixin:
     and the display helper methods (self._show_error, self._show_info, etc.)
     being available from the host class.
     """
+
+    # Type stubs for attributes provided by the host class
+    engine: Any
+    console: "Console"
+    running: bool
+    agent_manager: Optional["AgentModeManager"]
+    history_manager: "HistoryManager"
+    approval_integration: Optional["CLIApprovalIntegration"]
+    display_manager: "DisplayManager"
+
+    # Methods provided by DisplayMixin (or the host class)
+    def _show_error(self, message: str) -> None: ...
+    def _show_info(self, message: str) -> None: ...
+    def _show_success(self, message: str) -> None: ...
+    def _show_warning(self, message: str) -> None: ...
+    def _show_help(self) -> None: ...
+    def _show_command_help(self, command_name: str) -> None: ...
+    def _show_status(self) -> None: ...
+    def _clear_screen(self) -> None: ...
+    def stop(self) -> None: ...
 
     async def _handle_slash_command(self, command: Command) -> None:
         """
@@ -91,7 +119,7 @@ class CommandDispatchMixin:
         elif slash_cmd == SlashCommand.CONFIG:
             await self._handle_config_command(command)
         else:
-            self._show_info(f"Command {slash_cmd.value} is not yet implemented")
+            self._show_info(f"Command {slash_cmd.value} is not yet implemented")  # type: ignore[attr-defined]
 
     async def _handle_dynamic_command(self, command: Command) -> None:
         """
@@ -140,9 +168,9 @@ class CommandDispatchMixin:
 
         # Check if handler is async
         if inspect.iscoroutinefunction(handler):
-            return await handler(args, engine=self.engine, console=self.console)
+            return await handler(args, engine=self.engine, console=self.console)  # type: ignore[no-any-return]
         else:
-            return handler(args, engine=self.engine, console=self.console)
+            return handler(args, engine=self.engine, console=self.console)  # type: ignore[no-any-return]
 
     async def _execute_dynamic_script(
         self, script_path: Path, args: List[str]
@@ -222,7 +250,7 @@ class CommandDispatchMixin:
             self._show_error(f"Failed to get models: {e}")
 
     async def _get_enhanced_models_list(
-        self, filter_type: str = None, filter_value: str = None
+        self, filter_type: Optional[str] = None, filter_value: Optional[str] = None
     ) -> str:
         """Get enhanced models list with filtering and detailed information."""
         try:
@@ -416,10 +444,8 @@ class CommandDispatchMixin:
                         else:
                             self._show_error(f"Provider '{provider_name}' not found.")
 
-                        providers_command = Command(
-                            content="/providers",
-                            command_type=CommandType.SLASH_COMMAND,
-                            args=[],
+                        providers_command = Command.create_slash_command(
+                            SlashCommand.PROVIDERS, [], "/providers"
                         )
                         await self._show_providers(providers_command)
                         return
@@ -526,10 +552,8 @@ class CommandDispatchMixin:
             if "not available" in str(e).lower() or "not found" in str(e).lower():
                 self._show_info("Available options:")
 
-                providers_command = Command(
-                    content="/providers",
-                    command_type=CommandType.SLASH_COMMAND,
-                    args=[],
+                providers_command = Command.create_slash_command(
+                    SlashCommand.PROVIDERS, [], "/providers"
                 )
                 await self._show_providers(providers_command)
 

@@ -24,7 +24,7 @@ class OutputFormat(Enum):
 class TokenAccumulator:
     """Tracks cumulative token usage across multiple API calls."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._input_tokens = 0
         self._output_tokens = 0
         self._total_cost = 0.0
@@ -133,11 +133,11 @@ class HeadlessRunner:
 
     def __init__(
         self,
-        engine,
+        engine: Any,
         output_format: OutputFormat = OutputFormat.TEXT,
         no_approval: bool = False,
         verbose: bool = False,
-    ):
+    ) -> None:
         self._engine = engine
         self._no_approval = no_approval
         self._verbose = verbose

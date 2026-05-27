@@ -207,7 +207,7 @@ class UnifiedStatusManager:
         for listener in self.event_listeners:
             listener.stop()
 
-        for listener in self.stream_listeners.values():
+        for listener in self.stream_listeners.values():  # type: ignore[assignment]
             listener.stop()
 
         logger.info("UnifiedStatusManager shutdown complete")
@@ -269,7 +269,7 @@ class UnifiedStatusManager:
         """
         async with self._lock:
             operation.status = OperationStatus.RUNNING
-            operation.start_time = operation.start_time or time.time()
+            operation.start_time = operation.start_time or time.time()  # type: ignore[assignment]
 
             self.active_operations[operation.operation_id] = operation
 

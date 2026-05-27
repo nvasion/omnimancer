@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class ProviderRegistry:
     """Enhanced provider registry with comprehensive model catalog."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the provider registry."""
         self.providers: Dict[str, Type[BaseProvider]] = {}
         self.model_catalog: Dict[str, List[EnhancedModelInfo]] = {}

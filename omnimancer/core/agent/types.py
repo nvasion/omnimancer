@@ -37,7 +37,7 @@ class Operation:
     preview: Optional[str] = None
     created_at: Optional[datetime] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.created_at is None:
             self.created_at = datetime.now()
 
@@ -56,6 +56,6 @@ class OperationResult:
     created_at: Optional[datetime] = None
     was_cancelled: bool = False  # True if user pressed 'q' to cancel
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.created_at is None:
             self.created_at = datetime.now()

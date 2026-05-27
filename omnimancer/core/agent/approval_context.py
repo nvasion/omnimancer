@@ -132,7 +132,7 @@ class OperationDetails:
     batch_id: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Post-initialization processing."""
         # Auto-populate risk factors from security flags
         if not self.risk_factors and hasattr(self.security_flags, "get_risk_factors"):

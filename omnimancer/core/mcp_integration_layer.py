@@ -234,7 +234,7 @@ class EnhancedMCPIntegrator:
                 if tool.name not in self.tool_metrics:
                     self.tool_metrics[tool.name] = ToolMetrics()
 
-            self.last_discovery_time = current_time
+            self.last_discovery_time = current_time  # type: ignore[assignment]
 
             logger.info(
                 f"Discovered {len(self.discovered_tools)} tools across "
@@ -477,7 +477,7 @@ class EnhancedMCPIntegrator:
 
                 # Use timeout
                 result = await asyncio.wait_for(
-                    self.mcp_manager.execute_tool(tool_name, enhanced_args),
+                    self.mcp_manager.execute_tool(tool_name, enhanced_args),  # type: ignore[union-attr]
                     timeout=context.timeout_seconds,
                 )
 
@@ -633,7 +633,7 @@ class EnhancedMCPIntegrator:
         tool_name: str,
         arguments: Dict[str, Any],
         result: ToolExecutionResult,
-    ):
+    ) -> None:
         """Cache a tool execution result."""
         cache_key = self._generate_cache_key(tool_name, arguments)
         self.result_cache[cache_key] = (result, time.time())
@@ -658,7 +658,7 @@ class EnhancedMCPIntegrator:
         success: bool,
         execution_time: float,
         error: Optional[str] = None,
-    ):
+    ) -> None:
         """Record execution metrics for monitoring."""
         current_time = time.time()
 
@@ -765,7 +765,7 @@ class EnhancedMCPIntegrator:
             # Boost score based on reliability
             metrics = self.tool_metrics.get(tool_name)
             if metrics:
-                score += metrics.reliability_score * 5
+                score += metrics.reliability_score * 5  # type: ignore[assignment]
 
                 # Penalize if tool has been failing recently
                 if metrics.consecutive_failures > 2:
@@ -826,12 +826,12 @@ class EnhancedMCPIntegrator:
             if tools
         }
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Clear the result cache."""
         self.result_cache.clear()
         logger.info("Tool result cache cleared")
 
-    def reset_metrics(self, tool_name: Optional[str] = None):
+    def reset_metrics(self, tool_name: Optional[str] = None) -> None:
         """Reset performance metrics."""
         if tool_name:
             if tool_name in self.tool_metrics:
@@ -869,7 +869,7 @@ class EnhancedMCPIntegrator:
                 problematic_tools.append(tool_name)
 
         if problematic_tools:
-            health_status["problematic_tools"] = problematic_tools
+            health_status["problematic_tools"] = problematic_tools  # type: ignore[assignment]
             if (
                 len(problematic_tools) > len(self.discovered_tools) * 0.3
             ):  # More than 30% problematic

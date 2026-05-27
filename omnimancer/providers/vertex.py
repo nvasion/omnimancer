@@ -7,7 +7,7 @@ with support for Google Cloud project configuration, location settings, and serv
 
 import os
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List, Union
 
 import httpx
 
@@ -15,6 +15,7 @@ from ..core.models import (
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
+    ModelInfo,
     ToolCall,
     ToolDefinition,
 )
@@ -36,7 +37,7 @@ class VertexAIProvider(BaseProvider):
     service account authentication, and Gemini models.
     """
 
-    def __init__(self, api_key: str, model: str = "", **kwargs):
+    def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
         Initialize Vertex AI provider.
 
@@ -71,7 +72,7 @@ class VertexAIProvider(BaseProvider):
         # Build base URL
         self.base_url = f"https://{self.vertex_location}-aiplatform.googleapis.com/v1/projects/{self.vertex_project}/locations/{self.vertex_location}/publishers/google/models"
 
-    def _setup_authentication(self):
+    def _setup_authentication(self) -> None:
         """Set up Google Cloud authentication."""
         if self.service_account_path:
             # Use service account file
@@ -474,7 +475,7 @@ class VertexAIProvider(BaseProvider):
             },
         }
 
-        config = model_configs.get(
+        config: Dict[str, Any] = model_configs.get(
             self.model,
             {
                 "description": f"Vertex AI model {self.model}",
@@ -509,7 +510,7 @@ class VertexAIProvider(BaseProvider):
 
         return enhanced_info
 
-    def get_available_models(self) -> List[EnhancedModelInfo]:
+    def get_available_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get list of available Vertex AI models.
         """
@@ -581,7 +582,7 @@ class VertexAIProvider(BaseProvider):
         for model in models:
             model.update_swe_rating()
 
-        return models
+        return models  # type: ignore[return-value]
 
     def supports_tools(self) -> bool:
         """

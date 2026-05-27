@@ -22,7 +22,7 @@ def get_active_cancellation_handler() -> Optional["CancellationHandler"]:
     return _active_cancellation_handler
 
 
-def set_active_cancellation_handler(handler: Optional["CancellationHandler"]):
+def set_active_cancellation_handler(handler: Optional["CancellationHandler"]) -> None:
     """Set the currently active cancellation handler."""
     global _active_cancellation_handler
     _active_cancellation_handler = handler
@@ -55,7 +55,7 @@ class CancellationHandler:
         operation: Callable,
         status_message: str = "Processing...",
         cancellation_message: str = "Operation cancelled by user",
-        signal_handler=None,
+        signal_handler: Any = None,
         status_callback: Optional[Callable[[], str]] = None,
     ) -> Any:
         """
@@ -95,10 +95,10 @@ class CancellationHandler:
             # If we have a status callback, use dynamic status
             if status_callback:
 
-                async def update_status():
-                    while not self.active_operation.done():
+                async def update_status() -> None:
+                    while not self.active_operation.done():  # type: ignore[union-attr]
                         current_status = status_callback()
-                        self.console.status(
+                        self.console.status(  # type: ignore[call-arg]
                             f"[bold green]{current_status} (Press Ctrl+C to cancel)",
                             spinner="dots",
                             refresh=True,
@@ -117,11 +117,11 @@ class CancellationHandler:
                         pass
             else:
                 # Use static status message
-                self.status_display = self.console.status(
+                self.status_display = self.console.status(  # type: ignore[assignment]
                     f"[bold green]{status_message} (Press Ctrl+C to cancel)",
                     spinner="dots",
                 )
-                with self.status_display:
+                with self.status_display:  # type: ignore[attr-defined]
                     result = await self.active_operation
 
             logger.debug("Cancellable operation completed successfully")
@@ -173,11 +173,11 @@ class CancellationHandler:
         """
         if self.is_operation_active():
             logger.info("Cancelling active operation")
-            self.active_operation.cancel()
+            self.active_operation.cancel()  # type: ignore[union-attr]
             return True
         return False
 
-    def pause_status_display(self):
+    def pause_status_display(self) -> None:
         """
         Pause the status display to allow for user interaction.
 
@@ -193,7 +193,7 @@ class CancellationHandler:
                 pass
             logger.debug("Status display paused for user interaction")
 
-    def resume_status_display(self):
+    def resume_status_display(self) -> None:
         """
         Resume the status display after user interaction.
         """
@@ -232,7 +232,7 @@ class EnhancedStatusDisplay:
         enhanced_message = (
             f"[bold green]{message}... (Press Ctrl+C to cancel)[/bold green]"
         )
-        return self.console.status(enhanced_message, spinner="dots")
+        return self.console.status(enhanced_message, spinner="dots")  # type: ignore[return-value]
 
     def show_cancellation_notice(self, message: str = "Operation cancelled") -> None:
         """

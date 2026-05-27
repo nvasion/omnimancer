@@ -6,7 +6,7 @@ with support for deployment names, API versioning, and Azure-specific authentica
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List, Union
 
 import httpx
 
@@ -14,6 +14,7 @@ from ..core.models import (
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
+    ModelInfo,
     ToolCall,
     ToolDefinition,
 )
@@ -35,7 +36,7 @@ class AzureProvider(BaseProvider):
     API versioning, and Azure authentication methods.
     """
 
-    def __init__(self, api_key: str, model: str = "", **kwargs):
+    def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
         Initialize Azure OpenAI provider.
 
@@ -444,7 +445,7 @@ class AzureProvider(BaseProvider):
         }
 
         # Try to match deployment name to known models
-        config = None
+        config: Dict[str, Any] = {}
         for model_name, model_config in model_configs.items():
             if model_name in self.azure_deployment.lower():
                 config = model_config
@@ -487,7 +488,7 @@ class AzureProvider(BaseProvider):
 
         return enhanced_info
 
-    def get_available_models(self) -> List[EnhancedModelInfo]:
+    def get_available_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get list of available Azure OpenAI models.
 
@@ -577,7 +578,7 @@ class AzureProvider(BaseProvider):
         for model in models:
             model.update_swe_rating()
 
-        return models
+        return models  # type: ignore[return-value]
 
     def supports_tools(self) -> bool:
         """

@@ -125,7 +125,7 @@ class ProviderInitializer:
         cls,
         provider_name: str,
         config: ProviderConfig,
-        config_manager: "ConfigManager" = None,
+        config_manager: "ConfigManager" = None,  # type: ignore[name-defined]
     ) -> BaseProvider:
         """
         Get or create cached provider instance.
@@ -167,7 +167,7 @@ class ProviderInitializer:
         cls,
         provider_name: str,
         config: ProviderConfig,
-        config_manager: "ConfigManager" = None,
+        config_manager: "ConfigManager" = None,  # type: ignore[name-defined]
     ) -> BaseProvider:
         """
         Create a new provider instance.
@@ -225,7 +225,7 @@ class ProviderInitializer:
         }
         if auth_type_override:
             kwargs["auth_type"] = auth_type_override
-        instance = provider_class(api_key=api_key, model=config.model, **kwargs)
+        instance = provider_class(api_key=api_key, model=config.model, **kwargs)  # type: ignore[arg-type]
 
         return instance
 
@@ -339,7 +339,7 @@ class ProviderInitializer:
             if enhanced and models and isinstance(models[0], ModelInfo):
                 models = [EnhancedModelInfo.from_model_info(model) for model in models]
 
-            return models
+            return models  # type: ignore[return-value]
 
         except Exception as e:
             logger.error(f"Error fetching model info for {provider_name}: {e}")
@@ -416,7 +416,7 @@ class ProviderInitializer:
     async def initialize_providers(
         cls,
         provider_configs: Dict[str, ProviderConfig],
-        config_manager: "ConfigManager" = None,
+        config_manager: "ConfigManager" = None,  # type: ignore[name-defined]
     ) -> Dict[str, BaseProvider]:
         """
         Initialize all providers from configuration.

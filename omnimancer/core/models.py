@@ -261,10 +261,10 @@ class EnhancedModelInfo:
         )
 
     @classmethod
-    def from_model_info(cls, model_info: ModelInfo, **kwargs) -> "EnhancedModelInfo":
+    def from_model_info(cls, model_info: "ModelInfo | EnhancedModelInfo", **kwargs: Any) -> "EnhancedModelInfo":
         """Create EnhancedModelInfo from legacy ModelInfo."""
         # Convert legacy cost_per_token to per-million costs
-        cost_per_million = model_info.cost_per_token * 1_000_000
+        cost_per_million = model_info.cost_per_token * 1_000_000  # type: ignore[union-attr]
 
         return cls(
             name=model_info.name,
@@ -279,7 +279,7 @@ class EnhancedModelInfo:
             latest_version=model_info.latest_version,
             deprecated=model_info.deprecated,
             context_window=model_info.max_tokens,
-            is_free=model_info.cost_per_token == 0,
+            is_free=model_info.cost_per_token == 0,  # type: ignore[union-attr]
             **kwargs,
         )
 
@@ -433,126 +433,126 @@ class ProviderConfig(BaseModel):
 
     @field_validator("temperature")
     @classmethod
-    def validate_temperature(cls, v):
+    def validate_temperature(cls, v: Any) -> Any:
         if v is not None and (v < 0 or v > 2):
             raise ValueError("temperature must be between 0 and 2")
         return v
 
     @field_validator("top_p")
     @classmethod
-    def validate_top_p(cls, v):
+    def validate_top_p(cls, v: Any) -> Any:
         if v is not None and (v < 0 or v > 1):
             raise ValueError("top_p must be between 0 and 1")
         return v
 
     @field_validator("frequency_penalty")
     @classmethod
-    def validate_frequency_penalty(cls, v):
+    def validate_frequency_penalty(cls, v: Any) -> Any:
         if v is not None and (v < -2 or v > 2):
             raise ValueError("frequency_penalty must be between -2 and 2")
         return v
 
     @field_validator("presence_penalty")
     @classmethod
-    def validate_presence_penalty(cls, v):
+    def validate_presence_penalty(cls, v: Any) -> Any:
         if v is not None and (v < -2 or v > 2):
             raise ValueError("presence_penalty must be between -2 and 2")
         return v
 
     @field_validator("timeout")
     @classmethod
-    def validate_timeout(cls, v):
+    def validate_timeout(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("timeout must be positive")
         return v
 
     @field_validator("repeat_penalty")
     @classmethod
-    def validate_repeat_penalty(cls, v):
+    def validate_repeat_penalty(cls, v: Any) -> Any:
         if v is not None and (v < 0.1 or v > 2.0):
             raise ValueError("repeat_penalty must be between 0.1 and 2.0")
         return v
 
     @field_validator("max_input_tokens")
     @classmethod
-    def validate_max_input_tokens(cls, v):
+    def validate_max_input_tokens(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("max_input_tokens must be positive")
         return v
 
     @field_validator("num_predict")
     @classmethod
-    def validate_num_predict(cls, v):
+    def validate_num_predict(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("num_predict must be positive")
         return v
 
     @field_validator("num_ctx")
     @classmethod
-    def validate_num_ctx(cls, v):
+    def validate_num_ctx(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("num_ctx must be positive")
         return v
 
     @field_validator("seed")
     @classmethod
-    def validate_seed(cls, v):
+    def validate_seed(cls, v: Any) -> Any:
         if v is not None and (v < 0 or v > 2**32 - 1):
             raise ValueError("seed must be between 0 and 2^32-1")
         return v
 
     @field_validator("priority")
     @classmethod
-    def validate_priority(cls, v):
+    def validate_priority(cls, v: Any) -> Any:
         if v < 0:
             raise ValueError("priority must be non-negative")
         return v
 
     @field_validator("max_retries")
     @classmethod
-    def validate_max_retries(cls, v):
+    def validate_max_retries(cls, v: Any) -> Any:
         if v < 0:
             raise ValueError("max_retries must be non-negative")
         return v
 
     @field_validator("retry_delay")
     @classmethod
-    def validate_retry_delay(cls, v):
+    def validate_retry_delay(cls, v: Any) -> Any:
         if v < 0:
             raise ValueError("retry_delay must be non-negative")
         return v
 
     @field_validator("health_check_interval")
     @classmethod
-    def validate_health_check_interval(cls, v):
+    def validate_health_check_interval(cls, v: Any) -> Any:
         if v <= 0:
             raise ValueError("health_check_interval must be positive")
         return v
 
     @field_validator("health_check_timeout")
     @classmethod
-    def validate_health_check_timeout(cls, v):
+    def validate_health_check_timeout(cls, v: Any) -> Any:
         if v <= 0:
             raise ValueError("health_check_timeout must be positive")
         return v
 
     @field_validator("rate_limit_requests_per_minute")
     @classmethod
-    def validate_rate_limit_requests(cls, v):
+    def validate_rate_limit_requests(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("rate_limit_requests_per_minute must be positive")
         return v
 
     @field_validator("rate_limit_tokens_per_minute")
     @classmethod
-    def validate_rate_limit_tokens(cls, v):
+    def validate_rate_limit_tokens(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("rate_limit_tokens_per_minute must be positive")
         return v
 
     @field_validator("auth_type")
     @classmethod
-    def validate_auth_type(cls, v):
+    def validate_auth_type(cls, v: Any) -> Any:
         valid_types = ["api_key", "bearer", "oauth", "service_account", "none"]
         if v not in valid_types:
             raise ValueError(f'auth_type must be one of: {", ".join(valid_types)}')
@@ -560,42 +560,42 @@ class ProviderConfig(BaseModel):
 
     @field_validator("mirostat")
     @classmethod
-    def validate_mirostat(cls, v):
+    def validate_mirostat(cls, v: Any) -> Any:
         if v is not None and v not in [0, 1, 2]:
             raise ValueError("mirostat must be 0, 1, or 2")
         return v
 
     @field_validator("mirostat_eta")
     @classmethod
-    def validate_mirostat_eta(cls, v):
+    def validate_mirostat_eta(cls, v: Any) -> Any:
         if v is not None and (v <= 0 or v > 1):
             raise ValueError("mirostat_eta must be between 0 and 1")
         return v
 
     @field_validator("mirostat_tau")
     @classmethod
-    def validate_mirostat_tau(cls, v):
+    def validate_mirostat_tau(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("mirostat_tau must be positive")
         return v
 
     @field_validator("num_gpu")
     @classmethod
-    def validate_num_gpu(cls, v):
+    def validate_num_gpu(cls, v: Any) -> Any:
         if v is not None and v < 0:
             raise ValueError("num_gpu must be non-negative")
         return v
 
     @field_validator("num_thread")
     @classmethod
-    def validate_num_thread(cls, v):
+    def validate_num_thread(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("num_thread must be positive")
         return v
 
     @field_validator("search_recency_filter")
     @classmethod
-    def validate_search_recency_filter(cls, v):
+    def validate_search_recency_filter(cls, v: Any) -> Any:
         if v is not None:
             valid_filters = ["hour", "day", "week", "month", "year"]
             if v not in valid_filters:
@@ -606,7 +606,7 @@ class ProviderConfig(BaseModel):
 
     @field_validator("grok_mode")
     @classmethod
-    def validate_grok_mode(cls, v):
+    def validate_grok_mode(cls, v: Any) -> Any:
         if v is not None:
             valid_modes = ["balanced", "creative", "precise"]
             if v not in valid_modes:
@@ -615,21 +615,21 @@ class ProviderConfig(BaseModel):
 
     @field_validator("random_seed")
     @classmethod
-    def validate_random_seed(cls, v):
+    def validate_random_seed(cls, v: Any) -> Any:
         if v is not None and (v < 0 or v > 2**32 - 1):
             raise ValueError("random_seed must be between 0 and 2^32-1")
         return v
 
     @field_validator("top_k")
     @classmethod
-    def validate_top_k(cls, v):
+    def validate_top_k(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("top_k must be positive")
         return v
 
     @field_validator("azure_endpoint")
     @classmethod
-    def validate_azure_endpoint(cls, v):
+    def validate_azure_endpoint(cls, v: Any) -> Any:
         if v is not None and v.strip():
             # Basic URL validation
             if not (v.startswith("https://") or v.startswith("http://")):
@@ -639,35 +639,35 @@ class ProviderConfig(BaseModel):
 
     @field_validator("api_version")
     @classmethod
-    def validate_api_version(cls, v):
+    def validate_api_version(cls, v: Any) -> Any:
         if v is not None and not v.strip():
             raise ValueError("api_version cannot be empty if provided")
         return v
 
     @field_validator("vertex_location")
     @classmethod
-    def validate_vertex_location(cls, v):
+    def validate_vertex_location(cls, v: Any) -> Any:
         if v is not None and not v.strip():
             raise ValueError("vertex_location cannot be empty if provided")
         return v
 
     @field_validator("aws_region")
     @classmethod
-    def validate_aws_region(cls, v):
+    def validate_aws_region(cls, v: Any) -> Any:
         if v is not None and not v.strip():
             raise ValueError("aws_region cannot be empty if provided")
         return v
 
     @field_validator("max_cost_per_token")
     @classmethod
-    def validate_max_cost_per_token(cls, v):
+    def validate_max_cost_per_token(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("max_cost_per_token must be positive")
         return v
 
     @field_validator("claude_code_mode")
     @classmethod
-    def validate_claude_code_mode(cls, v):
+    def validate_claude_code_mode(cls, v: Any) -> Any:
         if v is not None:
             valid_modes = ["opus", "sonnet"]
             if v not in valid_modes:
@@ -857,14 +857,14 @@ class MCPServerConfig(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, v):
+    def validate_name(cls, v: Any) -> Any:
         if not v or not v.strip():
             raise ValueError("MCP server name cannot be empty")
         return v.strip()
 
     @field_validator("command")
     @classmethod
-    def validate_command(cls, v):
+    def validate_command(cls, v: Any) -> Any:
         if not v or not v.strip():
             raise ValueError("MCP server command cannot be empty")
         return v.strip()
@@ -900,7 +900,7 @@ class MCPConfig(BaseModel):
 
     @field_validator("auto_approve_timeout")
     @classmethod
-    def validate_auto_approve_timeout(cls, v):
+    def validate_auto_approve_timeout(cls, v: Any) -> Any:
         if v is not None and v <= 0:
             raise ValueError("auto_approve_timeout must be positive")
         if v is not None and v > 120:  # 2 minutes max
@@ -909,42 +909,42 @@ class MCPConfig(BaseModel):
 
     @field_validator("max_concurrent_servers")
     @classmethod
-    def validate_max_concurrent_servers(cls, v):
+    def validate_max_concurrent_servers(cls, v: Any) -> Any:
         if v <= 0:
             raise ValueError("max_concurrent_servers must be positive")
         return v
 
     @field_validator("default_timeout")
     @classmethod
-    def validate_default_timeout(cls, v):
+    def validate_default_timeout(cls, v: Any) -> Any:
         if v <= 0:
             raise ValueError("default_timeout must be positive")
         return v
 
     @field_validator("retry_attempts")
     @classmethod
-    def validate_retry_attempts(cls, v):
+    def validate_retry_attempts(cls, v: Any) -> Any:
         if v < 0:
             raise ValueError("retry_attempts must be non-negative")
         return v
 
     @field_validator("retry_delay")
     @classmethod
-    def validate_retry_delay(cls, v):
+    def validate_retry_delay(cls, v: Any) -> Any:
         if v < 0:
             raise ValueError("retry_delay must be non-negative")
         return v
 
     @field_validator("max_tool_execution_time")
     @classmethod
-    def validate_max_tool_execution_time(cls, v):
+    def validate_max_tool_execution_time(cls, v: Any) -> Any:
         if v <= 0:
             raise ValueError("max_tool_execution_time must be positive")
         return v
 
     @field_validator("log_level")
     @classmethod
-    def validate_log_level(cls, v):
+    def validate_log_level(cls, v: Any) -> Any:
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if v.upper() not in valid_levels:
             raise ValueError(f'log_level must be one of: {", ".join(valid_levels)}')
@@ -952,7 +952,7 @@ class MCPConfig(BaseModel):
 
     @field_validator("tool_cache_ttl")
     @classmethod
-    def validate_tool_cache_ttl(cls, v):
+    def validate_tool_cache_ttl(cls, v: Any) -> Any:
         if v <= 0:
             raise ValueError("tool_cache_ttl must be positive")
         return v
@@ -997,14 +997,14 @@ class ConfigProfile(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, v):
+    def validate_name(cls, v: Any) -> Any:
         if not v or not v.strip():
             raise ValueError("profile name cannot be empty")
         return v.strip()
 
     @field_validator("default_provider")
     @classmethod
-    def validate_default_provider(cls, v):
+    def validate_default_provider(cls, v: Any) -> Any:
         if not v or not v.strip():
             raise ValueError("default_provider cannot be empty")
         return v.strip()
@@ -1056,21 +1056,21 @@ class Config(BaseModel):
 
     @field_validator("default_provider")
     @classmethod
-    def validate_default_provider(cls, v):
+    def validate_default_provider(cls, v: Any) -> Any:
         if not v or not v.strip():
             raise ValueError("default_provider cannot be empty")
         return v.strip()
 
     @field_validator("storage_path")
     @classmethod
-    def validate_storage_path(cls, v):
+    def validate_storage_path(cls, v: Any) -> Any:
         if not v or not v.strip():
             raise ValueError("storage_path cannot be empty")
         return v.strip()
 
     @field_validator("active_profile")
     @classmethod
-    def validate_active_profile(cls, v, info):
+    def validate_active_profile(cls, v: Any, info: Any) -> Any:
         if v is not None and "profiles" in info.data:
             profiles = info.data["profiles"]
             if v not in profiles:
@@ -1079,7 +1079,7 @@ class Config(BaseModel):
 
     @field_validator("log_level")
     @classmethod
-    def validate_log_level(cls, v):
+    def validate_log_level(cls, v: Any) -> Any:
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if v.upper() not in valid_levels:
             raise ValueError(f'log_level must be one of: {", ".join(valid_levels)}')
@@ -1087,21 +1087,21 @@ class Config(BaseModel):
 
     @field_validator("provider_timeout_default")
     @classmethod
-    def validate_provider_timeout_default(cls, v):
+    def validate_provider_timeout_default(cls, v: Any) -> Any:
         if v <= 0:
             raise ValueError("provider_timeout_default must be positive")
         return v
 
     @field_validator("concurrent_requests_limit")
     @classmethod
-    def validate_concurrent_requests_limit(cls, v):
+    def validate_concurrent_requests_limit(cls, v: Any) -> Any:
         if v <= 0:
             raise ValueError("concurrent_requests_limit must be positive")
         return v
 
     @field_validator("request_cache_ttl")
     @classmethod
-    def validate_request_cache_ttl(cls, v):
+    def validate_request_cache_ttl(cls, v: Any) -> Any:
         if v <= 0:
             raise ValueError("request_cache_ttl must be positive")
         return v
@@ -1207,22 +1207,22 @@ class Config(BaseModel):
         if hasattr(obj, final_key):
             current_value = getattr(obj, final_key)
             try:
+                converted: Any
                 if isinstance(current_value, bool):
-                    converted_value = value.lower() in (
+                    converted = value.lower() in (
                         "true",
                         "1",
                         "yes",
                         "on",
                     )
                 elif isinstance(current_value, int):
-                    converted_value = int(value)
+                    converted = int(value)
                 elif isinstance(current_value, float):
-                    converted_value = float(value)
+                    converted = float(value)
                 else:
-                    converted_value = value
-                setattr(obj, final_key, converted_value)
+                    converted = value
+                setattr(obj, final_key, converted)
             except (ValueError, TypeError):
-                # If conversion fails, keep as string
                 setattr(obj, final_key, value)
 
     def validate_configuration(self) -> List[str]:
@@ -1232,7 +1232,7 @@ class Config(BaseModel):
         Returns:
             List of validation error messages (empty if valid)
         """
-        errors = []
+        errors: List[str] = []
 
         # Validate basic configuration
         if not self.default_provider:
@@ -1306,90 +1306,6 @@ class Config(BaseModel):
             errors.extend(self._validate_cohere_config(provider_name, config))
         elif config.provider_type == "ollama" or provider_name == "ollama":
             errors.extend(self._validate_ollama_config(provider_name, config))
-
-        return errors
-
-    def _validate_claude_config(
-        self, provider_name: str, config: ProviderConfig
-    ) -> List[str]:
-        """Validate Claude-specific configuration."""
-        errors = []
-        if not config.api_key:
-            errors.append(f"Claude provider '{provider_name}' requires an API key")
-        return errors
-
-    def _validate_openai_config(
-        self, provider_name: str, config: ProviderConfig
-    ) -> List[str]:
-        """Validate OpenAI-specific configuration."""
-        errors = []
-        if not config.api_key:
-            errors.append(f"OpenAI provider '{provider_name}' requires an API key")
-        return errors
-
-    def _validate_gemini_config(
-        self, provider_name: str, config: ProviderConfig
-    ) -> List[str]:
-        """Validate Gemini-specific configuration."""
-        errors = []
-        if not config.api_key:
-            errors.append(f"Gemini provider '{provider_name}' requires an API key")
-        return errors
-
-    def _validate_cohere_config(
-        self, provider_name: str, config: ProviderConfig
-    ) -> List[str]:
-        """Validate Cohere-specific configuration."""
-        errors = []
-        if not config.api_key:
-            errors.append(f"Cohere provider '{provider_name}' requires an API key")
-        return errors
-
-    def _validate_ollama_config(
-        self, provider_name: str, config: ProviderConfig
-    ) -> List[str]:
-        """Validate Ollama-specific configuration."""
-        errors = []
-        # Ollama doesn't require API key but needs base_url
-        if not config.base_url:
-            config.base_url = "http://localhost:11434"  # Set default
-        return errors
-
-    def _validate_mcp_config(self) -> List[str]:
-        """Validate MCP configuration."""
-        errors = []
-
-        if self.mcp.enabled:
-            if not self.mcp.servers:
-                errors.append("MCP is enabled but no servers are configured")
-
-            for server_name, server_config in self.mcp.servers.items():
-                if not server_config.command:
-                    errors.append(
-                        f"MCP server '{server_name}' has no command specified"
-                    )
-
-        return errors
-
-    def _validate_profile_config(
-        self, profile_name: str, profile: ConfigProfile
-    ) -> List[str]:
-        """Validate a configuration profile."""
-        errors = []
-
-        if profile.default_provider not in profile.providers:
-            errors.append(
-                f"Profile '{profile_name}' default provider '{profile.default_provider}' not found in profile providers"
-            )
-
-        # Validate each provider in the profile
-        for provider_name, provider_config in profile.providers.items():
-            provider_errors = self._validate_provider_config(
-                provider_name, provider_config
-            )
-            errors.extend(
-                [f"Profile '{profile_name}': {error}" for error in provider_errors]
-            )
 
         return errors
 
@@ -1586,7 +1502,7 @@ class Config(BaseModel):
             # This would be tracked in runtime state, not persisted config
             pass
 
-    def get_fallback_providers(self, exclude_provider: str = None) -> List[str]:
+    def get_fallback_providers(self, exclude_provider: Optional[str] = None) -> List[str]:
         """Get list of fallback providers in priority order."""
         providers_by_priority = self.get_providers_by_priority()
         fallback_providers = []
@@ -1660,7 +1576,7 @@ class Config(BaseModel):
         if provider_name in self.providers:
             extra_settings = self.providers[provider_name].extra_settings
             if extra_settings and "is_healthy" in extra_settings:
-                return extra_settings["is_healthy"]
+                return bool(extra_settings["is_healthy"])
         return None
 
 
@@ -1690,11 +1606,11 @@ class ConfigTemplate:
     recommended_providers: List[str]
     recommended_models: Dict[str, str]
     settings: Dict[str, Any]
-    mcp_tools: List[str] = None
-    provider_configs: Dict[str, Any] = None
-    mcp_servers: Dict[str, Any] = None
+    mcp_tools: Optional[List[str]] = None
+    provider_configs: Optional[Dict[str, Any]] = None
+    mcp_servers: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.mcp_tools is None:
             self.mcp_tools = []
         if self.provider_configs is None:
@@ -1706,11 +1622,11 @@ class ConfigTemplate:
 class ConfigTemplateManager:
     """Minimal configuration template manager."""
 
-    def __init__(self):
-        self.templates = {}
+    def __init__(self) -> None:
+        self.templates: Dict[str, ConfigTemplate] = {}
         self._initialize_templates()
 
-    def _initialize_templates(self):
+    def _initialize_templates(self) -> None:
         """Initialize all available templates."""
         self.templates["coding"] = self._create_coding_template()
         self.templates["research"] = self._create_research_template()

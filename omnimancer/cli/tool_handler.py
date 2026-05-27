@@ -28,7 +28,7 @@ AUTO_APPROVED_TOOLS = {"file_read", "find_files", "search_text"}
 class ToolHandler:
     """Executes tool calls from providers via the AgentEngine."""
 
-    def __init__(self, agent_engine):
+    def __init__(self, agent_engine: Any) -> None:
         self.agent_engine = agent_engine
 
     def get_tool_definitions(self) -> List[ToolDefinition]:

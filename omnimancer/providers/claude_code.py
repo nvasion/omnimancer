@@ -8,9 +8,9 @@ with support for opus and sonnet modes with free access.
 import os
 import subprocess
 from datetime import datetime
-from typing import List
+from typing import Dict, List, Union, Any
 
-from ..core.models import ChatContext, ChatResponse, EnhancedModelInfo
+from ..core.models import ChatContext, ChatResponse, EnhancedModelInfo, ModelInfo
 from ..utils.errors import (
     AuthenticationError,
     ModelNotFoundError,
@@ -28,7 +28,7 @@ class ClaudeCodeProvider(BaseProvider):
     supporting opus and sonnet modes with free local access.
     """
 
-    def __init__(self, api_key: str = "local", model: str = "", **kwargs):
+    def __init__(self, api_key: str = "local", model: str = "", **kwargs: Any) -> None:
         """
         Initialize Claude-code provider.
 
@@ -67,7 +67,7 @@ class ClaudeCodeProvider(BaseProvider):
         else:
             return "sonnet"  # Default to sonnet
 
-    def _validate_installation(self):
+    def _validate_installation(self) -> None:
         """
         Validate that Claude-code is installed and accessible.
 
@@ -300,7 +300,7 @@ class ClaudeCodeProvider(BaseProvider):
             },
         }
 
-        config = model_configs.get(
+        config: Dict[str, Any] = model_configs.get(
             self.model,
             {
                 "description": f"Claude-code model {self.model}",
@@ -333,7 +333,7 @@ class ClaudeCodeProvider(BaseProvider):
 
         return enhanced_info
 
-    def get_available_models(self) -> List[EnhancedModelInfo]:
+    def get_available_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get list of available Claude-code models.
         """
@@ -375,7 +375,7 @@ class ClaudeCodeProvider(BaseProvider):
         for model in models:
             model.update_swe_rating()
 
-        return models
+        return models  # type: ignore[return-value]
 
     def supports_tools(self) -> bool:
         """

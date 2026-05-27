@@ -6,11 +6,11 @@ with support for search-enabled conversations and recency filtering.
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List, Union
 
 import httpx
 
-from ..core.models import ChatContext, ChatResponse, EnhancedModelInfo
+from ..core.models import ChatContext, ChatResponse, EnhancedModelInfo, ModelInfo
 from ..utils.errors import (
     AuthenticationError,
     ModelNotFoundError,
@@ -31,7 +31,7 @@ class PerplexityProvider(BaseProvider):
 
     BASE_URL = "https://api.perplexity.ai"
 
-    def __init__(self, api_key: str, model: str = "", **kwargs):
+    def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
         Initialize Perplexity provider.
 
@@ -324,7 +324,7 @@ class PerplexityProvider(BaseProvider):
             },
         }
 
-        config = model_configs.get(
+        config: Dict[str, Any] = model_configs.get(
             self.model,
             {
                 "description": f"Perplexity model {self.model}",
@@ -359,7 +359,7 @@ class PerplexityProvider(BaseProvider):
 
         return enhanced_info
 
-    def get_available_models(self) -> List[EnhancedModelInfo]:
+    def get_available_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get list of available Perplexity models.
         """
@@ -446,7 +446,7 @@ class PerplexityProvider(BaseProvider):
         for model in models:
             model.update_swe_rating()
 
-        return models
+        return models  # type: ignore[return-value]
 
     def supports_tools(self) -> bool:
         """

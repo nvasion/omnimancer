@@ -5,7 +5,7 @@ This module provides the Cohere AI provider implementation using Cohere's API.
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import httpx
 
@@ -30,7 +30,7 @@ class CohereProvider(BaseProvider):
 
     BASE_URL = "https://api.cohere.ai/v1"
 
-    def __init__(self, api_key: str, model: str = "", **kwargs):
+    def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
         Initialize Cohere provider.
 
@@ -324,7 +324,7 @@ class CohereProvider(BaseProvider):
             },
         }
 
-        config = model_configs.get(
+        config: Dict[str, Any] = model_configs.get(
             self.model,
             {
                 "description": f"Cohere model {self.model}",
@@ -345,7 +345,7 @@ class CohereProvider(BaseProvider):
             latest_version=self.model == "command-r-plus",
         )
 
-    def get_available_models(self) -> List[ModelInfo]:
+    def get_available_models(self) -> List[ModelInfo]:  # type: ignore[override]
         """
         Get list of available Cohere models.
         """

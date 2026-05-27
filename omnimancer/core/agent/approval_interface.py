@@ -37,7 +37,7 @@ class ApprovalInterface:
     diff visualization, and batch approval capabilities.
     """
 
-    def __init__(self, approval_manager: EnhancedApprovalManager):
+    def __init__(self, approval_manager: EnhancedApprovalManager) -> None:
         """
         Initialize approval interface.
 
@@ -401,7 +401,7 @@ class ApprovalInterface:
         operation: Operation,
         preview: ChangePreview,
         approval_request: Optional[ApprovalRequest] = None,
-    ):
+    ) -> None:
         """Show detailed view of operation and preview."""
         self._print_header("Detailed View")
 
@@ -460,7 +460,7 @@ class ApprovalInterface:
 
     def _print_operation_info(
         self, operation: Operation, risk_level: Optional[RiskLevel] = None
-    ):
+    ) -> None:
         """Print formatted operation information."""
         print(f"Operation: {operation.type.value.replace('_', ' ').title()}")
         print(f"Description: {operation.description}")
@@ -472,7 +472,7 @@ class ApprovalInterface:
         print(f"Reversible: {'Yes' if operation.reversible else 'No'}")
         print()
 
-    def _print_preview(self, preview: ChangePreview, compact: bool = False):
+    def _print_preview(self, preview: ChangePreview, compact: bool = False) -> None:
         """Print formatted preview information."""
         if compact:
             print(f"Preview: {preview.description}")
@@ -492,7 +492,7 @@ class ApprovalInterface:
                     print("    ... (use 'details' to see full diff)")
         print()
 
-    def _print_batch_summary(self, batch_request: BatchApprovalRequest):
+    def _print_batch_summary(self, batch_request: BatchApprovalRequest) -> None:
         """Print summary of batch request."""
         print(f"Total Operations: {len(batch_request.operations)}")
         print(f"Created: {batch_request.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -501,7 +501,7 @@ class ApprovalInterface:
             print(f"Expires: {batch_request.expires_at.strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Operation type breakdown
-        type_counts = {}
+        type_counts = {}  # type: ignore[var-annotated]
         for operation in batch_request.operations:
             type_counts[operation.type] = type_counts.get(operation.type, 0) + 1
 
@@ -510,7 +510,7 @@ class ApprovalInterface:
             print(f"  {op_type.value}: {count}")
 
         # Risk level breakdown
-        risk_counts = {}
+        risk_counts = {}  # type: ignore[var-annotated]
         for preview in batch_request.previews:
             if preview.risk_assessment:
                 # Extract risk level from assessment
@@ -534,7 +534,7 @@ class ApprovalInterface:
 
         print()
 
-    def _print_diff_line(self, line: str):
+    def _print_diff_line(self, line: str) -> None:
         """Print a diff line with appropriate coloring."""
         if not self.show_colors:
             print(line)
@@ -589,7 +589,7 @@ class ApprovalInterface:
         reset_code = colors["reset"]
         return f"{color_code}{text}{reset_code}"
 
-    def _print_header(self, title: str):
+    def _print_header(self, title: str) -> None:
         """Print formatted header."""
         print()
         print("=" * 60)
@@ -597,34 +597,34 @@ class ApprovalInterface:
         print("=" * 60)
         print()
 
-    def _print_separator(self):
+    def _print_separator(self) -> None:
         """Print separator line."""
         print("-" * 40)
 
-    def _print_success(self, message: str):
+    def _print_success(self, message: str) -> None:
         """Print success message."""
         print(self._colorize(message, "green"))
 
-    def _print_warning(self, message: str):
+    def _print_warning(self, message: str) -> None:
         """Print warning message."""
         print(self._colorize(message, "yellow"))
 
-    def _print_error(self, message: str):
+    def _print_error(self, message: str) -> None:
         """Print error message."""
         print(self._colorize(message, "red"))
 
-    def _print_info(self, message: str):
+    def _print_info(self, message: str) -> None:
         """Print info message."""
         print(self._colorize(message, "cyan"))
 
-    def set_colors_enabled(self, enabled: bool):
+    def set_colors_enabled(self, enabled: bool) -> None:
         """Enable or disable colored output."""
         self.show_colors = enabled
 
-    def set_auto_show_diff(self, enabled: bool):
+    def set_auto_show_diff(self, enabled: bool) -> None:
         """Enable or disable automatic diff display."""
         self.auto_show_diff = enabled
 
-    def set_max_diff_lines(self, max_lines: int):
+    def set_max_diff_lines(self, max_lines: int) -> None:
         """Set maximum number of diff lines to display."""
         self.max_diff_lines = max_lines

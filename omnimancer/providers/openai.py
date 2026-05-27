@@ -5,7 +5,7 @@ This module provides the OpenAI API provider implementation using OpenAI's API.
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import httpx
 
@@ -27,7 +27,7 @@ class OpenAIProvider(BaseProvider):
 
     BASE_URL = "https://api.openai.com/v1"
 
-    def __init__(self, api_key: str, model: str = "", **kwargs):
+    def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
         Initialize OpenAI provider.
 
@@ -314,7 +314,7 @@ class OpenAIProvider(BaseProvider):
             },
         }
 
-        config = model_configs.get(
+        config: Dict[str, Any] = model_configs.get(
             self.model,
             {
                 "description": f"OpenAI model {self.model}",
@@ -335,7 +335,7 @@ class OpenAIProvider(BaseProvider):
             latest_version=self.model == "gpt-4-turbo",
         )
 
-    def _get_static_models(self) -> List[ModelInfo]:
+    def _get_static_models(self) -> List[ModelInfo]:  # type: ignore[override]
         """
         Get static list of available OpenAI models.
         """
@@ -403,7 +403,7 @@ class OpenAIProvider(BaseProvider):
         vision_models = ["gpt-4-vision-preview", "gpt-4-turbo", "gpt-4o"]
         return any(model in self.model for model in vision_models)
 
-    async def fetch_live_models(self) -> List[ModelInfo]:
+    async def fetch_live_models(self) -> List[ModelInfo]:  # type: ignore[override]
         """
         Fetch live model list from OpenAI API.
 
@@ -466,4 +466,4 @@ class OpenAIProvider(BaseProvider):
 
         except Exception:
             # Fall back to static model list if API call fails
-            return self.get_available_models()
+            return self.get_available_models()  # type: ignore[return-value]
