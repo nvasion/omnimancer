@@ -21,7 +21,7 @@ from omnimancer.core.security import SecurityManager
 
 
 def create_mock_context_manager(response):
-    """Helper function to create a proper async context manager for mocking aiohttp responses."""
+    """Create a proper async context manager for mocking aiohttp."""
 
     class MockContextManager:
         def __init__(self, response):
@@ -187,8 +187,8 @@ class TestWebResponse:
             encoding="utf-8",
         )
 
-        assert response.is_success == True
-        assert response.is_text == True
+        assert response.is_success is True
+        assert response.is_text is True
         assert response.text == "<html>Test</html>"
 
     def test_web_response_binary(self):
@@ -203,8 +203,8 @@ class TestWebResponse:
             encoding="binary",
         )
 
-        assert response.is_success == True
-        assert response.is_text == False
+        assert response.is_success is True
+        assert response.is_text is False
         assert response.text == binary_content.decode("utf-8", errors="ignore")
 
     def test_web_response_json(self):
@@ -296,7 +296,7 @@ class TestResponseCache:
 
         assert cached is not None
         assert cached.content == response.content
-        assert cached.from_cache == True
+        assert cached.from_cache is True
 
     @pytest.mark.asyncio
     async def test_cache_expiration(self, temp_dir):
@@ -397,7 +397,7 @@ class TestWebClient:
 
         assert response.status == 200
         assert response.content == "<html>Success</html>"
-        assert response.is_success == True
+        assert response.is_success is True
 
     @patch("aiohttp.ClientSession")
     @pytest.mark.asyncio
@@ -473,11 +473,11 @@ class TestWebClient:
 
         # First request should hit the network
         response1 = await web_client.get("https://example.com")
-        assert response1.from_cache == False
+        assert response1.from_cache is False
 
         # Second request should come from cache
         response2 = await web_client.get("https://example.com")
-        assert response2.from_cache == True
+        assert response2.from_cache is True
         assert response2.content == response1.content
 
         # Should only have made one network request

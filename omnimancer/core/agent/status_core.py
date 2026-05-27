@@ -346,7 +346,8 @@ class EventListener:
         Initialize event listener.
 
         Args:
-            event_types: Set of event types to listen for. If None, listens to all events.
+            event_types: Set of event types to listen for.
+                If None, listens to all events.
         """
         self.event_types = event_types or set(EventType)
         self.active = True

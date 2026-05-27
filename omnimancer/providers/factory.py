@@ -5,7 +5,10 @@ This module provides a factory for creating AI provider instances
 based on configuration and provider type.
 """
 
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
+
+if TYPE_CHECKING:
+    from ..core.config_manager import ConfigManager
 
 from ..core.models import EnhancedModelInfo, ModelInfo, ProviderConfig
 from ..utils.errors import ConfigurationError
@@ -74,16 +77,23 @@ class ProviderFactory:
 
         if provider_name not in cls._cache_timestamps:
             return False
-        return (time.time() - cls._cache_timestamps[provider_name]) < cls._cache_ttl
+        elapsed = time.time() - cls._cache_timestamps[provider_name]
+        return elapsed < cls._cache_ttl
 
     @classmethod
     def _get_cached_provider_instance(
         cls, provider_name: str, config: ProviderConfig
     ) -> BaseProvider:
         """Get or create a cached provider instance."""
-        cache_key = f"{provider_name}:{config.model}:{hash(str(config.model_dump()))}"
+        config_hash = hash(str(config.model_dump()))
+        cache_key = (
+            f"{provider_name}:{config.model}:{config_hash}"
+        )
 
-        if cache_key in cls._provider_instances and cls._is_cache_valid(cache_key):
+        if (
+            cache_key in cls._provider_instances
+            and cls._is_cache_valid(cache_key)
+        ):
             return cls._provider_instances[cache_key]
 
         # Create new instance
@@ -106,14 +116,17 @@ class ProviderFactory:
         return instance
 
     @classmethod
-    def _get_cached_models(cls, provider_name: str, enhanced: bool = False) -> Union[List[ModelInfo], List[EnhancedModelInfo]]:
+    def _get_cached_models(
+        cls, provider_name: str, enhanced: bool = False
+    ) -> Union[List[ModelInfo], List[EnhancedModelInfo]]:
         """Get cached model information for a provider."""
         import time
 
-        cache_dict = cls._enhanced_model_cache if enhanced else cls._model_cache
-
-        if provider_name in cache_dict and cls._is_cache_valid(provider_name):  # type: ignore[operator]
-            return cache_dict[provider_name]  # type: ignore[index, no-any-return]
+        if cls._is_cache_valid(provider_name):
+            if enhanced and provider_name in cls._enhanced_model_cache:
+                return cls._enhanced_model_cache[provider_name]
+            elif not enhanced and provider_name in cls._model_cache:
+                return cls._model_cache[provider_name]
 
         # Cache miss - need to fetch models
         if provider_name not in cls._providers:
@@ -127,13 +140,17 @@ class ProviderFactory:
             if enhanced:
                 # Convert to EnhancedModelInfo if needed
                 enhanced_models: List[EnhancedModelInfo]
-                if raw_models and isinstance(raw_models[0], ModelInfo):
+                if raw_models and isinstance(
+                    raw_models[0], ModelInfo
+                ):
                     enhanced_models = [
-                        EnhancedModelInfo.from_model_info(model) for model in raw_models
+                        EnhancedModelInfo.from_model_info(model)
+                        for model in raw_models
                     ]
                 else:
                     enhanced_models = [
-                        EnhancedModelInfo.from_model_info(model) for model in raw_models
+                        EnhancedModelInfo.from_model_info(model)
+                        for model in raw_models
                     ]
                 cls._enhanced_model_cache[provider_name] = enhanced_models
                 cls._cache_timestamps[provider_name] = time.time()
@@ -141,10 +158,18 @@ class ProviderFactory:
             else:
                 # Convert to ModelInfo if needed
                 basic_models: List[ModelInfo]
-                if raw_models and isinstance(raw_models[0], EnhancedModelInfo):
-                    basic_models = [model.to_model_info() for model in raw_models]  # type: ignore[union-attr]
+                if raw_models and isinstance(
+                    raw_models[0], EnhancedModelInfo
+                ):
+                    basic_models = [
+                        m.to_model_info()
+                        for m in raw_models
+                        if isinstance(m, EnhancedModelInfo)
+                    ]
                 else:
-                    basic_models = raw_models  # type: ignore[assignment]
+                    basic_models = [
+                        m for m in raw_models if isinstance(m, ModelInfo)
+                    ]
                 cls._model_cache[provider_name] = basic_models
                 cls._cache_timestamps[provider_name] = time.time()
                 return basic_models
@@ -180,7 +205,7 @@ class ProviderFactory:
         cls,
         name: str,
         config: ProviderConfig,
-        config_manager: Optional["ConfigManager"] = None,  # type: ignore[name-defined]
+        config_manager: Optional["ConfigManager"] = None,
     ) -> BaseProvider:
         """
         Create a provider instance.
@@ -262,7 +287,8 @@ class ProviderFactory:
     @classmethod
     def get_all_enhanced_models(cls) -> Dict[str, List[EnhancedModelInfo]]:
         """
-        Get all available models with enhanced information from all registered providers.
+        Get all available models with enhanced information
+        from all registered providers.
 
         Returns:
             Dictionary mapping provider names to their enhanced model information
@@ -480,7 +506,11 @@ class ProviderFactory:
                 message = "Provider is working correctly"
             elif credentials_valid:
                 status = "warning"
-                message = f'Provider accessible but model "{config.model}" may not be available'
+                message = (
+                    "Provider accessible but model "
+                    f'"{config.model}" may not be '
+                    "available"
+                )
             else:
                 status = "error"
                 message = "Invalid credentials or provider not accessible"
@@ -563,7 +593,8 @@ class ProviderFactory:
                         if getattr(m, "supports_multimodal", False)
                     ]
                 elif capability == "streaming":
-                    # For streaming, check provider capability since it's not model-specific
+                    # For streaming, check provider capability
+                    # since it's not model-specific
                     if temp_provider.supports_streaming():
                         filtered_models = all_models
                     else:
@@ -585,7 +616,9 @@ class ProviderFactory:
         Get enhanced models that support a specific capability.
 
         Args:
-            capability: Capability to filter by ('tools', 'multimodal', 'streaming', 'latest', 'free')
+            capability: Capability to filter by
+                ('tools', 'multimodal', 'streaming',
+                'latest', 'free')
 
         Returns:
             Dictionary mapping provider names to enhanced models with the capability
@@ -605,9 +638,14 @@ class ProviderFactory:
                 if capability == "tools":
                     filtered_models = [m for m in enhanced_models if m.supports_tools]
                 elif capability == "multimodal":
-                    filtered_models = [m for m in enhanced_models if m.supports_multimodal]
+                    filtered_models = [
+                        m
+                        for m in enhanced_models
+                        if m.supports_multimodal
+                    ]
                 elif capability == "streaming":
-                    # For streaming, check provider capability since it's not model-specific
+                    # For streaming, check provider capability
+                    # since it's not model-specific
                     if temp_provider.supports_streaming():
                         filtered_models = enhanced_models
                     else:

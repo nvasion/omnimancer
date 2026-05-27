@@ -68,7 +68,10 @@ class HistoryEntry:
         return self.command
 
     def __repr__(self) -> str:
-        return f"HistoryEntry(command='{self.command[:50]}...', timestamp={self.timestamp})"
+        return (
+            f"HistoryEntry(command='{self.command[:50]}...',"
+            f" timestamp={self.timestamp})"
+        )
 
 
 class HistoryManager:
@@ -365,7 +368,7 @@ class HistoryManager:
 
             elif format.lower() == "txt":
                 with open(export_path, "w") as f:
-                    f.write(f"# Omnimancer Command History Export\n")
+                    f.write("# Omnimancer Command History Export\n")
                     f.write(f"# Exported at: {datetime.now().isoformat()}\n")
                     f.write(f"# Session ID: {self.session_id}\n\n")
 

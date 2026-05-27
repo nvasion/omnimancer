@@ -61,9 +61,18 @@ class HeadlessOutputEmitter:
 
     def emit_init(self, model: str) -> None:
         if self._format == OutputFormat.STREAM_JSON:
-            self._write_json_line({"type": "system", "subtype": "init", "model": model})
+            self._write_json_line({
+                "type": "system",
+                "subtype": "init",
+                "model": model,
+            })
 
-    def emit_assistant(self, content: str, model: str, stop_reason: Optional[str]) -> None:
+    def emit_assistant(
+        self,
+        content: str,
+        model: str,
+        stop_reason: Optional[str],
+    ) -> None:
         self._last_content = content
         if self._format == OutputFormat.TEXT:
             self._stdout.write(content + "\n")
@@ -71,12 +80,21 @@ class HeadlessOutputEmitter:
         elif self._format == OutputFormat.STREAM_JSON:
             self._write_json_line({
                 "type": "assistant",
-                "message": {"model": model, "content": content, "stop_reason": stop_reason},
+                "message": {
+                    "model": model,
+                    "content": content,
+                    "stop_reason": stop_reason,
+                },
             })
 
-    def emit_tool_use(self, name: str, arguments: dict) -> None:
+    def emit_tool_use(
+        self, name: str, arguments: dict,
+    ) -> None:
         if self._format == OutputFormat.TEXT and self._verbose:
-            self._stdout.write(f"[tool] {name} {json.dumps(arguments)}\n")
+            args_json = json.dumps(arguments)
+            self._stdout.write(
+                f"[tool] {name} {args_json}\n"
+            )
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
             self._write_json_line({
@@ -84,7 +102,12 @@ class HeadlessOutputEmitter:
                 "tool": {"name": name, "arguments": arguments},
             })
 
-    def emit_tool_result(self, name: str, content: str, error: Optional[str]) -> None:
+    def emit_tool_result(
+        self,
+        name: str,
+        content: str,
+        error: Optional[str],
+    ) -> None:
         if self._format == OutputFormat.TEXT and self._verbose:
             status = f"error: {error}" if error else "ok"
             self._stdout.write(f"[result] {name}: {status}\n")
@@ -92,10 +115,21 @@ class HeadlessOutputEmitter:
         elif self._format == OutputFormat.STREAM_JSON:
             self._write_json_line({
                 "type": "tool_result",
-                "tool": {"name": name, "content": content, "error": error},
+                "tool": {
+                    "name": name,
+                    "content": content,
+                    "error": error,
+                },
             })
 
-    def emit_result(self, content: str, model: str, usage: dict, cost: float, stop_reason: Optional[str]) -> None:
+    def emit_result(
+        self,
+        content: str,
+        model: str,
+        usage: dict,
+        cost: float,
+        stop_reason: Optional[str],
+    ) -> None:
         if self._format == OutputFormat.TEXT:
             if content != self._last_content:
                 self._stdout.write(content + "\n")
@@ -166,7 +200,9 @@ class HeadlessRunner:
         last_stop_reason = "end_turn"
 
         for iteration in range(MAX_TOOL_ITERATIONS):
-            response = await self._engine.send_message_with_tools(current_message, tools)
+            response = await self._engine.send_message_with_tools(
+                current_message, tools
+            )
             self._tokens.add(response)
 
             if not response.is_success:
@@ -178,7 +214,11 @@ class HeadlessRunner:
 
             if response.content:
                 last_content = response.content
-                self._emitter.emit_assistant(response.content, last_model, last_stop_reason)
+                self._emitter.emit_assistant(
+                    response.content,
+                    last_model,
+                    last_stop_reason,
+                )
 
             if not response.tool_calls:
                 break
@@ -187,8 +227,14 @@ class HeadlessRunner:
             for tc in response.tool_calls:
                 self._emitter.emit_tool_use(tc.name, tc.arguments)
 
-                result = await tool_handler.execute_tool_call(tc)
-                self._emitter.emit_tool_result(tc.name, result.content or "", result.error)
+                result = await tool_handler.execute_tool_call(
+                    tc
+                )
+                self._emitter.emit_tool_result(
+                    tc.name,
+                    result.content or "",
+                    result.error,
+                )
 
                 if result.error:
                     result_parts.append(f"[{tc.name}] Error: {result.error}")

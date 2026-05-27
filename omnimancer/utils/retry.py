@@ -165,7 +165,9 @@ class RetryHandler:
         )
         raise last_exception  # type: ignore[misc]
 
-    def execute_sync_with_retry(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    def execute_sync_with_retry(
+        self, func: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> Any:
         """
         Execute a synchronous function with retry logic.
 

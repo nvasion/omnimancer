@@ -2,7 +2,7 @@
 Test that approval handler properly creates ChangePreview objects from Operations.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -44,7 +44,7 @@ async def test_handle_single_approval_creates_change_preview():
 
     # Get the arguments passed to prompt_for_approval
     call_args = mock_prompt_handler.prompt_for_approval.call_args
-    approval_request = call_args[0][0]
+    call_args[0][0]
     change_preview = call_args[0][1]
 
     # Verify change_preview is a ChangePreview object, not a string
@@ -76,7 +76,8 @@ async def test_handle_single_approval_maps_operation_types():
 
     # Test cases mapping OperationType to expected ChangeType
     test_cases = [
-        (OperationType.FILE_READ, ChangeType.FILE_MODIFY),  # No FILE_READ in ChangeType
+        # No FILE_READ in ChangeType, maps to FILE_MODIFY
+        (OperationType.FILE_READ, ChangeType.FILE_MODIFY),
         (OperationType.FILE_WRITE, ChangeType.FILE_MODIFY),  # Maps to FILE_MODIFY
         (OperationType.FILE_DELETE, ChangeType.FILE_DELETE),
         (OperationType.DIRECTORY_CREATE, ChangeType.DIRECTORY_CREATE),
@@ -104,14 +105,19 @@ async def test_handle_single_approval_maps_operation_types():
         change_preview = call_args[0][1]
 
         # Verify change_type matches expected
+        msg = (
+            f"Failed for {operation_type.value}: "
+            f"expected {expected_change_type.value}, "
+            f"got {change_preview.change_type.value}"
+        )
         assert (
             change_preview.change_type == expected_change_type
-        ), f"Failed for {operation_type.value}: expected {expected_change_type.value}, got {change_preview.change_type.value}"
+        ), msg
 
 
 @pytest.mark.asyncio
 async def test_approval_formatter_receives_valid_preview():
-    """Test that approval formatter receives a ChangePreview object with change_type attribute."""
+    """Test approval formatter receives a ChangePreview with change_type."""
     from omnimancer.cli.approval_formatter import CLIApprovalFormatter
     from omnimancer.core.security.approval_workflow import ApprovalRequest, RiskLevel
 

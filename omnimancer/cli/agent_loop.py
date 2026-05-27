@@ -35,7 +35,11 @@ class AgentLoopMixin:
     async def _execute_continuous_workflow(
         self, original_message: str, initial_response: Any
     ) -> None:
-        """Execute a continuous workflow, sending AI responses back for more actions until complete."""
+        """Execute a continuous workflow.
+
+        Sends AI responses back for more actions
+        until complete.
+        """
         current_response = initial_response
 
         while True:
@@ -85,7 +89,13 @@ class AgentLoopMixin:
                 )
                 break
 
-            continue_message = f"I executed the operations. Here are the results:\n\n{executed_response}\n\nWhat should I do next to complete the task: {original_message}"
+            continue_message = (
+                "I executed the operations."
+                " Here are the results:\n\n"
+                f"{executed_response}\n\n"
+                "What should I do next to complete"
+                f" the task: {original_message}"
+            )
 
             try:
                 next_response = await self.engine.send_message(continue_message)
@@ -93,7 +103,10 @@ class AgentLoopMixin:
                 break
 
             if not next_response.is_success:
-                self._show_error(f"Workflow continuation failed: {next_response.error}")
+                self._show_error(
+                    "Workflow continuation failed:"
+                    f" {next_response.error}"
+                )
                 break
 
             done_indicators = [
@@ -124,20 +137,32 @@ class AgentLoopMixin:
             return False
 
         action_verbs = [
-            "analyze", "check", "review", "examine", "look at", "inspect",
-            "fix", "repair", "solve", "resolve", "debug", "troubleshoot",
-            "create", "make", "build", "generate", "write", "add",
-            "update", "modify", "change", "edit", "improve", "optimize",
-            "delete", "remove", "clean", "cleanup", "refactor",
+            "analyze", "check", "review", "examine",
+            "look at", "inspect",
+            "fix", "repair", "solve", "resolve",
+            "debug", "troubleshoot",
+            "create", "make", "build", "generate",
+            "write", "add",
+            "update", "modify", "change", "edit",
+            "improve", "optimize",
+            "delete", "remove", "clean", "cleanup",
+            "refactor",
             "install", "setup", "configure", "deploy",
             "run", "execute", "test", "validate", "verify",
             "scan", "find", "search",
-            "help me", "can you", "could you", "would you", "please",
-            "implement", "develop", "code", "program", "script",
+            "help me", "can you", "could you",
+            "would you", "please",
+            "implement", "develop", "code",
+            "program", "script",
         ]
 
-        imperative_patterns = [normalized.startswith(verb) for verb in action_verbs]
-        contains_action_verb = any(verb in normalized for verb in action_verbs)
+        imperative_patterns = [
+            normalized.startswith(verb)
+            for verb in action_verbs
+        ]
+        contains_action_verb = any(
+            verb in normalized for verb in action_verbs
+        )
 
         question_patterns = [
             "how do i", "how can i", "what should i",
@@ -148,14 +173,19 @@ class AgentLoopMixin:
         )
 
         is_action = (
-            any(imperative_patterns) or contains_action_verb or contains_action_question
+            any(imperative_patterns)
+            or contains_action_verb
+            or contains_action_question
         )
 
         pure_question_starters = [
             "what is", "what are", "who is", "who are",
             "when is", "when was", "where is", "why",
         ]
-        is_pure_question = any(normalized.startswith(q) for q in pure_question_starters)
+        is_pure_question = any(
+            normalized.startswith(q)
+            for q in pure_question_starters
+        )
 
         return is_action and not is_pure_question
 
@@ -211,15 +241,21 @@ class AgentLoopMixin:
                         operation
                     )
                     if result.success:
-                        updated_response = updated_response.replace(
-                            match.group(0),
-                            f"✅ Successfully created file '{filename}' ({len(content)} characters)",
+                        msg = (
+                            "✅ Successfully created file"
+                            f" '{filename}'"
+                            f" ({len(content)} characters)"
+                        )
+                        updated_response = (
+                            updated_response.replace(
+                                match.group(0), msg,
+                            )
                         )
                     else:
                         if result.was_cancelled:
                             updated_response = updated_response.replace(
                                 match.group(0),
-                                f"🚫 Agent workflow cancelled by user",
+                                "🚫 Agent workflow cancelled by user",
                             )
                             return updated_response + "\n\n__WORKFLOW_CANCELLED__"
                         else:
@@ -231,14 +267,25 @@ class AgentLoopMixin:
                     try:
                         with open(filename, "w") as f:
                             f.write(content)
-                        updated_response = updated_response.replace(
-                            match.group(0),
-                            f"✅ Successfully created file '{filename}' ({len(content)} characters)",
+                        msg = (
+                            "✅ Successfully created file"
+                            f" '{filename}'"
+                            f" ({len(content)} characters)"
+                        )
+                        updated_response = (
+                            updated_response.replace(
+                                match.group(0), msg,
+                            )
                         )
                     except Exception as e:
-                        updated_response = updated_response.replace(
-                            match.group(0),
-                            f"❌ Failed to create file '{filename}': {str(e)}",
+                        msg = (
+                            "❌ Failed to create file"
+                            f" '{filename}': {str(e)}"
+                        )
+                        updated_response = (
+                            updated_response.replace(
+                                match.group(0), msg,
+                            )
                         )
 
             # FILE_READ
@@ -444,11 +491,17 @@ class AgentLoopMixin:
                 else:
                     updated_response = updated_response.replace(
                         match.group(0),
-                        f"❌ '{cmd_base}' is not a safe command. Use [COMMAND_EXEC] for approval workflow.",
+                        f"❌ '{cmd_base}' is not a safe"
+                        " command. Use [COMMAND_EXEC]"
+                        " for approval workflow.",
                     )
 
             # COMMAND_EXEC
-            command_pattern = r"(?:<!--(read-only|modifies-system)-->\s*)?\[COMMAND_EXEC\](.*?)\[/COMMAND_EXEC\]"
+            command_pattern = (
+                r"(?:<!--(read-only|modifies-system)-->"
+                r"\s*)?\[COMMAND_EXEC\](.*?)"
+                r"\[/COMMAND_EXEC\]"
+            )
             for match in re.finditer(command_pattern, response_content, re.DOTALL):
                 metadata = match.group(1)
                 command = match.group(2).strip()
@@ -460,7 +513,9 @@ class AgentLoopMixin:
                 if not agent_engine:
                     updated_response = updated_response.replace(
                         match.group(0),
-                        f"❌ Agent engine not available - command execution disabled for security",
+                        "❌ Agent engine not available"
+                        " - command execution disabled"
+                        " for security",
                     )
                     continue
 
@@ -487,9 +542,16 @@ class AgentLoopMixin:
                             "not approved" in result.error.lower()
                             or "denied" in result.error.lower()
                         ):
-                            updated_response = updated_response.replace(
-                                match.group(0),
-                                f"❌ Command denied: `{command}`\nReason: {result.error}",
+                            deny_msg = (
+                                "❌ Command denied:"
+                                f" `{command}`\nReason:"
+                                f" {result.error}"
+                            )
+                            updated_response = (
+                                updated_response.replace(
+                                    match.group(0),
+                                    deny_msg,
+                                )
                             )
                         else:
                             output = (
@@ -505,7 +567,7 @@ class AgentLoopMixin:
                         if result.was_cancelled:
                             updated_response = updated_response.replace(
                                 match.group(0),
-                                f"🚫 Agent workflow cancelled by user",
+                                "🚫 Agent workflow cancelled by user",
                             )
                             return updated_response + "\n\n__WORKFLOW_CANCELLED__"
                         else:

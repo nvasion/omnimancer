@@ -247,7 +247,7 @@ class TestPersistentState:
         )
 
         # Verify settings were loaded
-        assert new_manager.settings.auto_approve_low_risk == True
+        assert new_manager.settings.auto_approve_low_risk is True
 
         # Verify state file exists
         state_file = Path(temp_storage) / "agent_state.json"

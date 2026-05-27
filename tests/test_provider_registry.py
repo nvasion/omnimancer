@@ -7,14 +7,14 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "."))
 
 
-from omnimancer.core.models import (
+from omnimancer.core.models import (  # noqa: E402
     ChatContext,
     ChatResponse,
     EnhancedModelInfo,
     ModelInfo,
 )
-from omnimancer.core.provider_registry import ProviderRegistry
-from omnimancer.providers.base import BaseProvider
+from omnimancer.core.provider_registry import ProviderRegistry  # noqa: E402
+from omnimancer.providers.base import BaseProvider  # noqa: E402
 
 
 class MockProvider(BaseProvider):
@@ -175,7 +175,7 @@ def test_provider_registry():
     # Test provider summary
     summary = registry.get_provider_summary("mock")
     assert summary["name"] == "mock"
-    assert summary["registered"] == True
+    assert summary["registered"] is True
     assert summary["total_models"] == 3
     assert summary["available_models"] == 3
     assert summary["tool_capable_models"] == 1
@@ -187,9 +187,9 @@ def test_provider_registry():
     assert len(errors) == 0  # Should be no errors
 
     # Test unregistration
-    assert registry.unregister_provider("mock") == True
+    assert registry.unregister_provider("mock") is True
     assert not registry.is_provider_registered("mock")
-    assert registry.unregister_provider("nonexistent") == False
+    assert registry.unregister_provider("nonexistent") is False
 
     # Test string representations
     registry.register_provider("mock", MockProvider)

@@ -1,8 +1,9 @@
 """
 AWS Bedrock provider implementation for Omnimancer.
 
-This module provides the AWS Bedrock provider implementation using AWS Bedrock's Converse API
-with support for Claude models, API key authentication, and region configuration.
+This module provides the AWS Bedrock provider implementation
+using AWS Bedrock's Converse API with support for Claude models,
+API key authentication, and region configuration.
 """
 
 import json
@@ -43,8 +44,10 @@ class BedrockProvider(BaseProvider):
 
         Args:
             api_key: AWS Bedrock API key (30-day key from AWS console)
-            model: Bedrock model ID or ARN to use (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0'
-                   or 'arn:aws:bedrock:us-west-2::foundation-model/meta.llama4-maverick-17b-instruct-v1:0')
+            model: Bedrock model ID or ARN to use
+                (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0'
+                or an ARN like
+                'arn:aws:bedrock:us-west-2::foundation-model/...')
             **kwargs: Additional configuration including region settings
         """
         # Validate API key is provided
@@ -55,8 +58,10 @@ class BedrockProvider(BaseProvider):
         if not model:
             raise ValueError(
                 "Model ID is required for AWS Bedrock provider. "
-                "Use a model ID (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0') "
-                "or inference profile (e.g., 'us.anthropic.claude-3-sonnet-20240229-v1:0')"
+                "Use a model ID (e.g., "
+                "'anthropic.claude-3-sonnet-20240229-v1:0') "
+                "or inference profile (e.g., "
+                "'us.anthropic.claude-3-sonnet-20240229-v1:0')"
             )
 
         super().__init__(api_key, model, **kwargs)
@@ -71,7 +76,9 @@ class BedrockProvider(BaseProvider):
         self.top_k = kwargs.get("top_k", 250)
 
         # Build base URL for Bedrock API key authentication
-        self.base_url = f"https://bedrock-runtime.{self.aws_region}.amazonaws.com"
+        self.base_url = (
+            f"https://bedrock-runtime.{self.aws_region}.amazonaws.com"
+        )
 
     def _is_arn(self, model_id: str) -> bool:
         """Check if the model ID is in ARN format."""
@@ -106,9 +113,12 @@ class BedrockProvider(BaseProvider):
             return {
                 "success": False,
                 "message": error_message,
-                "suggestion": f"Try using ARN format to specify the exact region. Suggestions:\n"
-                f"  Foundation model: {foundation_arn}\n"
-                f"  Inference profile: {inference_arn}",
+                "suggestion": (
+                    "Try using ARN format to specify "
+                    "the exact region. Suggestions:\n"
+                    f"  Foundation model: {foundation_arn}\n"
+                    f"  Inference profile: {inference_arn}"
+                ),
                 "suggested_arns": {
                     "foundation_model": foundation_arn,
                     "inference_profile": inference_arn,
@@ -179,13 +189,21 @@ class BedrockProvider(BaseProvider):
                 message, context, available_tools
             )
 
-            # Build URL for the specific model - use appropriate endpoint based on model format
+            # Build URL - use appropriate endpoint based on model format
             if self._is_arn(self.model):
                 # For ARN format, extract the actual model ID for the URL
-                model_for_url = self._extract_model_id_from_arn(self.model)
-                url = f"{self.base_url}/model/{model_for_url}/converse"
+                model_for_url = (
+                    self._extract_model_id_from_arn(self.model)
+                )
+                url = (
+                    f"{self.base_url}/model"
+                    f"/{model_for_url}/converse"
+                )
             else:
-                url = f"{self.base_url}/model/{self.model}/converse"
+                url = (
+                    f"{self.base_url}/model"
+                    f"/{self.model}/converse"
+                )
 
             # Create headers with Bearer token authentication
             headers = {
@@ -196,7 +214,10 @@ class BedrockProvider(BaseProvider):
             # Make API request
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    url, headers=headers, content=request_body, timeout=30.0
+                    url,
+                    headers=headers,
+                    content=request_body,
+                    timeout=30.0,
                 )
 
             # Handle response with tool calls
@@ -218,7 +239,10 @@ class BedrockProvider(BaseProvider):
         """
         try:
             # Test API key by listing foundation models (not model-specific)
-            url = f"https://bedrock.{self.aws_region}.amazonaws.com/foundation-models"
+            url = (
+                f"https://bedrock.{self.aws_region}"
+                ".amazonaws.com/foundation-models"
+            )
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
@@ -253,12 +277,20 @@ class BedrockProvider(BaseProvider):
 
             test_body = json.dumps(test_request)
 
-            # Build URL for validation - use appropriate endpoint based on model format
+            # Build URL for validation
             if self._is_arn(self.model):
-                model_for_url = self._extract_model_id_from_arn(self.model)
-                url = f"{self.base_url}/model/{model_for_url}/converse"
+                model_for_url = (
+                    self._extract_model_id_from_arn(self.model)
+                )
+                url = (
+                    f"{self.base_url}/model"
+                    f"/{model_for_url}/converse"
+                )
             else:
-                url = f"{self.base_url}/model/{self.model}/converse"
+                url = (
+                    f"{self.base_url}/model"
+                    f"/{self.model}/converse"
+                )
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -282,14 +314,21 @@ class BedrockProvider(BaseProvider):
                         "message", error_data.get("Message", "Unknown error")
                     )
 
-                    # Parse different error types and provide intelligent suggestions
-                    if "not authorized" in error_msg or "explicit deny" in error_msg:
+                    # Parse different error types
+                    if (
+                        "not authorized" in error_msg
+                        or "explicit deny" in error_msg
+                    ):
                         return self._suggest_arn_conversion(
                             self.model,
-                            f"Access denied to model {self.model}. This may be due to SCP restrictions or regional access issues.",
+                            f"Access denied to model "
+                            f"{self.model}. This may be "
+                            "due to SCP restrictions or "
+                            "regional access issues.",
                         )
                     elif (
-                        "not supported" in error_msg or "inference profile" in error_msg
+                        "not supported" in error_msg
+                        or "inference profile" in error_msg
                     ):
                         if not self._is_arn(self.model):
                             # Suggest ARN format for inference profile access
@@ -304,28 +343,51 @@ class BedrockProvider(BaseProvider):
                             )
                             return {
                                 "success": False,
-                                "message": f"Model {self.model} requires inference profile access",
-                                "suggestion": f"Try using inference profile ARN: {inference_arn}",
+                                "message": (
+                                    f"Model {self.model} "
+                                    "requires inference "
+                                    "profile access"
+                                ),
+                                "suggestion": (
+                                    "Try using inference "
+                                    "profile ARN: "
+                                    f"{inference_arn}"
+                                ),
                             }
                         else:
                             return {
                                 "success": False,
-                                "message": f"Model {self.model} requires inference profile access",
-                                "suggestion": "Some models require using inference profiles instead of direct model IDs.",
+                                "message": (
+                                    f"Model {self.model} "
+                                    "requires inference "
+                                    "profile access"
+                                ),
+                                "suggestion": (
+                                    "Some models require "
+                                    "using inference profiles"
+                                    " instead of direct "
+                                    "model IDs."
+                                ),
                             }
                     elif "don't have access" in error_msg:
                         return self._suggest_arn_conversion(
                             self.model,
-                            f"No access to model {self.model}. You may need to request access in the AWS Bedrock console.",
+                            f"No access to model {self.model}."
+                            " You may need to request "
+                            "access in the AWS Bedrock "
+                            "console.",
                         )
                     else:
                         return self._suggest_arn_conversion(
                             self.model, f"Model test failed: {error_msg}"
                         )
-                except:
+                except Exception:
                     return {
                         "success": False,
-                        "message": f"Model test failed with HTTP {response.status_code}",
+                        "message": (
+                            "Model test failed with "
+                            f"HTTP {response.status_code}"
+                        ),
                     }
 
         except Exception as e:
@@ -408,7 +470,10 @@ class BedrockProvider(BaseProvider):
         # Add tools in Bedrock Converse format
         if tools:
             request_data["toolConfig"] = {
-                "tools": [self._convert_tool_to_bedrock_format(tool) for tool in tools]
+                "tools": [
+                    self._convert_tool_to_bedrock_format(tool)
+                    for tool in tools
+                ]
             }
 
         return json.dumps(request_data)
@@ -464,7 +529,10 @@ class BedrockProvider(BaseProvider):
                 else:
                     raise ProviderError("Empty content in Bedrock response")
             else:
-                raise ProviderError("Invalid response format from Bedrock Converse API")
+                raise ProviderError(
+                    "Invalid response format from "
+                    "Bedrock Converse API"
+                )
 
         elif response.status_code == 401:
             raise AuthenticationError("Invalid API key for Bedrock")
@@ -482,8 +550,16 @@ class BedrockProvider(BaseProvider):
                 error_code = error_data.get("__type", error_data.get("code", ""))
                 if error_code:
                     error_msg = f"{error_code}: {error_msg}"
-            except:
-                error_msg = f"HTTP {response.status_code}: {response.text[:200] if response.text else 'No response body'}"
+            except Exception:
+                resp_text = (
+                    response.text[:200]
+                    if response.text
+                    else "No response body"
+                )
+                error_msg = (
+                    f"HTTP {response.status_code}: "
+                    f"{resp_text}"
+                )
 
             raise ProviderError(f"AWS Bedrock API error: {error_msg}")
 
@@ -528,7 +604,10 @@ class BedrockProvider(BaseProvider):
                     timestamp=datetime.now(),
                 )
             else:
-                raise ProviderError("Invalid response format from Bedrock Converse API")
+                raise ProviderError(
+                    "Invalid response format from "
+                    "Bedrock Converse API"
+                )
         else:
             return self._handle_response(response)
 
@@ -565,7 +644,7 @@ class BedrockProvider(BaseProvider):
                 "supports_multimodal": True,
             },
             "anthropic.claude-3-5-sonnet-20241022-v2:0": {
-                "description": "Claude 3.5 Sonnet on AWS Bedrock - Latest and most capable",
+                "description": "Claude 3.5 Sonnet on AWS Bedrock - Latest",
                 "max_tokens": 200000,
                 "cost_per_million_input": 3.0,
                 "cost_per_million_output": 15.0,
@@ -618,7 +697,7 @@ class BedrockProvider(BaseProvider):
             EnhancedModelInfo(
                 name="anthropic.claude-3-5-sonnet-20241022-v2:0",
                 provider="bedrock",
-                description="Claude 3.5 Sonnet on AWS Bedrock - Latest and most capable",
+                description="Claude 3.5 Sonnet on AWS Bedrock - Latest",
                 max_tokens=200000,
                 cost_per_million_input=3.0,
                 cost_per_million_output=15.0,

@@ -13,7 +13,7 @@ import pytest
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from omnimancer.core.agent.program_executor import (
+from omnimancer.core.agent.program_executor import (  # noqa: E402
     CommandCategory,
     CommandResult,
     CommandValidator,
@@ -23,8 +23,11 @@ from omnimancer.core.agent.program_executor import (
     SecurityError,
     StreamingExecutor,
 )
-from omnimancer.core.security.approval_workflow import ApprovalWorkflow, RiskLevel
-from omnimancer.core.security.sandbox_manager import SandboxManager
+from omnimancer.core.security.approval_workflow import (  # noqa: E402
+    ApprovalWorkflow,
+    RiskLevel,
+)
+from omnimancer.core.security.sandbox_manager import SandboxManager  # noqa: E402
 
 
 @pytest.fixture
@@ -334,7 +337,9 @@ class TestEnhancedProgramExecutor:
         )
 
         # Use a write command (git commit requires approval, git status does not)
-        result = await program_executor.execute_command("git", ["commit", "-m", "test"], config)
+        result = await program_executor.execute_command(
+            "git", ["commit", "-m", "test"], config
+        )
 
         assert result.success is False
         assert "denied" in result.error_message.lower()

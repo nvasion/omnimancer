@@ -308,7 +308,7 @@ class ConversationManager:
         export_path = self.conversations_dir / f"{base_name}.txt"
 
         with open(export_path, "w", encoding="utf-8") as f:
-            f.write(f"Omnimancer Conversation Export\n")
+            f.write("Omnimancer Conversation Export\n")
             f.write(f"Session ID: {context.session_id}\n")
             f.write(f"Model: {context.current_model}\n")
             f.write(f"Messages: {len(context.messages)}\n")
@@ -329,7 +329,7 @@ class ConversationManager:
         export_path = self.conversations_dir / f"{base_name}.md"
 
         with open(export_path, "w", encoding="utf-8") as f:
-            f.write(f"# Omnimancer Conversation\n\n")
+            f.write("# Omnimancer Conversation\n\n")
             f.write(f"**Session ID:** {context.session_id}\n")
             f.write(f"**Model:** {context.current_model}\n")
             f.write(f"**Messages:** {len(context.messages)}\n\n")

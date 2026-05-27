@@ -223,7 +223,7 @@ class ErrorHandler:
         self._record_error(error, server_name or "unknown", "mcp")
 
         if isinstance(error, MCPConnectionError):
-            error_msg = f"Failed to connect to MCP server"
+            error_msg = "Failed to connect to MCP server"
             if server_name:
                 error_msg += f": {server_name}"
 
@@ -240,7 +240,7 @@ class ErrorHandler:
                 suggestions.append(error.retry_suggestion)
 
         elif isinstance(error, MCPTimeoutError):
-            error_msg = f"MCP server operation timed out"
+            error_msg = "MCP server operation timed out"
             if server_name:
                 error_msg += f" on {server_name}"
 
@@ -257,7 +257,7 @@ class ErrorHandler:
                 suggestions.append(f"Operation '{error.operation}' timed out")
 
         elif isinstance(error, MCPServerError):
-            error_msg = f"MCP server error"
+            error_msg = "MCP server error"
             if server_name:
                 error_msg += f" on {server_name}"
 
@@ -302,7 +302,8 @@ class ErrorHandler:
         Args:
             failed_provider: Name of the provider that failed
             available_providers: List of available providers
-            required_capabilities: List of required capabilities (e.g., 'tools', 'multimodal')
+            required_capabilities: List of required capabilities
+                (e.g., 'tools', 'multimodal')
 
         Returns:
             Dictionary with degradation options
@@ -460,7 +461,12 @@ class ErrorHandler:
             "most_recent_error": recent_errors[-1] if recent_errors else None,
         }
 
-    def _record_error(self, error: Exception, component_name: str, component_type: str) -> None:
+    def _record_error(
+        self,
+        error: Exception,
+        component_name: str,
+        component_type: str,
+    ) -> None:
         """Record an error in the error history."""
         error_record = {
             "timestamp": datetime.now(),
@@ -562,7 +568,9 @@ error_handler = ErrorHandler()
 
 
 def handle_provider_error(
-    error: Exception, provider_name: str, available_providers: Optional[List[str]] = None
+    error: Exception,
+    provider_name: str,
+    available_providers: Optional[List[str]] = None,
 ) -> Tuple[str, List[str], bool]:
     """Convenience function for handling provider errors."""
     return error_handler.handle_provider_error(
@@ -579,7 +587,11 @@ def handle_mcp_error(
     return error_handler.handle_mcp_error(error, server_name, available_servers)
 
 
-def should_retry_operation(error: Exception, attempt_count: int, max_attempts: int = 3) -> Tuple[bool, float]:
+def should_retry_operation(
+    error: Exception,
+    attempt_count: int,
+    max_attempts: int = 3,
+) -> Tuple[bool, float]:
     """Convenience function for retry logic."""
     return error_handler.should_retry_operation(error, attempt_count, max_attempts)
 

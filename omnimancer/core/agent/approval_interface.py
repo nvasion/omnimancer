@@ -61,7 +61,8 @@ class ApprovalInterface:
         Handle approval request for a single operation.
 
         Args:
-            approval_data: Dictionary containing operation, preview, and approval request
+            approval_data: Dictionary containing operation,
+                preview, and approval request
 
         Returns:
             Tuple of (approved: bool, was_cancelled: bool)
@@ -215,7 +216,7 @@ class ApprovalInterface:
                 elif choice == ApprovalChoice.APPROVE_ALL:
                     # Approve remaining operations
                     approved_indices.extend(range(i, len(batch_request.operations)))
-                    self._print_success(f"✓ Approved all remaining operations")
+                    self._print_success("✓ Approved all remaining operations")
                     return {"approved_indices": approved_indices}
                 elif choice == ApprovalChoice.DENY_ALL:
                     self._print_warning("✗ Denied all remaining operations")
@@ -467,7 +468,10 @@ class ApprovalInterface:
 
         if risk_level:
             risk_color = self._get_risk_color(risk_level)
-            print(f"Risk Level: {self._colorize(risk_level.value.upper(), risk_color)}")
+            risk_text = self._colorize(
+                risk_level.value.upper(), risk_color
+            )
+            print(f"Risk Level: {risk_text}")
 
         print(f"Reversible: {'Yes' if operation.reversible else 'No'}")
         print()

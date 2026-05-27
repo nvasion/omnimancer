@@ -135,7 +135,9 @@ class ChangePreview:
 
         if self.risk_assessment:
             html_parts.append(
-                f"<p><strong>Risk:</strong> <span class='risk'>{self.risk_assessment}</span></p>"
+                "<p><strong>Risk:</strong> "
+                f"<span class='risk'>"
+                f"{self.risk_assessment}</span></p>"
             )
 
         html_parts.append(
@@ -176,7 +178,9 @@ class BatchApprovalRequest:
 
     def is_expired(self) -> bool:
         """Check if the batch request has expired."""
-        return self.expires_at and datetime.now() > self.expires_at  # type: ignore[return-value]
+        return bool(
+            self.expires_at and datetime.now() > self.expires_at
+        )
 
     def get_approval_summary(self) -> Dict[str, Any]:
         """Get summary of approval status."""
@@ -360,7 +364,10 @@ class EnhancedApprovalManager:
         batch_request = BatchApprovalRequest(
             operations=operations,
             previews=previews,
-            expires_at=datetime.now() + timedelta(minutes=self.default_timeout_minutes),
+            expires_at=(
+                datetime.now()
+                + timedelta(minutes=self.default_timeout_minutes)
+            ),
         )
 
         self.pending_batches[batch_request.id] = batch_request

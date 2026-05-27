@@ -18,17 +18,17 @@ from typing import List
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-import pytest
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import (
+import pytest  # noqa: E402
+from rich.console import Console  # noqa: E402
+from rich.panel import Panel  # noqa: E402
+from rich.progress import (  # noqa: E402
     BarColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
     TimeElapsedColumn,
 )
-from rich.table import Table
+from rich.table import Table  # noqa: E402
 
 
 class TestResult(Enum):
@@ -74,7 +74,9 @@ class IntegrationTestRunner:
         """
         self.console.print(
             Panel(
-                "[bold blue]File Modification Approval Flow - Integration Tests[/bold blue]",
+                "[bold blue]File Modification Approval"
+                " Flow - Integration Tests"
+                "[/bold blue]",
                 title="🧪 Test Suite",
                 expand=False,
             )
@@ -327,8 +329,10 @@ class IntegrationTestRunner:
             self.console.print(
                 Panel(
                     f"[bold green]🎉 ALL TESTS PASSED! 🎉[/bold green]\n\n"
-                    f"Successfully executed {total_tests} integration tests in {self.total_duration:.2f} seconds.\n"
-                    f"The file modification approval flow is ready for production use.",
+                    f"Successfully executed {total_tests} integration"
+                    f" tests in {self.total_duration:.2f} seconds.\n"
+                    "The file modification approval flow"
+                    " is ready for production use.",
                     title="✅ Success",
                     border_style="green",
                 )
@@ -337,8 +341,11 @@ class IntegrationTestRunner:
             self.console.print(
                 Panel(
                     f"[bold red]❌ SOME TESTS FAILED ❌[/bold red]\n\n"
-                    f"Failed: {failed_tests} | Errors: {error_tests} | Total: {total_tests}\n"
-                    f"Please review the failed tests above and fix the issues.",
+                    f"Failed: {failed_tests} | Errors:"
+                    f" {error_tests} | Total:"
+                    f" {total_tests}\n"
+                    "Please review the failed tests"
+                    " above and fix the issues.",
                     title="🚫 Test Failures",
                     border_style="red",
                 )
@@ -369,10 +376,29 @@ class IntegrationTestRunner:
             )
         )
 
+        base = (
+            "tests/integration/"
+            "test_file_modification_flow_integration.py"
+            "::TestFileModificationFlowIntegration"
+        )
+        edge = (
+            "tests/integration/"
+            "test_approval_flow_edge_cases.py"
+            "::TestApprovalFlowEdgeCases"
+        )
         critical_tests = [
-            "tests/integration/test_file_modification_flow_integration.py::TestFileModificationFlowIntegration::test_single_file_creation_approved",
-            "tests/integration/test_file_modification_flow_integration.py::TestFileModificationFlowIntegration::test_batch_workflow_mixed_approvals",
-            "tests/integration/test_approval_flow_edge_cases.py::TestApprovalFlowEdgeCases::test_filesystem_permission_errors",
+            (
+                f"{base}"
+                "::test_single_file_creation_approved"
+            ),
+            (
+                f"{base}"
+                "::test_batch_workflow_mixed_approvals"
+            ),
+            (
+                f"{edge}"
+                "::test_filesystem_permission_errors"
+            ),
         ]
 
         passed = 0

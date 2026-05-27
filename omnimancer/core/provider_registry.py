@@ -136,7 +136,8 @@ class ProviderRegistry:
             models: List of enhanced model info
         """
         logger.info(
-            f"Updating model catalog for provider: {provider_name} ({len(models)} models)"
+            f"Updating model catalog for provider:"
+            f" {provider_name} ({len(models)} models)"
         )
         self.model_catalog[provider_name] = models
         self.last_update = datetime.now()
@@ -148,7 +149,8 @@ class ProviderRegistry:
         Get models filtered by capability (tools, multimodal, etc.).
 
         Args:
-            capability: Capability to filter by ('tools', 'multimodal', 'latest', 'free')
+            capability: Capability to filter by
+                ('tools', 'multimodal', 'latest', 'free')
 
         Returns:
             Dictionary mapping provider names to filtered models
@@ -248,7 +250,8 @@ class ProviderRegistry:
             matches = [
                 m
                 for m in models
-                if query_lower in m.name.lower() or query_lower in m.description.lower()
+                if query_lower in m.name.lower()
+                or query_lower in m.description.lower()
             ]
 
             if matches:
@@ -329,14 +332,22 @@ class ProviderRegistry:
             len(models) for models in self.get_multimodal_models().values()
         )
         free_models = sum(len(models) for models in self.get_free_models().values())
-        latest_models = sum(len(models) for models in self.get_latest_models().values())
+        latest_models = sum(
+            len(models)
+            for models in self.get_latest_models().values()
+        )
 
         # Count models by performance tier
         high_perf = sum(
             len(models) for models in self.get_models_by_performance(60.0).values()
         )
         mid_perf = (
-            sum(len(models) for models in self.get_models_by_performance(40.0).values())
+            sum(
+                len(models)
+                for models in self.get_models_by_performance(
+                    40.0
+                ).values()
+            )
             - high_perf
         )
 
@@ -425,8 +436,16 @@ class ProviderRegistry:
     def __str__(self) -> str:
         """String representation of the registry."""
         stats = self.get_catalog_stats()
-        return f"ProviderRegistry({stats['total_providers']} providers, {stats['total_models']} models)"
+        return (
+            f"ProviderRegistry("
+            f"{stats['total_providers']} providers, "
+            f"{stats['total_models']} models)"
+        )
 
     def __repr__(self) -> str:
         """Detailed string representation of the registry."""
-        return f"ProviderRegistry(providers={list(self.providers.keys())}, last_update={self.last_update})"
+        providers = list(self.providers.keys())
+        return (
+            f"ProviderRegistry(providers={providers},"
+            f" last_update={self.last_update})"
+        )

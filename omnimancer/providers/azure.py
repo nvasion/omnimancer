@@ -1,8 +1,9 @@
 """
 Azure OpenAI provider implementation for Omnimancer.
 
-This module provides the Azure OpenAI provider implementation using Azure's OpenAI Service
-with support for deployment names, API versioning, and Azure-specific authentication.
+This module provides the Azure OpenAI provider implementation
+using Azure's OpenAI Service with support for deployment names,
+API versioning, and Azure-specific authentication.
 """
 
 from datetime import datetime
@@ -42,7 +43,8 @@ class AzureProvider(BaseProvider):
 
         Args:
             api_key: Azure OpenAI API key
-            model: Model deployment name in Azure (e.g., 'gpt-4', 'gpt-35-turbo', custom deployment name)
+            model: Model deployment name in Azure
+                (e.g., 'gpt-4', 'gpt-35-turbo')
             **kwargs: Additional configuration including Azure-specific settings
         """
         super().__init__(api_key, model or "gpt-4", **kwargs)
@@ -268,7 +270,9 @@ class AzureProvider(BaseProvider):
 
         return messages
 
-    def _convert_tools_to_azure_format(self, tools: List[ToolDefinition]) -> List[Dict]:
+    def _convert_tools_to_azure_format(
+        self, tools: List[ToolDefinition]
+    ) -> List[Dict]:
         """
         Convert tool definitions to Azure OpenAI API format.
 
@@ -340,7 +344,7 @@ class AzureProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Azure OpenAI API error: {error_msg}")

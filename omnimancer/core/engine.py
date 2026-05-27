@@ -81,7 +81,8 @@ class CoreEngine:
         try:
             config = self.config_manager.get_config()
 
-            # Use the optimized provider initializer with config_manager for API key decryption
+            # Use the optimized provider initializer with
+            # config_manager for API key decryption
             self.providers = await self.provider_initializer.initialize_providers(
                 config.providers, self.config_manager
             )
@@ -92,11 +93,15 @@ class CoreEngine:
             factory = ProviderFactory()
             available_providers = factory.get_available_providers()
 
-            # Register all available providers (not just configured ones) for catalog management
+            # Register all available providers (not just
+            # configured ones) for catalog management
             for provider_name in available_providers:
                 try:
-                    # Just register the provider name, the registry will handle class loading
-                    self.provider_registry.register_provider(provider_name, None)  # type: ignore[arg-type]
+                    # Register the provider name; the registry
+                    # will handle class loading
+                    self.provider_registry.register_provider(
+                        provider_name, None,  # type: ignore[arg-type]
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to register provider {provider_name}: {e}")
 
@@ -132,7 +137,9 @@ class CoreEngine:
         """
         try:
             if provider_name not in self.providers:
-                raise ConfigurationError(f"Provider '{provider_name}' is not available")
+                raise ConfigurationError(
+                    f"Provider '{provider_name}' is not available"
+                )
 
             provider = self.providers[provider_name]
 
@@ -153,7 +160,8 @@ class CoreEngine:
 
                 if model_name not in all_model_names:
                     raise ConfigurationError(
-                        f"Model '{model_name}' not available for provider '{provider_name}'"
+                        f"Model '{model_name}' not available"
+                        f" for provider '{provider_name}'"
                     )
 
                 provider.model = model_name
@@ -284,17 +292,25 @@ class CoreEngine:
 
     async def send_message_stream(self, message: str) -> AsyncIterator[StreamEvent]:
         if not self.current_provider:
-            yield StreamEvent(type=StreamEventType.ERROR, error="No provider available.")
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                error="No provider available.",
+            )
             return
         context = self.chat_manager.get_current_context()
-        async for event in self.current_provider.send_message_stream(message, context):
+        async for event in self.current_provider.send_message_stream(
+            message, context
+        ):
             yield event
 
     async def send_message_with_tools_stream(
         self, message: str, tools: List[ToolDefinition]
     ) -> AsyncIterator[StreamEvent]:
         if not self.current_provider:
-            yield StreamEvent(type=StreamEventType.ERROR, error="No provider available.")
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                error="No provider available.",
+            )
             return
         context = self.chat_manager.get_current_context()
         async for event in self.current_provider.send_message_with_tools_stream(
@@ -321,8 +337,10 @@ class CoreEngine:
                     else:
                         all_models.append(model)
             except Exception as e:
+                provider_name = provider.get_provider_name()
                 logger.warning(
-                    f"Failed to get models from provider {provider.get_provider_name()}: {e}"
+                    f"Failed to get models from"
+                    f" provider {provider_name}: {e}"
                 )
 
         return all_models
@@ -530,7 +548,10 @@ class CoreEngine:
                 await self.mcp_manager.initialize_servers()
                 logger.info("MCP servers initialized successfully")
             else:
-                logger.info("MCP manager not configured - skipping MCP initialization")
+                logger.info(
+                    "MCP manager not configured"
+                    " - skipping MCP initialization"
+                )
         except Exception as e:
             logger.error(f"Failed to initialize MCP: {e}")
             raise
@@ -659,7 +680,8 @@ class CoreEngine:
         status_info.append("=" * 40)
 
         # Basic status
-        status_info.append(f"Enabled: {'Yes' if self.mcp_manager.is_enabled else 'No'}")
+        enabled = "Yes" if self.mcp_manager.is_enabled else "No"
+        status_info.append(f"Enabled: {enabled}")
         status_info.append(
             f"Initialized: {'Yes' if self.mcp_manager.initialized else 'No'}"
         )
@@ -674,7 +696,8 @@ class CoreEngine:
 
         if degradation["functionality_impact"]:
             status_info.append("\nFunctionality Impact:")
-            for impact in degradation["functionality_impact"]:  # type: ignore[attr-defined]
+            impacts = degradation["functionality_impact"]
+            for impact in impacts:  # type: ignore[attr-defined]
                 status_info.append(f"  • {impact}")
 
         return "\n".join(status_info)
@@ -698,7 +721,12 @@ class CoreEngine:
         try:
             if server_name:
                 # For specific server, we'd need a method to connect individual servers
-                return f"Connecting to specific server '{server_name}' is not yet implemented. Use reload to reconnect all servers."
+                return (
+                    f"Connecting to specific server"
+                    f" '{server_name}' is not yet"
+                    " implemented. Use reload to"
+                    " reconnect all servers."
+                )
             else:
                 await self.mcp_manager.initialize_servers()
                 return "Attempted to connect to all MCP servers."
@@ -755,8 +783,12 @@ class CoreEngine:
                 health_info.append(f"   Command: {status['command']}")
 
             overall_health = health_status.get("overall_healthy", False)
+            health_text = (
+                "🟢 Healthy" if overall_health
+                else "🔴 Issues detected"
+            )
             health_info.append(
-                f"\nOverall Health: {'🟢 Healthy' if overall_health else '🔴 Issues detected'}"
+                f"\nOverall Health: {health_text}"
             )
 
             return "\n".join(health_info)
@@ -797,7 +829,11 @@ class CoreEngine:
             if server_name:
                 tools = self.mcp_manager.get_tools_by_server(server_name)
                 if not tools:
-                    return f"No tools found for server '{server_name}' or server not connected."
+                    return (
+                        f"No tools found for server"
+                        f" '{server_name}' or server"
+                        " not connected."
+                    )
 
                 tools_info = []
                 tools_info.append(f"Tools from {server_name}")
@@ -825,7 +861,7 @@ MCP Commands:
 =============
 
 /mcp status     - Show MCP system status
-/mcp health     - Show server health status  
+/mcp health     - Show server health status
 /mcp servers    - List all configured servers
 /mcp tools      - List all available tools
 /mcp tools <server> - List tools from specific server
@@ -845,7 +881,9 @@ Examples:
         try:
             from .agent_engine import AgentEngine
 
-            self.agent_engine = AgentEngine(self.config_manager)  # type: ignore[assignment]
+            self.agent_engine = AgentEngine(  # type: ignore[assignment]
+                self.config_manager
+            )
             logger.info("Agent engine initialized successfully")
         except Exception as e:
             logger.warning(f"Failed to initialize agent engine: {e}")

@@ -10,10 +10,13 @@ import inspect
 import logging
 import threading
 import time
-from typing import Dict, List, Type
+from typing import TYPE_CHECKING, Dict, List, Optional, Type
 
 from ..providers.base import BaseProvider
 from .models import EnhancedModelInfo, ProviderConfig
+
+if TYPE_CHECKING:
+    from .config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +128,7 @@ class ProviderInitializer:
         cls,
         provider_name: str,
         config: ProviderConfig,
-        config_manager: "ConfigManager" = None,  # type: ignore[name-defined]
+        config_manager: Optional["ConfigManager"] = None,
     ) -> BaseProvider:
         """
         Get or create cached provider instance.
@@ -167,7 +170,7 @@ class ProviderInitializer:
         cls,
         provider_name: str,
         config: ProviderConfig,
-        config_manager: "ConfigManager" = None,  # type: ignore[name-defined]
+        config_manager: Optional["ConfigManager"] = None,
     ) -> BaseProvider:
         """
         Create a new provider instance.
@@ -225,7 +228,9 @@ class ProviderInitializer:
         }
         if auth_type_override:
             kwargs["auth_type"] = auth_type_override
-        instance = provider_class(api_key=api_key, model=config.model, **kwargs)  # type: ignore[arg-type]
+        instance = provider_class(
+            api_key=api_key or "", model=config.model, **kwargs
+        )
 
         return instance
 
@@ -416,7 +421,7 @@ class ProviderInitializer:
     async def initialize_providers(
         cls,
         provider_configs: Dict[str, ProviderConfig],
-        config_manager: "ConfigManager" = None,  # type: ignore[name-defined]
+        config_manager: Optional["ConfigManager"] = None,
     ) -> Dict[str, BaseProvider]:
         """
         Initialize all providers from configuration.

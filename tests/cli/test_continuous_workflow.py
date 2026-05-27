@@ -184,7 +184,10 @@ class TestContinuousWorkflow:
         # Test with various operation patterns, including escaped brackets
         test_cases = [
             ("[FILE_WRITE:test.txt]content[/FILE_WRITE]", True),
-            ("[FILE_WRITE:test.txt\\]content[/FILE_WRITE\\]", True),  # Escaped brackets
+            (  # Escaped brackets
+                "[FILE_WRITE:test.txt\\]content[/FILE_WRITE\\]",
+                True,
+            ),
             ("[FILE_READ:test.txt]", True),
             ("[FILE_READ:test.txt\\]", True),  # Escaped bracket
             ("[COMMAND_EXEC] ls -la [/COMMAND_EXEC]", True),
@@ -343,5 +346,6 @@ class TestWorkflowIntegration:
     async def test_chat_message_workflow_integration(self):
         """Test integration between chat message handling and workflow execution."""
         # This would test the full integration from chat command to workflow execution
-        # For now, this is a placeholder that could be expanded with real integration testing
+        # For now, this is a placeholder that could be expanded
+        # with real integration testing
         pass

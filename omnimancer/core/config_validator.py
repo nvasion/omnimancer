@@ -80,7 +80,10 @@ class ConfigValidator:
         try:
             # Convert config to JSON string
             if hasattr(config, "model_dump"):
-                config_json = json.dumps(config.model_dump(mode="json"), sort_keys=True)
+                config_json = json.dumps(
+                    config.model_dump(mode="json"),
+                    sort_keys=True,
+                )
             else:
                 # Handle mock objects or dictionaries
                 config_json = json.dumps(str(config), sort_keys=True)
@@ -136,7 +139,8 @@ class ConfigValidator:
                     and config.default_provider not in config.providers
                 ):
                     errors.append(
-                        f"Default provider '{config.default_provider}' is not configured"
+                        f"Default provider '{config.default_provider}'"
+                        " is not configured"
                     )
 
             # Check if at least one provider is configured
@@ -180,7 +184,8 @@ class ConfigValidator:
             storage_path = Path(config.storage_path).expanduser()
             if not storage_path.parent.exists():
                 errors.append(
-                    f"Storage path parent directory does not exist: {storage_path.parent}"
+                    "Storage path parent directory"
+                    f" does not exist: {storage_path.parent}"
                 )
         except Exception as e:
             errors.append(f"Invalid storage path: {e}")
@@ -243,7 +248,8 @@ class ConfigValidator:
             provider_errors = validator_method(provider_config)
             errors.extend(provider_errors)
         else:
-            # Generic validation for unknown providers - but be lenient if provider_factory exists
+            # Generic validation for unknown providers -
+            # be lenient if provider_factory exists
             if hasattr(self, "provider_factory") and self.provider_factory:
                 # In test mode, don't require API key if provider factory is available
                 pass
@@ -326,7 +332,9 @@ class ConfigValidator:
                             and server_config.timeout <= 0
                         ):
                             errors.append(
-                                f"MCP server '{server_name}' has invalid timeout: {server_config.timeout}"
+                                f"MCP server '{server_name}'"
+                                " has invalid timeout:"
+                                f" {server_config.timeout}"
                             )
                     except (TypeError, AttributeError):
                         # Skip timeout validation for mock objects
@@ -346,7 +354,11 @@ class ConfigValidator:
 
             try:
                 if hasattr(mcp_config, "max_concurrent_servers"):
-                    servers_val = getattr(mcp_config, "max_concurrent_servers", None)  # type: ignore[assignment]
+                    servers_val = getattr(  # type: ignore[assignment]
+                        mcp_config,
+                        "max_concurrent_servers",
+                        None,
+                    )
                     if servers_val is not None and servers_val <= 0:
                         errors.append(
                             f"Invalid MCP max_concurrent_servers: {servers_val}"
@@ -376,7 +388,8 @@ class ConfigValidator:
         ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Claude model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Claude model '{config.model}'."
+                f" Valid models: {', '.join(valid_models)}"
             )
 
         return errors
@@ -399,7 +412,8 @@ class ConfigValidator:
         ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown OpenAI model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown OpenAI model '{config.model}'."
+                f" Valid models: {', '.join(valid_models)}"
             )
 
         # Validate OpenAI-specific settings
@@ -419,7 +433,8 @@ class ConfigValidator:
         valid_models = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Gemini model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Gemini model '{config.model}'."
+                f" Valid models: {', '.join(valid_models)}"
             )
 
         # Validate Google-specific settings
@@ -444,7 +459,8 @@ class ConfigValidator:
         ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Cohere model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Cohere model '{config.model}'."
+                f" Valid models: {', '.join(valid_models)}"
             )
 
         return errors
@@ -457,17 +473,23 @@ class ConfigValidator:
         # But we should validate the base_url if provided
         if config.base_url:
             if not config.base_url.startswith(("http://", "https://")):
-                errors.append("Ollama base_url must start with 'http://' or 'https://'")
+                errors.append(
+                    "Ollama base_url must start with"
+                    " 'http://' or 'https://'"
+                )
 
         # Model validation is difficult for Ollama since models are dynamic
         # We'll just ensure it's not empty
         if not config.model:
-            errors.append("Ollama provider requires a model name")
+            errors.append(
+                "Ollama provider requires a model name"
+            )
 
-        # Validate timeout for Ollama (can be slower than cloud providers)
+        # Validate timeout for Ollama (can be slower)
         if config.timeout and config.timeout < 10:
             errors.append(
-                "Ollama timeout should be at least 10 seconds for local inference"
+                "Ollama timeout should be at least"
+                " 10 seconds for local inference"
             )
 
         return errors
@@ -483,7 +505,9 @@ class ConfigValidator:
         valid_models = ["sonar-pro", "sonar", "deep-research"]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Perplexity model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Perplexity model"
+                f" '{config.model}'. Valid models:"
+                f" {', '.join(valid_models)}"
             )
 
         return errors
@@ -499,7 +523,8 @@ class ConfigValidator:
         valid_models = ["grok-3", "grok-3-fast"]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown xAI model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown xAI model '{config.model}'."
+                f" Valid models: {', '.join(valid_models)}"
             )
 
         return errors
@@ -522,7 +547,9 @@ class ConfigValidator:
         model_valid = any(pattern in config.model for pattern in valid_model_patterns)
         if not model_valid:
             errors.append(
-                f"Unknown Mistral model '{config.model}'. Valid model patterns: {', '.join(valid_model_patterns)}"
+                f"Unknown Mistral model '{config.model}'."
+                " Valid model patterns:"
+                f" {', '.join(valid_model_patterns)}"
             )
 
         return errors
@@ -596,7 +623,9 @@ class ConfigValidator:
         valid_modes = ["opus", "sonnet"]
         if config.claude_code_mode and config.claude_code_mode not in valid_modes:
             errors.append(
-                f"Unknown Claude-code mode '{config.claude_code_mode}'. Valid modes: {', '.join(valid_modes)}"
+                "Unknown Claude-code mode"
+                f" '{config.claude_code_mode}'."
+                f" Valid modes: {', '.join(valid_modes)}"
             )
 
         return errors

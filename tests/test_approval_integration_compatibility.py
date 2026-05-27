@@ -14,12 +14,14 @@ from omnimancer.cli.approval_integration import (
 @pytest.mark.asyncio
 async def test_integration_with_basic_approval_manager():
     """Test that integration works with basic ApprovalManager (no batch callback)."""
-    # Create mock agent engine with basic ApprovalManager (no set_batch_approval_callback)
+    # Create mock agent engine with basic ApprovalManager
+    # (no set_batch_approval_callback)
     mock_agent_engine = MagicMock()
     mock_approval = MagicMock()
     mock_approval.set_approval_callback = MagicMock()
     # Explicitly don't have set_batch_approval_callback
-    delattr(mock_approval, 'set_batch_approval_callback') if hasattr(mock_approval, 'set_batch_approval_callback') else None
+    if hasattr(mock_approval, 'set_batch_approval_callback'):
+        delattr(mock_approval, 'set_batch_approval_callback')
     mock_agent_engine.approval = mock_approval
 
     # Create mock CLI approval integration

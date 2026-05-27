@@ -139,7 +139,10 @@ class TestModuleIntegrity:
                 module = importlib.import_module(module_name)
                 assert (
                     module is not None
-                ), f"Module {module_name} should import without circular dependencies"
+                ), (
+                    f"Module {module_name} should import"
+                    " without circular dependencies"
+                )
             except ImportError as e:
                 pytest.fail(
                     f"Circular import or missing dependency in {module_name}: {e}"
@@ -225,7 +228,9 @@ class TestModuleCompatibility:
                 importlib.import_module(import_name)
             except ImportError:
                 pytest.fail(
-                    f"Required dependency {package_name} (import as {import_name}) is not available"
+                    f"Required dependency {package_name}"
+                    f" (import as {import_name})"
+                    " is not available"
                 )
 
     def test_agent_system_imports_complete(self):

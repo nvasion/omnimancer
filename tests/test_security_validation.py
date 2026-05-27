@@ -36,7 +36,12 @@ class TestSecurityValidation:
                     max_tokens=4000,
                 ),
                 "claude": ProviderConfig(
-                    api_key="sk-ant-api03-1234567890abcdef1234567890abcdef1234567890abcdef",
+                    api_key=(
+                        "sk-ant-api03-"
+                        "1234567890abcdef"
+                        "1234567890abcdef"
+                        "1234567890abcdef"
+                    ),
                     model="claude-3-sonnet-20240229",
                     max_tokens=4000,
                 ),
@@ -71,11 +76,19 @@ class TestSecurityValidation:
         config_str = str(config)
 
         # Verify that full API keys are not exposed
-        assert "sk-1234567890abcdef1234567890abcdef1234567890abcdef" not in config_str
-        assert (
-            "sk-ant-api03-1234567890abcdef1234567890abcdef1234567890abcdef"
-            not in config_str
+        full_openai_key = (
+            "sk-1234567890abcdef"
+            "1234567890abcdef"
+            "1234567890abcdef"
         )
+        assert full_openai_key not in config_str
+        full_claude_key = (
+            "sk-ant-api03-"
+            "1234567890abcdef"
+            "1234567890abcdef"
+            "1234567890abcdef"
+        )
+        assert full_claude_key not in config_str
         assert "azure-key-1234567890abcdef" not in config_str
         assert "AKIA1234567890ABCDEF" not in config_str
         assert "abcdef1234567890abcdef1234567890abcdef12" not in config_str
@@ -104,8 +117,8 @@ class TestSecurityValidation:
             print(f"✅ World readable: {world_readable}")
             print(f"✅ World writable: {world_writable}")
 
-            # In a production environment, we would want to ensure files are not world-readable
-            # For testing purposes, we just verify we can check permissions
+            # In production, we'd ensure files aren't world-readable
+            # For testing, we just verify we can check permissions
             assert not world_writable, "Configuration file should not be world-writable"
 
     def test_sensitive_data_not_in_error_messages(self):
@@ -269,11 +282,26 @@ class TestSecurityValidation:
         # instead of being stored in configuration files
 
         test_env_vars = {
-            "OPENAI_API_KEY": "sk-env-1234567890abcdef1234567890abcdef1234567890abcdef",
-            "CLAUDE_API_KEY": "sk-ant-env-1234567890abcdef1234567890abcdef1234567890abcdef",
-            "AZURE_OPENAI_KEY": "azure-env-key-1234567890abcdef",
-            "AWS_ACCESS_KEY_ID": "AKIA-ENV-1234567890ABCDEF",
-            "AWS_SECRET_ACCESS_KEY": "env-secret-1234567890abcdef1234567890abcdef12",
+            "OPENAI_API_KEY": (
+                "sk-env-1234567890abcdef"
+                "1234567890abcdef"
+                "1234567890abcdef"
+            ),
+            "CLAUDE_API_KEY": (
+                "sk-ant-env-1234567890abcdef"
+                "1234567890abcdef"
+                "1234567890abcdef"
+            ),
+            "AZURE_OPENAI_KEY": (
+                "azure-env-key-1234567890abcdef"
+            ),
+            "AWS_ACCESS_KEY_ID": (
+                "AKIA-ENV-1234567890ABCDEF"
+            ),
+            "AWS_SECRET_ACCESS_KEY": (
+                "env-secret-1234567890abcdef"
+                "1234567890abcdef12"
+            ),
         }
 
         with patch.dict(os.environ, test_env_vars):
@@ -388,7 +416,8 @@ class TestSecurityValidation:
             original_stat = os.stat(config_path)
             backup_stat = os.stat(backup_path)
 
-            # In a production system, we'd want to ensure backup has same or more restrictive permissions
+            # In production, we'd want backup to have same
+            # or more restrictive permissions
             print(
                 f"✅ Original file permissions: {stat.filemode(original_stat.st_mode)}"
             )
@@ -451,18 +480,37 @@ class TestSecurityValidation:
         error_scenarios = [
             {
                 "error_type": "Authentication Error",
-                "raw_error": "Invalid API key: sk-1234567890abcdef1234567890abcdef1234567890abcdef",
-                "expected_safe_error": "Invalid API key: sk-1***",
+                "raw_error": (
+                    "Invalid API key: "
+                    "sk-1234567890abcdef"
+                    "1234567890abcdef"
+                    "1234567890abcdef"
+                ),
+                "expected_safe_error": (
+                    "Invalid API key: sk-1***"
+                ),
             },
             {
                 "error_type": "AWS Credentials Error",
-                "raw_error": "Access denied for key AKIA1234567890ABCDEF",
-                "expected_safe_error": "Access denied for key AKIA***",
+                "raw_error": (
+                    "Access denied for key"
+                    " AKIA1234567890ABCDEF"
+                ),
+                "expected_safe_error": (
+                    "Access denied for key AKIA***"
+                ),
             },
             {
                 "error_type": "Configuration Error",
-                "raw_error": "Failed to load config with secret: abcdef1234567890abcdef1234567890abcdef12",
-                "expected_safe_error": "Failed to load config with secret: ***",
+                "raw_error": (
+                    "Failed to load config with secret: "
+                    "abcdef1234567890"
+                    "abcdef1234567890abcdef12"
+                ),
+                "expected_safe_error": (
+                    "Failed to load config"
+                    " with secret: ***"
+                ),
             },
         ]
 
@@ -491,11 +539,18 @@ class TestSecurityValidation:
             sanitized = sanitize_error_message(scenario["raw_error"])
 
             # Verify sensitive data is removed
-            assert (
-                "sk-1234567890abcdef1234567890abcdef1234567890abcdef" not in sanitized
+            full_key = (
+                "sk-1234567890abcdef"
+                "1234567890abcdef"
+                "1234567890abcdef"
             )
+            assert full_key not in sanitized
             assert "AKIA1234567890ABCDEF" not in sanitized
-            assert "abcdef1234567890abcdef1234567890abcdef12" not in sanitized
+            secret = (
+                "abcdef1234567890"
+                "abcdef1234567890abcdef12"
+            )
+            assert secret not in sanitized
 
             # Verify masking is present
             assert "***" in sanitized
@@ -534,7 +589,8 @@ if __name__ == "__main__":
             print("\n" + "=" * 60)
             print("🎉 All Security Validation Tests Passed!")
             print(
-                "✅ Task 11.3 - Final validation and security review completed successfully"
+                "Task 11.3 - Final validation and"
+                " security review completed"
             )
             print("\n🔒 Security Summary:")
             print("   • API key storage and masking validated")

@@ -10,13 +10,20 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from cryptography.fernet import Fernet
 
 from ..utils.errors import ConfigurationError, MCPConfigurationError
 from .config_migration import ConfigMigration, ConfigValidator
-from .models import Config, ConfigProfile, MCPConfig, MCPServerConfig, ProviderConfig
+from .models import (
+    Config,
+    ConfigProfile,
+    EnhancedModelInfo,
+    MCPConfig,
+    MCPServerConfig,
+    ProviderConfig,
+)
 
 
 class ConfigManager:
@@ -155,7 +162,8 @@ class ConfigManager:
         Save configuration to file.
 
         Args:
-            config: Configuration to save (optional, uses current config if not provided)
+            config: Configuration to save (optional, uses
+                current config if not provided)
 
         Raises:
             ConfigurationError: If saving fails
@@ -248,7 +256,8 @@ class ConfigManager:
             try:
                 return self._decrypt_api_key(provider_config.api_key)
             except ConfigurationError:
-                # If decryption fails, assume it's a plain text key (for backward compatibility)
+                # If decryption fails, assume it's a plain
+                # text key (for backward compatibility)
                 return provider_config.api_key
         return None
 
@@ -274,7 +283,7 @@ class ConfigManager:
 
         self.save_config()
 
-    def add_custom_model(self, model_info: "EnhancedModelInfo") -> None:  # type: ignore[name-defined]
+    def add_custom_model(self, model_info: "EnhancedModelInfo") -> None:
         """
         Add a custom model to the configuration.
 
@@ -286,7 +295,10 @@ class ConfigManager:
         # Check if model already exists (by name and provider)
         existing_model = None
         for i, model in enumerate(config.custom_models):
-            if model.name == model_info.name and model.provider == model_info.provider:
+            if (
+                model.name == model_info.name
+                and model.provider == model_info.provider
+            ):
                 existing_model = i
                 break
 
@@ -320,7 +332,7 @@ class ConfigManager:
 
         return False
 
-    def get_custom_models(self) -> List["EnhancedModelInfo"]:  # type: ignore[name-defined]
+    def get_custom_models(self) -> List["EnhancedModelInfo"]:
         """
         Get list of custom models from configuration.
 
@@ -417,7 +429,8 @@ class ConfigManager:
         Set up initial configuration with provider details.
 
         Args:
-            provider_configs: Dict mapping provider names to their config (api_key, model)
+            provider_configs: Dict mapping provider names to
+                their config (api_key, model)
             default_provider: Name of the default provider
 
         Raises:
@@ -442,8 +455,12 @@ class ConfigManager:
             providers[provider_name] = ProviderConfig(
                 api_key=self._encrypt_api_key(config_data["api_key"]),
                 model=config_data["model"],
-                max_tokens=config_data.get("max_tokens"),  # type: ignore[arg-type]
-                temperature=config_data.get("temperature"),  # type: ignore[arg-type]
+                max_tokens=config_data.get(  # type: ignore[arg-type]
+                    "max_tokens"
+                ),
+                temperature=config_data.get(  # type: ignore[arg-type]
+                    "temperature"
+                ),
             )
 
         # Create and save configuration
@@ -566,7 +583,9 @@ class ConfigManager:
         """
         server_config = self.get_mcp_server_config(server_name)
         if not server_config:
-            raise MCPConfigurationError(f"MCP server '{server_name}' is not configured")
+            raise MCPConfigurationError(
+                f"MCP server '{server_name}' is not configured"
+            )
 
         server_config.enabled = True
         self.save_config()
@@ -583,7 +602,9 @@ class ConfigManager:
         """
         server_config = self.get_mcp_server_config(server_name)
         if not server_config:
-            raise MCPConfigurationError(f"MCP server '{server_name}' is not configured")
+            raise MCPConfigurationError(
+                f"MCP server '{server_name}' is not configured"
+            )
 
         server_config.enabled = False
         self.save_config()
@@ -610,7 +631,8 @@ class ConfigManager:
                 errors.append(f"MCP server '{server_name}' has no command")
             if server_config.timeout <= 0:
                 errors.append(
-                    f"MCP server '{server_name}' has invalid timeout: {server_config.timeout}"
+                    f"MCP server '{server_name}' has invalid"
+                    f" timeout: {server_config.timeout}"
                 )
 
         # Validate global MCP settings
@@ -620,7 +642,8 @@ class ConfigManager:
             )
         if mcp_config.max_concurrent_servers <= 0:
             errors.append(
-                f"Invalid MCP max_concurrent_servers: {mcp_config.max_concurrent_servers}"
+                "Invalid MCP max_concurrent_servers:"
+                f" {mcp_config.max_concurrent_servers}"
             )
 
         return errors
@@ -638,7 +661,9 @@ class ConfigManager:
         try:
             config_path = Path(mcp_config_path).expanduser()
             if not config_path.exists():
-                raise MCPConfigurationError(f"MCP config file not found: {config_path}")
+                raise MCPConfigurationError(
+                    f"MCP config file not found: {config_path}"
+                )
 
             with open(config_path, "r") as f:
                 mcp_data = json.load(f)
@@ -652,7 +677,9 @@ class ConfigManager:
             self.save_config()
 
         except json.JSONDecodeError as e:
-            raise MCPConfigurationError(f"Invalid JSON in MCP config file: {e}")
+            raise MCPConfigurationError(
+                f"Invalid JSON in MCP config file: {e}"
+            )
         except Exception as e:
             raise MCPConfigurationError(f"Failed to load MCP configuration: {e}")
 
@@ -726,8 +753,9 @@ class ConfigManager:
             try:
                 # Try to decrypt - if successful, it's encrypted
                 self._decrypt_api_key(config.api_key)
-            except:
-                # If decryption fails and doesn't start with sk-ant-, it's likely invalid
+            except Exception:
+                # If decryption fails and doesn't start with
+                # sk-ant-, it's likely invalid
                 if not config.api_key.startswith("sk-ant-"):
                     errors.append("Claude API key should start with 'sk-ant-'")
 
@@ -740,7 +768,8 @@ class ConfigManager:
         ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Claude model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Claude model '{config.model}'."
+                f" Valid models: {', '.join(valid_models)}"
             )
 
         return errors
@@ -757,7 +786,7 @@ class ConfigManager:
                 decrypted = self._decrypt_api_key(config.api_key)
                 if not decrypted.startswith("sk-"):
                     errors.append("OpenAI API key should start with 'sk-'")
-            except:
+            except Exception:
                 errors.append("OpenAI API key should start with 'sk-'")
 
         # Validate model
@@ -771,7 +800,8 @@ class ConfigManager:
         ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown OpenAI model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown OpenAI model '{config.model}'."
+                f" Valid models: {', '.join(valid_models)}"
             )
 
         # Validate OpenAI-specific settings
@@ -792,14 +822,15 @@ class ConfigManager:
                 decrypted = self._decrypt_api_key(config.api_key)
                 if not decrypted.startswith("AIza"):
                     errors.append("Gemini API key should start with 'AIza'")
-            except:
+            except Exception:
                 errors.append("Gemini API key should start with 'AIza'")
 
         # Validate model
         valid_models = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Gemini model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Gemini model '{config.model}'."
+                f" Valid models: {', '.join(valid_models)}"
             )
 
         # Validate Google-specific settings
@@ -825,7 +856,8 @@ class ConfigManager:
         ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Cohere model '{config.model}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Cohere model '{config.model}'."
+                f" Valid models: {', '.join(valid_models)}"
             )
 
         return errors
@@ -838,7 +870,10 @@ class ConfigManager:
         # But we should validate the base_url if provided
         if config.base_url:
             if not config.base_url.startswith(("http://", "https://")):
-                errors.append("Ollama base_url must start with 'http://' or 'https://'")
+                errors.append(
+                    "Ollama base_url must start with"
+                    " 'http://' or 'https://'"
+                )
 
         # Model validation is difficult for Ollama since models are dynamic
         # We'll just ensure it's not empty
@@ -1058,7 +1093,9 @@ class ConfigManager:
         # Map CLI arguments to configuration fields
         cli_mapping = {
             "provider": "default_provider",
-            "model": lambda: self._set_provider_model(config, cli_args.get("model")),
+            "model": lambda: self._set_provider_model(
+                config, cli_args.get("model")
+            ),
             "temperature": lambda: self._set_provider_temperature(
                 config, cli_args.get("temperature")
             ),
@@ -1074,8 +1111,13 @@ class ConfigManager:
                 if callable(config_path):
                     config_path()
                 else:
-                    setattr(config, config_path, cli_args[cli_arg])  # type: ignore[arg-type]
-                    config.config_sources[config_path] = f"cli:{cli_arg}"  # type: ignore[index]
+                    assert isinstance(config_path, str)
+                    setattr(
+                        config, config_path, cli_args[cli_arg]
+                    )
+                    config.config_sources[
+                        config_path
+                    ] = f"cli:{cli_arg}"
 
     def _set_provider_model(self, config: Config, model: Optional[str]) -> None:
         """Set model for the default provider."""
@@ -1085,7 +1127,9 @@ class ConfigManager:
                 "cli:model"
             )
 
-    def _set_provider_temperature(self, config: Config, temperature: Optional[float]) -> None:
+    def _set_provider_temperature(
+        self, config: Config, temperature: Optional[float]
+    ) -> None:
         """Set temperature for the default provider."""
         if temperature is not None and config.default_provider in config.providers:
             config.providers[config.default_provider].temperature = temperature
@@ -1093,7 +1137,9 @@ class ConfigManager:
                 f"providers.{config.default_provider}.temperature"
             ] = "cli:temperature"
 
-    def _set_provider_max_tokens(self, config: Config, max_tokens: Optional[int]) -> None:
+    def _set_provider_max_tokens(
+        self, config: Config, max_tokens: Optional[int]
+    ) -> None:
         """Set max_tokens for the default provider."""
         if max_tokens is not None and config.default_provider in config.providers:
             config.providers[config.default_provider].max_tokens = max_tokens

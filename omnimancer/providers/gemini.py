@@ -1,7 +1,8 @@
 """
 Google Gemini provider implementation for Omnimancer.
 
-This module provides the Google Gemini AI provider implementation using Google AI Studio API.
+This module provides the Google Gemini AI provider implementation
+using Google AI Studio API.
 """
 
 from datetime import datetime
@@ -35,7 +36,9 @@ class GeminiProvider(BaseProvider):
 
         Args:
             api_key: Google AI Studio API key
-            model: Gemini model to use (e.g., 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash-exp')
+            model: Gemini model to use
+                (e.g., 'gemini-1.5-pro',
+                'gemini-1.5-flash')
             **kwargs: Additional configuration
         """
         super().__init__(api_key, model or "gemini-1.5-pro", **kwargs)
@@ -158,7 +161,7 @@ class GeminiProvider(BaseProvider):
                     error_msg = error_data.get("error", {}).get(
                         "message", f"HTTP {response.status_code}"
                     )
-                except:
+                except Exception:
                     error_msg = f"HTTP {response.status_code}"
                 raise ProviderError(f"Gemini API validation failed: {error_msg}")
 
@@ -226,12 +229,17 @@ class GeminiProvider(BaseProvider):
                     if finish_reason and finish_reason != "STOP":
                         if finish_reason == "SAFETY":
                             raise ProviderError(
-                                "Response blocked by Gemini safety filters. Try rephrasing your request.",
+                                "Response blocked by Gemini "
+                                "safety filters. Try "
+                                "rephrasing your request.",
                                 provider="gemini",
                             )
                         elif finish_reason == "MAX_TOKENS":
                             raise ProviderError(
-                                "Response truncated due to token limit. Consider reducing context or max_tokens.",
+                                "Response truncated due to "
+                                "token limit. Consider "
+                                "reducing context or "
+                                "max_tokens.",
                                 provider="gemini",
                             )
                         else:
@@ -316,7 +324,9 @@ class GeminiProvider(BaseProvider):
                 error_msg = error_data.get("error", {}).get("message", "")
                 if "PERMISSION_DENIED" in error_msg:
                     raise AuthenticationError(
-                        "Gemini API access denied. Check API key permissions and billing.",
+                        "Gemini API access denied. "
+                        "Check API key permissions "
+                        "and billing.",
                         provider="gemini",
                     )
                 else:
@@ -376,7 +386,7 @@ class GeminiProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Gemini API error: {error_msg}", provider="gemini")

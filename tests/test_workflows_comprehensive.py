@@ -15,7 +15,6 @@ Testing complete workflows from setup to validation, including:
 - User experience workflows
 """
 
-import json
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -132,7 +131,9 @@ def integrated_system(temp_workspace, mock_providers):
     provider_factory.create_provider.side_effect = (
         lambda name, **kwargs: mock_providers.get(name)
     )
-    provider_factory.get_available_providers.return_value = list(mock_providers.keys())
+    provider_factory.get_available_providers.return_value = (
+        list(mock_providers.keys())
+    )
 
     # Register mock providers
     for name, provider_class in mock_providers.items():
@@ -160,10 +161,7 @@ class TestCompleteSetupWorkflow:
 
         # Step 1: Generate initial configuration
         system["config_path"]
-        # generator = system['config_generator']  # Removed as over-engineered
-
-        # generated_config_path = generator.generate_full_config(str(config_path))  # Removed as over-engineered
-        # assert Path(generated_config_path).exists()  # Removed as over-engineered
+        # ConfigGenerator removed as over-engineered
 
         # Step 2: Load and verify generated configuration
         config_manager = system["config_manager"]
@@ -189,7 +187,8 @@ class TestCompleteSetupWorkflow:
             health_status = await health_monitor.check_all_providers(config)
             assert health_status.overall_healthy is True
 
-class TestProviderSwitchingWorkflows:
+
+class TestProviderSwitchingWorkflows:  # noqa: E302
     """Test provider switching and model selection workflows."""
 
     @pytest.mark.asyncio
@@ -386,42 +385,13 @@ class TestConfigurationWorkflows:
         # generator = system['config_generator']  # Removed as over-engineered
 
         # Generate coding template configuration
-        coding_config_path = system["workspace"] / "coding_config.json"
-        # result_path = generator.generate_template_config("coding", str(coding_config_path))  # Removed as over-engineered
+        system["workspace"] / "coding_config.json"
+        # result_path = generator.generate_template_config(
+        #     "coding", str(coding_config_path)
+        # )  # Removed as over-engineered
 
         # assert Path(result_path).exists()  # Removed as over-engineered
         return  # Skip rest of test since ConfigGenerator removed
-
-        # Load and verify coding configuration
-        with open(coding_config_path) as f:
-            config_data = json.load(f)
-
-        assert "providers" in config_data
-        assert "chat_settings" in config_data
-
-        # Verify coding-specific optimizations
-        chat_settings = config_data["chat_settings"]
-        assert chat_settings["temperature"] <= 0.2  # Low temperature for coding
-        assert chat_settings["max_tokens"] >= 4096  # Large context for code
-
-        # Test research template
-        research_config_path = system["workspace"] / "research_config.json"
-        result_path = generator.generate_template_config(
-            "research", str(research_config_path)
-        )
-
-        assert Path(result_path).exists()
-
-        # Load and verify research configuration
-        with open(research_config_path) as f:
-            config_data = json.load(f)
-
-        # Should have search-capable providers prioritized
-        providers = config_data.get("providers", {})
-        assert any(
-            "perplexity" in provider or "search" in str(providers).lower()
-            for provider in providers.keys()
-        )
 
     @pytest.mark.asyncio
     async def test_comprehensive_validation_workflow(self, integrated_system):
@@ -497,7 +467,8 @@ class TestErrorHandlingWorkflows:
         with patch.object(validator, "provider_factory", system["provider_factory"]):
             validation_result = await validator.validate_full_config(config)
 
-            # In test environment, validation may still pass since we're mocking providers
+            # In test env, validation may still pass since
+            # we're mocking providers
             # The important thing is that validation completes without crashing
             assert isinstance(validation_result.is_valid, bool)
             assert isinstance(validation_result.errors, list)

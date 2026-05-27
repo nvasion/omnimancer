@@ -75,7 +75,11 @@ def sample_chat_context():
         ),
         ChatMessage(
             role=MessageRole.ASSISTANT,
-            content="Recent AI developments include advances in reasoning and multimodal capabilities.",
+            content=(
+                "Recent AI developments include"
+                " advances in reasoning and"
+                " multimodal capabilities."
+            ),
             timestamp=datetime.now(),
             model_used="grok-beta",
         ),
@@ -128,7 +132,11 @@ def mock_successful_response():
             {
                 "message": {
                     "role": "assistant",
-                    "content": "Based on the latest information, AI has made significant strides in reasoning capabilities.",
+                    "content": (
+                        "Based on the latest information,"
+                        " AI has made significant strides"
+                        " in reasoning capabilities."
+                    ),
                 }
             }
         ],
@@ -229,10 +237,12 @@ class TestXAIProviderMessageSending:
                 "Tell me about AI", sample_chat_context
             )
 
-            assert (
-                response.content
-                == "Based on the latest information, AI has made significant strides in reasoning capabilities."
+            expected = (
+                "Based on the latest information,"
+                " AI has made significant strides"
+                " in reasoning capabilities."
             )
+            assert response.content == expected
             assert response.model_used == "grok-beta"
             assert response.tokens_used == 50
             assert response.timestamp is not None
@@ -558,9 +568,9 @@ class TestXAIProviderModelInfo:
         assert isinstance(model_info, EnhancedModelInfo)
         assert model_info.name == "grok-beta"
         assert model_info.provider == "xai"
-        assert (
-            model_info.description
-            == "Grok Beta - Advanced reasoning with real-time information"
+        assert model_info.description == (
+            "Grok Beta - Advanced reasoning"
+            " with real-time information"
         )
         assert model_info.max_tokens == 131072
         assert model_info.cost_per_million_input == 5.0
@@ -577,9 +587,9 @@ class TestXAIProviderModelInfo:
         model_info = provider.get_model_info()
 
         assert model_info.name == "grok-vision-beta"
-        assert (
-            model_info.description
-            == "Grok Vision Beta - Multimodal model with image understanding"
+        assert model_info.description == (
+            "Grok Vision Beta - Multimodal model"
+            " with image understanding"
         )
         assert model_info.max_tokens == 8192
         assert model_info.swe_score == 65.3
@@ -677,10 +687,12 @@ class TestXAIProviderMessagePreparation:
         assert messages[0]["role"] == "user"
         assert messages[0]["content"] == "What are the latest developments in AI?"
         assert messages[1]["role"] == "assistant"
-        assert (
-            messages[1]["content"]
-            == "Recent AI developments include advances in reasoning and multimodal capabilities."
+        expected_msg = (
+            "Recent AI developments include"
+            " advances in reasoning and"
+            " multimodal capabilities."
         )
+        assert messages[1]["content"] == expected_msg
 
         # Check new message
         assert messages[2]["role"] == "user"
@@ -729,10 +741,12 @@ class TestXAIProviderResponseHandling:
 
         response = xai_provider._handle_response(mock_response)
 
-        assert (
-            response.content
-            == "Based on the latest information, AI has made significant strides in reasoning capabilities."
+        expected_resp = (
+            "Based on the latest information,"
+            " AI has made significant strides"
+            " in reasoning capabilities."
         )
+        assert response.content == expected_resp
         assert response.model_used == "grok-beta"
         assert response.tokens_used == 50
         assert response.timestamp is not None

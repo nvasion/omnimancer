@@ -545,7 +545,10 @@ class TestStreamEvent:
     def test_message_start(self):
         from omnimancer.core.models import StreamEvent, StreamEventType
 
-        event = StreamEvent(type=StreamEventType.MESSAGE_START, model="claude-sonnet-4-6")
+        event = StreamEvent(
+            type=StreamEventType.MESSAGE_START,
+            model="claude-sonnet-4-6",
+        )
         assert event.model == "claude-sonnet-4-6"
 
     def test_tool_use_start(self):

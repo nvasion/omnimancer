@@ -333,7 +333,9 @@ class StreamingExecutor:
         self.stdout_buffer = []  # type: ignore[var-annotated]
         self.stderr_buffer = []  # type: ignore[var-annotated]
 
-    async def stream_process_output(self, process: asyncio.subprocess.Process) -> None:
+    async def stream_process_output(
+        self, process: asyncio.subprocess.Process
+    ) -> None:
         """Stream output from a running process."""
 
         async def read_stream(
@@ -397,9 +399,11 @@ class EnhancedProgramExecutor:
         self.active_processes: Dict[str, SandboxedProcess] = {}
         self.execution_history: List[CommandResult] = []
 
-        # Note: Command classification is now handled by AI via metadata in system prompt
-        # The AI adds <!--read-only--> or <!--modifies-system--> before COMMAND_EXEC
-        # This eliminates the need for hardcoded pattern detection
+        # Command classification is handled by AI via
+        # metadata in system prompt.
+        # AI adds <!--read-only--> or <!--modifies-system-->
+        # before COMMAND_EXEC. This eliminates the need for
+        # hardcoded pattern detection.
 
     async def execute_command(
         self,
@@ -427,8 +431,10 @@ class EnhancedProgramExecutor:
         start_time = time.time()
 
         try:
-            # Approval is now controlled by AI metadata (<!--read-only--> vs <!--modifies-system-->)
-            # The interface.py parser sets requires_approval based on AI's classification
+            # Approval is controlled by AI metadata
+            # (<!--read-only--> vs <!--modifies-system-->)
+            # interface.py sets requires_approval from AI's
+            # classification
             if config.require_approval and self.approval_workflow:
                 # Assess risk for approval context
                 risk_level = self.validator.assess_command_risk(command, args)
@@ -543,16 +549,24 @@ class EnhancedProgramExecutor:
                         stdout=stdout,
                         stderr=stderr,
                         was_terminated=True,
-                        error_message=f"Command timed out after {config.timeout_seconds} seconds",
+                        error_message=(
+                            "Command timed out after "
+                            f"{config.timeout_seconds} seconds"
+                        ),
                     )
             else:
                 # Simple execution without streaming
                 try:
-                    stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=config.timeout_seconds  # type: ignore[arg-type]
+                    raw_stdout, raw_stderr = await asyncio.wait_for(
+                        process.communicate(),
+                        timeout=float(config.timeout_seconds or 300),
                     )
-                    stdout = stdout.decode("utf-8", errors="replace")  # type: ignore[attr-defined]
-                    stderr = stderr.decode("utf-8", errors="replace")  # type: ignore[attr-defined]
+                    stdout = raw_stdout.decode(
+                        "utf-8", errors="replace"
+                    )
+                    stderr = raw_stderr.decode(
+                        "utf-8", errors="replace"
+                    )
                 except asyncio.TimeoutError:
                     process.terminate()
                     try:
@@ -567,7 +581,10 @@ class EnhancedProgramExecutor:
                         args=args,
                         exit_code=-1,
                         was_terminated=True,
-                        error_message=f"Command timed out after {config.timeout_seconds} seconds",
+                        error_message=(
+                            "Command timed out after "
+                            f"{config.timeout_seconds} seconds"
+                        ),
                     )
 
             exit_code = process.returncode if process.returncode is not None else -1
@@ -607,7 +624,9 @@ class EnhancedProgramExecutor:
         )
 
         try:
-            with self.sandbox_manager.create_sandbox(resource_limits) as sandbox:  # type: ignore[attr-defined]
+            with self.sandbox_manager.create_sandbox(  # type: ignore[attr-defined]
+                resource_limits
+            ) as sandbox:
                 # Execute in sandbox
                 sandboxed_process = await sandbox.execute_command(
                     command,
@@ -699,7 +718,10 @@ class EnhancedProgramExecutor:
             if process.is_running():
                 proc_args = getattr(process.process, "args", [])
                 if isinstance(proc_args, (list, tuple)) and len(proc_args) > 0:
-                    cmd_str = f"{proc_args[0]} {' '.join(str(a) for a in proc_args[1:])}"
+                    rest = ' '.join(
+                        str(a) for a in proc_args[1:]
+                    )
+                    cmd_str = f"{proc_args[0]} {rest}"
                 else:
                     cmd_str = str(proc_args)
                 active[exec_id] = {

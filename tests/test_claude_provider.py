@@ -5,16 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from omnimancer.core.models import (
-    ChatContext,
-    ChatMessage,
-    ChatResponse,
-    MessageRole,
-    ToolCall,
-    ToolDefinition,
-)
+from omnimancer.core.models import ChatContext, ChatMessage, MessageRole, ToolDefinition
 from omnimancer.providers.claude import ClaudeProvider
-from omnimancer.utils.errors import NetworkError, ProviderError
+from omnimancer.utils.errors import NetworkError
 
 
 @pytest.fixture
@@ -149,7 +142,11 @@ class TestClaudeProviderToolCalling:
 
     @pytest.mark.asyncio
     async def test_send_message_with_tools_returns_tool_calls(
-        self, claude_provider, sample_chat_context, sample_tools, mock_tool_use_response
+        self,
+        claude_provider,
+        sample_chat_context,
+        sample_tools,
+        mock_tool_use_response,
     ):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -245,7 +242,11 @@ class TestClaudeProviderToolCalling:
 
     @pytest.mark.asyncio
     async def test_send_message_with_tools_sends_correct_api_format(
-        self, claude_provider, sample_chat_context, sample_tools, mock_text_only_response
+        self,
+        claude_provider,
+        sample_chat_context,
+        sample_tools,
+        mock_text_only_response,
     ):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -324,25 +325,37 @@ class TestClaudeProviderToolCalling:
     def test_convert_tools_empty_list(self, claude_provider):
         assert claude_provider._convert_tools_to_claude_format([]) == []
 
-    def test_parse_tool_calls_from_response(self, claude_provider, mock_tool_use_response):
+    def test_parse_tool_calls_from_response(
+        self, claude_provider, mock_tool_use_response
+    ):
         content_blocks = mock_tool_use_response["content"]
-        text, tool_calls = claude_provider._parse_response_content(content_blocks)
+        text, tool_calls = (
+            claude_provider._parse_response_content(content_blocks)
+        )
 
         assert text == "I'll read that file for you."
         assert len(tool_calls) == 1
         assert tool_calls[0].name == "file_read"
         assert tool_calls[0].arguments == {"path": "/src/main.py"}
 
-    def test_parse_text_only_response(self, claude_provider, mock_text_only_response):
+    def test_parse_text_only_response(
+        self, claude_provider, mock_text_only_response
+    ):
         content_blocks = mock_text_only_response["content"]
-        text, tool_calls = claude_provider._parse_response_content(content_blocks)
+        text, tool_calls = (
+            claude_provider._parse_response_content(content_blocks)
+        )
 
         assert text == "Here's what I found."
         assert len(tool_calls) == 0
 
-    def test_parse_multiple_tool_calls(self, claude_provider, mock_multi_tool_response):
+    def test_parse_multiple_tool_calls(
+        self, claude_provider, mock_multi_tool_response
+    ):
         content_blocks = mock_multi_tool_response["content"]
-        text, tool_calls = claude_provider._parse_response_content(content_blocks)
+        text, tool_calls = (
+            claude_provider._parse_response_content(content_blocks)
+        )
 
         assert text == "Let me read the file and run the tests."
         assert len(tool_calls) == 2
@@ -377,7 +390,10 @@ class TestClaudeProviderStreaming:
 
     @pytest.fixture
     def streaming_provider(self):
-        return ClaudeProvider(api_key="sk-test-key-123", model="claude-sonnet-4-20250514")
+        return ClaudeProvider(
+            api_key="sk-test-key-123",
+            model="claude-sonnet-4-20250514",
+        )
 
     @pytest.fixture
     def sample_context(self):
@@ -390,24 +406,53 @@ class TestClaudeProviderStreaming:
     async def test_stream_text_only(self, streaming_provider, sample_context):
         from omnimancer.core.models import StreamEventType
 
+        msg_start_data = (
+            '{"type":"message_start","message":'
+            '{"id":"msg_1","type":"message",'
+            '"role":"assistant","content":[],'
+            '"model":"claude-sonnet-4-20250514",'
+            '"stop_reason":null,'
+            '"usage":{"input_tokens":25,'
+            '"output_tokens":0}}}'
+        )
+        cb_start_data = (
+            '{"type":"content_block_start",'
+            '"index":0,"content_block":'
+            '{"type":"text","text":""}}'
+        )
+        cb_delta1 = (
+            '{"type":"content_block_delta",'
+            '"index":0,"delta":'
+            '{"type":"text_delta","text":"Hello"}}'
+        )
+        cb_delta2 = (
+            '{"type":"content_block_delta",'
+            '"index":0,"delta":'
+            '{"type":"text_delta","text":" world"}}'
+        )
+        msg_delta_data = (
+            '{"type":"message_delta",'
+            '"delta":{"stop_reason":"end_turn"},'
+            '"usage":{"output_tokens":10}}'
+        )
         sse_lines = [
             'event: message_start',
-            'data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","stop_reason":null,"usage":{"input_tokens":25,"output_tokens":0}}}',
+            f'data: {msg_start_data}',
             '',
             'event: content_block_start',
-            'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+            f'data: {cb_start_data}',
             '',
             'event: content_block_delta',
-            'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}',
+            f'data: {cb_delta1}',
             '',
             'event: content_block_delta',
-            'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" world"}}',
+            f'data: {cb_delta2}',
             '',
             'event: content_block_stop',
             'data: {"type":"content_block_stop","index":0}',
             '',
             'event: message_delta',
-            'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":10}}',
+            f'data: {msg_delta_data}',
             '',
             'event: message_stop',
             'data: {"type":"message_stop"}',
@@ -436,7 +481,10 @@ class TestClaudeProviderStreaming:
             mock_client_cls.return_value = mock_client
 
             events = []
-            async for event in streaming_provider.send_message_stream("Hello", sample_context):
+            stream = streaming_provider.send_message_stream(
+                "Hello", sample_context
+            )
+            async for event in stream:
                 events.append(event)
 
         types = [e.type for e in events]
@@ -457,33 +505,76 @@ class TestClaudeProviderStreaming:
     async def test_stream_with_tool_use(self, streaming_provider, sample_context):
         from omnimancer.core.models import StreamEventType
 
+        msg_start = (
+            '{"type":"message_start","message":'
+            '{"id":"msg_2","type":"message",'
+            '"role":"assistant","content":[],'
+            '"model":"claude-sonnet-4-20250514",'
+            '"stop_reason":null,'
+            '"usage":{"input_tokens":50,'
+            '"output_tokens":0}}}'
+        )
+        cb_start_text = (
+            '{"type":"content_block_start",'
+            '"index":0,"content_block":'
+            '{"type":"text","text":""}}'
+        )
+        cb_delta_text = (
+            '{"type":"content_block_delta",'
+            '"index":0,"delta":'
+            '{"type":"text_delta",'
+            '"text":"Reading file."}}'
+        )
+        cb_start_tool = (
+            '{"type":"content_block_start",'
+            '"index":1,"content_block":'
+            '{"type":"tool_use",'
+            '"id":"toolu_abc","name":"file_read"}}'
+        )
+        cb_delta_json1 = (
+            '{"type":"content_block_delta",'
+            '"index":1,"delta":'
+            '{"type":"input_json_delta",'
+            '"partial_json":"{\\"path\\""}}'
+        )
+        cb_delta_json2 = (
+            '{"type":"content_block_delta",'
+            '"index":1,"delta":'
+            '{"type":"input_json_delta",'
+            '"partial_json":": \\"/main.py\\"}"}}'
+        )
+        msg_delta = (
+            '{"type":"message_delta",'
+            '"delta":{"stop_reason":"tool_use"},'
+            '"usage":{"output_tokens":30}}'
+        )
         sse_lines = [
             'event: message_start',
-            'data: {"type":"message_start","message":{"id":"msg_2","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","stop_reason":null,"usage":{"input_tokens":50,"output_tokens":0}}}',
+            f'data: {msg_start}',
             '',
             'event: content_block_start',
-            'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+            f'data: {cb_start_text}',
             '',
             'event: content_block_delta',
-            'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Reading file."}}',
+            f'data: {cb_delta_text}',
             '',
             'event: content_block_stop',
             'data: {"type":"content_block_stop","index":0}',
             '',
             'event: content_block_start',
-            'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_abc","name":"file_read"}}',
+            f'data: {cb_start_tool}',
             '',
             'event: content_block_delta',
-            'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"path\\""}}',
+            f'data: {cb_delta_json1}',
             '',
             'event: content_block_delta',
-            'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":": \\"/main.py\\"}"}}',
+            f'data: {cb_delta_json2}',
             '',
             'event: content_block_stop',
             'data: {"type":"content_block_stop","index":1}',
             '',
             'event: message_delta',
-            'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":30}}',
+            f'data: {msg_delta}',
             '',
             'event: message_stop',
             'data: {"type":"message_stop"}',
@@ -533,7 +624,6 @@ class TestClaudeProviderStreaming:
     async def test_stream_http_error(self, streaming_provider, sample_context):
         import httpx
 
-        from omnimancer.core.models import StreamEventType
         from omnimancer.utils.errors import NetworkError
 
         with patch("httpx.AsyncClient") as mock_client_cls:
@@ -545,6 +635,13 @@ class TestClaudeProviderStreaming:
             )
             mock_client_cls.return_value = mock_client
 
-            with pytest.raises(NetworkError, match="timed out"):
-                async for _ in streaming_provider.send_message_stream("hi", sample_context):
+            with pytest.raises(
+                NetworkError, match="timed out"
+            ):
+                stream = (
+                    streaming_provider.send_message_stream(
+                        "hi", sample_context
+                    )
+                )
+                async for _ in stream:
                     pass

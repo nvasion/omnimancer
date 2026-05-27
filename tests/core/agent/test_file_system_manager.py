@@ -150,7 +150,7 @@ class TestFileSystemManager:
         # Write file
         result = await fs_manager.write_file(test_file, test_content)
 
-        assert result["success"] == True
+        assert result["success"] is True
         assert test_file.exists()
         assert test_file.read_text() == test_content
 
@@ -167,7 +167,7 @@ class TestFileSystemManager:
         # Write new content with backup
         result = await fs_manager.write_file(test_file, new_content, backup=True)
 
-        assert result["success"] == True
+        assert result["success"] is True
         assert result["backup_path"] is not None
         assert test_file.read_text() == new_content
 
@@ -185,8 +185,8 @@ class TestFileSystemManager:
         # Write with atomic=True (default)
         result = await fs_manager.write_file(test_file, test_content, atomic=True)
 
-        assert result["success"] == True
-        assert result["atomic"] == True
+        assert result["success"] is True
+        assert result["atomic"] is True
         assert test_file.exists()
         assert test_file.read_text() == test_content
 
@@ -224,7 +224,7 @@ class TestFileSystemManager:
         # Restore from backup
         success = await fs_manager.restore_backup(backup_path, test_file)
 
-        assert success == True
+        assert success is True
         assert test_file.read_text() == original_content
 
     @pytest.mark.asyncio
@@ -234,7 +234,7 @@ class TestFileSystemManager:
 
         success = await fs_manager.create_directory(new_dir)
 
-        assert success == True
+        assert success is True
         assert new_dir.exists()
         assert new_dir.is_dir()
 
@@ -245,7 +245,7 @@ class TestFileSystemManager:
 
         success = await fs_manager.create_directory(nested_dir, parents=True)
 
-        assert success == True
+        assert success is True
         assert nested_dir.exists()
         assert nested_dir.is_dir()
 
@@ -262,7 +262,7 @@ class TestFileSystemManager:
         # Delete file
         result = await fs_manager.delete_file(test_file)
 
-        assert result["success"] == True
+        assert result["success"] is True
         assert not test_file.exists()
 
     @pytest.mark.asyncio
@@ -277,7 +277,7 @@ class TestFileSystemManager:
         # Delete with backup
         result = await fs_manager.delete_file(test_file, backup=True)
 
-        assert result["success"] == True
+        assert result["success"] is True
         assert not test_file.exists()
         assert result["backup_path"] is not None
 
@@ -321,7 +321,7 @@ class TestFileSystemManager:
         # Copy file
         success = await fs_manager.copy_file(src_file, dst_file)
 
-        assert success == True
+        assert success is True
         assert dst_file.exists()
         assert dst_file.read_text() == test_content
         assert src_file.exists()  # Source should still exist
@@ -339,7 +339,7 @@ class TestFileSystemManager:
         # Move file
         result = await fs_manager.move_file(src_file, dst_file)
 
-        assert result["success"] == True
+        assert result["success"] is True
         assert dst_file.exists()
         assert dst_file.read_text() == test_content
         assert not src_file.exists()  # Source should be gone
@@ -358,9 +358,9 @@ class TestFileSystemManager:
 
         assert info["name"] == "info_test.txt"
         assert info["size"] == len(test_content.encode())
-        assert info["is_file"] == True
-        assert info["is_dir"] == False
-        assert info["is_binary"] == False
+        assert info["is_file"] is True
+        assert info["is_dir"] is False
+        assert info["is_binary"] is False
         assert "md5_hash" in info
         assert "sha256_hash" in info
 
@@ -432,11 +432,11 @@ class TestFileSystemManager:
 
         # Test git add
         success = await fs_manager.git_add(test_file)
-        assert success == True
+        assert success is True
 
         # Test git status
         status = await fs_manager.git_status(temp_dir)
-        assert status["success"] == True
+        assert status["success"] is True
         assert "test.txt" in status["status_output"]
 
     @pytest.mark.asyncio
@@ -454,7 +454,7 @@ class TestFileSystemManager:
         assert status is not None
         assert status["type"] == "write"
         assert status["path"] == test_file
-        assert status["success"] == True
+        assert status["success"] is True
 
     @pytest.mark.asyncio
     async def test_streaming_read(self, fs_manager, temp_dir):
@@ -567,22 +567,22 @@ class TestFileSystemManagerIntegration:
 
         # 1. Create original file
         result = await fs_manager.write_file(original_file, original_content)
-        assert result["success"] == True
+        assert result["success"] is True
 
         # 2. Copy file
         success = await fs_manager.copy_file(original_file, copied_file)
-        assert success == True
+        assert success is True
 
         # 3. Modify original with backup
         result = await fs_manager.write_file(
             original_file, modified_content, backup=True
         )
-        assert result["success"] == True
+        assert result["success"] is True
         assert result["backup_path"] is not None
 
         # 4. Move copied file
         result = await fs_manager.move_file(copied_file, moved_file)
-        assert result["success"] == True
+        assert result["success"] is True
 
         # 5. Verify final state
         assert original_file.read_text() == modified_content
@@ -592,7 +592,7 @@ class TestFileSystemManagerIntegration:
         # 6. Restore from backup
         backup_path = Path(result["backup_path"])
         success = await fs_manager.restore_backup(backup_path, original_file)
-        assert success == True
+        assert success is True
         assert original_file.read_text() == original_content
 
     @pytest.mark.asyncio
@@ -648,7 +648,7 @@ class TestFileSystemManagerDirectoryAwareness:
 
         is_repo = await fs_manager.is_git_repository(temp_dir)
 
-        assert is_repo == True
+        assert is_repo is True
 
     @pytest.mark.asyncio
     async def test_is_git_repository_false(self, fs_manager, temp_dir):
@@ -656,7 +656,7 @@ class TestFileSystemManagerDirectoryAwareness:
         # temp_dir doesn't have .git directory by default
         is_repo = await fs_manager.is_git_repository(temp_dir)
 
-        assert is_repo == False
+        assert is_repo is False
 
     @pytest.mark.asyncio
     async def test_is_git_repository_subdirectory(self, fs_manager, temp_dir):
@@ -672,7 +672,7 @@ class TestFileSystemManagerDirectoryAwareness:
         # Should detect git repository from subdirectory
         is_repo = await fs_manager.is_git_repository(sub_dir)
 
-        assert is_repo == True
+        assert is_repo is True
 
     @pytest.mark.asyncio
     async def test_is_git_repository_default_path(self, fs_manager):
@@ -724,7 +724,7 @@ class TestFileSystemManagerDirectoryAwareness:
         context = await fs_manager.get_directory_context(temp_dir)
 
         assert context["current_working_directory"] == str(temp_dir)
-        assert context["is_git_repository"] == False
+        assert context["is_git_repository"] is False
         assert context["git_repository_root"] is None
         assert context["relative_to_repo_root"] is None
 
@@ -743,7 +743,7 @@ class TestFileSystemManagerDirectoryAwareness:
         context = await fs_manager.get_directory_context(sub_dir)
 
         assert context["current_working_directory"] == str(sub_dir)
-        assert context["is_git_repository"] == True
+        assert context["is_git_repository"] is True
         assert context["git_repository_root"] == str(temp_dir)
         assert context["relative_to_repo_root"] == "src/components"
 
@@ -775,7 +775,7 @@ class TestFileSystemManagerDirectoryAwareness:
         context = await fs_manager.get_directory_context(temp_dir)
 
         assert context["current_working_directory"] == str(temp_dir)
-        assert context["is_git_repository"] == True
+        assert context["is_git_repository"] is True
         assert context["git_repository_root"] == str(temp_dir)
         assert context["relative_to_repo_root"] == "."
 
@@ -816,9 +816,9 @@ class TestFileSystemManagerDirectoryAwareness:
             context = await fs_manager.get_directory_context(test_path)
 
             # Verify consistency
-            assert is_repo == True
+            assert is_repo is True
             assert repo_root == temp_dir
-            assert context["is_git_repository"] == True
+            assert context["is_git_repository"] is True
             assert context["git_repository_root"] == str(temp_dir)
             assert context["relative_to_repo_root"] == expected_relative
             assert context["current_working_directory"] == str(test_path)
@@ -836,13 +836,14 @@ class TestFileSystemManagerApprovalFlow:
         # Write file with approval
         result = await fs_manager_with_approval.write_file(test_file, test_content)
 
-        assert result["success"] == True
-        assert result["approved"] == True
+        assert result["success"] is True
+        assert result["approved"] is True
         assert test_file.exists()
         assert test_file.read_text() == test_content
 
         # Verify the approval manager was called
-        fs_manager_with_approval.approval_manager.request_single_approval.assert_called_once()
+        approval = fs_manager_with_approval.approval_manager
+        approval.request_single_approval.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_write_file_approval_denied(self, mock_security, temp_dir):
@@ -884,8 +885,8 @@ class TestFileSystemManagerApprovalFlow:
         # Delete file with approval
         result = await fs_manager_with_approval.delete_file(test_file)
 
-        assert result["success"] == True
-        assert result["approved"] == True
+        assert result["success"] is True
+        assert result["approved"] is True
         assert not test_file.exists()
         assert result["backup_path"] is not None
 
@@ -904,12 +905,13 @@ class TestFileSystemManagerApprovalFlow:
         # Create directory with approval
         success = await fs_manager_with_approval.create_directory(new_dir)
 
-        assert success == True
+        assert success is True
         assert new_dir.exists()
         assert new_dir.is_dir()
 
         # Verify the approval manager was called
-        fs_manager_with_approval.approval_manager.request_single_approval.assert_called()
+        approval = fs_manager_with_approval.approval_manager
+        approval.request_single_approval.assert_called()
 
     @pytest.mark.asyncio
     async def test_move_file_with_approval(self, fs_manager_with_approval, temp_dir):
@@ -924,8 +926,8 @@ class TestFileSystemManagerApprovalFlow:
         # Move file with approval
         result = await fs_manager_with_approval.move_file(src_file, dst_file)
 
-        assert result["success"] == True
-        assert result["approved"] == True
+        assert result["success"] is True
+        assert result["approved"] is True
         assert dst_file.exists()
         assert dst_file.read_text() == test_content
         assert not src_file.exists()
@@ -946,7 +948,7 @@ class TestFileSystemManagerApprovalFlow:
         # Write file without approval
         result = await fs_manager.write_file(test_file, test_content)
 
-        assert result["success"] == True
+        assert result["success"] is True
         # 'approved' key should still be present but True (auto-approved)
         assert "approved" in result
         assert test_file.exists()
@@ -981,7 +983,7 @@ class TestFileSystemManagerApprovalFlow:
         assert captured_operation.data["path"] == str(test_file)
         assert captured_operation.data["content"] == test_content
         assert captured_operation.data["content_length"] == len(test_content)
-        assert captured_operation.requires_approval == True
+        assert captured_operation.requires_approval is True
 
 
 if __name__ == "__main__":

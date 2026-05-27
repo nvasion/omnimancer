@@ -10,13 +10,12 @@ import asyncio
 import logging
 import os
 import re
-import readline
+import readline  # noqa: F401
+import select
 import sys
 from typing import Any, Optional
 
 import click
-
-logger = logging.getLogger(__name__)
 
 # Third-party imports
 from rich.console import Console
@@ -27,6 +26,7 @@ from ..core.agent_mode_manager import AgentModeManager
 from ..core.config_manager import ConfigManager
 from ..core.engine import CoreEngine
 from ..core.history_manager import HistoryManager
+from ..core.models import ChatResponse
 from ..core.signal_handler import SignalHandler
 
 # UI imports
@@ -46,6 +46,8 @@ from .display import DisplayManager, DisplayMixin
 from .system_prompts import build_agent_prompt, get_agent_capabilities_prompt
 from .tool_handler import MAX_TOOL_ITERATIONS, ToolHandler
 
+logger = logging.getLogger(__name__)
+
 # Version import
 try:
     from omnimancer import __version__
@@ -53,8 +55,10 @@ except ImportError:
     __version__ = "unknown"
 
 
-
-class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, CommandDispatchMixin):
+class CommandLineInterface(
+    DisplayMixin, CompletionMixin,
+    AgentLoopMixin, CommandDispatchMixin,
+):
     """
     Interactive command-line interface for Omnimancer.
 
@@ -139,11 +143,16 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
                 config = self.engine.config_manager.get_config()
                 if not hasattr(config, "providers") or not config.providers:
                     self.console.print(
-                        "\n[yellow]No providers configured. Set API keys in your .env file or environment variables.[/yellow]"
+                        "\n[yellow]No providers configured."
+                        " Set API keys in your .env file"
+                        " or environment variables."
+                        "[/yellow]"
                     )
                 else:
                     self.console.print(
-                        "[yellow]Check your .env file or environment variables for provider API keys.[/yellow]"
+                        "[yellow]Check your .env file or"
+                        " environment variables for"
+                        " provider API keys.[/yellow]"
                     )
 
                 # Continue running even if provider initialization failed
@@ -428,7 +437,8 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
             # Get agent engine - check both direct attribute and via engine
             agent_engine = getattr(self.engine, "agent_engine", None)
 
-            # If no agent_engine on CoreEngine, it might be the engine itself is an AgentEngine
+            # If no agent_engine on CoreEngine, the engine
+            # itself might be an AgentEngine
             if not agent_engine and hasattr(self.engine, "approval"):
                 agent_engine = self.engine
 
@@ -483,25 +493,56 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
             )
 
     def _setup_file_interaction_integration(self) -> Any:
-        """Set up CLI file interaction integration for read-before-write operations."""
+        """Set up file interaction integration."""
         try:
-            agent_engine = getattr(self.engine, "agent_engine", None)
+            agent_engine = getattr(
+                self.engine, "agent_engine", None
+            )
 
-            if agent_engine and hasattr(agent_engine, "set_read_before_write_callback"):
-                async def simple_review_callback(review_data: Any) -> Any:
-                    """Simple file review: show path and ask for confirmation."""
-                    file_path = review_data.get("file_path", "unknown")
-                    operation = review_data.get("operation", "modify")
-                    self.console.print(f"\n[yellow]Agent wants to {operation}: {file_path}[/yellow]")
-                    approved = Confirm.ask("Approve?", default=True)
-                    return {"approved": approved, "cancelled": not approved}
+            if agent_engine and hasattr(
+                agent_engine,
+                "set_read_before_write_callback",
+            ):
+                async def simple_review_callback(
+                    review_data: Any,
+                ) -> Any:
+                    """Show path and ask for confirm."""
+                    file_path = review_data.get(
+                        "file_path", "unknown"
+                    )
+                    operation = review_data.get(
+                        "operation", "modify"
+                    )
+                    self.console.print(
+                        f"\n[yellow]Agent wants to"
+                        f" {operation}: {file_path}"
+                        f"[/yellow]"
+                    )
+                    approved = Confirm.ask(
+                        "Approve?", default=True
+                    )
+                    return {
+                        "approved": approved,
+                        "cancelled": not approved,
+                    }
 
-                agent_engine.set_read_before_write_callback(simple_review_callback)
-                logger.debug("File interaction integration set up successfully")
+                agent_engine.set_read_before_write_callback(
+                    simple_review_callback
+                )
+                logger.debug(
+                    "File interaction integration"
+                    " set up successfully"
+                )
             else:
-                logger.debug("No agent engine available for file interaction integration")
+                logger.debug(
+                    "No agent engine available for"
+                    " file interaction integration"
+                )
         except Exception as e:
-            logger.error(f"Failed to set up file interaction integration: {e}")
+            logger.error(
+                "Failed to set up file interaction"
+                f" integration: {e}"
+            )
 
     def _reset_terminal(self) -> None:
         """Reset terminal to ensure it's in normal mode."""
@@ -515,14 +556,14 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
                     os.system("stty sane 2>/dev/null")
                     # Ensure we're in canonical mode with echo
                     os.system("stty icanon echo 2>/dev/null")
-                except:
+                except Exception:
                     pass
         except Exception:
             # Ignore any errors during terminal reset
             pass
 
     def _get_agent_capabilities_prompt(self) -> str:
-        """Get system prompt describing agent capabilities with safety and directory awareness."""
+        """Get system prompt for agent capabilities."""
         return get_agent_capabilities_prompt()
 
     def _get_user_input(self) -> Optional[str]:
@@ -555,14 +596,14 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
                     tty.setcbreak(sys.stdin.fileno())
 
                     # Check if data is available (indicates paste)
-                    while select.select([sys.stdin], [], [], 0.05)[0]:  # type: ignore[name-defined]
+                    while select.select([sys.stdin], [], [], 0.05)[0]:
                         try:
                             line = sys.stdin.readline()
                             if line:
                                 lines.append(line.rstrip("\n"))
                             else:
                                 break
-                        except:
+                        except Exception:
                             break
                 finally:
                     # Restore terminal settings
@@ -579,7 +620,7 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
 
         except (EOFError, KeyboardInterrupt):
             return None
-        except Exception as e:
+        except Exception:
             # Fallback to simple input on any error
             return first_line if "first_line" in locals() else None
 
@@ -617,7 +658,10 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
             self.progress_indicator.disable()
 
             try:
-                agent_mode = self.agent_manager and self.agent_manager.mode.value == "on"
+                agent_mode = (
+                    self.agent_manager
+                    and self.agent_manager.mode.value == "on"
+                )
                 use_native_tools = (
                     agent_mode and self.engine.provider_supports_tools()
                 )
@@ -742,7 +786,7 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
                     status = f"[{tc.name}] Error: {result.error}"
                     self.console.print(f"  [red]✗ {tc.name}: {result.error}[/red]")
                 else:
-                    preview = (result.content or "")[:200]
+                    (result.content or "")[:200]
                     status = f"[{tc.name}] Success: {result.content}"
                     self.console.print(f"  [green]✓ {tc.name}[/green]")
                 result_parts.append(status)
@@ -753,18 +797,23 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
                 + f"\n\nContinue working on the task: {user_message}"
             )
 
-        self._show_warning(f"Reached maximum tool call iterations ({MAX_TOOL_ITERATIONS}).")
+        self._show_warning(
+            "Reached maximum tool call iterations"
+            f" ({MAX_TOOL_ITERATIONS})."
+        )
 
-    async def _stream_tool_response(self, message: str, tools: Any) -> "ChatResponse":  # type: ignore[name-defined]
+    async def _stream_tool_response(self, message: str, tools: Any) -> "ChatResponse":
         from ..core.models import ChatResponse, StreamEventType
         from ..ui.streaming_display import StreamingDisplay
 
         display = StreamingDisplay(self.console)
         display.start()
-        final_response = None
+        final_response: Optional[ChatResponse] = None
 
         try:
-            async for event in self.engine.send_message_with_tools_stream(message, tools):
+            async for event in self.engine.send_message_with_tools_stream(
+                message, tools
+            ):
                 display.handle_event(event)
                 if event.type == StreamEventType.MESSAGE_COMPLETE:
                     final_response = event.response
@@ -772,7 +821,10 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
             display.stop()
 
         if final_response:
-            final_response.tool_calls = display.tool_calls if display.tool_calls else None
+            final_response.tool_calls = (
+                display.tool_calls if display.tool_calls
+                else None
+            )
             final_response.content = display.accumulated_text
             self.engine.chat_manager.add_user_message(message)
             if final_response.is_success:
@@ -781,15 +833,18 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
                 )
             return final_response
 
-        return ChatResponse(content="", model_used="", tokens_used=0, error="Stream failed")
+        return ChatResponse(
+            content="", model_used="",
+            tokens_used=0, error="Stream failed",
+        )
 
-    async def _stream_chat_response(self, message: str) -> "ChatResponse":  # type: ignore[name-defined]
+    async def _stream_chat_response(self, message: str) -> "ChatResponse":
         from ..core.models import ChatResponse, StreamEventType
         from ..ui.streaming_display import StreamingDisplay
 
         display = StreamingDisplay(self.console)
         display.start()
-        final_response = None
+        final_response: Optional[ChatResponse] = None
 
         try:
             async for event in self.engine.send_message_stream(message):
@@ -808,7 +863,10 @@ class CommandLineInterface(DisplayMixin, CompletionMixin, AgentLoopMixin, Comman
                 )
             return final_response
 
-        return ChatResponse(content="", model_used="", tokens_used=0, error="Stream failed")
+        return ChatResponse(
+            content="", model_used="",
+            tokens_used=0, error="Stream failed",
+        )
 
     def _handle_keyboard_interrupt(self) -> None:
         """Handle Ctrl+C interrupt."""
@@ -825,31 +883,55 @@ def main() -> None:
     """
 
     @click.command()
-    @click.option("--help", "-h", is_flag=True, help="Show this help message and exit")
-    @click.option("--version", "-v", is_flag=True, help="Show version information")
+    @click.option(
+        "--help", "-h", is_flag=True,
+        help="Show this help message and exit",
+    )
+    @click.option(
+        "--version", "-v", is_flag=True,
+        help="Show version information",
+    )
     @click.option("--config", "-c", help="Path to configuration file")
     @click.option(
         "--no-approval",
         is_flag=True,
         help="Skip approval prompts and auto-approve all operations",
     )
-    @click.option("-p", "--prompt", type=str, default=None, help="Run in headless mode with the given prompt")
+    @click.option(
+        "-p", "--prompt", type=str, default=None,
+        help="Run in headless mode with the given prompt",
+    )
     @click.option(
         "--output-format", "output_format",
         type=click.Choice(["text", "json", "stream-json"]),
         default="text",
         help="Output format for headless mode",
     )
-    @click.option("--verbose", is_flag=True, default=False, help="Verbose output in headless mode")
+    @click.option(
+        "--verbose", is_flag=True, default=False,
+        help="Verbose output in headless mode",
+    )
     @click.option(
         "--dangerously-skip-permissions",
         is_flag=True,
         default=False,
         help="Auto-approve all tool operations (headless mode)",
     )
-    @click.option("--provider", type=str, default=None, help="AI provider to use")
-    @click.option("--model", type=str, default=None, help="Model to use")
-    def cli_main(help: Any, version: Any, config: Any, no_approval: Any, prompt: Any, output_format: Any, verbose: Any, dangerously_skip_permissions: Any, provider: Any, model: Any) -> None:
+    @click.option(
+        "--provider", type=str, default=None,
+        help="AI provider to use",
+    )
+    @click.option(
+        "--model", type=str, default=None,
+        help="Model to use",
+    )
+    def cli_main(
+        help: Any, version: Any, config: Any,
+        no_approval: Any, prompt: Any,
+        output_format: Any, verbose: Any,
+        dangerously_skip_permissions: Any,
+        provider: Any, model: Any,
+    ) -> None:
         """Omnimancer - A multi-model coding agent for the terminal."""
 
         if help:

@@ -107,9 +107,10 @@ class TestAgentErrorHandling(unittest.TestCase):
         ):
             AgentEngine(mock_config_manager)
 
-            # Skip this test as the FileSystemManager doesn't currently have path validation
+            # Skip: FileSystemManager doesn't have path validation
             self.skipTest(
-                "Path validation not implemented in current FileSystemManager"
+                "Path validation not implemented in"
+                " current FileSystemManager"
             )
 
     def test_agent_engine_forbidden_path_detection(self):
@@ -197,9 +198,13 @@ class TestErrorContextAndRecovery(unittest.TestCase):
         exit_code = 127
         stderr_output = "command not found"
 
+        details = (
+            f"Command: {command}, Exit code: {exit_code}"
+            f", Stderr: {stderr_output}"
+        )
         error = ExecutionError(
             "Command execution failed",
-            details=f"Command: {command}, Exit code: {exit_code}, Stderr: {stderr_output}",
+            details=details,
         )
 
         # Test that context is preserved

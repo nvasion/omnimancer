@@ -903,7 +903,8 @@ class TestMCPIntegrationScenarios:
             results = await asyncio.gather(*tasks)
             execution_time = time.time() - start_time
 
-            # Should complete in roughly 0.1 seconds (concurrent) rather than 0.3 (sequential)
+            # Should complete in ~0.1s (concurrent)
+            # rather than 0.3s (sequential)
             assert execution_time < 0.2
 
             # Verify all results

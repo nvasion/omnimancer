@@ -214,8 +214,10 @@ class TestStreamChatResponse:
 
 class TestStreamingRouting:
     @pytest.mark.asyncio
-    async def test_tool_flow_uses_streaming_when_supported(self, interface, mock_engine):
-        """_handle_tool_calling_flow uses _stream_tool_response when provider supports streaming."""
+    async def test_tool_flow_uses_streaming_when_supported(
+        self, interface, mock_engine
+    ):
+        """Uses _stream_tool_response when provider supports it."""
         provider = MagicMock()
         provider.supports_streaming.return_value = True
         mock_engine.current_provider = provider
@@ -233,7 +235,10 @@ class TestStreamingRouting:
         )
 
         with patch.object(
-            interface, "_stream_tool_response", new_callable=AsyncMock, return_value=response
+            interface,
+            "_stream_tool_response",
+            new_callable=AsyncMock,
+            return_value=response,
         ) as mock_stream:
             with patch.object(interface.console, "print"):
                 await interface._handle_tool_calling_flow("Do stuff")
@@ -241,8 +246,10 @@ class TestStreamingRouting:
         mock_stream.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_tool_flow_skips_streaming_when_not_supported(self, interface, mock_engine):
-        """_handle_tool_calling_flow uses send_message_with_tools when streaming not supported."""
+    async def test_tool_flow_skips_streaming_when_not_supported(
+        self, interface, mock_engine
+    ):
+        """Uses send_message_with_tools when not supported."""
         provider = MagicMock()
         provider.supports_streaming.return_value = False
         mock_engine.current_provider = provider
@@ -267,8 +274,10 @@ class TestStreamingRouting:
         mock_engine.send_message_with_tools.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_chat_uses_streaming_when_supported(self, interface, mock_engine):
-        """Non-agent chat path uses _stream_chat_response when provider supports streaming."""
+    async def test_chat_uses_streaming_when_supported(
+        self, interface, mock_engine
+    ):
+        """Non-agent chat uses _stream_chat_response."""
         from omnimancer.cli.commands import Command, CommandType
 
         provider = MagicMock()
@@ -294,22 +303,39 @@ class TestStreamingRouting:
         )
 
         with patch.object(
-            interface, "_stream_chat_response", new_callable=AsyncMock, return_value=response
+            interface,
+            "_stream_chat_response",
+            new_callable=AsyncMock,
+            return_value=response,
         ) as mock_stream:
-            with patch.object(interface, "_show_user_message"):
-                with patch.object(interface, "_show_token_status"):
+            with patch.object(
+                interface, "_show_user_message"
+            ):
+                with patch.object(
+                    interface, "_show_token_status"
+                ):
+                    cancel_handler = (
+                        interface.cancellation_handler
+                    )
                     with patch.object(
-                        interface.cancellation_handler, "start_cancellable_operation"
+                        cancel_handler,
+                        "start_cancellable_operation",
                     ) as mock_cancel:
+
                         async def run_op(**kwargs):
                             await kwargs["operation"]()
+
                         mock_cancel.side_effect = run_op
-                        await interface._handle_chat_message(command)
+                        await interface._handle_chat_message(
+                            command
+                        )
 
         mock_stream.assert_called_once_with("Hello")
 
     @pytest.mark.asyncio
-    async def test_chat_skips_streaming_when_not_supported(self, interface, mock_engine):
+    async def test_chat_skips_streaming_when_not_supported(
+        self, interface, mock_engine
+    ):
         """Non-agent chat path uses send_message when streaming not supported."""
         from omnimancer.cli.commands import Command, CommandType
 
@@ -329,16 +355,30 @@ class TestStreamingRouting:
             raw_input="Hello",
         )
 
-        with patch.object(interface, "_show_user_message"):
-            with patch.object(interface, "_show_assistant_message") as mock_show:
-                with patch.object(interface, "_show_token_status"):
+        with patch.object(
+            interface, "_show_user_message"
+        ):
+            with patch.object(
+                interface, "_show_assistant_message"
+            ) as mock_show:
+                with patch.object(
+                    interface, "_show_token_status"
+                ):
+                    cancel_handler = (
+                        interface.cancellation_handler
+                    )
                     with patch.object(
-                        interface.cancellation_handler, "start_cancellable_operation"
+                        cancel_handler,
+                        "start_cancellable_operation",
                     ) as mock_cancel:
+
                         async def run_op(**kwargs):
                             await kwargs["operation"]()
+
                         mock_cancel.side_effect = run_op
-                        await interface._handle_chat_message(command)
+                        await interface._handle_chat_message(
+                            command
+                        )
 
         mock_engine.send_message.assert_called_once()
         mock_show.assert_called_once_with("Hi", "test-model")

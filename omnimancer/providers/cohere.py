@@ -193,14 +193,17 @@ class CohereProvider(BaseProvider):
                 if "model" in error_msg.lower() or "not found" in error_msg.lower():
                     available_models = [m.name for m in self.get_available_models()]
                     raise ModelNotFoundError(
-                        f"Cohere model '{self.model}' not found or not accessible",
+                        f"Cohere model '{self.model}'"
+                        " not found or not accessible",
                         provider="cohere",
                         model_name=self.model,
                         available_models=available_models,
                     )
                 elif "token" in error_msg.lower() and "limit" in error_msg.lower():
                     raise ProviderError(
-                        f"Token limit exceeded: {error_msg}. Try reducing message length.",
+                        "Token limit exceeded: "
+                        f"{error_msg}. Try reducing "
+                        "message length.",
                         provider="cohere",
                     )
                 elif (
@@ -228,7 +231,10 @@ class CohereProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("message", "")
-                if "billing" in error_msg.lower() or "payment" in error_msg.lower():
+                if (
+                    "billing" in error_msg.lower()
+                    or "payment" in error_msg.lower()
+                ):
                     raise QuotaExceededError(
                         "Cohere API access restricted due to billing issues",
                         provider="cohere",
@@ -262,7 +268,10 @@ class CohereProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("message", "")
-                if "quota" in error_msg.lower() or "usage" in error_msg.lower():
+                if (
+                    "quota" in error_msg.lower()
+                    or "usage" in error_msg.lower()
+                ):
                     raise QuotaExceededError(
                         "Cohere API usage quota exceeded", provider="cohere"
                     )
@@ -283,7 +292,8 @@ class CohereProvider(BaseProvider):
 
         elif response.status_code == 502 or response.status_code == 503:
             raise ProviderUnavailableError(
-                "Cohere API temporarily unavailable. Service may be under maintenance.",
+                "Cohere API temporarily unavailable."
+                " Service may be under maintenance.",
                 provider="cohere",
                 estimated_recovery="10-30 minutes",
             )
@@ -292,7 +302,7 @@ class CohereProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("message", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Cohere API error: {error_msg}", provider="cohere")
@@ -308,12 +318,18 @@ class CohereProvider(BaseProvider):
                 "cost_per_token": 0.0000005,
             },
             "command-r-plus": {
-                "description": "Command R+ - Enhanced version with improved capabilities",
+                "description": (
+                    "Command R+ - Enhanced version"
+                    " with improved capabilities"
+                ),
                 "max_tokens": 128000,
                 "cost_per_token": 0.000003,
             },
             "command-light": {
-                "description": "Command Light - Fast and efficient model for simple tasks",
+                "description": (
+                    "Command Light - Fast and efficient"
+                    " model for simple tasks"
+                ),
                 "max_tokens": 4096,
                 "cost_per_token": 0.0000003,
             },

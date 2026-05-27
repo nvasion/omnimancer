@@ -290,7 +290,9 @@ class TestGeminiProviderModelInfo:
 
     def test_get_model_info_gemini_1_5_pro(self):
         """Test getting model info for Gemini 1.5 Pro."""
-        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
+        provider = GeminiProvider(
+            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
+        )
         model_info = provider.get_model_info()
 
         assert model_info.name == "gemini-1.5-pro"
@@ -327,7 +329,9 @@ class TestGeminiProviderModelInfo:
 
     def test_get_model_info_gemini_1_0_pro(self):
         """Test getting model info for Gemini 1.0 Pro."""
-        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.0-pro")
+        provider = GeminiProvider(
+            api_key="AIzaSyTest123456789", model="gemini-1.0-pro"
+        )
         model_info = provider.get_model_info()
 
         assert model_info.name == "gemini-1.0-pro"
@@ -393,7 +397,7 @@ class TestGeminiProviderModelInfo:
         assert names1 == names2
 
     def test_model_info_matches_available_models(self):
-        """Test that get_model_info() returns consistent info with get_available_models()."""
+        """Test get_model_info() is consistent with get_available_models()."""
         provider = GeminiProvider(
             api_key="AIzaSyTest123456789", model="gemini-1.5-flash"
         )
@@ -424,7 +428,9 @@ class TestGeminiProviderCapabilities:
 
     def test_supports_tools_gemini_1_5_pro(self):
         """Test tool support for Gemini 1.5 Pro."""
-        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
+        provider = GeminiProvider(
+            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
+        )
         assert provider.supports_tools() is True
 
     def test_supports_tools_gemini_1_5_flash(self):
@@ -436,12 +442,16 @@ class TestGeminiProviderCapabilities:
 
     def test_supports_tools_gemini_1_0_pro(self):
         """Test tool support for Gemini 1.0 Pro."""
-        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.0-pro")
+        provider = GeminiProvider(
+            api_key="AIzaSyTest123456789", model="gemini-1.0-pro"
+        )
         assert provider.supports_tools() is False
 
     def test_supports_multimodal_gemini_1_5_pro(self):
         """Test multimodal support for Gemini 1.5 Pro."""
-        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.5-pro")
+        provider = GeminiProvider(
+            api_key="AIzaSyTest123456789", model="gemini-1.5-pro"
+        )
         assert provider.supports_multimodal() is True
 
     def test_supports_multimodal_gemini_1_5_flash(self):
@@ -453,7 +463,9 @@ class TestGeminiProviderCapabilities:
 
     def test_supports_multimodal_gemini_1_0_pro(self):
         """Test multimodal support for Gemini 1.0 Pro."""
-        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.0-pro")
+        provider = GeminiProvider(
+            api_key="AIzaSyTest123456789", model="gemini-1.0-pro"
+        )
         assert provider.supports_multimodal() is False
 
 
@@ -670,7 +682,9 @@ class TestGeminiProviderToolCalling:
         self, sample_chat_context, sample_tools
     ):
         """Test tool calling with model that doesn't support tools."""
-        provider = GeminiProvider(api_key="AIzaSyTest123456789", model="gemini-1.0-pro")
+        provider = GeminiProvider(
+            api_key="AIzaSyTest123456789", model="gemini-1.0-pro"
+        )
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -1231,7 +1245,11 @@ class TestGeminiProviderComprehensiveValidation:
         complex_tools = [
             ToolDefinition(
                 name="complex_calculation",
-                description="Perform complex mathematical calculations with multiple parameters",
+                description=(
+                    "Perform complex mathematical"
+                    " calculations with multiple"
+                    " parameters"
+                ),
                 parameters={
                     "type": "object",
                     "properties": {

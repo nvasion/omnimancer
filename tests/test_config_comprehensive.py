@@ -21,8 +21,8 @@ import pytest
 from omnimancer.core.config_migration import ConfigMigration
 from omnimancer.core.config_validator import ConfigValidator
 
-# from omnimancer.core.config_generator import ConfigGenerator  # Removed as over-engineered
-# from omnimancer.core.config_repair import ConfigRepair  # Removed as over-engineered
+# ConfigGenerator removed as over-engineered
+# ConfigRepair removed as over-engineered
 from omnimancer.core.models import (
     Config,
     ConfigTemplate,
@@ -56,8 +56,11 @@ class TestConfigValidator:
             mcp=MCPConfig(),
         )
 
-        with patch("omnimancer.core.config_validator.Path") as mock_path:
-            mock_path.return_value.expanduser.return_value.parent.exists.return_value = (
+        with patch(
+            "omnimancer.core.config_validator.Path"
+        ) as mock_path:
+            expanded = mock_path.return_value.expanduser
+            expanded.return_value.parent.exists.return_value = (
                 True
             )
 
@@ -110,8 +113,11 @@ class TestConfigValidator:
             mcp=MCPConfig(),
         )
 
-        with patch("omnimancer.core.config_validator.Path") as mock_path:
-            mock_path.return_value.expanduser.return_value.parent.exists.return_value = (
+        with patch(
+            "omnimancer.core.config_validator.Path"
+        ) as mock_path:
+            expanded = mock_path.return_value.expanduser
+            expanded.return_value.parent.exists.return_value = (
                 True
             )
 
@@ -204,49 +210,28 @@ class TestConfigGenerator:
 
     def test_init(self):
         """Test ConfigGenerator initialization."""
-        # assert hasattr(self.generator, 'provider_registry')  # Removed as over-engineered
-        # assert hasattr(self.generator, 'template_manager')  # Removed as over-engineered
+        # Removed as over-engineered
         pass
 
     def test_generate_full_config(self):
         """Test full configuration generation."""
-        # Test that the method exists and is callable
-        # assert hasattr(self.generator, 'generate_full_config')  # Removed as over-engineered
-        # assert callable(self.generator.generate_full_config)  # Removed as over-engineered
+        # Removed as over-engineered
         pass
 
     def test_generate_template_config(self):
         """Test template configuration generation."""
-        # Test that the method exists and is callable
-        # assert hasattr(self.generator, 'generate_template_config')  # Removed as over-engineered
-        # assert callable(self.generator.generate_template_config)  # Removed as over-engineered
+        # Removed as over-engineered
         pass
 
     def test_mcp_server_defaults_disabled(self):
-        """Test that MCP servers are disabled by default in generated config."""
-        # mcp_config = self.generator._create_example_mcp_config()  # Removed as over-engineered
+        """Test MCP servers disabled by default."""
+        # Removed as over-engineered
         return
-
-        # Check that specific MCP servers are disabled by default
-        assert "filesystem" in mcp_config.servers
-        assert mcp_config.servers["filesystem"].enabled is False
-
-        assert "calculator" in mcp_config.servers
-        assert mcp_config.servers["calculator"].enabled is False
-
-        assert "datetime" in mcp_config.servers
-        assert mcp_config.servers["datetime"].enabled is False
 
     def test_mcp_servers_have_proper_commands(self):
-        """Test that MCP servers have correct uvx command configuration."""
-        # mcp_config = self.generator._create_example_mcp_config()  # Removed as over-engineered
+        """Test MCP servers have correct uvx config."""
+        # Removed as over-engineered
         return
-
-        for server_name, server_config in mcp_config.servers.items():
-            assert server_config.command == "uvx"
-            assert isinstance(server_config.args, list)
-            assert len(server_config.args) > 0
-            assert server_config.args[0].startswith("mcp-server-")
 
 
 @pytest.mark.skip(reason="ConfigRepair removed as over-engineered")
@@ -259,9 +244,7 @@ class TestConfigRepair:
 
     def test_init(self):
         """Test ConfigRepair initialization."""
-        # assert isinstance(self.repair.validator, ConfigValidator)  # Removed as over-engineered
-        # assert hasattr(self.repair, 'config_path')  # Removed as over-engineered
-        # assert hasattr(self.repair, 'backup_path')  # Removed as over-engineered
+        # Removed as over-engineered
         pass
 
     def test_analyze_config(self):
@@ -274,18 +257,19 @@ class TestConfigRepair:
             mcp=MCPConfig(),
         )
 
-        # issues = self.repair.analyze_config(config)  # Removed as over-engineered
+        # Removed as over-engineered
         issues = []
 
         assert isinstance(issues, list)
         # Should have minimal issues for valid config
-        assert len([issue for issue in issues if issue["severity"] == "error"]) == 0
+        error_issues = [
+            i for i in issues if i["severity"] == "error"
+        ]
+        assert len(error_issues) == 0
 
     def test_is_error_fixable(self):
         """Test error fixability detection."""
-
-        # assert self.repair._is_error_fixable(fixable_error) is True  # Removed as over-engineered
-        # assert self.repair._is_error_fixable(unfixable_error) is False  # Removed as over-engineered
+        # Removed as over-engineered
         pass
 
 
@@ -387,7 +371,7 @@ class TestConfigTemplateManager:
                 ), f"Server {server_name} should be disabled by default"
 
     def test_template_mcp_server_descriptions_mention_uvx(self):
-        """Test that MCP server descriptions mention uvx requirement."""
+        """Test MCP server descriptions mention uvx."""
         templates = [
             self.manager._create_coding_template(),
             self.manager._create_research_template(),
@@ -396,12 +380,17 @@ class TestConfigTemplateManager:
 
         for template in templates:
             if template.mcp_servers:
-                for server_name, server_config in template.mcp_servers.items():
-                    description = server_config.get("description", "")
-                    if description:  # Only check non-empty descriptions
+                for sname, sconfig in (
+                    template.mcp_servers.items()
+                ):
+                    desc = sconfig.get("description", "")
+                    if desc:
                         assert (
-                            "uvx" in description.lower()
-                        ), f"Server {server_name} description should mention uvx requirement"
+                            "uvx" in desc.lower()
+                        ), (
+                            f"Server {sname} description"
+                            " should mention uvx"
+                        )
 
 
 class TestConfigMigration:
@@ -485,15 +474,16 @@ class TestConfigTemplate:
         assert template.mcp_servers["filesystem"]["command"] == "fs-server"
 
 
-@pytest.mark.skip(reason="ConfigGenerator and ConfigRepair removed as over-engineered")
+@pytest.mark.skip(
+    reason="ConfigGenerator/ConfigRepair removed"
+)
 class TestConfigIntegration:
     """Integration tests for config components."""
 
     def setup_method(self):
         """Set up test fixtures."""
         self.validator = ConfigValidator()
-        # self.generator = ConfigGenerator()  # Removed as over-engineered
-        # self.repair = ConfigRepair()  # Removed as over-engineered
+        # Removed as over-engineered
         self.template_manager = ConfigTemplateManager()
         # ConfigMigration requires a config_path
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
@@ -523,17 +513,21 @@ class TestConfigIntegration:
         )
 
         # 4. Validate config
-        with patch("omnimancer.core.config_validator.Path") as mock_path:
-            mock_path.return_value.expanduser.return_value.parent.exists.return_value = (
+        with patch(
+            "omnimancer.core.config_validator.Path"
+        ) as mock_path:
+            expanded = mock_path.return_value.expanduser
+            expanded.return_value.parent.exists.return_value = (
                 True
             )
             errors = self.validator.validate_config(config)
             assert len(errors) == 0
 
-        # 5. Analyze for issues
-        # issues = self.repair.analyze_config(config)  # Removed as over-engineered
+        # 5. Analyze for issues (removed as over-engineered)
         issues = []
-        error_issues = [issue for issue in issues if issue["severity"] == "error"]
+        error_issues = [
+            i for i in issues if i["severity"] == "error"
+        ]
         assert len(error_issues) == 0
 
         # 6. Test migration detection
@@ -589,7 +583,12 @@ class TestConfigIntegration:
         """Test migration integration with validation."""
         # Write old config data to temp file
         old_config = {
-            "providers": {"openai": {"model": "gpt-3.5-turbo", "api_key": "sk-test123"}}
+            "providers": {
+                "openai": {
+                    "model": "gpt-3.5-turbo",
+                    "api_key": "sk-test123",
+                }
+            }
         }
         with open(self.tmp_config_path, "w") as f:
             json.dump(old_config, f)
@@ -609,8 +608,11 @@ class TestConfigIntegration:
             mcp=MCPConfig(),
         )
 
-        with patch("omnimancer.core.config_validator.Path") as mock_path:
-            mock_path.return_value.expanduser.return_value.parent.exists.return_value = (
+        with patch(
+            "omnimancer.core.config_validator.Path"
+        ) as mock_path:
+            expanded = mock_path.return_value.expanduser
+            expanded.return_value.parent.exists.return_value = (
                 True
             )
             errors = self.validator.validate_config(config)

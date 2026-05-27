@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from omnimancer.core.agent.types import Operation, OperationResult, OperationType
+from omnimancer.core.agent.types import OperationResult, OperationType
 
 
 @pytest.mark.asyncio
@@ -100,7 +100,7 @@ async def test_file_write_requires_approval():
     response_content = '[FILE_WRITE:/etc/passwd] malicious content [/FILE_WRITE]'
 
     # Parse and execute
-    result = await cli._parse_and_execute_operations(response_content)
+    await cli._parse_and_execute_operations(response_content)
 
     # Verify approval was required
     mock_agent_engine.execute_with_approval.assert_called_once()
@@ -115,8 +115,6 @@ async def test_file_write_requires_approval():
 @pytest.mark.asyncio
 async def test_no_subprocess_fallback_for_commands():
     """Test that there is NO subprocess fallback that bypasses approval."""
-    import subprocess
-
     from omnimancer.cli.interface import CommandLineInterface
 
     # Create mock engine with agent_engine that raises exception

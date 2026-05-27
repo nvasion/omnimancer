@@ -125,7 +125,8 @@ class FileReadError(ReadBeforeWriteError):
             original_exception=original_exception,
         )
         super().__init__(
-            f"Failed to read existing content from {file_path}: {str(original_exception)}",
+            f"Failed to read existing content from "
+            f"{file_path}: {str(original_exception)}",
             ReadBeforeWriteErrorType.FILE_READ_ERROR,
             context,
             original_exception,
@@ -146,7 +147,8 @@ class FileWriteError(ReadBeforeWriteError):
             original_exception=original_exception,
         )
         super().__init__(
-            f"Failed to write reviewed content to {file_path}: {str(original_exception)}",
+            f"Failed to write reviewed content to "
+            f"{file_path}: {str(original_exception)}",
             ReadBeforeWriteErrorType.FILE_WRITE_ERROR,
             context,
             original_exception,
@@ -188,7 +190,8 @@ class CallbackError(ReadBeforeWriteError):
             original_exception=original_exception,
         )
         super().__init__(
-            f"Error in user review callback for {file_path}: {str(original_exception)}",
+            f"Error in user review callback for "
+            f"{file_path}: {str(original_exception)}",
             ReadBeforeWriteErrorType.CALLBACK_ERROR,
             context,
             original_exception,
@@ -277,17 +280,39 @@ class ReadBeforeWriteErrorHandler:
 
         # Recovery strategy mappings
         self.recovery_strategies = {
-            ReadBeforeWriteErrorType.FILE_READ_ERROR: RecoveryStrategy.FALLBACK_TO_REGULAR_WRITE,
-            ReadBeforeWriteErrorType.FILE_WRITE_ERROR: RecoveryStrategy.RETRY,
-            ReadBeforeWriteErrorType.USER_INTERFACE_ERROR: RecoveryStrategy.PROMPT_USER,
-            ReadBeforeWriteErrorType.PERMISSION_ERROR: RecoveryStrategy.ABORT_OPERATION,
-            ReadBeforeWriteErrorType.ENCODING_ERROR: RecoveryStrategy.PROMPT_USER,
-            ReadBeforeWriteErrorType.CONTENT_VALIDATION_ERROR: RecoveryStrategy.PROMPT_USER,
-            ReadBeforeWriteErrorType.CALLBACK_ERROR: RecoveryStrategy.FALLBACK_TO_REGULAR_WRITE,
-            ReadBeforeWriteErrorType.DIFF_GENERATION_ERROR: RecoveryStrategy.LOG_AND_CONTINUE,
-            ReadBeforeWriteErrorType.PREVIEW_ERROR: RecoveryStrategy.LOG_AND_CONTINUE,
-            ReadBeforeWriteErrorType.USER_REJECTION: RecoveryStrategy.SKIP_OPERATION,
-            ReadBeforeWriteErrorType.TIMEOUT_ERROR: RecoveryStrategy.PROMPT_USER,
+            ReadBeforeWriteErrorType.FILE_READ_ERROR: (
+                RecoveryStrategy.FALLBACK_TO_REGULAR_WRITE
+            ),
+            ReadBeforeWriteErrorType.FILE_WRITE_ERROR: (
+                RecoveryStrategy.RETRY
+            ),
+            ReadBeforeWriteErrorType.USER_INTERFACE_ERROR: (
+                RecoveryStrategy.PROMPT_USER
+            ),
+            ReadBeforeWriteErrorType.PERMISSION_ERROR: (
+                RecoveryStrategy.ABORT_OPERATION
+            ),
+            ReadBeforeWriteErrorType.ENCODING_ERROR: (
+                RecoveryStrategy.PROMPT_USER
+            ),
+            ReadBeforeWriteErrorType.CONTENT_VALIDATION_ERROR: (
+                RecoveryStrategy.PROMPT_USER
+            ),
+            ReadBeforeWriteErrorType.CALLBACK_ERROR: (
+                RecoveryStrategy.FALLBACK_TO_REGULAR_WRITE
+            ),
+            ReadBeforeWriteErrorType.DIFF_GENERATION_ERROR: (
+                RecoveryStrategy.LOG_AND_CONTINUE
+            ),
+            ReadBeforeWriteErrorType.PREVIEW_ERROR: (
+                RecoveryStrategy.LOG_AND_CONTINUE
+            ),
+            ReadBeforeWriteErrorType.USER_REJECTION: (
+                RecoveryStrategy.SKIP_OPERATION
+            ),
+            ReadBeforeWriteErrorType.TIMEOUT_ERROR: (
+                RecoveryStrategy.PROMPT_USER
+            ),
         }
 
     def handle_error(
@@ -358,7 +383,10 @@ class ReadBeforeWriteErrorHandler:
             if retry_count < max_retries:
                 return {
                     "success": True,
-                    "message": f"Retrying operation (attempt {retry_count + 1}/{max_retries})",
+                    "message": (
+                        f"Retrying operation "
+                        f"(attempt {retry_count + 1}/{max_retries})"
+                    ),
                     "should_retry": True,
                 }
             else:
@@ -414,7 +442,10 @@ class ReadBeforeWriteErrorHandler:
         log_message = f"Read-before-write error: {error.message}"
 
         if error.context:
-            log_message += f" [File: {error.context.file_path}, Operation: {error.context.operation}]"
+            log_message += (
+                f" [File: {error.context.file_path}, "
+                f"Operation: {error.context.operation}]"
+            )
 
         # Determine log level based on error type
         if error.error_type in [ReadBeforeWriteErrorType.USER_REJECTION]:

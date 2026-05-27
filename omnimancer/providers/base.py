@@ -205,7 +205,9 @@ class BaseProvider(ABC):
 
         # This should be overridden by tool-supporting providers
         raise NotImplementedError(
-            f"{self.__class__.__name__} supports tools but hasn't implemented send_message_with_tools"
+            f"{self.__class__.__name__} supports tools "
+            "but hasn't implemented "
+            "send_message_with_tools"
         )
 
     async def send_message_stream(
@@ -222,7 +224,9 @@ class BaseProvider(ABC):
         context: ChatContext,
         available_tools: List[ToolDefinition],
     ) -> AsyncIterator[StreamEvent]:
-        response = await self.send_message_with_tools(message, context, available_tools)
+        response = await self.send_message_with_tools(
+            message, context, available_tools
+        )
         yield StreamEvent(type=StreamEventType.MESSAGE_START, model=self.model)
         if response.content:
             yield StreamEvent(type=StreamEventType.TEXT_DELTA, text=response.content)
@@ -279,7 +283,8 @@ class BaseProvider(ABC):
             Estimated cost in USD
         """
         model_info = self.get_model_info()
-        return (input_tokens + output_tokens) * model_info.cost_per_token  # type: ignore[union-attr]
+        total = input_tokens + output_tokens
+        return total * model_info.cost_per_token  # type: ignore[union-attr]
 
     def prepare_context(self, context: ChatContext) -> List[Dict[str, str]]:
         """

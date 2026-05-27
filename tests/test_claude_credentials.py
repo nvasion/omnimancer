@@ -2,7 +2,6 @@
 
 import json
 import time
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -90,8 +89,11 @@ class TestLoadClaudeCredentials:
         assert creds.access_token == "sk-ant-oat01-test-access-token"
 
     def test_load_from_default_path(self, valid_credentials_data):
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.read_text", return_value=json.dumps(valid_credentials_data)):
+        creds_json = json.dumps(valid_credentials_data)
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.read_text", return_value=creds_json),
+        ):
             creds = load_claude_credentials()
             assert creds is not None
 
@@ -118,7 +120,7 @@ class TestRefreshClaudeToken:
         creds_file = tmp_path / ".credentials.json"
         creds_file.write_text(json.dumps(valid_credentials_data))
 
-        new_expires = int((time.time() + 7200) * 1000)
+        int((time.time() + 7200) * 1000)
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -200,8 +202,6 @@ class TestClaudeProviderBearerAuth:
 
     @pytest.mark.asyncio
     async def test_bearer_sends_authorization_header(self):
-        import httpx
-
         from omnimancer.core.models import ChatContext
         from omnimancer.providers.claude import ClaudeProvider
 
@@ -228,7 +228,7 @@ class TestClaudeProviderBearerAuth:
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_client_cls.return_value = mock_client
 
-            response = await provider.send_message("hi", context)
+            await provider.send_message("hi", context)
 
             call_kwargs = mock_client.post.call_args
             headers = call_kwargs.kwargs.get("headers", {})
@@ -238,8 +238,6 @@ class TestClaudeProviderBearerAuth:
 
     @pytest.mark.asyncio
     async def test_api_key_sends_x_api_key_header(self):
-        import httpx
-
         from omnimancer.core.models import ChatContext
         from omnimancer.providers.claude import ClaudeProvider
 
@@ -265,7 +263,7 @@ class TestClaudeProviderBearerAuth:
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_client_cls.return_value = mock_client
 
-            response = await provider.send_message("hi", context)
+            await provider.send_message("hi", context)
 
             call_kwargs = mock_client.post.call_args
             headers = call_kwargs.kwargs.get("headers", {})
@@ -379,7 +377,7 @@ class TestSubscription429Detection:
     async def test_subscription_429_raises_provider_error_not_rate_limit(self):
         from omnimancer.core.models import ChatContext
         from omnimancer.providers.claude import ClaudeProvider
-        from omnimancer.utils.errors import ProviderError, RateLimitError
+        from omnimancer.utils.errors import ProviderError
 
         provider = ClaudeProvider(
             api_key="token", model="claude-sonnet-4-6", auth_type="bearer"
@@ -402,5 +400,8 @@ class TestSubscription429Detection:
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_client_cls.return_value = mock_client
 
-            with pytest.raises(ProviderError, match="subscription tokens only support Haiku"):
+            with pytest.raises(
+                ProviderError,
+                match="subscription tokens only support Haiku",
+            ):
                 await provider.send_message("hi", context)

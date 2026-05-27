@@ -194,7 +194,10 @@ def sample_chat_messages():
         ),
         ChatMessage(
             role=MessageRole.ASSISTANT,
-            content="Hello! I'm doing well, thank you for asking. How can I help you today?",
+            content=(
+                "Hello! I'm doing well, thank you"
+                " for asking. How can I help you today?"
+            ),
             timestamp=datetime(2024, 1, 1, 12, 0, 5),
             model_used="gpt-4",
         ),
@@ -206,7 +209,11 @@ def sample_chat_messages():
         ),
         ChatMessage(
             role=MessageRole.ASSISTANT,
-            content="Quantum computing is a type of computation that harnesses quantum mechanics...",
+            content=(
+                "Quantum computing is a type of"
+                " computation that harnesses"
+                " quantum mechanics..."
+            ),
             timestamp=datetime(2024, 1, 1, 12, 1, 10),
             model_used="gpt-4",
         ),

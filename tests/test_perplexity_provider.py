@@ -62,7 +62,8 @@ def sample_chat_context():
         ),
         ChatMessage(
             role=MessageRole.ASSISTANT,
-            content="I can help you check the weather. What location are you interested in?",
+            content="I can help you check the weather."
+            " What location are you interested in?",
             timestamp=datetime.now(),
             model_used="llama-3.1-sonar-small-128k-online",
         ),
@@ -83,7 +84,11 @@ def mock_successful_response():
             {
                 "message": {
                     "role": "assistant",
-                    "content": "Based on current weather data, it's sunny with 75°F temperature.",
+                    "content": (
+                        "Based on current weather data,"
+                        " it's sunny with 75°F"
+                        " temperature."
+                    ),
                 }
             }
         ],
@@ -113,7 +118,11 @@ def mock_successful_response_with_metadata():
             {
                 "message": {
                     "role": "assistant",
-                    "content": "The latest AI developments include significant advances in reasoning capabilities.",
+                    "content": (
+                        "The latest AI developments"
+                        " include significant advances"
+                        " in reasoning capabilities."
+                    ),
                 }
             }
         ],
@@ -153,7 +162,9 @@ class TestPerplexityProviderInitialization:
         provider = PerplexityProvider(api_key="test-key")
 
         assert provider.api_key == "test-key"
-        assert provider.model == "llama-3.1-sonar-small-128k-online"
+        assert provider.model == (
+            "llama-3.1-sonar-small-128k-online"
+        )
         assert provider.max_tokens == 4096
         assert provider.temperature == 0.2
         assert provider.search_enabled is True
@@ -165,7 +176,9 @@ class TestPerplexityProviderInitialization:
     def test_initialization_with_custom_values(self, perplexity_provider):
         """Test provider initialization with custom values."""
         assert perplexity_provider.api_key == "test-perplexity-key"
-        assert perplexity_provider.model == "llama-3.1-sonar-small-128k-online"
+        assert perplexity_provider.model == (
+            "llama-3.1-sonar-small-128k-online"
+        )
         assert perplexity_provider.max_tokens == 4096
         assert perplexity_provider.temperature == 0.2
         assert perplexity_provider.search_enabled is True
@@ -472,9 +485,10 @@ class TestPerplexityProviderModelInfo:
         assert isinstance(model_info, EnhancedModelInfo)
         assert model_info.name == "llama-3.1-sonar-small-128k-online"
         assert model_info.provider == "perplexity"
-        assert (
-            model_info.description == "Llama 3.1 Sonar Small with real-time web search"
+        expected_desc = (
+            "Llama 3.1 Sonar Small with real-time web search"
         )
+        assert model_info.description == expected_desc
         assert model_info.max_tokens == 127072
         assert model_info.cost_per_million_input == 0.2
         assert model_info.cost_per_million_output == 0.2

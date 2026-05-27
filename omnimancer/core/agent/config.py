@@ -405,10 +405,17 @@ class AgentConfig:
         if providers_data:
             for provider_id, provider_data in providers_data.items():
                 self.validator.validate_provider_config(provider_data)
-                provider_type = ProviderType(provider_data["provider_type"])
+                provider_type = ProviderType(
+                    provider_data["provider_type"]
+                )
+                filtered = {
+                    k: v
+                    for k, v in provider_data.items()
+                    if k != "provider_type"
+                }
                 self.providers[provider_id] = ProviderConfig(
                     provider_type=provider_type,
-                    **{k: v for k, v in provider_data.items() if k != "provider_type"},
+                    **filtered,
                 )
 
     def _save_all_configs(self) -> None:
@@ -704,7 +711,9 @@ class AgentConfig:
         imported_version = imported_data.get("version", "1.0")
         if imported_version != self.CONFIG_VERSION:
             logging.warning(
-                f"Configuration version mismatch: {imported_version} vs {self.CONFIG_VERSION}"
+                "Configuration version mismatch: "
+                f"{imported_version} vs "
+                f"{self.CONFIG_VERSION}"
             )
 
         if not merge:
@@ -735,11 +744,20 @@ class AgentConfig:
 
         if "providers" in imported_data:
             for provider_id, provider_data in imported_data["providers"].items():
-                self.validator.validate_provider_config(provider_data)
-                provider_type = ProviderType(provider_data["provider_type"])
+                self.validator.validate_provider_config(
+                    provider_data
+                )
+                provider_type = ProviderType(
+                    provider_data["provider_type"]
+                )
+                filtered = {
+                    k: v
+                    for k, v in provider_data.items()
+                    if k != "provider_type"
+                }
                 self.providers[provider_id] = ProviderConfig(
                     provider_type=provider_type,
-                    **{k: v for k, v in provider_data.items() if k != "provider_type"},
+                    **filtered,
                 )
             self._mark_dirty("providers")
 
@@ -830,7 +848,7 @@ class AgentConfig:
         for watcher in self._file_watchers:
             try:
                 watcher.stop()
-            except:
+            except Exception:
                 pass
         self._file_watchers.clear()
 
@@ -841,5 +859,5 @@ class AgentConfig:
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
+        except Exception:
             pass

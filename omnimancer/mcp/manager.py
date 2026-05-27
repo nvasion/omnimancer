@@ -101,7 +101,8 @@ class MCPManager:
                 except MCPConfigurationError as e:
                     error_msg, suggestions, _ = handle_mcp_error(e, server_name)
                     logger.error(
-                        f"Configuration error for MCP server '{server_name}': {error_msg}"
+                        f"Configuration error for MCP server "
+                        f"'{server_name}': {error_msg}"
                     )
                     for suggestion in suggestions:
                         logger.info(f"  Suggestion: {suggestion}")
@@ -129,11 +130,13 @@ class MCPManager:
                             self.clients[server_name] = client
                             successful_connections += 1
                             logger.info(
-                                f"Successfully connected to MCP server on retry: {server_name}"
+                                "Successfully connected to MCP "
+                                f"server on retry: {server_name}"
                             )
                         except Exception as retry_error:
                             logger.error(
-                                f"Retry failed for MCP server '{server_name}': {retry_error}"
+                                "Retry failed for MCP server "
+                                f"'{server_name}': {retry_error}"
                             )
                             failed_connections.append(
                                 (server_name, "connection_failed", str(e))
@@ -153,7 +156,8 @@ class MCPManager:
                 except Exception as e:
                     error_msg, suggestions, _ = handle_mcp_error(e, server_name)
                     logger.error(
-                        f"Unexpected error initializing MCP server '{server_name}': {error_msg}"
+                        "Unexpected error initializing MCP "
+                        f"server '{server_name}': {error_msg}"
                     )
                     failed_connections.append((server_name, "unknown_error", str(e)))
 
@@ -170,7 +174,8 @@ class MCPManager:
         # Log initialization summary
         total_servers = len(enabled_servers)
         logger.info(
-            f"MCP initialization complete. Connected to {successful_connections}/{total_servers} servers."
+            "MCP initialization complete. Connected to "
+            f"{successful_connections}/{total_servers} servers."
         )
 
         if failed_connections:
@@ -187,7 +192,9 @@ class MCPManager:
             )
         elif successful_connections < total_servers:
             logger.info(
-                f"Partial MCP connectivity: {successful_connections} servers available for tool execution."
+                f"Partial MCP connectivity: "
+                f"{successful_connections} servers "
+                "available for tool execution."
             )
 
     async def shutdown(self) -> None:
@@ -262,7 +269,8 @@ class MCPManager:
 
             if available_tools:
                 raise MCPError(
-                    f"Tool '{name}' not found. Available tools: {', '.join(available_tools[:5])}"
+                    f"Tool '{name}' not found. Available "
+                    f"tools: {', '.join(available_tools[:5])}"
                 )
             else:
                 raise MCPError(
@@ -286,7 +294,9 @@ class MCPManager:
             # If the client is no longer connected, try to find an alternative
             if not target_client.is_connected:
                 logger.info(
-                    f"Server {target_client.server_name} disconnected, looking for alternatives..."
+                    f"Server {target_client.server_name} "
+                    "disconnected, looking for "
+                    "alternatives..."
                 )
 
                 # Try to find another server with the same tool
@@ -313,7 +323,9 @@ class MCPManager:
 
             raise MCPError(f"Failed to execute tool '{name}': {e}")
 
-    async def reload_servers(self, server_name: Optional[str] = None) -> bool:  # type: ignore[return]
+    async def reload_servers(  # type: ignore[return]
+        self, server_name: Optional[str] = None
+    ) -> bool:
         """
         Reload server configurations and reconnect.
 

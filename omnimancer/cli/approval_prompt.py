@@ -10,7 +10,7 @@ import asyncio
 import logging
 import signal
 import types
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -22,10 +22,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from omnimancer.ui.cancellation_handler import (
-    CancellationHandler,
-    get_active_cancellation_handler,
-)
+from omnimancer.ui.cancellation_handler import get_active_cancellation_handler
 
 from ..core.agent.approval_manager import BatchApprovalRequest, ChangePreview
 from ..core.security.approval_workflow import ApprovalRequest
@@ -141,7 +138,7 @@ class CLIApprovalPrompt:
             "remember": ApprovalDecisionType.APPROVED_AND_REMEMBER,
             "e": ApprovalDecisionType.REVIEW_AND_EDIT,  # Edit content
             "edit": ApprovalDecisionType.REVIEW_AND_EDIT,
-            "2": ApprovalDecisionType.REVIEW_AND_EDIT,  # Support legacy numeric responses
+            "2": ApprovalDecisionType.REVIEW_AND_EDIT,  # Legacy
             "n": ApprovalDecisionType.DENIED,
             "no": ApprovalDecisionType.DENIED,
             "reject": ApprovalDecisionType.DENIED,
@@ -224,17 +221,22 @@ class CLIApprovalPrompt:
 
         except KeyboardInterrupt:
             self.console.print(
-                "\n[red]❌ File modification cancelled by user (Ctrl+C)[/red]"
+                "\n[red]❌ File modification cancelled"
+                " by user (Ctrl+C)[/red]"
             )
             return {
                 "approved": False,
                 "reason": "Cancelled by user (Ctrl+C)",
-                "response_time_seconds": (datetime.now() - start_time).total_seconds(),
+                "response_time_seconds": (
+                    datetime.now() - start_time
+                ).total_seconds(),
             }
 
         except asyncio.TimeoutError:
             self.console.print(
-                f"\n[red]⏰ File modification timed out after {timeout} seconds - Operation denied[/red]"
+                f"\n[red]⏰ File modification timed out"
+                f" after {timeout} seconds"
+                f" - Operation denied[/red]"
             )
             return {
                 "approved": False,
@@ -244,11 +246,16 @@ class CLIApprovalPrompt:
             }
 
         except Exception as e:
-            logger.error(f"Error in file modification approval: {e}")
+            logger.error(
+                "Error in file modification"
+                f" approval: {e}"
+            )
             return {
                 "approved": False,
                 "reason": f"Error occurred: {str(e)}",
-                "response_time_seconds": (datetime.now() - start_time).total_seconds(),
+                "response_time_seconds": (
+                    datetime.now() - start_time
+                ).total_seconds(),
             }
 
         finally:
@@ -328,15 +335,22 @@ class CLIApprovalPrompt:
                 response_time_seconds=response_time,
             )
 
-            self.console.print("\n[red]❌ Operation cancelled by user (Ctrl+C)[/red]")
+            self.console.print(
+                "\n[red]❌ Operation cancelled"
+                " by user (Ctrl+C)[/red]"
+            )
 
             # Log cancellation details for debugging
             logger.info(
-                f"Approval cancelled after {response_time:.2f} seconds: {approval_request.operation_type}"
+                f"Approval cancelled after"
+                f" {response_time:.2f} seconds:"
+                f" {approval_request.operation_type}"
             )
 
             # Perform any necessary cleanup
-            await self._handle_cancellation_cleanup(approval_request, "user_interrupt")
+            await self._handle_cancellation_cleanup(
+                approval_request, "user_interrupt"
+            )
 
             return decision
 
@@ -350,12 +364,15 @@ class CLIApprovalPrompt:
             )
 
             self.console.print(
-                f"\n[red]⏰ Approval timed out after {timeout} seconds - Operation denied[/red]"
+                f"\n[red]⏰ Approval timed out after"
+                f" {timeout} seconds"
+                f" - Operation denied[/red]"
             )
 
             # Log timeout details
             logger.warning(
-                f"Approval timeout after {timeout}s: {approval_request.operation_type}"
+                f"Approval timeout after {timeout}s:"
+                f" {approval_request.operation_type}"
             )
 
             # Perform cleanup for timeout
@@ -368,10 +385,15 @@ class CLIApprovalPrompt:
             decision = ApprovalDecision(
                 decision=ApprovalDecisionType.DENIED,
                 user_notes=f"Error occurred: {str(e)}",
-                response_time_seconds=(datetime.now() - start_time).total_seconds(),
+                response_time_seconds=(
+                    datetime.now() - start_time
+                ).total_seconds(),
             )
 
-            self.console.print(f"[red]❌ Error in approval prompt: {e}[/red]")
+            self.console.print(
+                f"[red]❌ Error in approval prompt:"
+                f" {e}[/red]"
+            )
             return decision
 
         finally:
@@ -474,7 +496,9 @@ class CLIApprovalPrompt:
             raise  # Re-raise timeout for upper level handling
 
     async def _get_batch_decision_with_timeout(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: Optional[int] = None
+        self,
+        batch_request: BatchApprovalRequest,
+        timeout_seconds: Optional[int] = None,
     ) -> BatchApprovalDecision:
         """Get batch decision - waits indefinitely for user response."""
         # Wait indefinitely for user input (no timeout like Claude Code)
@@ -522,9 +546,11 @@ class CLIApprovalPrompt:
             return await self._get_batch_decision_with_timeout(batch_request, None)
 
     async def _handle_selective_approval(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: Optional[int] = None
+        self,
+        batch_request: BatchApprovalRequest,
+        timeout_seconds: Optional[int] = None,
     ) -> BatchApprovalDecision:
-        """Handle selective operation approval - waits indefinitely for user response."""
+        """Handle selective approval - wait for response."""
         operation_count = len(batch_request.operations)
 
         self.console.print(
@@ -552,7 +578,9 @@ class CLIApprovalPrompt:
         )
 
     async def _handle_individual_approval(
-        self, batch_request: BatchApprovalRequest, timeout_seconds: Optional[int] = None
+        self,
+        batch_request: BatchApprovalRequest,
+        timeout_seconds: Optional[int] = None,
     ) -> BatchApprovalDecision:
         """Handle individual operation approval."""
         individual_decisions = []
@@ -566,7 +594,9 @@ class CLIApprovalPrompt:
             zip(batch_request.operations, batch_request.previews)
         ):
             self.console.print(
-                f"\n[bold]--- Operation {i + 1} of {len(batch_request.operations)} ---[/bold]"
+                f"\n[bold]--- Operation {i + 1} of"
+                f" {len(batch_request.operations)}"
+                " ---[/bold]"
             )
 
             # Create individual approval request
@@ -647,10 +677,13 @@ class CLIApprovalPrompt:
         self.console.print()
         self.console.print("[blue]🧠 Remember Decision Confirmation[/blue]")
         self.console.print(
-            f"You chose to remember this approval for similar '{approval_request.operation_type}' operations."
+            "You chose to remember this approval for"
+            f" similar '{approval_request.operation_type}'"
+            " operations."
         )
         self.console.print(
-            "This means similar operations will be automatically approved without asking."
+            "This means similar operations will be"
+            " automatically approved without asking."
         )
         self.console.print()
 
@@ -709,7 +742,9 @@ class CLIApprovalPrompt:
         """Display confirmation of batch decision."""
         if batch_decision.decision_type == "approve_all":
             self.console.print(
-                f"[green]✅ Approved all {len(batch_request.operations)} operations[/green]"
+                "[green]✅ Approved all"
+                f" {len(batch_request.operations)}"
+                " operations[/green]"
             )
 
         elif batch_decision.decision_type == "deny_all":
@@ -733,10 +768,14 @@ class CLIApprovalPrompt:
                 )
 
         elif batch_decision.decision_type == "individual":
-            approved_count = len(batch_decision.approved_indices or [])
+            approved_count = len(
+                batch_decision.approved_indices or []
+            )
             total_count = len(batch_request.operations)
             self.console.print(
-                f"[blue]✅ Individual review complete: {approved_count} of {total_count} approved[/blue]"
+                "[blue]✅ Individual review complete:"
+                f" {approved_count} of"
+                f" {total_count} approved[/blue]"
             )
 
         elif batch_decision.decision_type in ["cancelled", "timeout"]:
@@ -755,7 +794,9 @@ class CLIApprovalPrompt:
         try:
             # Log the cancellation for debugging
             logger.debug(
-                f"Performing cancellation cleanup for {approval_request.operation_type} - Reason: {reason}"
+                "Performing cancellation cleanup for"
+                f" {approval_request.operation_type}"
+                f" - Reason: {reason}"
             )
 
             # Clean up any temporary resources that might have been allocated
@@ -777,7 +818,10 @@ class CLIApprovalPrompt:
             }
 
             # In a full implementation, this could be sent to a metrics system
-            logger.info(f"Approval cancellation recorded: {cancellation_data}")
+            logger.info(
+                "Approval cancellation recorded:"
+                f" {cancellation_data}"
+            )
 
         except Exception as e:
             logger.error(f"Error during cancellation cleanup: {e}")
@@ -831,9 +875,9 @@ class CLIApprovalPrompt:
         header_text.append(
             f"{current_model} - File Modification Review\n", style="bold cyan"
         )
-        header_text.append(f"Operation: ", style="bold")
+        header_text.append("Operation: ", style="bold")
         header_text.append(f"{operation.title()}\n", style="yellow")
-        header_text.append(f"File: ", style="bold")
+        header_text.append("File: ", style="bold")
         header_text.append(f"{file_path}", style="green")
 
         header_panel = Panel(
@@ -951,7 +995,9 @@ class CLIApprovalPrompt:
 
         self.console.print(diff_panel)
 
-    def _display_side_by_side_preview(self, current_content: str, new_content: str) -> None:
+    def _display_side_by_side_preview(
+        self, current_content: str, new_content: str,
+    ) -> None:
         """Display side-by-side preview when diff is not available."""
         current_content = self._ensure_string(current_content)
         new_content = self._ensure_string(new_content)
@@ -1003,7 +1049,11 @@ class CLIApprovalPrompt:
 
         self.console.print(stats_panel)
 
-    def _display_content_comparison_stats(self, current_content: str, new_content: str) -> None:
+    def _display_content_comparison_stats(
+        self,
+        current_content: str,
+        new_content: str,
+    ) -> None:
         """Display comparison statistics between current and new content."""
         current_content = self._ensure_string(current_content)
         new_content = self._ensure_string(new_content)

@@ -158,7 +158,7 @@ class TestErrorClassInteraction:
         execution_error = ExecutionError("Execution failed")
         timeout_error = TimeoutError("Timeout occurred")
 
-        assert type(execution_error) != type(timeout_error)
+        assert not isinstance(execution_error, type(timeout_error))
         assert not isinstance(execution_error, TimeoutError)
         assert not isinstance(timeout_error, ExecutionError)
 

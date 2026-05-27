@@ -1,4 +1,7 @@
-"""File system operations manager with security, backup, and atomic operations."""
+"""File system operations manager.
+
+Provides security, backup, and atomic operations.
+"""
 
 import glob as glob_module
 import hashlib
@@ -13,8 +16,6 @@ from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 import aiofiles
 import aiofiles.os
 
-logger = logging.getLogger(__name__)
-
 from ..security import SecurityManager
 from ..security.permission_controller import PermissionOperation
 from .approval_manager import EnhancedApprovalManager
@@ -28,6 +29,8 @@ from .read_before_write_errors import (
 )
 from .types import Operation, OperationResult, OperationType
 
+logger = logging.getLogger(__name__)
+
 
 class FileOperationError(Exception):
     """Custom exception for file operation errors."""
@@ -36,7 +39,10 @@ class FileOperationError(Exception):
 
 
 class FileSystemManager:
-    """Comprehensive file system operations with security, backup, and atomic operations."""
+    """Comprehensive file system operations.
+
+    Provides security, backup, and atomic operations.
+    """
 
     def __init__(
         self,
@@ -98,35 +104,31 @@ class FileSystemManager:
         )
 
     async def check_file_exists(
-        self, path: Union[str, Path], follow_symlinks: bool = True
+        self,
+        path: Union[str, Path],
+        follow_symlinks: bool = True,
     ) -> Dict[str, Any]:
-        """
-        Check if a file exists with comprehensive error handling and metadata.
+        """Check if a file exists with error handling.
 
         Args:
             path: Path to check for existence
-            follow_symlinks: Whether to follow symbolic links (default: True)
+            follow_symlinks: Whether to follow symbolic links
 
         Returns:
-            Dict containing:
-                - exists: Boolean indicating if file exists
-                - path: Resolved path string
-                - is_file: Boolean indicating if path points to a file
-                - is_directory: Boolean indicating if path points to a directory
-                - is_symlink: Boolean indicating if path is a symbolic link
-                - size: File size in bytes (if exists and is file)
-                - modified_time: Last modified timestamp (if exists)
-                - error: Error message if check failed
+            Dict with exists, path, is_file, is_directory,
+            is_symlink, size, modified_time, error keys.
         """
         try:
             original_path = Path(path)
-            # Use resolved path for file operations, but preserve original path for return value
+            # Use resolved path for ops, preserve original for return
             resolved_path = (
                 original_path.resolve() if follow_symlinks else original_path
             )
 
             # Check if original path is a symlink before resolving
-            is_symlink = await aiofiles.os.path.islink(original_path)  # type: ignore[attr-defined]
+            is_symlink = await aiofiles.os.path.islink(  # type: ignore[attr-defined]
+                original_path
+            )
 
             # First check existence using aiofiles for async operation
             exists = await aiofiles.os.path.exists(resolved_path)
@@ -134,10 +136,10 @@ class FileSystemManager:
             if not exists:
                 return {
                     "exists": False,
-                    "path": str(original_path),  # Return original path, not resolved
+                    "path": str(original_path),
                     "is_file": False,
                     "is_directory": False,
-                    "is_symlink": is_symlink,  # May be True for broken symlinks
+                    "is_symlink": is_symlink,
                     "size": None,
                     "modified_time": None,
                     "error": None,
@@ -151,25 +153,23 @@ class FileSystemManager:
                     str(resolved_path), "read"
                 )
                 if not security_result["success"]:
-                    # Check if it's a real security denial vs. SecurityManager limitations
+                    # Check if it's a real security denial
                     error_msg = security_result.get("error", "")
-                    # If SecurityManager says "does not exist" but we know it exists,
-                    # it might be a directory or other filesystem object the SecurityManager doesn't handle
+                    # SecurityManager may not handle directories
                     if (
                         "does not exist" in error_msg.lower()
                         or "not found" in error_msg.lower()
                     ):
-                        # Continue with existence check - SecurityManager may not handle directories properly
+                        # Continue with existence check
                         logger.debug(
-                            f"SecurityManager doesn't recognize {resolved_path}, continuing with existence check"
+                            f"SecurityManager doesn't recognize "
+                            f"{resolved_path}, continuing"
                         )
                     else:
                         # Actual security denial for existing path
                         return {
                             "exists": True,
-                            "path": str(
-                                original_path
-                            ),  # Return original path, not resolved
+                            "path": str(original_path),
                             "is_file": False,
                             "is_directory": False,
                             "is_symlink": is_symlink,
@@ -179,11 +179,13 @@ class FileSystemManager:
                         }
             except Exception as security_error:
                 logger.warning(
-                    f"Security check failed for {resolved_path}: {security_error}"
+                    f"Security check failed for "
+                    f"{resolved_path}: {security_error}"
                 )
-                # Continue with existence check despite security error
+                # Continue despite security error
                 logger.debug(
-                    f"Continuing existence check despite security error: {security_error}"
+                    f"Continuing existence check "
+                    f"despite error: {security_error}"
                 )
 
             # Gather additional metadata if file exists
@@ -199,9 +201,7 @@ class FileSystemManager:
 
                 return {
                     "exists": True,
-                    "path": str(
-                        original_path
-                    ),  # Return original path to preserve symlink paths
+                    "path": str(original_path),
                     "is_file": is_file,
                     "is_directory": is_directory,
                     "is_symlink": is_symlink,
@@ -211,28 +211,37 @@ class FileSystemManager:
                 }
 
             except OSError as os_error:
-                # File exists but we can't get metadata (permission issues, etc.)
+                # Can't get metadata (permission issues, etc.)
                 logger.warning(
-                    f"Could not get metadata for {resolved_path}: {os_error}"
+                    f"Could not get metadata for "
+                    f"{resolved_path}: {os_error}"
                 )
                 return {
                     "exists": True,
-                    "path": str(
-                        original_path
-                    ),  # Return original path to preserve symlink paths
+                    "path": str(original_path),
                     "is_file": False,
                     "is_directory": False,
                     "is_symlink": is_symlink,
                     "size": None,
                     "modified_time": None,
-                    "error": f"Metadata access failed: {str(os_error)}",
+                    "error": (
+                        f"Metadata access failed: {os_error}"
+                    ),
                 }
 
         except Exception as e:
-            logger.error(f"Error checking file existence for {original_path}: {e}")
+            logger.error(
+                f"Error checking file existence "
+                f"for {original_path}: {e}"
+            )
+            _path = (
+                original_path
+                if "original_path" in locals()
+                else path
+            )
             return {
                 "exists": False,
-                "path": str(original_path if "original_path" in locals() else path),
+                "path": str(_path),
                 "is_file": False,
                 "is_directory": False,
                 "is_symlink": False,
@@ -265,29 +274,31 @@ class FileSystemManager:
         read_before_write: bool = False,
         user_review_callback: Optional[Callable] = None,
     ) -> Dict[str, Any]:
-        """
-        Write file content with existence check and user confirmation if file exists.
+        """Write file with existence check and confirmation.
 
         Args:
             path: Path to write to
             content: Content to write (string or bytes)
             encoding: File encoding (default: 'utf-8')
-            confirmation_callback: Optional callback for user confirmation on file overwrite
-            backup: Whether to create backup of existing file (default: True)
-            atomic: Whether to use atomic write operation (default: True)
-            read_before_write: Whether to use read-before-write workflow (default: False)
-            user_review_callback: Optional callback for user review when read_before_write=True
+            confirmation_callback: Optional callback for
+                user confirmation on file overwrite
+            backup: Create backup of existing file
+            atomic: Use atomic write operation
+            read_before_write: Use read-before-write workflow
+            user_review_callback: Optional callback for user
+                review when read_before_write=True
 
         Returns:
             Dictionary with operation result
         """
         original_path = Path(path)
-        operation_id = (
-            f"write_confirm_{hashlib.md5(str(original_path).encode()).hexdigest()[:8]}"
-        )
+        _hash = hashlib.md5(
+            str(original_path).encode()
+        ).hexdigest()[:8]
+        operation_id = f"write_confirm_{_hash}"
 
         try:
-            # Check if file exists with detailed information (preserving symlink info)
+            # Check if file exists with detailed information
             file_info = await self.check_file_exists(original_path)
 
             # If file exists and we have a confirmation callback, ask user
@@ -327,15 +338,21 @@ class FileSystemManager:
                         "success": False,
                         "operation_id": operation_id,
                         "path": str(original_path),
-                        "reason": f"Confirmation callback error: {str(e)}",
+                        "reason": (
+                            f"Confirmation callback error: {e}"
+                        ),
                         "file_exists": file_info["exists"],
                     }
 
             # Handle symlink replacement if needed
-            if file_info["exists"] and file_info.get("is_symlink", False):
-                # If overwriting a symlink, remove it first to create a regular file
+            if (
+                file_info["exists"]
+                and file_info.get("is_symlink", False)
+            ):
+                # Remove symlink first to create a regular file
                 logger.debug(
-                    f"Removing symlink at {original_path} before writing new file"
+                    f"Removing symlink at {original_path} "
+                    f"before writing new file"
                 )
                 await aiofiles.os.unlink(original_path)
 
@@ -422,24 +439,26 @@ class FileSystemManager:
         read_before_write: bool = False,
         user_review_callback: Optional[Callable] = None,
     ) -> Dict[str, Any]:
-        """
-        Write file content with atomic operations, backup, security validation, and approval.
+        """Write file with atomic ops, backup, and approval.
 
         Args:
             path: Path to write to
             content: Content to write (string or bytes)
             encoding: File encoding (default: 'utf-8')
-            backup: Whether to create backup of existing file (default: True)
-            atomic: Whether to use atomic write operation (default: True)
-            read_before_write: Whether to use read-before-write workflow (default: False)
-            user_review_callback: Optional callback for user review when read_before_write=True
+            backup: Create backup of existing file
+            atomic: Use atomic write operation
+            read_before_write: Use read-before-write workflow
+            user_review_callback: Optional review callback
 
         Returns:
             Dictionary with operation result
         """
 
         path = Path(path).resolve()
-        operation_id = f"write_{hashlib.md5(str(path).encode()).hexdigest()[:8]}"
+        _hash = hashlib.md5(
+            str(path).encode()
+        ).hexdigest()[:8]
+        operation_id = f"write_{_hash}"
 
         # If read-before-write is enabled, delegate to that method
         if read_before_write:
@@ -468,7 +487,11 @@ class FileSystemManager:
             content_str = ""
             content_length = 0
         elif isinstance(content, str):
-            content_str = content[:1000] + "..." if len(content) > 1000 else content
+            content_str = (
+                content[:1000] + "..."
+                if len(content) > 1000
+                else content
+            )
             content_length = len(content)
         else:
             # bytes content
@@ -549,9 +572,10 @@ class FileSystemManager:
         operation_id: Optional[str] = None,
         approved: bool = True,
     ) -> Dict[str, Any]:
-        """
-        Execute the core file write operation with security, backup, and atomic operations.
-        Used by both write_file() and _perform_direct_write() to avoid code duplication.
+        """Execute the core file write operation.
+
+        Handles security, backup, and atomic operations.
+        Used by write_file() and _perform_direct_write().
         """
         try:
             # Security validation
@@ -578,27 +602,39 @@ class FileSystemManager:
                     # Log backup failure but continue with write operation
                     logger.warning(f"Backup creation failed for {path}: {e}")
                     if operation_id:
-                        self.active_operations[operation_id]["backup_warning"] = str(e)
+                        self.active_operations[operation_id][
+                            "backup_warning"
+                        ] = str(e)
 
             # Atomic write
+            resolved_path = Path(path)
             if atomic:
-                result = await self._atomic_write(path, content, encoding)  # type: ignore[arg-type]
+                result = await self._atomic_write(
+                    resolved_path, content, encoding
+                )
             else:
-                result = await self._direct_write(path, content, encoding)  # type: ignore[arg-type]
+                result = await self._direct_write(
+                    resolved_path, content, encoding
+                )
 
             # Update operation tracking if operation_id provided
             if operation_id:
                 self.active_operations[operation_id].update(result)
                 self.active_operations[operation_id]["success"] = True
 
+            _content_bytes = (
+                content.encode(encoding)
+                if isinstance(content, str)
+                else content
+            )
             return {
                 "success": True,
                 "operation_id": operation_id,
                 "path": str(path),
-                "backup_path": str(backup_path) if backup_path else None,
-                "bytes_written": len(
-                    content.encode(encoding) if isinstance(content, str) else content
+                "backup_path": (
+                    str(backup_path) if backup_path else None
                 ),
+                "bytes_written": len(_content_bytes),
                 "atomic": atomic,
                 "approved": approved,
             }
@@ -626,12 +662,15 @@ class FileSystemManager:
         backup: bool = True,
         atomic: bool = True,
     ) -> Dict[str, Any]:
-        """
-        Perform direct file write bypassing the main write_file method.
-        Used internally by read_before_write to avoid infinite loops.
+        """Perform direct write bypassing write_file.
+
+        Used internally by read_before_write to avoid loops.
         """
         path = Path(path).resolve()
-        operation_id = f"direct_write_{hashlib.md5(str(path).encode()).hexdigest()[:8]}"
+        _hash = hashlib.md5(
+            str(path).encode()
+        ).hexdigest()[:8]
+        operation_id = f"direct_write_{_hash}"
 
         # Validate content is not None
         if content is None:
@@ -826,7 +865,7 @@ class FileSystemManager:
                     result = await self.security.secure_file_access(str(path), "read")
                     if result["success"]:
                         validated_paths.append(path)
-                except:
+                except Exception:
                     # Skip files that fail security validation
                     continue
 
@@ -862,16 +901,19 @@ class FileSystemManager:
             raise FileOperationError(f"Failed to copy file: {str(e)}")
 
     async def move_file(
-        self, src: Union[str, Path], dst: Union[str, Path], backup: bool = True
+        self,
+        src: Union[str, Path],
+        dst: Union[str, Path],
+        backup: bool = True,
     ) -> Dict[str, Any]:
-        """Move file with security validation, approval, and optional backup."""
+        """Move file with security, approval, and backup."""
 
         src = Path(src).resolve()
         dst = Path(dst).resolve()
 
         # Create operation for approval workflow
         operation = self._create_operation(
-            operation_type=OperationType.FILE_WRITE,  # Move involves writing to new location
+            operation_type=OperationType.FILE_WRITE,
             description=f"Move file: {src.name} → {dst.name}",
             data={
                 "source_path": str(src),
@@ -885,7 +927,8 @@ class FileSystemManager:
         approved = await self._request_approval_if_needed(operation)
         if not approved:
             raise FileOperationError(
-                f"File move operation denied by approval workflow: {src} → {dst}"
+                "File move operation denied by "
+                f"approval workflow: {src} → {dst}"
             )
 
         # Copy first, then delete source
@@ -925,7 +968,11 @@ class FileSystemManager:
                 "created": datetime.fromtimestamp(stat_result.st_ctime),
                 "is_file": path.is_file(),
                 "is_dir": path.is_dir(),
-                "is_binary": (self._is_binary_file(path) if path.is_file() else False),
+                "is_binary": (
+                    self._is_binary_file(path)
+                    if path.is_file()
+                    else False
+                ),
                 "mime_type": mimetypes.guess_type(str(path))[0],
                 "permissions": oct(stat_result.st_mode)[-3:],
             }
@@ -934,8 +981,14 @@ class FileSystemManager:
             if (
                 path.is_file() and stat_result.st_size < 10 * 1024 * 1024
             ):  # Only for files < 10MB
-                raw_content = await self.read_file(path, binary=True)
-                content_bytes = raw_content if isinstance(raw_content, bytes) else raw_content.encode("utf-8")
+                raw_content = await self.read_file(
+                    path, binary=True
+                )
+                content_bytes = (
+                    raw_content
+                    if isinstance(raw_content, bytes)
+                    else raw_content.encode("utf-8")
+                )
                 info["md5_hash"] = hashlib.md5(content_bytes).hexdigest()
                 info["sha256_hash"] = hashlib.sha256(content_bytes).hexdigest()
 
@@ -967,7 +1020,7 @@ class FileSystemManager:
                     try:
                         info = await self.get_file_info(item)
                         items.append(info)
-                    except:
+                    except Exception:
                         # Skip items that can't be accessed
                         continue
             else:
@@ -975,11 +1028,14 @@ class FileSystemManager:
                     try:
                         info = await self.get_file_info(item)
                         items.append(info)
-                    except:
+                    except Exception:
                         # Skip items that can't be accessed
                         continue
 
-            return sorted(items, key=lambda x: (not x["is_dir"], x["name"].lower()))
+            return sorted(
+                items,
+                key=lambda x: (not x["is_dir"], x["name"].lower()),
+            )
 
         except Exception as e:
             raise FileOperationError(f"Failed to list directory: {str(e)}")
@@ -992,7 +1048,7 @@ class FileSystemManager:
             with open(path, "rb") as f:
                 chunk = f.read(8192)
                 return b"\x00" in chunk
-        except:
+        except Exception:
             return False
 
     async def _atomic_write(
@@ -1093,11 +1149,15 @@ class FileSystemManager:
         backup_path = operation.get("backup_path")
         original_path = operation.get("path")
 
-        if backup_path and original_path and await aiofiles.os.path.exists(backup_path):
+        if (
+            backup_path
+            and original_path
+            and await aiofiles.os.path.exists(backup_path)
+        ):
             try:
                 await self._copy_file(Path(backup_path), Path(original_path))
                 return True
-            except:
+            except Exception:
                 return False
 
         return False
@@ -1112,17 +1172,21 @@ class FileSystemManager:
         # Check if we're in a git repository
         try:
             result = await self.security.execute_secure_command(
-                ["git", "rev-parse", "--git-dir"], working_dir=str(path.parent)
+                ["git", "rev-parse", "--git-dir"],
+                working_dir=str(path.parent),
             )
             if not result["success"]:
                 raise FileOperationError("Not in a git repository")
-        except:
-            raise FileOperationError("Git not available or not in a git repository")
+        except Exception:
+            raise FileOperationError(
+                "Git not available or not in a git repository"
+            )
 
         # Add file to git
         try:
             result = await self.security.execute_secure_command(
-                ["git", "add", str(path)], working_dir=str(path.parent)
+                ["git", "add", str(path)],
+                working_dir=str(path.parent),
             )
             return result["success"]  # type: ignore[no-any-return]
         except Exception as e:
@@ -1177,7 +1241,9 @@ class FileSystemManager:
         async with aiofiles.open(path, "rb") as f:
             yield f
 
-    async def get_operation_status(self, operation_id: str) -> Optional[Dict[str, Any]]:
+    async def get_operation_status(
+        self, operation_id: str
+    ) -> Optional[Dict[str, Any]]:
         """Get status of a tracked operation."""
         return self.active_operations.get(operation_id)
 
@@ -1274,7 +1340,8 @@ class FileSystemManager:
                         )
                     elif error_result.get("fallback_action") == "regular_write":
                         logger.warning(
-                            f"Falling back to regular write for {path} due to read error"
+                            "Falling back to regular write"
+                            f" for {path} due to read error"
                         )
                         return await self._perform_direct_write(
                             path=path, content=new_content, encoding=encoding
@@ -1307,16 +1374,20 @@ class FileSystemManager:
 
             # Generate diff if both contents exist
             try:
-                if current_content and not current_content.startswith(
-                    "<Error reading file:"  # type: ignore[arg-type]
+                if (
+                    current_content
+                    and isinstance(current_content, str)
+                    and not current_content.startswith("<Error reading file:")
                 ):
                     if isinstance(new_content, str):
                         review_data["diff"] = self._generate_content_diff(
-                            current_content, new_content, str(path)  # type: ignore[arg-type]
+                            current_content,
+                            new_content,
+                            str(path),
                         )
                     elif isinstance(new_content, bytes):
                         review_data["diff"] = self._generate_content_diff(
-                            current_content,  # type: ignore[arg-type]
+                            current_content,
                             new_content.decode(encoding, errors="ignore"),
                             str(path),
                         )
@@ -1356,7 +1427,8 @@ class FileSystemManager:
                         )
                     elif error_result.get("fallback_action") == "regular_write":
                         logger.warning(
-                            f"Falling back to regular write for {path} due to callback error"
+                            "Falling back to regular write"
+                            f" for {path} due to callback error"
                         )
                         return await self._perform_direct_write(
                             path=path, content=new_content, encoding=encoding
@@ -1385,7 +1457,9 @@ class FileSystemManager:
                 from .read_before_write_errors import UserRejectionError
 
                 rejection_reason = user_decision.get("reason", "User rejected changes")
-                rejection_error = UserRejectionError(str(path), rejection_reason)  # type: ignore[arg-type]
+                rejection_error = UserRejectionError(
+                    str(path), rejection_reason,  # type: ignore[arg-type]
+                )
                 error_result = self.error_handler.handle_error(
                     rejection_error, retry_count, max_retries
                 )
@@ -1407,7 +1481,9 @@ class FileSystemManager:
 
             if user_decision.get("modified_content") is not None:
                 try:
-                    self._validate_content(final_content, str(path))  # type: ignore[arg-type]
+                    self._validate_content(
+                        final_content, str(path),  # type: ignore[arg-type]
+                    )
                 except Exception as validation_error:
                     content_error = ContentValidationError(
                         str(path), str(validation_error)
@@ -1419,7 +1495,8 @@ class FileSystemManager:
                     if error_result.get("fallback_action") == "prompt_user":
                         return {
                             "success": False,
-                            "error": f"Content validation failed: {str(validation_error)}",
+                            "error": f"Content validation failed:"
+                            f" {str(validation_error)}",
                             "operation": "read_before_write",
                             "error_details": error_result,
                             "requires_user_action": True,
@@ -1427,8 +1504,10 @@ class FileSystemManager:
 
             # Proceed with write operation - CRITICAL FIX for infinite loop
             try:
-                # Skip read_before_write to avoid calling the replaced write_file method again
-                # This directly performs the file write without triggering approval again
+                # Skip read_before_write to avoid calling
+                # the replaced write_file method again.
+                # Directly performs the file write without
+                # triggering approval again.
                 write_result = await self._perform_direct_write(
                     path=path,
                     content=final_content,  # type: ignore[arg-type]
@@ -1623,8 +1702,10 @@ class FileSystemManager:
         """Get the current working directory."""
         return Path.cwd()
 
-    async def is_git_repository(self, path: Optional[Union[str, Path]] = None) -> bool:
-        """Check if the given path (or current directory) is a Git repository."""
+    async def is_git_repository(
+        self, path: Optional[Union[str, Path]] = None
+    ) -> bool:
+        """Check if path (or cwd) is a Git repository."""
 
         check_path = (
             Path(path).resolve() if path else self.get_current_working_directory()
@@ -1667,7 +1748,7 @@ class FileSystemManager:
     async def get_directory_context(
         self, path: Optional[Union[str, Path]] = None
     ) -> Dict[str, Any]:
-        """Get comprehensive directory context including working directory and repository status."""
+        """Get directory context with repo status."""
 
         target_path = (
             Path(path).resolve() if path else self.get_current_working_directory()
@@ -1690,7 +1771,7 @@ class FileSystemManager:
                         target_path.relative_to(repo_root)
                     )
                 except ValueError:
-                    # Path is not relative to repo root (shouldn't happen, but just in case)
+                    # Path is not relative to repo root
                     context["relative_to_repo_root"] = str(target_path)
 
         return context
@@ -1704,7 +1785,7 @@ class FileSystemManager:
             if temp_path and await aiofiles.os.path.exists(temp_path):
                 try:
                     await aiofiles.os.remove(temp_path)
-                except:
+                except Exception:
                     pass
 
         self.active_operations.clear()
@@ -1718,7 +1799,7 @@ class FileSystemManager:
         encoding: str = "utf-8",
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Create a new file with the given content (test compatibility wrapper)."""
+        """Create a new file (test compatibility wrapper)."""
         return await self.write_file(
             path=path, content=content, encoding=encoding, **kwargs
         )
@@ -1730,7 +1811,7 @@ class FileSystemManager:
         encoding: str = "utf-8",
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Modify an existing file with new content (test compatibility wrapper)."""
+        """Modify existing file (test compatibility wrapper)."""
         return await self.write_file(
             path=path, content=content, encoding=encoding, **kwargs
         )
@@ -1743,18 +1824,24 @@ class FileSystemManager:
                 result = await self.read_file(operation.data["path"])
                 return OperationResult(success=True, data=result)
             elif operation.type == OperationType.FILE_WRITE:
-                result = await self.write_file(  # type: ignore[assignment]
+                write_result = await self.write_file(
                     path=operation.data["path"],
                     content=operation.data["content"],
                     encoding=operation.data.get("encoding", "utf-8"),
                 )
-                return OperationResult(success=result["success"], data=result)  # type: ignore[arg-type, call-overload, index]
+                return OperationResult(
+                    success=bool(write_result["success"]),
+                    data=write_result,
+                )
             elif operation.type == OperationType.FILE_DELETE:
-                result = await self.delete_file(  # type: ignore[assignment]
+                delete_result = await self.delete_file(
                     path=operation.data["path"],
                     backup=operation.data.get("backup", True),
                 )
-                return OperationResult(success=result["success"], data=result)  # type: ignore[arg-type, call-overload, index]
+                return OperationResult(
+                    success=bool(delete_result["success"]),
+                    data=delete_result,
+                )
             else:
                 return OperationResult(
                     success=False,
@@ -1763,8 +1850,10 @@ class FileSystemManager:
         except Exception as e:
             return OperationResult(success=False, error=str(e))
 
-    async def preview_operation(self, operation: Operation) -> str:
-        """Generate a preview of what the operation will do (interface compatibility)."""
+    async def preview_operation(
+        self, operation: Operation
+    ) -> str:
+        """Generate a preview of what the operation will do."""
         try:
             if operation.type == OperationType.FILE_READ:
                 return f"Read file: {operation.data['path']}"
@@ -1772,10 +1861,14 @@ class FileSystemManager:
                 path = operation.data["path"]
                 exists = await aiofiles.os.path.exists(path)
                 action = "Update" if exists else "Create"
-                content_preview = str(operation.data["content"])[:100]
-                if len(content_preview) < len(str(operation.data["content"])):
+                _content = str(operation.data["content"])
+                content_preview = _content[:100]
+                if len(content_preview) < len(_content):
                     content_preview += "..."
-                return f"{action} file: {path}\nContent preview: {content_preview}"
+                return (
+                    f"{action} file: {path}\n"
+                    f"Content preview: {content_preview}"
+                )
             elif operation.type == OperationType.FILE_DELETE:
                 return f"Delete file: {operation.data['path']}"
             else:

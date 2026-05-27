@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 
-from ..core.models import ChatResponse, StreamEvent, StreamEventType, ToolCall
+from ..core.models import StreamEvent, StreamEventType, ToolCall
 
 
 class StreamingDisplay:
@@ -50,10 +50,19 @@ class StreamingDisplay:
             self._current_tool_json += event.partial_json
         elif event.type == StreamEventType.TOOL_USE_END:
             try:
-                args = json.loads(self._current_tool_json) if self._current_tool_json else {}
+                args = (
+                    json.loads(self._current_tool_json)
+                    if self._current_tool_json
+                    else {}
+                )
             except json.JSONDecodeError:
                 args = {}
-            self.tool_calls.append(ToolCall(name=self._current_tool_name, arguments=args))
+            self.tool_calls.append(
+                ToolCall(
+                    name=self._current_tool_name,
+                    arguments=args,
+                )
+            )
             self._current_tool_name = ""
             self._current_tool_json = ""
 

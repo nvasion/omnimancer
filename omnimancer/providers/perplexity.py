@@ -37,7 +37,8 @@ class PerplexityProvider(BaseProvider):
 
         Args:
             api_key: Perplexity API key
-            model: Perplexity model to use (e.g., 'llama-3.1-sonar-small-128k-online', 'llama-3.1-sonar-large-128k-online')
+            model: Perplexity model to use
+                (e.g., 'llama-3.1-sonar-small-128k-online')
             **kwargs: Additional configuration including search settings
         """
         super().__init__(
@@ -216,7 +217,7 @@ class PerplexityProvider(BaseProvider):
             try:
                 error_data = response.json()
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            except:
+            except Exception:
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"Perplexity API error: {error_msg}")

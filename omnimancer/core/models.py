@@ -183,7 +183,10 @@ class EnhancedModelInfo:
         """Get formatted cost display string."""
         if self.is_free:
             return "Free"
-        return f"${self.cost_per_million_input:.2f} in, ${self.cost_per_million_output:.2f} out"
+        return (
+            f"${self.cost_per_million_input:.2f} in,"
+            f" ${self.cost_per_million_output:.2f} out"
+        )
 
     def get_swe_display(self) -> str:
         """Get formatted SWE score display."""
@@ -261,10 +264,16 @@ class EnhancedModelInfo:
         )
 
     @classmethod
-    def from_model_info(cls, model_info: "ModelInfo | EnhancedModelInfo", **kwargs: Any) -> "EnhancedModelInfo":
+    def from_model_info(
+        cls,
+        model_info: "ModelInfo | EnhancedModelInfo",
+        **kwargs: Any,
+    ) -> "EnhancedModelInfo":
         """Create EnhancedModelInfo from legacy ModelInfo."""
         # Convert legacy cost_per_token to per-million costs
-        cost_per_million = model_info.cost_per_token * 1_000_000  # type: ignore[union-attr]
+        cost_per_million = (
+            model_info.cost_per_token * 1_000_000  # type: ignore[union-attr]
+        )
 
         return cls(
             name=model_info.name,
@@ -279,7 +288,9 @@ class EnhancedModelInfo:
             latest_version=model_info.latest_version,
             deprecated=model_info.deprecated,
             context_window=model_info.max_tokens,
-            is_free=model_info.cost_per_token == 0,  # type: ignore[union-attr]
+            is_free=(
+                model_info.cost_per_token == 0  # type: ignore[union-attr]
+            ),
             **kwargs,
         )
 
@@ -304,7 +315,8 @@ class ProviderConfig(BaseModel):
     temperature: Optional[float] = None
 
     # Provider-specific settings
-    base_url: Optional[str] = None  # For custom endpoints (OpenAI-compatible, Ollama)
+    # For custom endpoints (OpenAI-compatible, Ollama)
+    base_url: Optional[str] = None
     organization: Optional[str] = None  # For OpenAI organizations
     project_id: Optional[str] = None  # For Google Cloud projects
     timeout: Optional[float] = None  # Request timeout in seconds
@@ -352,13 +364,20 @@ class ProviderConfig(BaseModel):
     logit_bias: Optional[Dict[int, float]] = None  # Token biasing
 
     # Provider capabilities
-    supports_tools: bool = False  # Whether provider supports function calling
-    supports_multimodal: bool = False  # Whether provider supports images/files
-    supports_streaming: bool = True  # Whether provider supports streaming responses
-    supports_system_messages: bool = True  # Whether provider supports system messages
-    supports_function_calling: bool = False  # Alias for supports_tools for clarity
-    supports_vision: bool = False  # Whether provider supports image analysis
-    supports_json_mode: bool = False  # Whether provider supports JSON mode
+    # Whether provider supports function calling
+    supports_tools: bool = False
+    # Whether provider supports images/files
+    supports_multimodal: bool = False
+    # Whether provider supports streaming responses
+    supports_streaming: bool = True
+    # Whether provider supports system messages
+    supports_system_messages: bool = True
+    # Alias for supports_tools for clarity
+    supports_function_calling: bool = False
+    # Whether provider supports image analysis
+    supports_vision: bool = False
+    # Whether provider supports JSON mode
+    supports_json_mode: bool = False
 
     # Configuration metadata
     provider_type: Optional[str] = None  # Provider type identifier
@@ -380,7 +399,8 @@ class ProviderConfig(BaseModel):
 
     # Custom headers and authentication
     custom_headers: Optional[Dict[str, str]] = None
-    auth_type: str = "api_key"  # api_key, bearer, oauth, service_account, none
+    # api_key, bearer, oauth, service_account, none
+    auth_type: str = "api_key"
     oauth_config: Optional[Dict[str, Any]] = None  # OAuth configuration
 
     # Perplexity-specific settings
@@ -830,7 +850,12 @@ class ProviderConfig(BaseModel):
                         for k, v in data[field].items()
                     }
 
-        return f"ProviderConfig(model={data.get('model')}, provider_type={data.get('provider_type')}, api_key={'***masked***' if self.api_key else None})"
+        masked_key = "***masked***" if self.api_key else None
+        return (
+            f"ProviderConfig(model={data.get('model')},"
+            f" provider_type={data.get('provider_type')},"
+            f" api_key={masked_key})"
+        )
 
     def __repr__(self) -> str:
         """Representation with masked sensitive data."""
@@ -959,7 +984,11 @@ class MCPConfig(BaseModel):
 
     def get_enabled_servers(self) -> Dict[str, MCPServerConfig]:
         """Get only enabled MCP servers."""
-        return {name: config for name, config in self.servers.items() if config.enabled}
+        return {
+            name: config
+            for name, config in self.servers.items()
+            if config.enabled
+        }
 
     def get_server_by_name(self, name: str) -> Optional[MCPServerConfig]:
         """Get a specific MCP server configuration by name."""
@@ -1180,7 +1209,8 @@ class Config(BaseModel):
         # Handle provider-specific environment variables
         for env_var, value in env_vars.items():
             if env_var.startswith("omnimancer_") and "_API_KEY" in env_var:
-                # Extract provider name from env var (e.g., omnimancer_CLAUDE_API_KEY -> claude)
+                # Extract provider name from env var
+                # (e.g., omnimancer_CLAUDE_API_KEY -> claude)
                 provider_name = (
                     env_var.replace("omnimancer_", "").replace("_API_KEY", "").lower()
                 )
@@ -1239,7 +1269,8 @@ class Config(BaseModel):
             errors.append("No default provider specified")
         elif self.default_provider not in self.providers:
             errors.append(
-                f"Default provider '{self.default_provider}' not found in configured providers"
+                f"Default provider '{self.default_provider}'"
+                " not found in configured providers"
             )
 
         if not self.providers:
@@ -1279,7 +1310,11 @@ class Config(BaseModel):
                 "enabled": config.enabled,
             }
 
-        return f"Config(default_provider={self.default_provider}, providers={list(self.providers.keys())}, mcp_enabled={self.mcp.enabled})"
+        return (
+            f"Config(default_provider={self.default_provider},"
+            f" providers={list(self.providers.keys())},"
+            f" mcp_enabled={self.mcp.enabled})"
+        )
 
     def __repr__(self) -> str:
         """Representation with masked sensitive data."""
@@ -1327,7 +1362,9 @@ class Config(BaseModel):
         ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Claude model '{config.model}' for provider '{provider_name}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Claude model '{config.model}' for"
+                f" provider '{provider_name}'. Valid models:"
+                f" {', '.join(valid_models)}"
             )
 
         return errors
@@ -1352,7 +1389,9 @@ class Config(BaseModel):
         ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown OpenAI model '{config.model}' for provider '{provider_name}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown OpenAI model '{config.model}' for"
+                f" provider '{provider_name}'. Valid models:"
+                f" {', '.join(valid_models)}"
             )
 
         return errors
@@ -1365,14 +1404,21 @@ class Config(BaseModel):
 
         if not config.api_key and not config.service_account_path:
             errors.append(
-                f"Gemini provider '{provider_name}' requires either an API key or service account"
+                f"Gemini provider '{provider_name}' requires"
+                " either an API key or service account"
             )
 
         # Validate model
-        valid_models = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"]
+        valid_models = [
+            "gemini-1.5-pro",
+            "gemini-1.5-flash",
+            "gemini-1.0-pro",
+        ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Gemini model '{config.model}' for provider '{provider_name}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Gemini model '{config.model}' for"
+                f" provider '{provider_name}'. Valid models:"
+                f" {', '.join(valid_models)}"
             )
 
         return errors
@@ -1395,7 +1441,9 @@ class Config(BaseModel):
         ]
         if config.model not in valid_models:
             errors.append(
-                f"Unknown Cohere model '{config.model}' for provider '{provider_name}'. Valid models: {', '.join(valid_models)}"
+                f"Unknown Cohere model '{config.model}' for"
+                f" provider '{provider_name}'. Valid models:"
+                f" {', '.join(valid_models)}"
             )
 
         return errors
@@ -1411,7 +1459,9 @@ class Config(BaseModel):
         if config.base_url:
             if not config.base_url.startswith(("http://", "https://")):
                 errors.append(
-                    f"Ollama provider '{provider_name}' base_url must start with 'http://' or 'https://'"
+                    f"Ollama provider '{provider_name}'"
+                    " base_url must start with"
+                    " 'http://' or 'https://'"
                 )
 
         # Model validation is difficult for Ollama since models are dynamic
@@ -1432,7 +1482,8 @@ class Config(BaseModel):
                 errors.append(f"MCP server '{server_name}' has no command")
             if server_config.timeout <= 0:
                 errors.append(
-                    f"MCP server '{server_name}' has invalid timeout: {server_config.timeout}"
+                    f"MCP server '{server_name}' has invalid"
+                    f" timeout: {server_config.timeout}"
                 )
 
         return errors
@@ -1447,7 +1498,9 @@ class Config(BaseModel):
             errors.append(f"Profile '{profile_name}' has no default provider")
         elif profile.default_provider not in profile.providers:
             errors.append(
-                f"Profile '{profile_name}' default provider '{profile.default_provider}' not found in profile providers"
+                f"Profile '{profile_name}' default provider"
+                f" '{profile.default_provider}' not found"
+                " in profile providers"
             )
 
         if not profile.providers:
@@ -1502,7 +1555,9 @@ class Config(BaseModel):
             # This would be tracked in runtime state, not persisted config
             pass
 
-    def get_fallback_providers(self, exclude_provider: Optional[str] = None) -> List[str]:
+    def get_fallback_providers(
+        self, exclude_provider: Optional[str] = None
+    ) -> List[str]:
         """Get list of fallback providers in priority order."""
         providers_by_priority = self.get_providers_by_priority()
         fallback_providers = []

@@ -298,7 +298,7 @@ class TestCohereProviderModelInfo:
         assert names1 == names2
 
     def test_model_info_matches_available_models(self):
-        """Test that get_model_info() returns consistent info with get_available_models()."""
+        """Test get_model_info() is consistent with get_available_models()."""
         provider = CohereProvider(api_key="co_test123456789", model="command-r-plus")
 
         # Get model info for current model
@@ -410,7 +410,9 @@ class TestCohereProviderMessageSending:
         """Test handling of model not found errors."""
         mock_response = MagicMock()
         mock_response.status_code = 400
-        mock_response.json.return_value = {"message": "model 'invalid-model' not found"}
+        mock_response.json.return_value = {
+            "message": "model 'invalid-model' not found"
+        }
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(

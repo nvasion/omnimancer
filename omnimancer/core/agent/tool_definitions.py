@@ -20,7 +20,10 @@ CODING_AGENT_TOOLS = [
     ),
     ToolDefinition(
         name="file_write",
-        description="Write content to a file. Creates the file if it doesn't exist, overwrites if it does.",
+        description=(
+            "Write content to a file. Creates the file "
+            "if it doesn't exist, overwrites if it does."
+        ),
         parameters={
             "type": "object",
             "properties": {
@@ -52,7 +55,10 @@ CODING_AGENT_TOOLS = [
     ),
     ToolDefinition(
         name="command_exec",
-        description="Execute a shell command and return its stdout, stderr, and exit code.",
+        description=(
+            "Execute a shell command and return its "
+            "stdout, stderr, and exit code."
+        ),
         parameters={
             "type": "object",
             "properties": {
@@ -76,11 +82,18 @@ CODING_AGENT_TOOLS = [
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "Glob pattern to match (e.g. '**/*.py', 'src/**/*.ts')",
+                    "description": (
+                        "Glob pattern to match "
+                        "(e.g. '**/*.py', 'src/**/*.ts')"
+                    ),
                 },
                 "directory": {
                     "type": "string",
-                    "description": "Root directory to search from (optional, defaults to current directory)",
+                    "description": (
+                        "Root directory to search from "
+                        "(optional, defaults to current "
+                        "directory)"
+                    ),
                 },
             },
             "required": ["pattern"],
@@ -89,7 +102,11 @@ CODING_AGENT_TOOLS = [
     ),
     ToolDefinition(
         name="search_text",
-        description="Search for text or regex pattern in files. Returns matching lines with file paths and line numbers.",
+        description=(
+            "Search for text or regex pattern in files. "
+            "Returns matching lines with file paths "
+            "and line numbers."
+        ),
         parameters={
             "type": "object",
             "properties": {
@@ -99,7 +116,11 @@ CODING_AGENT_TOOLS = [
                 },
                 "directory": {
                     "type": "string",
-                    "description": "Directory to search in (optional, defaults to current directory)",
+                    "description": (
+                        "Directory to search in "
+                        "(optional, defaults to current "
+                        "directory)"
+                    ),
                 },
                 "file_pattern": {
                     "type": "string",

@@ -63,7 +63,8 @@ def sample_chat_context():
         ),
         ChatMessage(
             role=MessageRole.ASSISTANT,
-            content="I'm here to help you with various tasks. What would you like to know?",
+            content="I'm here to help you with various tasks."
+            " What would you like to know?",
             timestamp=datetime.now(),
             model_used="gpt-4",
         ),
@@ -84,7 +85,11 @@ def mock_successful_response():
             {
                 "message": {
                     "role": "assistant",
-                    "content": "I can help you with a wide range of topics including programming, writing, analysis, and more.",
+                    "content": (
+                        "I can help you with a wide range"
+                        " of topics including programming,"
+                        " writing, analysis, and more."
+                    ),
                 }
             }
         ],
@@ -103,7 +108,9 @@ class TestAzureProviderInitialization:
         """Test provider initialization with full Azure configuration."""
         assert azure_provider.api_key == "test-azure-key"
         assert azure_provider.model == "gpt-4"
-        assert azure_provider.azure_endpoint == "https://test-resource.openai.azure.com"
+        assert azure_provider.azure_endpoint == (
+            "https://test-resource.openai.azure.com"
+        )
         assert azure_provider.azure_deployment == "gpt-4-deployment"
         assert azure_provider.api_version == "2024-02-15-preview"
         assert azure_provider.max_tokens == 4096
@@ -154,10 +161,12 @@ class TestAzureProviderMessageSending:
                 "What can you help me with?", sample_chat_context
             )
 
-            assert (
-                response.content
-                == "I can help you with a wide range of topics including programming, writing, analysis, and more."
+            expected = (
+                "I can help you with a wide range"
+                " of topics including programming,"
+                " writing, analysis, and more."
             )
+            assert response.content == expected
             assert response.model_used == "gpt-4"
             assert response.tokens_used == 35
             assert response.timestamp is not None
@@ -183,8 +192,10 @@ class TestAzureProviderMessageSending:
             # Check that the correct Azure URL was called
             call_args = mock_post.call_args
             expected_url = (
-                "https://test-resource.openai.azure.com/openai/deployments/"
-                "gpt-4-deployment/chat/completions?api-version=2024-02-15-preview"
+                "https://test-resource.openai.azure"
+                ".com/openai/deployments/"
+                "gpt-4-deployment/chat/completions"
+                "?api-version=2024-02-15-preview"
             )
             assert call_args[0][0] == expected_url
 
@@ -394,7 +405,9 @@ class TestAzureProviderModelInfo:
         model_info = azure_provider_minimal.get_model_info()
 
         assert model_info.name == "gpt-35-turbo"
-        assert model_info.description == "GPT-3.5 Turbo via Azure OpenAI Service"
+        assert model_info.description == (
+            "GPT-3.5 Turbo via Azure OpenAI Service"
+        )
         assert model_info.max_tokens == 4096
         assert model_info.cost_per_million_input == 0.5
         assert model_info.cost_per_million_output == 1.5
@@ -514,7 +527,9 @@ class TestAzureProviderResponseHandling:
 
         assert (
             response.content
-            == "I can help you with a wide range of topics including programming, writing, analysis, and more."
+            == "I can help you with a wide range of topics"
+            " including programming, writing,"
+            " analysis, and more."
         )
         assert response.model_used == "gpt-4"
         assert response.tokens_used == 35
@@ -567,7 +582,12 @@ class TestAzureProviderURLConstruction:
 
     def test_build_url_missing_endpoint(self):
         """Test URL construction with missing endpoint."""
-        # This test is no longer valid since azure_endpoint is required during initialization
-        # The provider will raise ValueError during __init__ if endpoint is missing
-        with pytest.raises(ValueError, match="azure_endpoint is required"):
-            AzureProvider(api_key="test-key", model="gpt-4")
+        # This test is no longer valid since azure_endpoint
+        # is required during initialization. The provider will
+        # raise ValueError during __init__ if endpoint is missing
+        with pytest.raises(
+            ValueError, match="azure_endpoint is required"
+        ):
+            AzureProvider(
+                api_key="test-key", model="gpt-4"
+            )
