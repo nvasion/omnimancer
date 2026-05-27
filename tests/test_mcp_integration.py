@@ -830,7 +830,6 @@ class TestMCPIntegrationScenarios:
         connection_attempts = 0
 
         def mock_client_factory(server_config):
-            nonlocal connection_attempts
             client = AsyncMock(spec=MCPClient)
 
             async def mock_connect():
