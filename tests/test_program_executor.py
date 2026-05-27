@@ -23,13 +23,8 @@ from omnimancer.core.agent.program_executor import (
     SecurityError,
     StreamingExecutor,
 )
-from omnimancer.core.security.approval_workflow import (
-    ApprovalWorkflow,
-    RiskLevel,
-)
-from omnimancer.core.security.sandbox_manager import (
-    SandboxManager,
-)
+from omnimancer.core.security.approval_workflow import ApprovalWorkflow, RiskLevel
+from omnimancer.core.security.sandbox_manager import SandboxManager
 
 
 @pytest.fixture

@@ -15,16 +15,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from omnimancer.cli.commands import (
-    Command,
-    CommandType,
-    parse_command,
-)
+from omnimancer.cli.commands import Command, CommandType, parse_command
 from omnimancer.cli.interface import CommandLineInterface
 from omnimancer.core.config_manager import ConfigManager
-from omnimancer.core.models import (
-    ProviderConfig,
-)
+from omnimancer.core.models import ProviderConfig
 
 
 class TestCLICommands:
@@ -252,7 +246,7 @@ class TestCommandIntegration:
     def test_command_chain_parsing(self):
         """Test parsing of command chains or complex commands."""
         # Test simple commands that work
-        commands = ["/help", "/providers", "/setup"]
+        commands = ["/help", "/providers", "/models"]
 
         for cmd in commands:
             result = parse_command(cmd)
@@ -280,7 +274,7 @@ class TestCommandIntegration:
             "/ This looks like a command but isn't",
         ]
 
-        commands = ["/help", "/providers", "/setup"]
+        commands = ["/help", "/providers", "/models"]
 
         for msg in messages:
             result = parse_command(msg)
@@ -302,8 +296,8 @@ class TestCommandIntegration:
         valid_cases = [
             "/switch claude",  # Switch requires at least one argument
             "/switch claude gpt-4",  # Switch with model
-            "/setup",  # Setup command
-            "/validate",  # Validate command
+            "/models",  # Models command
+            "/history",  # History command
         ]
 
         for cmd_str in valid_cases:

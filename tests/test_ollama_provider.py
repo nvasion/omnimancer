@@ -11,17 +11,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from omnimancer.core.models import (
-    ChatContext,
-    ChatMessage,
-    MessageRole,
-)
+from omnimancer.core.models import ChatContext, ChatMessage, MessageRole
 from omnimancer.providers.ollama import OllamaProvider
-from omnimancer.utils.errors import (
-    ModelNotFoundError,
-    NetworkError,
-    ProviderError,
-)
+from omnimancer.utils.errors import ModelNotFoundError, NetworkError, ProviderError
 
 
 @pytest.fixture

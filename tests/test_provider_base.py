@@ -32,12 +32,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from omnimancer.core.models import (
-    ChatContext,
-    ChatMessage,
-    MessageRole,
-    ModelInfo,
-)
+from omnimancer.core.models import ChatContext, ChatMessage, MessageRole, ModelInfo
 from omnimancer.utils.errors import (
     AuthenticationError,
     ModelNotFoundError,
@@ -320,3 +315,102 @@ COMMON_ERROR_SCENARIOS = [
     {"status_code": 500, "error_type": "server_error"},
     {"status_code": 503, "error_type": "service_unavailable"},
 ]
+
+
+class TestBaseProviderStreamingFallback:
+    """Test that BaseProvider's streaming fallback wraps non-streaming responses."""
+
+    @pytest.fixture
+    def concrete_provider(self):
+        """Create a concrete provider subclass for testing fallback behavior."""
+        from omnimancer.core.models import ChatResponse, ModelInfo
+        from omnimancer.providers.base import BaseProvider
+
+        class FakeProvider(BaseProvider):
+            async def send_message(self, message, context):
+                return ChatResponse(
+                    content="Hello from fake provider",
+                    model_used="fake-model",
+                    tokens_used=42,
+                    input_tokens=10,
+                    output_tokens=42,
+                )
+
+            async def validate_credentials(self):
+                return True
+
+            def get_model_info(self):
+                return ModelInfo(
+                    name="fake-model", provider="fake",
+                    description="Fake", max_tokens=4096,
+                    cost_per_token=0.001, available=True,
+                )
+
+            def supports_tools(self):
+                return False
+
+            def supports_multimodal(self):
+                return False
+
+        return FakeProvider(api_key="test", model="fake-model")
+
+    @pytest.fixture
+    def sample_context(self):
+        return ChatContext(messages=[], current_model="fake", session_id="test")
+
+    @pytest.mark.asyncio
+    async def test_stream_fallback_yields_message_start(self, concrete_provider, sample_context):
+        from omnimancer.core.models import StreamEventType
+
+        events = []
+        async for event in concrete_provider.send_message_stream("hi", sample_context):
+            events.append(event)
+
+        assert events[0].type == StreamEventType.MESSAGE_START
+        assert events[0].model == "fake-model"
+
+    @pytest.mark.asyncio
+    async def test_stream_fallback_yields_text_delta(self, concrete_provider, sample_context):
+        from omnimancer.core.models import StreamEventType
+
+        events = []
+        async for event in concrete_provider.send_message_stream("hi", sample_context):
+            events.append(event)
+
+        text_events = [e for e in events if e.type == StreamEventType.TEXT_DELTA]
+        assert len(text_events) == 1
+        assert text_events[0].text == "Hello from fake provider"
+
+    @pytest.mark.asyncio
+    async def test_stream_fallback_yields_message_complete(self, concrete_provider, sample_context):
+        from omnimancer.core.models import StreamEventType
+
+        events = []
+        async for event in concrete_provider.send_message_stream("hi", sample_context):
+            events.append(event)
+
+        assert events[-1].type == StreamEventType.MESSAGE_COMPLETE
+        assert events[-1].response is not None
+        assert events[-1].response.content == "Hello from fake provider"
+        assert events[-1].response.tokens_used == 42
+
+    @pytest.mark.asyncio
+    async def test_stream_fallback_event_count(self, concrete_provider, sample_context):
+        events = []
+        async for event in concrete_provider.send_message_stream("hi", sample_context):
+            events.append(event)
+
+        assert len(events) == 3  # MESSAGE_START, TEXT_DELTA, MESSAGE_COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_stream_with_tools_fallback(self, concrete_provider, sample_context):
+        from omnimancer.core.models import StreamEventType
+
+        events = []
+        async for event in concrete_provider.send_message_with_tools_stream("hi", sample_context, []):
+            events.append(event)
+
+        assert len(events) == 3
+        assert events[0].type == StreamEventType.MESSAGE_START
+        assert events[1].type == StreamEventType.TEXT_DELTA
+        assert events[-1].type == StreamEventType.MESSAGE_COMPLETE

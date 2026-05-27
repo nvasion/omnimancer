@@ -10,7 +10,6 @@ import subprocess
 from datetime import datetime
 from typing import List
 
-
 from ..core.models import ChatContext, ChatResponse, EnhancedModelInfo
 from ..utils.errors import (
     AuthenticationError,

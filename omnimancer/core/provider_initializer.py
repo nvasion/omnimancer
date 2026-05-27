@@ -205,6 +205,17 @@ class ProviderInitializer:
                 api_key = env_key
                 logger.info(f"Using API key from environment for {provider_name}")
 
+        # For Claude, prefer subscription OAuth token when available
+        auth_type_override = None
+        if provider_name == "claude":
+            from .env_loader import load_claude_subscription_token
+
+            sub_token = load_claude_subscription_token()
+            if sub_token and not sub_token.get("expired"):
+                api_key = sub_token["access_token"]
+                auth_type_override = sub_token["auth_type"]
+                logger.info("Using Claude subscription OAuth token")
+
         # Create instance
         # Filter out None values to allow provider defaults to work
         kwargs = {
@@ -212,6 +223,8 @@ class ProviderInitializer:
             for k, v in config.model_dump(exclude={"api_key", "model"}).items()
             if v is not None
         }
+        if auth_type_override:
+            kwargs["auth_type"] = auth_type_override
         instance = provider_class(api_key=api_key, model=config.model, **kwargs)
 
         return instance

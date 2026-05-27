@@ -9,7 +9,7 @@ from typing import Dict, List
 
 import httpx
 
-from ..core.models import ChatContext, ChatResponse, ModelInfo
+from ..core.models import ChatContext, ChatResponse, ModelInfo, ToolCall, ToolDefinition
 from ..utils.errors import (
     AuthenticationError,
     ModelNotFoundError,
@@ -179,6 +179,113 @@ class OpenAIProvider(BaseProvider):
                 error_msg = f"HTTP {response.status_code}"
 
             raise ProviderError(f"OpenAI API error: {error_msg}")
+
+    async def send_message_with_tools(
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
+    ) -> ChatResponse:
+        if not self.supports_tools():
+            return await self.send_message(message, context)
+
+        try:
+            messages = self._prepare_messages(message, context)
+            tools = self._convert_tools_to_openai_format(available_tools)
+
+            request_body = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+            }
+            if tools:
+                request_body["tools"] = tools
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.BASE_URL}/chat/completions",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.api_key}",
+                    },
+                    json=request_body,
+                    timeout=60.0,
+                )
+
+            return self._handle_response_with_tools(response)
+
+        except httpx.TimeoutException:
+            raise NetworkError("Request to OpenAI API timed out")
+        except httpx.RequestError as e:
+            raise NetworkError(f"Network error: {e}")
+        except (
+            AuthenticationError,
+            RateLimitError,
+            ModelNotFoundError,
+            ProviderError,
+        ):
+            raise
+        except Exception as e:
+            raise ProviderError(f"Unexpected error: {e}")
+
+    def _convert_tools_to_openai_format(
+        self, tools: List[ToolDefinition]
+    ) -> List[Dict]:
+        if not tools:
+            return []
+
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in tools
+        ]
+
+    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
+        if response.status_code == 200:
+            data = response.json()
+            choices = data.get("choices", [])
+
+            if choices and len(choices) > 0:
+                msg = choices[0].get("message", {})
+                content = msg.get("content", "") or ""
+                usage = data.get("usage", {})
+
+                tool_calls = None
+                raw_tool_calls = msg.get("tool_calls")
+                if raw_tool_calls:
+                    import json
+
+                    tool_calls = []
+                    for tc in raw_tool_calls:
+                        func = tc.get("function", {})
+                        args = func.get("arguments", "{}")
+                        if isinstance(args, str):
+                            args = json.loads(args)
+                        tool_calls.append(
+                            ToolCall(
+                                name=func.get("name", ""),
+                                arguments=args,
+                            )
+                        )
+
+                return ChatResponse(
+                    content=content,
+                    model_used=self.model,
+                    tokens_used=usage.get("total_tokens", 0),
+                    timestamp=datetime.now(),
+                    tool_calls=tool_calls if tool_calls else None,
+                )
+            else:
+                raise ProviderError("Empty response from OpenAI API")
+
+        return self._handle_response(response)
 
     def get_model_info(self) -> ModelInfo:
         """

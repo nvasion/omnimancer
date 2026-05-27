@@ -9,13 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from omnimancer.utils.errors import (
-    ConfigurationError,
-)
-from tests.conftest import (
-    create_chat_response,
-    create_model_info,
-)
+from omnimancer.utils.errors import ConfigurationError
+from tests.conftest import create_chat_response, create_model_info
 
 
 @pytest.mark.integration

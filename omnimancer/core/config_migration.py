@@ -12,10 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from ..utils.errors import ConfigurationError
-from .models import (
-    Config,
-    ProviderConfig,
-)
+from .models import Config, ProviderConfig
 
 
 class ConfigMigration:

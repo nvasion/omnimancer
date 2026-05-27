@@ -1,309 +1,253 @@
-# Omnimancer CLI
-## Just-In-Time Engineering, Inc.
+# Omnimancer
 
-A unified command-line interface for multiple AI providers - chat with Claude, OpenAI, Gemini, and 10+ other AI models through a single, intuitive tool.
+A multi-model coding agent for the terminal. One tool, any LLM.
 
-## Quick Start
+Omnimancer works like `claude -p` but isn't locked to a single provider. Point it at Claude, OpenAI, Gemini, Bedrock, Ollama, or any of 13+ supported backends and get a coding agent that reads files, writes code, runs commands, and iterates autonomously — with streaming responses, token/cost tracking, and structured JSON output for pipeline integration.
 
-### Installation
+## Install
 
-**Using pipx (recommended):**
-```bash
-pipx install omnimancer-cli
-```
-
-**Using pip:**
 ```bash
 pip install omnimancer-cli
 ```
 
-### Available Commands
+## Usage
 
-After installation, use any of these commands:
-- **`omnimancer`** - Full command name
-- **`omn`** - Quick alias ⚡
-- **`omniman`** - Alternative alias
-
-### First Run
+### Headless (pipeline mode)
 
 ```bash
-omn  # or omnimancer, or omniman
+# Single prompt, JSON output — like claude -p
+omn -p "refactor auth.py to use dependency injection"
+
+# Pipe context in
+cat error.log | omn -p "diagnose this crash and suggest a fix"
+
+# Use a specific provider and model
+omn -p --provider claude --model claude-sonnet-4 "write tests for src/api/routes.py"
+omn -p --provider openai --model gpt-4o "explain this codebase"
+omn -p --provider ollama "review this diff" < changes.patch
+
+# Output formats
+omn -p "summarize this repo"                          # plain text (default)
+omn -p --output-format json "summarize this repo"     # structured JSON
+omn -p --output-format stream-json "summarize this"   # streaming JSON
+
+# Auto-approve all tool operations (CI/scripts)
+omn -p --dangerously-skip-permissions "fix the failing tests"
 ```
 
-On first run, you'll be guided through setup:
+Headless mode with `--output-format json` outputs:
 
-```
-🚀 Omnimancer Setup Wizard
-
-Select a provider to configure:
-1. Claude (Anthropic)
-2. OpenAI  
-3. Google Gemini
-4. Perplexity AI
-5. Ollama (Local)
-...
-
-Choose [1]: 1
-
-Enter your Claude API key: sk-ant-...
-✅ Configuration complete!
-
->>> Hello! How can you help me today?
-🤖 Claude: I'm Claude, an AI assistant created by Anthropic...
+```json
+{
+  "response": "Here's the refactored code...",
+  "model": "claude-sonnet-4-20250514",
+  "tool_calls": [
+    {"tool": "file_read", "args": {"path": "src/auth.py"}, "result": "..."},
+    {"tool": "file_write", "args": {"path": "src/auth.py"}, "result": "success"}
+  ],
+  "tokens": {"input": 1523, "output": 892}
+}
 ```
 
-## Basic Usage
+### Interactive mode
 
 ```bash
-# Start Omnimancer
-omn
+omn                        # start interactive REPL
+omn --provider openai      # start with a specific provider
+omn --no-approval          # skip approval prompts
+```
 
-# Start chatting
->>> What's the weather like?
+Interactive mode gives you a REPL with streaming responses, token/cost display, and agent capabilities:
 
-# Switch models mid-conversation  
+```
+>>> read src/main.py and add error handling
+[text streams in real-time as the model generates]
+  tokens: 1523 in / 892 out | ~$0.0134
+
 >>> /switch openai gpt-4o
->>> Now using GPT-4. How are you different?
-
-# Check available providers and models
->>> /providers
->>> /models
-
-# Save conversations
->>> /save my-chat
-
-# Load previous conversations
->>> /load my-chat
-
-# Get help
->>> /help
+>>> now review what we just changed
+[switches to OpenAI, continues conversation]
 ```
 
-## Agent Mode & File Operations
+### Streaming responses
 
-Omnimancer includes advanced agent capabilities that allow AI models to perform file operations with your explicit approval:
+Responses stream token-by-token as the model generates, so you see output immediately instead of waiting for the full response. After each response, a token/cost summary is displayed.
 
-### 🤖 **Autonomous Agent Features**
-- **File Creation**: Create new files with AI-generated content
-- **File Modification**: Edit existing files with intelligent changes
-- **Code Refactoring**: Restructure and improve existing code
-- **Documentation Generation**: Create comprehensive documentation
-- **Project Setup**: Initialize new projects with proper structure
+Streaming is automatic for providers that support it. Other providers fall back to displaying the full response once complete — no configuration needed.
 
-### 🔒 **Secure Approval System**
-Every file operation requires your explicit approval with:
+| Provider | Streaming |
+|----------|:---------:|
+| Claude (Anthropic) | Yes |
+| All others | Fallback (full response) |
 
-```bash
-🔍 File Operation Approval Required
-📄 Creating: data_analyzer.py
-📊 Risk Level: Low | 🟢 
-📏 Size: 1,247 bytes (45 lines)
+Streaming works in both regular chat and agent mode (tool calling flow). The display uses a live-updating terminal panel that refreshes at 15fps.
 
-[Y] Approve  [N] Deny  [D] View Details  [Q] Quit
+### Agent mode
+
+When agent mode is enabled (`/agent on`), the AI can autonomously:
+
+- **Read and write files** with approval workflow
+- **Execute shell commands** with security validation
+- **Search codebases** with fuzzy file matching (70% similarity threshold)
+- **Make HTTP requests** for API testing
+
+All destructive operations require explicit approval. Reads and searches are auto-approved.
+
+Providers that support native tool calling (Claude, OpenAI, Gemini) use structured function calls. Others fall back to operation markers parsed from the response text.
+
 ```
-
-### 🎨 **Rich Visual Interface**
-- **Syntax Highlighting**: Code displayed with proper formatting
-- **Diff Views**: See exactly what changes before approval
-- **Risk Assessment**: Operations rated Low/Medium/High/Critical
-- **Batch Operations**: Handle multiple files efficiently
-
-### ⚡ **Quick Examples**
-
-```bash 
-# Ask AI to create files
->>> Create a Python script to analyze CSV data
-🔍 Shows preview → [Y] to approve → ✅ File created
-
-# Request code modifications  
->>> Add error handling to this function
-🔍 Shows diff view → [Y] to approve → ✅ File updated
-
-# Batch project setup
->>> Set up a Flask web application
-🔍 Shows 8 files → [A] approve all → ✅ Project ready
+>>> /agent on
+>>> fix the failing test in tests/test_auth.py
+[agent reads test file, reads source, edits code, runs pytest, iterates]
+  tokens: 4210 in / 1893 out | ~$0.0412
 ```
-
-[**📖 Full Documentation**](docs/agent-approval-system.md) | [**🛡️ Security Guide**](docs/security.md)
 
 ## Supported Providers
 
-| Provider | API Key Required | Best For |
-|----------|------------------|----------|
-| **Claude** | [Anthropic Console](https://console.anthropic.com/) | Complex reasoning, analysis |
-| **Claude Code** | Anthropic API key | IDE integration, coding |
-| **OpenAI** | [OpenAI Platform](https://platform.openai.com/) | General purpose, coding |
-| **Gemini** | [Google AI Studio](https://aistudio.google.com/) | Large context, research |
-| **Perplexity** | [Perplexity](https://www.perplexity.ai/) | Real-time web search |
-| **xAI (Grok)** | [xAI Console](https://console.x.ai/) | Creative tasks, real-time info |
-| **Mistral** | [Mistral Platform](https://mistral.ai/) | Code generation, efficiency |
-| **AWS Bedrock** | [AWS Console](https://console.aws.amazon.com/bedrock/) | AWS integration |
-| **Ollama** | No API key (local) | Privacy, offline use |
-| **Azure OpenAI** | Azure setup required | Enterprise |
-| **Vertex AI** | Google Cloud setup | Enterprise |
-| **OpenRouter** | [OpenRouter](https://openrouter.ai/) | 100+ models access |
-| **Cohere** | [Cohere Platform](https://cohere.com/) | Multilingual, embeddings |
+| Provider | Tool Calling | Streaming | Notes |
+|----------|:---:|:---:|-------|
+| **Claude** (Anthropic) | Yes | Yes | Primary target. Best coding performance. |
+| **OpenAI** | Yes | Fallback | GPT-4o, o1, etc. |
+| **Gemini** (Google) | Yes | Fallback | Large context window. |
+| **AWS Bedrock** | Yes | Fallback | Claude/Titan via AWS. |
+| **Ollama** | No | Fallback | Local models. No API key needed. |
+| **xAI** (Grok) | Yes | Fallback | |
+| **Mistral** | No | Fallback | |
+| **Perplexity** | No | Fallback | Web search built-in. |
+| **Azure OpenAI** | Yes | Fallback | Enterprise Azure deployment. |
+| **Vertex AI** | Yes | Fallback | Google Cloud deployment. |
+| **OpenRouter** | No | Fallback | Access to 100+ models. |
+| **Cohere** | No | Fallback | |
+
+"Fallback" means the provider works but sends the full response at once instead of streaming token-by-token. The UI handles both modes transparently.
 
 ## Commands
 
-### Core Commands
 | Command | Description |
 |---------|-------------|
-| `/help` | Show all commands |
-| `/setup` | Run interactive setup wizard |
-| `/quit` | Exit Omnimancer |
-| `/clear` | Clear screen |
-
-### Model & Provider Management
-| Command | Description |
-|---------|-------------|
-| `/models` | List available models |
-| `/providers` | Show configured providers |
-| `/switch [provider] [model]` | Change provider/model |
+| `/help [command]` | Show help (optionally for a specific command) |
+| `/quit` | Exit (also: `/exit`, Ctrl+D) |
+| `/clear` | Clear terminal screen |
+| `/switch <provider> [model]` | Switch provider or model |
+| `/models [filter]` | List available models |
+| `/providers` | List all providers with status |
+| `/agent on\|off\|status` | Toggle agent mode |
+| `/config show\|set\|get` | View or modify configuration |
 | `/validate [provider]` | Validate provider configurations |
-| `/health [provider]` | Check provider health status |
-| `/repair [provider]` | Repair provider issues |
-| `/diagnose [provider]` | Run diagnostic tests |
-
-### Conversation Management
-| Command | Description |
-|---------|-------------|
-| `/save [name]` | Save current conversation |
-| `/load [name]` | Load saved conversation |
+| `/health [provider]` | Check provider health |
+| `/save [name]` | Save conversation |
+| `/load [name]` | Load conversation |
 | `/list` | List saved conversations |
-| `/history` | Conversation history management |
-
-### Agent & File Operations
-| Command | Description |
-|---------|-------------|
-| `/agent` | Enable/disable agent mode |
-| `/agents` | Manage agent configurations |
-| `/approvals` | View/manage file operation approvals |
-| `/permissions` | Configure security permissions |
-
-### Tool Integration
-| Command | Description |
-|---------|-------------|
-| `/tools` | Show available tools |
-| `/mcp` | MCP server management |
-
-### Model Management
-| Command | Description |
-|---------|-------------|
-| `/add-model` | Add custom model |
-| `/remove-model` | Remove custom model |
-| `/list-custom-models` | List custom models |
-
-### System
-| Command | Description |
-|---------|-------------|
-| `/status` | Show system status |
+| `/history` | Manage conversation history |
+| `/tools` | Show available MCP tools |
+| `/mcp status\|health\|reload` | MCP server management |
+| `/status` | System status |
 
 ## Configuration
 
-Omnimancer stores encrypted configuration in `~/.omnimancer/config.json`.
+### API keys
 
-### Manual Configuration
+The simplest setup is environment variables:
 
 ```bash
-# Add a provider
-omnimancer --config
-
-# Or edit configuration interactively
->>> /config
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+export GOOGLE_API_KEY="..."
+export XAI_API_KEY="..."
+omn
 ```
 
-### Environment Variables
+### Config file
+
+Config is stored in `~/.omnimancer/config.json`. You can edit it directly or use the CLI:
 
 ```bash
-export ANTHROPIC_API_KEY="your-key"
-export OPENAI_API_KEY="your-key"
-export GOOGLE_API_KEY="your-key"
-# ... then run omnimancer
+omn
+>>> /config set default_provider claude
+>>> /config get default_provider
+>>> /config validate                    # validate all provider configs
+>>> /config validate claude             # validate specific provider
 ```
 
-## Local AI with Ollama
+### Provider-specific setup
 
-For privacy and offline use:
-
+**Claude (Anthropic):**
 ```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
+export ANTHROPIC_API_KEY="sk-ant-..."
+# Models: claude-sonnet-4, claude-opus-4, claude-3-5-sonnet
+```
 
-# Start Ollama server
+**OpenAI:**
+```bash
+export OPENAI_API_KEY="sk-..."
+# Models: gpt-4o, gpt-4-turbo, gpt-3.5-turbo
+```
+
+**Google Gemini:**
+```bash
+export GOOGLE_API_KEY="..."
+# Models: gemini-1.5-pro, gemini-1.5-flash
+```
+
+**AWS Bedrock:**
+```bash
+# Uses AWS credentials (env vars, ~/.aws/credentials, or IAM role)
+export AWS_DEFAULT_REGION="us-east-1"
+# Models: anthropic.claude-3-5-sonnet, amazon.titan
+```
+
+**Ollama (local, no API key):**
+```bash
 ollama serve
-
-# Download a model
 ollama pull llama3.1
-
-# Configure Omnimancer
 omn
 >>> /switch ollama llama3.1
 ```
 
-## Tool Integration (MCP)
-
-Enable AI tool calling for file operations, web search, and more:
-
+**Azure OpenAI:**
 ```bash
-# Install UV for MCP servers
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Check tool status
->>> /tools
->>> /mcp status
+export AZURE_OPENAI_API_KEY="..."
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 ```
 
-Popular MCP tools:
-- **Filesystem**: File operations
-- **Web Search**: Real-time search  
-- **Git**: Repository management
+## Architecture
 
-## Examples
-
-### Basic Chat
 ```
->>> Explain quantum computing in simple terms
-🤖 Claude: Quantum computing is like having a super-powered calculator...
-
->>> /switch openai gpt-4o  
->>> How would you explain it differently?
-🤖 GPT-4: I'd compare quantum computing to exploring a maze...
-```
-
-### Code Generation
-```
->>> Write a Python function to calculate fibonacci numbers
-🤖 Claude: Here's an efficient implementation using memoization:
-
-```python
-def fibonacci(n, memo={}):
-    if n in memo:
-        return memo[n]
-    if n <= 1:
-        return n
-    memo[n] = fibonacci(n-1, memo) + fibonacci(n-2, memo)
-    return memo[n]
+omnimancer/
+├── cli/                    # CLI interface (modular)
+│   ├── interface.py       # Core REPL loop, streaming integration
+│   ├── command_dispatch.py # Slash command handlers
+│   ├── agent_loop.py      # Marker-based agent workflow
+│   ├── tool_handler.py    # Native tool call execution
+│   ├── system_prompts.py  # Prompt building
+│   ├── display.py         # Terminal output & token status
+│   └── completion.py      # Tab completion
+├── core/                   # Engine & business logic
+│   ├── engine.py          # Provider abstraction & streaming delegation
+│   ├── agent_engine.py    # Autonomous agent capabilities
+│   ├── models.py          # Data models (ChatResponse, StreamEvent, etc.)
+│   └── agent/             # File ops, approval, security
+├── providers/              # 13+ AI provider implementations
+│   ├── base.py            # Provider interface (streaming fallback)
+│   ├── claude.py          # Anthropic (native streaming & tool calling)
+│   ├── openai.py          # OpenAI (native tool calling)
+│   └── ...
+├── ui/                     # Terminal UI components
+│   └── streaming_display.py # Rich Live streaming display
+└── mcp/                    # Model Context Protocol
 ```
 
-### Model Comparison
+### Streaming architecture
+
+Streaming uses async generators that flow through the full stack:
+
 ```
->>> /switch claude claude-3-5-sonnet
->>> What's 15 * 24?
-🤖 Claude: 15 × 24 = 360
-
->>> /switch openai gpt-4o
->>> What's 15 * 24?  
-🤖 GPT-4: 15 × 24 = 360
+Provider (SSE parsing) → Engine (delegation) → Interface (display routing)
+                                                  ↓
+                                          StreamingDisplay (Rich Live panel)
 ```
 
-## Advanced Features
-
-- **Conversation Management**: Save/load chat history
-- **Model Switching**: Compare responses between providers
-- **Tool Calling**: AI can execute code, search web, manage files
-- **Health Monitoring**: Provider status and diagnostics
-- **Configuration Templates**: Pre-configured setups for different use cases
+Each layer yields `StreamEvent` objects. Providers that don't implement real streaming get an automatic fallback in `BaseProvider` that wraps the full response in the same event format, so the UI code works identically for all providers.
 
 ## Development
 
@@ -311,54 +255,11 @@ def fibonacci(n, memo={}):
 git clone https://gitlab.com/jite-ai/omnimancer
 cd omnimancer
 pip install -e ".[dev]"
-pytest
+pytest tests/ -v
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-**"No providers configured"**
-```bash
-omn  # Run setup wizard
->>> /setup
-```
-
-**"Invalid API key"**
-- Check key format (Claude: `sk-ant-`, OpenAI: `sk-`, etc.)
-- Verify key at provider's website
-- Use `/validate` command to test configuration
-
-**"Ollama connection failed"**
-```bash
-ollama serve  # Start Ollama server
-ollama pull llama3.1  # Download a model
-```
-
-**Check system health:**
-```bash
-omn
->>> /health  # Check all providers
->>> /diagnose  # Run diagnostics
->>> /validate  # Validate configurations
-```
-
-**Debug mode:**
-```bash
-export OMNIMANCER_DEBUG=1
-omn
-```
+Tests follow TDD. 1,260 tests across providers, CLI, streaming, agent operations, and integration scenarios.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file.
-
-## Links
-
-- [GitHub Repository]https://gitlab.com/jite-ai/omnimancer)
-- [Issues](https://gitlab.com/jite-ai/omnimancer/issues)
-- [Documentation](https://gitlab.com/jite-ai/omnimancer/docs)
-
----
-
-**Omnimancer CLI** - One tool, multiple AI providers, endless possibilities.
+MIT

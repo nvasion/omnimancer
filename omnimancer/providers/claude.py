@@ -4,13 +4,22 @@ Claude provider implementation for Omnimancer.
 This module provides the Claude AI provider implementation using Anthropic's API.
 """
 
+import json as json_module
 from datetime import datetime
-from typing import Dict, List
+from typing import AsyncIterator, Dict, List
 
 import certifi
 import httpx
 
-from ..core.models import ChatContext, ChatResponse, ModelInfo
+from ..core.models import (
+    ChatContext,
+    ChatResponse,
+    ModelInfo,
+    StreamEvent,
+    StreamEventType,
+    ToolCall,
+    ToolDefinition,
+)
 from ..utils.errors import (
     AuthenticationError,
     ModelNotFoundError,
@@ -33,13 +42,35 @@ class ClaudeProvider(BaseProvider):
         Initialize Claude provider.
 
         Args:
-            api_key: Anthropic API key
+            api_key: Anthropic API key or OAuth bearer token
             model: Claude model to use (e.g., 'claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022')
-            **kwargs: Additional configuration
+            **kwargs: Additional configuration (auth_type="bearer" for OAuth)
         """
-        super().__init__(api_key, model or "claude-sonnet-4-20250514", **kwargs)
+        super().__init__(api_key, model or "claude-sonnet-4-6", **kwargs)
         self.max_tokens = kwargs.get("max_tokens") or 4096
         self.temperature = kwargs.get("temperature") or 0.7
+        self.auth_type = kwargs.get("auth_type", "api_key")
+
+    def _is_subscription_token(self) -> bool:
+        return self.auth_type == "bearer"
+
+    def _is_haiku(self) -> bool:
+        return "haiku" in self.model.lower()
+
+    def _build_headers(self) -> Dict[str, str]:
+        headers = {
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
+        if self._is_subscription_token():
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            betas = ["oauth-2025-04-20"]
+            if not self._is_haiku():
+                betas.insert(0, "claude-code-20250219")
+            headers["anthropic-beta"] = ",".join(betas)
+        else:
+            headers["x-api-key"] = self.api_key
+        return headers
 
     async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
@@ -61,11 +92,7 @@ class ClaudeProvider(BaseProvider):
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/messages",
-                        headers={
-                            "Content-Type": "application/json",
-                            "x-api-key": self.api_key,
-                            "anthropic-version": "2023-06-01",
-                        },
+                        headers=self._build_headers(),
                         json={
                             "model": self.model,
                             "max_tokens": self.max_tokens,
@@ -121,11 +148,7 @@ class ClaudeProvider(BaseProvider):
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
                         f"{self.BASE_URL}/messages",
-                        headers={
-                            "Content-Type": "application/json",
-                            "x-api-key": self.api_key,
-                            "anthropic-version": "2023-06-01",
-                        },
+                        headers=self._build_headers(),
                         json={
                             "model": self.model,
                             "max_tokens": 10,
@@ -235,6 +258,9 @@ class ClaudeProvider(BaseProvider):
                     model_used=self.model,
                     tokens_used=usage.get("output_tokens", 0),
                     timestamp=datetime.now(),
+                    input_tokens=usage.get("input_tokens"),
+                    output_tokens=usage.get("output_tokens"),
+                    stop_reason=data.get("stop_reason", "end_turn"),
                 )
             else:
                 raise ProviderError("Empty response from Claude API")
@@ -242,6 +268,12 @@ class ClaudeProvider(BaseProvider):
         elif response.status_code == 401:
             raise AuthenticationError("Invalid Claude API key")
         elif response.status_code == 429:
+            if self._is_subscription_429(response):
+                raise ProviderError(
+                    f"Claude subscription tokens only support Haiku for direct API access. "
+                    f"Model '{self.model}' requires an Anthropic API key. "
+                    f"Set ANTHROPIC_API_KEY or configure an API key in Omnimancer."
+                )
             raise RateLimitError("Claude API rate limit exceeded")
         elif response.status_code == 404:
             raise ModelNotFoundError(f"Claude model '{self.model}' not found")
@@ -254,41 +286,312 @@ class ClaudeProvider(BaseProvider):
 
             raise ProviderError(f"Claude API error: {error_msg}")
 
+    async def send_message_with_tools(
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
+    ) -> ChatResponse:
+        messages = self._prepare_messages(message, context)
+        tools = self._convert_tools_to_claude_format(available_tools)
+
+        request_body = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "messages": messages,
+        }
+        if tools:
+            request_body["tools"] = tools
+
+        for ssl_verify in [True, certifi.where(), False]:
+            try:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:
+                    response = await client.post(
+                        f"{self.BASE_URL}/messages",
+                        headers=self._build_headers(),
+                        json=request_body,
+                        timeout=60.0,
+                    )
+
+                return self._handle_response_with_tools(response)
+
+            except httpx.ConnectError as e:
+                if "SSL" in str(e) or "certificate" in str(e):
+                    continue
+                raise NetworkError(f"Connection error: {e}")
+            except httpx.TimeoutException:
+                raise NetworkError("Request to Claude API timed out")
+            except httpx.RequestError as e:
+                if "SSL" not in str(e) and "certificate" not in str(e):
+                    raise NetworkError(f"Network error: {e}")
+                continue
+            except (
+                AuthenticationError,
+                RateLimitError,
+                ModelNotFoundError,
+                ProviderError,
+            ):
+                raise
+            except Exception as e:
+                raise ProviderError(f"Unexpected error: {e}")
+
+        raise NetworkError("Failed to establish SSL connection to Claude API")
+
+    def _is_subscription_429(self, response: httpx.Response) -> bool:
+        if not self._is_subscription_token() or self._is_haiku():
+            return False
+        try:
+            data = response.json()
+            msg = data.get("error", {}).get("message", "")
+            has_rate_headers = any(
+                k.startswith("anthropic-ratelimit-") for k in response.headers
+            )
+            return msg == "Error" and not has_rate_headers
+        except Exception:
+            return False
+
+    def _convert_tools_to_claude_format(
+        self, tools: List[ToolDefinition]
+    ) -> List[Dict]:
+        if not tools:
+            return []
+
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.parameters,
+            }
+            for tool in tools
+        ]
+
+    def _parse_response_content(
+        self, content_blocks: List[Dict]
+    ) -> tuple:
+        text_parts = []
+        tool_calls = []
+
+        for block in content_blocks:
+            if block.get("type") == "text":
+                text_parts.append(block.get("text", ""))
+            elif block.get("type") == "tool_use":
+                tool_calls.append(
+                    ToolCall(
+                        name=block.get("name", ""),
+                        arguments=block.get("input", {}),
+                    )
+                )
+
+        return "".join(text_parts), tool_calls
+
+    def _handle_response_with_tools(self, response: httpx.Response) -> ChatResponse:
+        if response.status_code == 200:
+            data = response.json()
+            content_blocks = data.get("content", [])
+            text_content, tool_calls = self._parse_response_content(content_blocks)
+            usage = data.get("usage", {})
+
+            return ChatResponse(
+                content=text_content,
+                model_used=self.model,
+                tokens_used=usage.get("output_tokens", 0),
+                timestamp=datetime.now(),
+                tool_calls=tool_calls if tool_calls else None,
+                input_tokens=usage.get("input_tokens"),
+                output_tokens=usage.get("output_tokens"),
+                stop_reason=data.get("stop_reason", "end_turn"),
+            )
+
+        return self._handle_response(response)
+
+    def supports_streaming(self) -> bool:
+        return True
+
+    async def send_message_stream(
+        self, message: str, context: ChatContext
+    ) -> AsyncIterator[StreamEvent]:
+        messages = self._prepare_messages(message, context)
+        request_body = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "messages": messages,
+            "stream": True,
+        }
+        async for event in self._stream_request(request_body):
+            yield event
+
+    async def send_message_with_tools_stream(
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
+    ) -> AsyncIterator[StreamEvent]:
+        messages = self._prepare_messages(message, context)
+        tools = self._convert_tools_to_claude_format(available_tools)
+        request_body = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "messages": messages,
+            "stream": True,
+        }
+        if tools:
+            request_body["tools"] = tools
+        async for event in self._stream_request(request_body):
+            yield event
+
+    async def _stream_request(
+        self, request_body: dict
+    ) -> AsyncIterator[StreamEvent]:
+        for ssl_verify in [True, certifi.where(), False]:
+            try:
+                async with httpx.AsyncClient(verify=ssl_verify) as client:
+                    async with client.stream(
+                        "POST",
+                        f"{self.BASE_URL}/messages",
+                        headers=self._build_headers(),
+                        json=request_body,
+                        timeout=120.0,
+                    ) as response:
+                        if response.status_code != 200:
+                            await response.aread()
+                            self._handle_response(response)
+                            return
+
+                        async for event in self._parse_sse_stream(response):
+                            yield event
+                        return
+
+            except httpx.ConnectError as e:
+                if "SSL" in str(e) or "certificate" in str(e):
+                    continue
+                raise NetworkError(f"Connection error: {e}")
+            except httpx.TimeoutException:
+                raise NetworkError("Request to Claude API timed out")
+            except httpx.RequestError as e:
+                if "SSL" not in str(e) and "certificate" not in str(e):
+                    raise NetworkError(f"Network error: {e}")
+                continue
+            except (AuthenticationError, RateLimitError, ModelNotFoundError, ProviderError):
+                raise
+
+        raise NetworkError("Failed to establish SSL connection to Claude API")
+
+    async def _parse_sse_stream(
+        self, response: httpx.Response
+    ) -> AsyncIterator[StreamEvent]:
+        accumulated_text = ""
+        current_tool_name = ""
+        current_tool_id = ""
+        current_tool_json = ""
+        input_tokens = 0
+        output_tokens = 0
+        stop_reason = None
+        model = self.model
+        tool_calls = []
+
+        async for line in response.aiter_lines():
+            if not line.startswith("data: "):
+                continue
+            data_str = line[6:]
+            if data_str == "[DONE]":
+                break
+
+            try:
+                data = json_module.loads(data_str)
+            except json_module.JSONDecodeError:
+                continue
+
+            event_type = data.get("type")
+
+            if event_type == "message_start":
+                msg = data.get("message", {})
+                model = msg.get("model", self.model)
+                usage = msg.get("usage", {})
+                input_tokens = usage.get("input_tokens", 0)
+                yield StreamEvent(type=StreamEventType.MESSAGE_START, model=model)
+
+            elif event_type == "content_block_start":
+                block = data.get("content_block", {})
+                if block.get("type") == "tool_use":
+                    current_tool_name = block.get("name", "")
+                    current_tool_id = block.get("id", "")
+                    current_tool_json = ""
+                    yield StreamEvent(
+                        type=StreamEventType.TOOL_USE_START,
+                        tool_name=current_tool_name,
+                        tool_id=current_tool_id,
+                    )
+
+            elif event_type == "content_block_delta":
+                delta = data.get("delta", {})
+                if delta.get("type") == "text_delta":
+                    text = delta.get("text", "")
+                    accumulated_text += text
+                    yield StreamEvent(type=StreamEventType.TEXT_DELTA, text=text)
+                elif delta.get("type") == "input_json_delta":
+                    partial = delta.get("partial_json", "")
+                    current_tool_json += partial
+                    yield StreamEvent(
+                        type=StreamEventType.TOOL_USE_DELTA, partial_json=partial
+                    )
+
+            elif event_type == "content_block_stop":
+                if current_tool_name:
+                    try:
+                        args = json_module.loads(current_tool_json) if current_tool_json else {}
+                    except json_module.JSONDecodeError:
+                        args = {}
+                    tool_calls.append(ToolCall(name=current_tool_name, arguments=args))
+                    yield StreamEvent(type=StreamEventType.TOOL_USE_END)
+                    current_tool_name = ""
+                    current_tool_id = ""
+                    current_tool_json = ""
+
+            elif event_type == "message_delta":
+                delta = data.get("delta", {})
+                stop_reason = delta.get("stop_reason")
+                usage = data.get("usage", {})
+                output_tokens = usage.get("output_tokens", output_tokens)
+
+        final_response = ChatResponse(
+            content=accumulated_text,
+            model_used=model,
+            tokens_used=output_tokens,
+            timestamp=datetime.now(),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            stop_reason=stop_reason or "end_turn",
+            tool_calls=tool_calls if tool_calls else None,
+        )
+        yield StreamEvent(type=StreamEventType.MESSAGE_COMPLETE, response=final_response)
+
     def get_model_info(self) -> ModelInfo:
         """
         Get information about the current Claude model.
         """
         model_configs = {
-            "claude-sonnet-4-20250514": {
-                "description": "Claude Sonnet 4 - Latest and most capable model",
+            "claude-sonnet-4-6": {
+                "description": "Claude Sonnet 4.6 - Latest balanced model",
+                "max_tokens": 200000,
+                "cost_per_token": 0.000003,
+            },
+            "claude-opus-4-6": {
+                "description": "Claude Opus 4.6 - Most powerful for complex tasks",
                 "max_tokens": 200000,
                 "cost_per_token": 0.000015,
             },
-            "claude-opus-4-20250514": {
-                "description": "Claude Opus 4 - Most powerful model for complex tasks",
-                "max_tokens": 200000,
-                "cost_per_token": 0.000075,
-            },
-            "claude-3-5-sonnet-20241022": {
-                "description": "Claude 3.5 Sonnet - Enhanced reasoning and analysis",
-                "max_tokens": 200000,
-                "cost_per_token": 0.000015,
-            },
-            # Legacy models for backward compatibility
-            "claude-3-sonnet-20240229": {
-                "description": "Claude 3 Sonnet - Balanced performance and speed",
-                "max_tokens": 200000,
-                "cost_per_token": 0.000015,
-            },
-            "claude-3-haiku-20240307": {
-                "description": "Claude 3 Haiku - Fast and efficient",
+            "claude-haiku-4-5-20251001": {
+                "description": "Claude Haiku 4.5 - Fast and efficient",
                 "max_tokens": 200000,
                 "cost_per_token": 0.00000025,
             },
-            "claude-3-opus-20240229": {
-                "description": "Claude 3 Opus - Most capable model",
+            "claude-sonnet-4-20250514": {
+                "description": "Claude Sonnet 4 - Previous generation",
                 "max_tokens": 200000,
-                "cost_per_token": 0.000075,
+                "cost_per_token": 0.000003,
             },
         }
 
@@ -310,7 +613,7 @@ class ClaudeProvider(BaseProvider):
             available=True,
             supports_tools=True,
             supports_multimodal=True,
-            latest_version=self.model == "claude-sonnet-4-20250514",
+            latest_version=self.model == "claude-sonnet-4-6",
         )
 
     def _get_static_models(self) -> List[ModelInfo]:
@@ -319,32 +622,32 @@ class ClaudeProvider(BaseProvider):
         """
         return [
             ModelInfo(
-                name="claude-sonnet-4-20250514",
+                name="claude-sonnet-4-6",
                 provider="claude",
-                description="Claude Sonnet 4 - Latest and most capable model",
+                description="Claude Sonnet 4.6 - Latest balanced model",
                 max_tokens=200000,
-                cost_per_token=0.000015,
+                cost_per_token=0.000003,
                 available=True,
                 supports_tools=True,
                 supports_multimodal=True,
                 latest_version=True,
             ),
             ModelInfo(
-                name="claude-opus-4-20250514",
+                name="claude-opus-4-6",
                 provider="claude",
-                description="Claude Opus 4 - Most powerful model for complex tasks",
+                description="Claude Opus 4.6 - Most powerful for complex tasks",
                 max_tokens=200000,
-                cost_per_token=0.000075,
+                cost_per_token=0.000015,
                 available=True,
                 supports_tools=True,
                 supports_multimodal=True,
             ),
             ModelInfo(
-                name="claude-3-5-sonnet-20241022",
+                name="claude-haiku-4-5-20251001",
                 provider="claude",
-                description="Claude 3.5 Sonnet - Enhanced reasoning and analysis",
+                description="Claude Haiku 4.5 - Fast and efficient",
                 max_tokens=200000,
-                cost_per_token=0.000015,
+                cost_per_token=0.00000025,
                 available=True,
                 supports_tools=True,
                 supports_multimodal=True,
@@ -361,46 +664,34 @@ class ClaudeProvider(BaseProvider):
         Returns:
             List of ModelInfo objects for Claude models
         """
-        # Anthropic doesn't provide a models list endpoint
-        # Return the latest known models with updated information
         return [
             ModelInfo(
-                name="claude-3-5-sonnet-20241022",
+                name="claude-sonnet-4-6",
                 provider="claude",
-                description="Most intelligent model with enhanced coding capabilities",
-                max_tokens=8192,
-                cost_per_token=0.000003,  # $3 per million input tokens
+                description="Claude Sonnet 4.6 - Latest balanced model",
+                max_tokens=200000,
+                cost_per_token=0.000003,
                 available=True,
                 supports_tools=True,
                 supports_multimodal=True,
                 latest_version=True,
             ),
             ModelInfo(
-                name="claude-3-5-haiku-20241022",
+                name="claude-opus-4-6",
                 provider="claude",
-                description="Fast model optimized for speed and efficiency",
-                max_tokens=8192,
-                cost_per_token=0.00000025,  # $0.25 per million input tokens
+                description="Claude Opus 4.6 - Most powerful for complex tasks",
+                max_tokens=200000,
+                cost_per_token=0.000015,
                 available=True,
                 supports_tools=True,
                 supports_multimodal=True,
             ),
             ModelInfo(
-                name="claude-3-opus-20240229",
+                name="claude-haiku-4-5-20251001",
                 provider="claude",
-                description="Previous generation powerful model for complex tasks",
-                max_tokens=4096,
-                cost_per_token=0.000015,  # $15 per million input tokens
-                available=True,
-                supports_tools=True,
-                supports_multimodal=True,
-            ),
-            ModelInfo(
-                name="claude-3-haiku-20240307",
-                provider="claude",
-                description="Previous generation fast and lightweight model",
-                max_tokens=4096,
-                cost_per_token=0.00000025,  # $0.25 per million input tokens
+                description="Claude Haiku 4.5 - Fast and efficient",
+                max_tokens=200000,
+                cost_per_token=0.00000025,
                 available=True,
                 supports_tools=True,
                 supports_multimodal=True,

@@ -47,6 +47,28 @@ def load_api_key_from_env(provider_name: str) -> Optional[str]:
     return api_key
 
 
+def load_claude_subscription_token() -> Optional[dict]:
+    """
+    Load Claude subscription OAuth token from ~/.claude/.credentials.json.
+
+    Returns:
+        Dict with 'access_token' and 'auth_type' keys, or None if not available.
+    """
+    try:
+        from ..providers.claude_credentials import load_claude_credentials
+
+        creds = load_claude_credentials()
+        if creds and not creds.is_expired:
+            logger.info("Using Claude subscription OAuth token")
+            return {"access_token": creds.access_token, "auth_type": "bearer"}
+        elif creds and creds.is_expired:
+            logger.debug("Claude subscription token is expired, needs refresh")
+            return {"access_token": creds.access_token, "auth_type": "bearer", "expired": True, "creds": creds}
+    except Exception as e:
+        logger.debug(f"Could not load Claude subscription credentials: {e}")
+    return None
+
+
 def inject_env_api_keys(provider_configs: Dict) -> Dict:
     """
     Inject API keys from environment variables into provider configurations.

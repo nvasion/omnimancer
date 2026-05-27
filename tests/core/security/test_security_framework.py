@@ -14,14 +14,9 @@ from omnimancer.core.security import (
     SandboxManager,
     SecurityManager,
 )
-from omnimancer.core.security.approval_workflow import (
-    ApprovalStatus,
-    RiskLevel,
-)
+from omnimancer.core.security.approval_workflow import ApprovalStatus, RiskLevel
 from omnimancer.core.security.audit_logger import AuditEventType, AuditLevel
-from omnimancer.core.security.permission_controller import (
-    PermissionOperation,
-)
+from omnimancer.core.security.permission_controller import PermissionOperation
 from omnimancer.core.security.sandbox_manager import ResourceLimits
 
 

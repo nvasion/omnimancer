@@ -9,13 +9,7 @@ from typing import Dict, List
 
 import httpx
 
-from ..core.models import (
-    ChatContext,
-    ChatResponse,
-    ModelInfo,
-    ToolCall,
-    ToolDefinition,
-)
+from ..core.models import ChatContext, ChatResponse, ModelInfo, ToolCall, ToolDefinition
 from ..utils.errors import (
     AuthenticationError,
     ModelNotFoundError,

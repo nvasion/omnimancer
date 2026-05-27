@@ -488,6 +488,7 @@ class MockProviderFactory:
             name=model, provider=name
         )
         provider.validate_credentials = AsyncMock(return_value=True)
+        provider.supports_streaming.return_value = False
         return provider
 
     @staticmethod
@@ -508,6 +509,7 @@ class MockProviderFactory:
         provider.get_available_models.side_effect = Exception(error_message)
         provider.get_model_info.side_effect = Exception(error_message)
         provider.validate_credentials = AsyncMock(return_value=False)
+        provider.supports_streaming.return_value = False
         return provider
 
     @staticmethod
@@ -530,6 +532,7 @@ class MockProviderFactory:
             name=model, provider=name
         )
         provider.validate_credentials = AsyncMock(return_value=True)
+        provider.supports_streaming.return_value = False
         return provider
 
 

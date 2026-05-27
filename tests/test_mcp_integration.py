@@ -24,9 +24,7 @@ from omnimancer.core.models import (
 )
 from omnimancer.mcp.client import MCPClient
 from omnimancer.mcp.manager import MCPManager
-from omnimancer.utils.errors import (
-    MCPConnectionError,
-)
+from omnimancer.utils.errors import MCPConnectionError
 
 
 @pytest.fixture
