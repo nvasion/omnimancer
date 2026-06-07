@@ -21,33 +21,52 @@ omn -p "refactor auth.py to use dependency injection"
 # Pipe context in
 cat error.log | omn -p "diagnose this crash and suggest a fix"
 
-# Use a specific provider and model
-omn -p --provider claude --model claude-sonnet-4 "write tests for src/api/routes.py"
-omn -p --provider openai --model gpt-4o "explain this codebase"
-omn -p --provider ollama "review this diff" < changes.patch
+# Use a specific provider and model.
+# Note: the prompt must come right after -p; put other flags after it.
+omn -p "write tests for src/api/routes.py" --provider claude --model claude-sonnet-4
+omn -p "explain this codebase" --provider openai --model gpt-4o
+omn -p "review this diff" --provider ollama < changes.patch
 
 # Output formats
-omn -p "summarize this repo"                          # plain text (default)
-omn -p --output-format json "summarize this repo"     # structured JSON
-omn -p --output-format stream-json "summarize this"   # streaming JSON
+omn -p "summarize this repo"                                # plain text (default)
+omn -p "summarize this repo" --output-format json           # structured JSON
+omn -p "summarize this" --output-format stream-json         # streaming JSON
 
 # Auto-approve all tool operations (CI/scripts)
-omn -p --dangerously-skip-permissions "fix the failing tests"
+omn -p "fix the failing tests" --dangerously-skip-permissions
 ```
 
-Headless mode with `--output-format json` outputs:
+Headless mode with `--output-format json` emits a single structured result
+object — including the tool calls the agent made along the way:
 
 ```json
 {
-  "response": "Here's the refactored code...",
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "result": "Here's the refactored code...",
+  "session_id": "…",
   "model": "claude-sonnet-4-20250514",
+  "num_turns": 3,
   "tool_calls": [
-    {"tool": "file_read", "args": {"path": "src/auth.py"}, "result": "..."},
-    {"tool": "file_write", "args": {"path": "src/auth.py"}, "result": "success"}
+    {"name": "file_read", "arguments": {"path": "src/auth.py"}, "error": null},
+    {"name": "file_write", "arguments": {"path": "src/auth.py"}, "error": null}
   ],
-  "tokens": {"input": 1523, "output": 892}
+  "usage": {"input_tokens": 1523, "output_tokens": 892, "total_cost_usd": 0.04},
+  "total_cost_usd": 0.04,
+  "stop_reason": "end_turn"
 }
 ```
+
+On failure it stays valid JSON (stdout), with the error and any tool calls made:
+
+```json
+{"type": "result", "subtype": "error", "is_error": true, "error": "…", "tool_calls": [...]}
+```
+
+For a live, line-by-line stream of what the agent is doing (assistant text,
+each `tool_use`, each `tool_result`, then the final `result`), use
+`--output-format stream-json`.
 
 ### Interactive mode
 
@@ -117,6 +136,7 @@ Providers that support native tool calling (Claude, OpenAI, Gemini) use structur
 | **Azure OpenAI** | Yes | Fallback | Enterprise Azure deployment. |
 | **Vertex AI** | Yes | Fallback | Google Cloud deployment. |
 | **OpenRouter** | No | Fallback | Access to 100+ models. |
+| **DigitalOcean** | No | Fallback | OpenAI-compatible GenAI inference. Custom endpoint supported. |
 | **Cohere** | No | Fallback | |
 
 "Fallback" means the provider works but sends the full response at once instead of streaming token-by-token. The UI handles both modes transparently.
@@ -132,7 +152,9 @@ Providers that support native tool calling (Claude, OpenAI, Gemini) use structur
 | `/models [filter]` | List available models |
 | `/providers` | List all providers with status |
 | `/agent on\|off\|status` | Toggle agent mode |
-| `/config show\|set\|get` | View or modify configuration |
+| `/config show\|get\|set` | View or modify configuration |
+| `/config set-provider <name> [--api-key …] [--base-url …] [--model …]` | Create/update a provider |
+| `/config remove-provider <name>` | Remove a provider |
 | `/validate [provider]` | Validate provider configurations |
 | `/health [provider]` | Check provider health |
 | `/save [name]` | Save conversation |
@@ -159,14 +181,69 @@ omn
 
 ### Config file
 
-Config is stored in `~/.omnimancer/config.json`. You can edit it directly or use the CLI:
+Config is stored in `~/.omnimancer/config.json` (API keys are encrypted at rest).
+You can edit it directly or, more conveniently, configure everything from the CLI:
 
 ```bash
 omn
+# Configure a provider in one step (api key is encrypted before storage)
+>>> /config set-provider claude --api-key sk-ant-...
+>>> /config set-provider openai --api-key sk-... --model gpt-4o
+>>> /config set-provider openrouter --api-key sk-or-... --model anthropic/claude-3.5-sonnet
+
+# Set or change individual fields
+>>> /config set providers.openai.base_url https://my-proxy.example.com/v1
+>>> /config set providers.openai.max_tokens 8192
 >>> /config set default_provider claude
+
+# Inspect / clean up
+>>> /config show
 >>> /config get default_provider
->>> /config validate                    # validate all provider configs
->>> /config validate claude             # validate specific provider
+>>> /config remove-provider openai
+```
+
+### Multiple endpoints
+
+Each of these is just a provider you can point anywhere via `base_url`, so you can run
+several endpoints side by side and switch between them with `/switch <provider>`:
+
+| Endpoint | Provider name | Default base URL |
+|----------|---------------|------------------|
+| Claude (direct) | `claude` | `https://api.anthropic.com/v1` |
+| OpenAI | `openai` | `https://api.openai.com/v1` |
+| OpenRouter | `openrouter` | `https://openrouter.ai/api/v1` |
+| DigitalOcean inference | `digitalocean` | `https://inference.do-ai.run/v1` |
+
+Any OpenAI-compatible service (local proxy, gateway, self-hosted model) works by
+overriding `base_url` on the `openai` provider.
+
+### Environment variable overrides
+
+Environment variables take precedence over the saved config and are applied at
+runtime only (never written back to disk). This makes them ideal for CI and for
+testing endpoints without touching `config.json`.
+
+```bash
+# Conventional API keys
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+export OPENROUTER_API_KEY="sk-or-..."
+export DIGITALOCEAN_INFERENCE_KEY="..."
+
+# Per-provider overrides: OMNIMANCER_<PROVIDER>_{API_KEY,BASE_URL,MODEL}
+export OMNIMANCER_OPENAI_BASE_URL="http://localhost:1234/v1"
+export OMNIMANCER_DIGITALOCEAN_MODEL="llama3.3-70b-instruct"
+
+# Pick the default provider for this run
+export OMNIMANCER_DEFAULT_PROVIDER="digitalocean"
+omn
+```
+
+You can also override the endpoint for a single headless run with `--base-url`:
+
+```bash
+omn -p "summarize README.md" --provider openai --base-url http://localhost:1234/v1
+omn -p "explain this repo" --provider digitalocean --model llama3.3-70b-instruct
 ```
 
 ### Provider-specific setup
@@ -194,6 +271,21 @@ export GOOGLE_API_KEY="..."
 # Uses AWS credentials (env vars, ~/.aws/credentials, or IAM role)
 export AWS_DEFAULT_REGION="us-east-1"
 # Models: anthropic.claude-3-5-sonnet, amazon.titan
+```
+
+**OpenRouter:**
+```bash
+export OPENROUTER_API_KEY="sk-or-..."
+# Models: anthropic/claude-3.5-sonnet, openai/gpt-4o, and 100+ more
+```
+
+**DigitalOcean inference (OpenAI-compatible):**
+```bash
+export DIGITALOCEAN_INFERENCE_KEY="..."
+# Default endpoint: https://inference.do-ai.run/v1
+# Models: llama3.3-70b-instruct, llama3-8b-instruct, openai-gpt-4o
+# Override the endpoint if needed:
+export OMNIMANCER_DIGITALOCEAN_BASE_URL="https://inference.do-ai.run/v1"
 ```
 
 **Ollama (local, no API key):**

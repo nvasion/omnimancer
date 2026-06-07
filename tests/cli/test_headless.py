@@ -530,21 +530,108 @@ class TestHeadlessRunner:
         assert "Rate limit" in stderr_buf.getvalue()
 
     @pytest.mark.asyncio
+    async def test_json_error_is_structured_json(self):
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.send_message_with_tools = AsyncMock(
+            return_value=ChatResponse(
+                content="", model_used="", tokens_used=0, error="context overflow"
+            )
+        )
+        mock_engine.agent_engine = MagicMock()
+
+        stdout_buf = StringIO()
+        runner = HeadlessRunner(
+            engine=mock_engine,
+            output_format=OutputFormat.JSON,
+            no_approval=True,
+        )
+        runner._emitter._stdout = stdout_buf
+
+        exit_code = await runner.run("question")
+        assert exit_code == 1
+        # stdout must be valid JSON in json mode, even on error.
+        payload = json.loads(stdout_buf.getvalue())
+        assert payload["is_error"] is True
+        assert payload["error"] == "context overflow"
+        assert payload["type"] == "result"
+
+    @pytest.mark.asyncio
+    async def test_json_result_includes_tool_calls(self):
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        responses = [
+            ChatResponse(
+                content="Looking...",
+                model_used="claude",
+                tokens_used=5,
+                stop_reason="tool_use",
+                tool_calls=[ToolCall(name="find_files", arguments={"pattern": "*.py"})],
+            ),
+            ChatResponse(
+                content="Here is the explanation.",
+                model_used="claude",
+                tokens_used=8,
+                stop_reason="end_turn",
+                tool_calls=None,
+            ),
+        ]
+
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=responses)
+        mock_agent_engine = MagicMock()
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=MagicMock(
+                success=True, data="a.py\nb.py", error=None, was_cancelled=False
+            )
+        )
+        mock_engine.agent_engine = mock_agent_engine
+
+        stdout_buf = StringIO()
+        runner = HeadlessRunner(
+            engine=mock_engine,
+            output_format=OutputFormat.JSON,
+            no_approval=True,
+        )
+        runner._emitter._stdout = stdout_buf
+
+        exit_code = await runner.run("explain this repo")
+        assert exit_code == 0
+        payload = json.loads(stdout_buf.getvalue())
+        assert payload["result"] == "Here is the explanation."
+        assert payload["num_turns"] == 2
+        assert len(payload["tool_calls"]) == 1
+        assert payload["tool_calls"][0]["name"] == "find_files"
+
+    @pytest.mark.asyncio
     async def test_max_iterations_respected(self):
         from omnimancer.cli.headless import HeadlessRunner, OutputFormat
         from omnimancer.cli.tool_handler import MAX_TOOL_ITERATIONS
 
-        infinite_response = ChatResponse(
-            content="Working...",
-            model_used="test",
-            tokens_used=10,
-            stop_reason="tool_use",
-            tool_calls=[ToolCall(name="file_read", arguments={"path": "/x"})],
-        )
+        # Distinct args each call so loop-detection does not trip; this tests
+        # the hard iteration cap.
+        def make_response(*_args, **_kwargs):
+            make_response.n += 1
+            return ChatResponse(
+                content="Working...",
+                model_used="test",
+                tokens_used=10,
+                stop_reason="tool_use",
+                tool_calls=[
+                    ToolCall(
+                        name="Read", arguments={"file_path": f"/x{make_response.n}"}
+                    )
+                ],
+            )
+
+        make_response.n = 0
 
         mock_engine = MagicMock()
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
-        mock_engine.send_message_with_tools = AsyncMock(return_value=infinite_response)
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=make_response)
 
         mock_agent_engine = MagicMock()
         mock_agent_engine.execute_with_approval = AsyncMock(
@@ -568,3 +655,37 @@ class TestHeadlessRunner:
 
         await runner.run("loop")
         assert mock_engine.send_message_with_tools.call_count == MAX_TOOL_ITERATIONS
+
+    @pytest.mark.asyncio
+    async def test_repeated_tool_call_stops_early(self):
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        # Same tool call every time → loop detection should stop after 3.
+        repeated = ChatResponse(
+            content="",
+            model_used="test",
+            tokens_used=1,
+            stop_reason="tool_use",
+            tool_calls=[ToolCall(name="Write", arguments={"file_path": "/x"})],
+        )
+
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.send_message_with_tools = AsyncMock(return_value=repeated)
+        mock_agent_engine = MagicMock()
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=MagicMock(
+                success=True, data="ok", error=None, was_cancelled=False
+            )
+        )
+        mock_engine.agent_engine = mock_agent_engine
+
+        runner = HeadlessRunner(
+            engine=mock_engine, output_format=OutputFormat.TEXT, no_approval=True
+        )
+        runner._emitter._stdout = StringIO()
+
+        exit_code = await runner.run("loop")
+        assert exit_code == 0
+        # Stops on the 3rd identical call rather than running to the cap.
+        assert mock_engine.send_message_with_tools.call_count == 3

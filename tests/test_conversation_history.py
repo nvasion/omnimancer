@@ -121,7 +121,7 @@ class TestLoadCommand:
             await cli_interface._handle_load_command(command)
 
             mock_engine.load_conversation.assert_called_once_with("test.json")
-            mock_engine.get_conversation_info.assert_called_once_with("test.json")
+            mock_engine.get_conversation_summary.assert_called_once_with()
 
             # Check that info messages were shown
             assert mock_show_info.call_count == 2
@@ -131,7 +131,7 @@ class TestLoadCommand:
     @pytest.mark.asyncio
     async def test_load_command_no_info(self, cli_interface, mock_engine):
         """Test loading conversation when info is not available."""
-        mock_engine.get_conversation_info.return_value = None
+        mock_engine.get_conversation_summary.return_value = None
         command = Command.create_slash_command(
             SlashCommand.LOAD, ["test.json"], "/load test.json"
         )

@@ -26,6 +26,7 @@ class ProviderType(str, Enum):
     VERTEX = "vertex"
     BEDROCK = "bedrock"
     OPENROUTER = "openrouter"
+    DIGITALOCEAN = "digitalocean"
 
 
 @dataclass
@@ -81,11 +82,14 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
         common_settings={"anthropic_version": "2023-06-01"},
     ),
     ProviderType.CLAUDE_CODE: ProviderCapabilities(
-        supports_tools=True,
+        # The ClaudeCodeProvider does not implement send_message_with_tools, so
+        # user-provided tool calling is not wired through this integration even
+        # though Claude Code itself uses tools natively.
+        supports_tools=False,
         supports_multimodal=True,
         supports_streaming=True,
         supports_system_messages=True,
-        supports_function_calling=True,
+        supports_function_calling=False,
         supports_vision=True,
         supports_json_mode=True,
         default_max_tokens=8192,
@@ -125,11 +129,14 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
         },
     ),
     ProviderType.COHERE: ProviderCapabilities(
-        supports_tools=True,
+        # The Cohere provider does not implement send_message_with_tools, so
+        # tool/function calling is not wired even though Command-R models support
+        # it upstream. Keep False until the provider implements it.
+        supports_tools=False,
         supports_multimodal=False,
         supports_streaming=True,
         supports_system_messages=True,
-        supports_function_calling=True,
+        supports_function_calling=False,
         supports_vision=False,
         supports_json_mode=True,
         default_max_tokens=4096,
@@ -183,11 +190,12 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ),
     ProviderType.XAI: ProviderCapabilities(
         supports_tools=True,
-        supports_multimodal=False,
+        # Grok vision models support image input; the provider reports True.
+        supports_multimodal=True,
         supports_streaming=True,
         supports_system_messages=True,
         supports_function_calling=True,
-        supports_vision=False,
+        supports_vision=True,
         supports_json_mode=True,
         default_max_tokens=4096,
         default_temperature=0.7,
@@ -234,16 +242,34 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
         common_settings={"aws_region": "us-east-1"},
     ),
     ProviderType.OPENROUTER: ProviderCapabilities(
-        supports_tools=False,  # Depends on selected model
-        supports_multimodal=False,  # Depends on selected model
+        # OpenRouter is a passthrough aggregator: the provider implements tool
+        # calling and multimodal, so the integration is capable. Actual support
+        # is model-dependent at runtime (see OpenRouterProvider.supports_*()).
+        supports_tools=True,
+        supports_multimodal=True,
         supports_streaming=True,
         supports_system_messages=True,
-        supports_function_calling=False,  # Depends on selected model
-        supports_vision=False,  # Depends on selected model
-        supports_json_mode=False,  # Depends on selected model
+        supports_function_calling=True,
+        supports_vision=True,
+        supports_json_mode=True,
         default_max_tokens=4096,
         default_temperature=0.7,
         common_settings={"base_url": "https://openrouter.ai/api/v1"},
+    ),
+    ProviderType.DIGITALOCEAN: ProviderCapabilities(
+        # OpenAI-compatible passthrough: tool calling is wired via the OpenAI
+        # provider implementation. Multimodal is left False because the default
+        # models are text-only; actual support is model-dependent at runtime.
+        supports_tools=True,
+        supports_multimodal=False,
+        supports_streaming=True,
+        supports_system_messages=True,
+        supports_function_calling=True,
+        supports_vision=False,
+        supports_json_mode=True,
+        default_max_tokens=4096,
+        default_temperature=0.7,
+        common_settings={"base_url": "https://inference.do-ai.run/v1"},
     ),
 }
 
@@ -261,12 +287,17 @@ def get_provider_capabilities(provider_type: str) -> ProviderCapabilities:
     Raises:
         ValueError: If provider type is not supported
     """
-    try:
-        provider_enum = ProviderType(provider_type.lower().replace("-", "_"))
-        return PROVIDER_CAPABILITIES[provider_enum]
-    except (ValueError, KeyError):
-        # Return basic capabilities for unknown providers
-        return ProviderCapabilities()
+    # Enum values are mostly single words but a few use a hyphen (e.g.
+    # "claude-code"). Callers may pass either separator, so try the raw value
+    # and both normalizations before giving up.
+    key = provider_type.lower()
+    for candidate in (key, key.replace("_", "-"), key.replace("-", "_")):
+        try:
+            return PROVIDER_CAPABILITIES[ProviderType(candidate)]
+        except (ValueError, KeyError):
+            continue
+    # Return basic capabilities for unknown providers
+    return ProviderCapabilities()
 
 
 def get_provider_defaults(provider_type: str) -> Dict[str, Any]:

@@ -8,7 +8,7 @@ class TestBuildAgentPrompt:
     def test_tool_capable_provider_gets_tool_section(self):
         prompt = build_agent_prompt(supports_tools=True)
         assert "TOOL CALLING" in prompt
-        assert "file_read, file_write" in prompt
+        assert "Read, Write, Edit, Bash, Glob, Grep, WebFetch" in prompt
 
     def test_tool_capable_provider_no_markers(self):
         prompt = build_agent_prompt(supports_tools=True)

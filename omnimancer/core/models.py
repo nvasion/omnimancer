@@ -782,6 +782,13 @@ class ProviderConfig(BaseModel):
                 "temperature": 0.7,
                 "max_tokens": 4096,
             },
+            "digitalocean": {
+                "model": "llama3.3-70b-instruct",
+                "api_key": "your-digitalocean-inference-key",
+                "base_url": "https://inference.do-ai.run/v1",
+                "temperature": 0.7,
+                "max_tokens": 4096,
+            },
             "claude-code": {
                 "model": "claude-code-sonnet",
                 "claude_code_mode": "sonnet",
@@ -823,6 +830,7 @@ class ProviderConfig(BaseModel):
             "vertex",
             "bedrock",
             "openrouter",
+            "digitalocean",
             "claude-code",
         ]
 
@@ -1033,6 +1041,63 @@ class ConfigProfile(BaseModel):
         return v.strip()
 
 
+class HookCommand(BaseModel):
+    """A single shell command to run on a lifecycle event.
+
+    Hooks let users observe or gate Omnimancer's behaviour: a command can react
+    to an event (logging, notifications) or, when ``blocking`` is set, veto it by
+    exiting non-zero. The event's JSON payload is delivered on the hook's stdin.
+    """
+
+    name: str
+    command: str
+    enabled: bool = True
+    # Run with ``timeout`` seconds before the hook is killed and treated as a
+    # failure (which blocks the action if ``blocking`` is set).
+    timeout: int = 30
+    # Optional regex matched against the event's target (e.g. the message text
+    # for send events, or the command/path for tool events). When set, the hook
+    # only runs if the target matches. ``None`` means "always run".
+    matcher: Optional[str] = None
+    # When True, a non-zero exit (or timeout) vetoes the action.
+    blocking: bool = False
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: Any) -> Any:
+        if not v or not v.strip():
+            raise ValueError("Hook name cannot be empty")
+        return v.strip()
+
+    @field_validator("command")
+    @classmethod
+    def validate_command(cls, v: Any) -> Any:
+        if not v or not v.strip():
+            raise ValueError("Hook command cannot be empty")
+        return v.strip()
+
+
+class HooksConfig(BaseModel):
+    """User-configured lifecycle hooks, grouped by event name."""
+
+    # Master switch; when False no hooks run regardless of the lists below.
+    enabled: bool = True
+
+    # Fired before a message is sent to the provider. Blocking hooks can veto.
+    pre_send_message: List[HookCommand] = []
+    # Fired after a successful provider response (observe-only).
+    post_send_message: List[HookCommand] = []
+    # Fired before an agent tool/operation runs. Blocking hooks can veto.
+    tool_use_request: List[HookCommand] = []
+    # Fired after an agent tool/operation completes (observe-only).
+    post_tool: List[HookCommand] = []
+
+    def hooks_for(self, event: str) -> List[HookCommand]:
+        """Return the configured hooks for ``event`` (empty if unknown)."""
+        value = getattr(self, event, None)
+        return value if isinstance(value, list) else []
+
+
 class Config(BaseModel):
     """Main configuration model."""
 
@@ -1041,6 +1106,7 @@ class Config(BaseModel):
     chat_settings: ChatSettings = ChatSettings()
     storage_path: str
     mcp: MCPConfig = MCPConfig()
+    hooks: HooksConfig = HooksConfig()
 
     # Profile management
     profiles: Dict[str, ConfigProfile] = {}

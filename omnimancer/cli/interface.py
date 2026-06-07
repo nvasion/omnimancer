@@ -7,6 +7,7 @@ for the Omnimancer application.
 
 # Standard library imports
 import asyncio
+import json
 import logging
 import os
 import re
@@ -53,6 +54,41 @@ try:
     from omnimancer import __version__
 except ImportError:
     __version__ = "unknown"
+
+
+def apply_session_overrides(
+    config_manager: "ConfigManager",
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> None:
+    """Apply --provider/--model/--base-url overrides to the in-memory config.
+
+    These are ephemeral (never written to disk). ``initialize_providers()``
+    reads the in-memory config, so mutating it here is enough for the overrides
+    to take effect for the session.
+    """
+    if not (provider or model or base_url):
+        return
+
+    from ..core.models import ProviderConfig
+
+    cfg = config_manager.get_config()
+    if provider:
+        cfg.default_provider = provider
+
+    target = provider or cfg.default_provider
+    if not target:
+        return
+
+    provider_cfg = cfg.providers.get(target)
+    if provider_cfg is None:
+        provider_cfg = ProviderConfig(model=model or "")
+        cfg.providers[target] = provider_cfg
+    if model:
+        provider_cfg.model = model
+    if base_url:
+        provider_cfg.base_url = base_url.rstrip("/")
 
 
 class CommandLineInterface(
@@ -731,6 +767,10 @@ class CommandLineInterface(
         provider = getattr(self.engine, "current_provider", None)
         use_streaming = provider and provider.supports_streaming()
 
+        # Detect runaway loops: a weak model may repeat the same tool call
+        # forever. Stop if an identical call is issued too many times.
+        seen_calls: dict = {}
+
         for iteration in range(MAX_TOOL_ITERATIONS):
             if use_streaming:
                 response = await self._stream_tool_response(current_message, tools)
@@ -747,7 +787,23 @@ class CommandLineInterface(
 
             self._show_token_status(response)
 
+            # No tool calls → the model gave its final answer; we're done.
             if not response.tool_calls:
+                return
+
+            repeated = False
+            for tc in response.tool_calls:
+                sig = (
+                    f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True, default=str)}"
+                )
+                seen_calls[sig] = seen_calls.get(sig, 0) + 1
+                if seen_calls[sig] >= 3:
+                    repeated = True
+            if repeated:
+                self._show_warning(
+                    "Stopping: the model kept repeating the same tool call. "
+                    "Try rephrasing your request or using a more capable model."
+                )
                 return
 
             self.console.print(
@@ -762,16 +818,13 @@ class CommandLineInterface(
                     status = f"[{tc.name}] Error: {result.error}"
                     self.console.print(f"  [red]✗ {tc.name}: {result.error}[/red]")
                 else:
-                    (result.content or "")[:200]
-                    status = f"[{tc.name}] Success: {result.content}"
+                    status = f"[{tc.name}] Result: {result.content}"
                     self.console.print(f"  [green]✓ {tc.name}[/green]")
                 result_parts.append(status)
 
-            current_message = (
-                "Tool results:\n\n"
-                + "\n\n".join(result_parts)
-                + f"\n\nContinue working on the task: {user_message}"
-            )
+            # Feed results back without forcing the model to "continue" — let it
+            # decide whether more work is needed or it's time to answer.
+            current_message = "Tool results:\n\n" + "\n\n".join(result_parts)
 
         self._show_warning(
             "Reached maximum tool call iterations" f" ({MAX_TOOL_ITERATIONS})."
@@ -917,6 +970,13 @@ def main() -> None:
         default=None,
         help="Model to use",
     )
+    @click.option(
+        "--base-url",
+        "base_url",
+        type=str,
+        default=None,
+        help="Override the provider API endpoint (headless mode)",
+    )
     def cli_main(
         help: Any,
         version: Any,
@@ -928,6 +988,7 @@ def main() -> None:
         dangerously_skip_permissions: Any,
         provider: Any,
         model: Any,
+        base_url: Any,
     ) -> None:
         """Omnimancer - A multi-model coding agent for the terminal."""
 
@@ -960,6 +1021,7 @@ def main() -> None:
                     verbose=verbose,
                     provider=provider,
                     model=model,
+                    base_url=base_url,
                 )
             )
             sys.exit(exit_code)
@@ -967,6 +1029,10 @@ def main() -> None:
         # Interactive REPL mode
         try:
             config_manager = ConfigManager(config)
+
+            # Apply CLI overrides for this session (ephemeral — not persisted).
+            apply_session_overrides(config_manager, provider, model, base_url)
+
             engine = CoreEngine(config_manager)
             cli = CommandLineInterface(engine, no_approval=no_approval)
             cli.start()

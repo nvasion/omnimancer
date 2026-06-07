@@ -7,6 +7,7 @@ import pytest
 from omnimancer.cli.tool_handler import (
     AUTO_APPROVED_TOOLS,
     MAX_TOOL_ITERATIONS,
+    MAX_TOOL_RESULT_CHARS,
     TOOL_TO_OPERATION,
     ToolHandler,
 )
@@ -79,6 +80,131 @@ class TestToolHandlerMapping:
         assert "*.py" in op.data["command"]
         assert op.requires_approval is False
 
+    def test_claude_code_names_map(self, tool_handler):
+        # The Claude Code tool names resolve to operations.
+        for name in ("Read", "Write", "Bash", "Glob", "Grep", "WebFetch"):
+            op = tool_handler._tool_call_to_operation(ToolCall(name=name, arguments={}))
+            assert op is not None, name
+
+    def test_read_accepts_file_path(self, tool_handler):
+        op = tool_handler._tool_call_to_operation(
+            ToolCall(name="Read", arguments={"file_path": "/src/main.py"})
+        )
+        assert op.type == OperationType.FILE_READ
+        assert op.data["path"] == "/src/main.py"
+
+    def test_glob_uses_path_argument(self, tool_handler):
+        op = tool_handler._tool_call_to_operation(
+            ToolCall(name="Glob", arguments={"pattern": "*.py", "path": "src"})
+        )
+        assert "find src -type f -name '*.py'" in op.data["command"]
+
+    def test_grep_default_is_files_with_matches(self, tool_handler):
+        op = tool_handler._tool_call_to_operation(
+            ToolCall(name="Grep", arguments={"pattern": "X"})
+        )
+        assert "-l" in op.data["command"]
+
+    def test_grep_content_mode_with_options(self, tool_handler):
+        op = tool_handler._tool_call_to_operation(
+            ToolCall(
+                name="Grep",
+                arguments={
+                    "pattern": "X",
+                    "output_mode": "content",
+                    "-i": True,
+                    "-C": 2,
+                    "glob": "*.py",
+                    "head_limit": 50,
+                },
+            )
+        )
+        cmd = op.data["command"]
+        assert "-i" in cmd and "-n" in cmd and "-C 2" in cmd
+        assert "--include='*.py'" in cmd
+        assert "| head -n 50" in cmd
+
+    @pytest.mark.asyncio
+    async def test_read_offset_limit_slices(self, tool_handler, mock_agent_engine):
+        mock_agent_engine.execute_with_approval.return_value = OperationResult(
+            success=True, data="l1\nl2\nl3\nl4\nl5"
+        )
+        result = await tool_handler.execute_tool_call(
+            ToolCall(
+                name="Read", arguments={"file_path": "/f", "offset": 2, "limit": 2}
+            )
+        )
+        assert result.content == "l2\nl3"
+
+    @pytest.mark.asyncio
+    async def test_edit_replaces_unique_string(self, tool_handler, mock_agent_engine):
+        calls = []
+
+        async def fake(op):
+            calls.append(op.type)
+            if op.type == OperationType.FILE_READ:
+                return OperationResult(success=True, data="alpha beta gamma")
+            return OperationResult(success=True, data="written")
+
+        mock_agent_engine.execute_with_approval = AsyncMock(side_effect=fake)
+        result = await tool_handler.execute_tool_call(
+            ToolCall(
+                name="Edit",
+                arguments={
+                    "file_path": "/f",
+                    "old_string": "beta",
+                    "new_string": "BETA",
+                },
+            )
+        )
+        assert result.error is None
+        assert "Edited /f" in result.content
+        assert OperationType.FILE_READ in calls and OperationType.FILE_WRITE in calls
+
+    @pytest.mark.asyncio
+    async def test_edit_non_unique_requires_replace_all(
+        self, tool_handler, mock_agent_engine
+    ):
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=OperationResult(success=True, data="x x x")
+        )
+        result = await tool_handler.execute_tool_call(
+            ToolCall(
+                name="Edit",
+                arguments={"file_path": "/f", "old_string": "x", "new_string": "y"},
+            )
+        )
+        assert result.error is not None
+        assert "not unique" in result.error
+
+    @pytest.mark.asyncio
+    async def test_edit_missing_old_string_errors(
+        self, tool_handler, mock_agent_engine
+    ):
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=OperationResult(success=True, data="hello")
+        )
+        result = await tool_handler.execute_tool_call(
+            ToolCall(
+                name="Edit",
+                arguments={"file_path": "/f", "old_string": "zzz", "new_string": "y"},
+            )
+        )
+        assert "not found" in result.error
+
+    def test_find_files_excludes_heavy_dirs(self, tool_handler):
+        tc = ToolCall(name="find_files", arguments={"pattern": "*.py"})
+        cmd = tool_handler._tool_call_to_operation(tc).data["command"]
+        assert "-not -path '*/.venv/*'" in cmd
+        assert "-not -path '*/node_modules/*'" in cmd
+        assert "-not -path '*/.git/*'" in cmd
+
+    def test_search_text_excludes_heavy_dirs(self, tool_handler):
+        tc = ToolCall(name="search_text", arguments={"pattern": "import"})
+        cmd = tool_handler._tool_call_to_operation(tc).data["command"]
+        assert "--exclude-dir=.venv" in cmd
+        assert "--exclude-dir=node_modules" in cmd
+
     def test_search_text_mapping(self, tool_handler):
         tc = ToolCall(
             name="search_text",
@@ -132,6 +258,34 @@ class TestToolHandlerExecution:
         assert result.error is None
         assert result.content == "file contents here"
         mock_agent_engine.execute_with_approval.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_small_output_not_truncated(self, tool_handler, mock_agent_engine):
+        mock_agent_engine.execute_with_approval.return_value = OperationResult(
+            success=True, data="x" * 1000
+        )
+        tc = ToolCall(name="file_read", arguments={"path": "/a"})
+        result = await tool_handler.execute_tool_call(tc)
+
+        assert result.content == "x" * 1000
+        assert "truncated" not in result.content
+
+    @pytest.mark.asyncio
+    async def test_large_output_truncated(self, tool_handler, mock_agent_engine):
+        # Simulates `find`/`grep` dumping the whole tree (incl. .venv).
+        huge = "y" * 500_000
+        mock_agent_engine.execute_with_approval.return_value = OperationResult(
+            success=True, data=huge
+        )
+        tc = ToolCall(name="search_text", arguments={"pattern": "import"})
+        result = await tool_handler.execute_tool_call(tc)
+
+        assert len(result.content) < len(huge)
+        assert len(result.content) <= MAX_TOOL_RESULT_CHARS + 200  # marker overhead
+        assert "characters truncated" in result.content
+        # Keeps both head and tail of the output.
+        assert result.content.startswith("y")
+        assert result.content.endswith("y")
 
     @pytest.mark.asyncio
     async def test_execute_tool_call_failure(self, tool_handler, mock_agent_engine):
@@ -195,13 +349,13 @@ class TestToolDefinitions:
     def test_all_tools_defined(self):
         tool_names = {t.name for t in CODING_AGENT_TOOLS}
         expected = {
-            "file_read",
-            "file_write",
-            "file_delete",
-            "command_exec",
-            "find_files",
-            "search_text",
-            "web_request",
+            "Read",
+            "Write",
+            "Edit",
+            "Bash",
+            "Glob",
+            "Grep",
+            "WebFetch",
         }
         assert tool_names == expected
 
@@ -216,7 +370,10 @@ class TestToolDefinitions:
         auto_approved_from_defs = {
             t.name for t in CODING_AGENT_TOOLS if t.auto_approved
         }
-        assert auto_approved_from_defs == AUTO_APPROVED_TOOLS
+        # Every auto-approved tool definition must be recognized as auto-approved
+        # (AUTO_APPROVED_TOOLS also contains legacy aliases).
+        assert auto_approved_from_defs == {"Read", "Glob", "Grep", "WebFetch"}
+        assert auto_approved_from_defs <= AUTO_APPROVED_TOOLS
 
     def test_get_tool_definitions(self, tool_handler):
         tools = tool_handler.get_tool_definitions()

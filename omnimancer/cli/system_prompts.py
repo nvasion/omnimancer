@@ -286,21 +286,24 @@ PATTERN SUMMARY:
 
 TOOL_CALLING_SECTION = """
 🔧 TOOL CALLING:
-You have access to tools for interacting with the local system. When you need to
-perform an action (read a file, run a command, etc.), call the appropriate tool.
+You have access to tools for interacting with the local system. Use them only
+when the user's request actually requires an action on their files or system.
 The system handles approval for dangerous operations automatically.
 
-Available tools: file_read, file_write, file_delete,
-command_exec, find_files, search_text, web_request
+Available tools: Read, Write, Edit, Bash, Glob, Grep, WebFetch
 
 EXECUTION RULES:
-- Call tools directly — don't describe what you plan to do,
-  just do it
-- One tool call at a time; observe the result before
-  deciding on the next action
-- All file writes and risky commands require user approval
-  — the system handles this
-- File reads, searches, and find operations are auto-approved
+- If the user is just chatting, greeting you, or asking a question you can
+  answer from what you already know, reply in plain text — do NOT call a tool.
+- Only call a tool when it is needed to fulfill the request (read/modify files,
+  run a command, search the codebase, fetch a URL).
+- When you do use tools, call them directly — don't narrate; one tool call at a
+  time, observe the result, then decide the next action.
+- When you have enough information, STOP calling tools and give a final text
+  answer. Do not repeat the same tool call.
+- Prefer Read/Glob/Grep to explore; use Edit for targeted changes and Write for
+  new files. Writes, edits, and risky Bash commands require user approval.
+- Read, Glob, Grep, and WebFetch are auto-approved.
 """
 
 

@@ -619,7 +619,7 @@ class CommandDispatchMixin:
                 self.engine.load_conversation(filename)
 
             # Show loaded conversation info
-            info = self.engine.get_conversation_info(filename)
+            info = self.engine.get_conversation_summary()
             if info:
                 self._show_info(f"Loaded conversation: {filename}")
                 self._show_info(
@@ -645,7 +645,8 @@ class CommandDispatchMixin:
             await self._show_config()
         elif subcommand == "set":
             if len(args) >= 3:
-                await self._handle_config_set(args[1], args[2])
+                # Join the remainder so values may contain spaces.
+                await self._handle_config_set(args[1], " ".join(args[2:]))
             else:
                 self._show_error("Usage: /config set <key> <value>")
         elif subcommand == "get":
@@ -653,13 +654,17 @@ class CommandDispatchMixin:
                 await self._handle_config_get(args[1])
             else:
                 self._show_error("Usage: /config get <key>")
+        elif subcommand in ("set-provider", "add-provider"):
+            await self._handle_config_set_provider(args[1:])
+        elif subcommand in ("remove-provider", "delete-provider"):
+            await self._handle_config_remove_provider(args[1:])
         else:
             self._show_config_help()
 
     async def _show_config(self) -> None:
         """Show current configuration."""
         try:
-            config_info = self.engine.get_configuration_info()
+            config_info = self.engine.get_current_config()
 
             table = Table(title="Current Configuration")
             table.add_column("Setting", style="bold")
@@ -684,20 +689,179 @@ class CommandDispatchMixin:
             self._show_error(f"Failed to show configuration: {e}")
 
     async def _handle_config_set(self, key: str, value: str) -> None:
-        """Handle config set operation."""
+        """Handle config set operation.
+
+        Supported keys:
+          - ``default_provider``
+          - ``providers.<name>.<field>`` (e.g. providers.openai.api_key,
+            providers.digitalocean.base_url, providers.claude.model)
+        """
         try:
-            # This would need to be implemented in the engine
-            self._show_info(f"Setting {key} = {value}")
+            config_manager = self.engine.config_manager
+
+            if key == "default_provider":
+                config_manager.set_default_provider(value)
+                self._show_success(f"default_provider set to '{value}'")
+            elif key.startswith("providers."):
+                parts = key.split(".")
+                if len(parts) != 3:
+                    self._show_error(
+                        "Usage: /config set providers.<name>.<field> <value>"
+                    )
+                    return
+                _, provider_name, field = parts
+                self._set_provider_field(provider_name, field, value)
+            else:
+                self._show_error(
+                    f"Unsupported config key: '{key}'. Use 'default_provider' or "
+                    "'providers.<name>.<field>'."
+                )
+                return
+
             self._show_info(
-                "Note: Some settings may require restarting Omnimancer to take effect"
+                "Restart or switch providers (/provider) for changes to take effect."
             )
         except Exception as e:
             self._show_error(f"Failed to set configuration: {e}")
 
+    def _coerce_provider_value(self, field: str, value: str) -> Any:
+        """Coerce a string value to the type declared on ProviderConfig."""
+        import typing
+
+        from ..core.models import ProviderConfig
+
+        field_info = ProviderConfig.model_fields.get(field)
+        if field_info is None:
+            valid = ", ".join(sorted(ProviderConfig.model_fields))
+            raise ValueError(
+                f"Unknown provider setting '{field}'. Valid settings: {valid}"
+            )
+
+        annotation = field_info.annotation
+        types = set(typing.get_args(annotation)) or {annotation}
+        if bool in types:
+            return value.strip().lower() in ("1", "true", "yes", "on")
+        if int in types:
+            return int(value)
+        if float in types:
+            return float(value)
+        return value
+
+    def _set_provider_field(self, provider_name: str, field: str, value: str) -> None:
+        """Set a single field on a provider's configuration (creating it if needed)."""
+        from ..core.models import ProviderConfig
+
+        config_manager = self.engine.config_manager
+
+        if field == "api_key":
+            # set_api_key encrypts and creates a minimal entry if missing.
+            config_manager.set_api_key(provider_name, value)
+            self._show_success(f"api_key set for provider '{provider_name}'")
+            return
+
+        coerced = self._coerce_provider_value(field, value)
+        existing = config_manager.get_provider_config(provider_name)
+        data = existing.model_dump() if existing else {"model": ""}
+        data[field] = coerced
+        new_config = ProviderConfig(**data)
+        config_manager.set_provider_config(provider_name, new_config)
+        self._show_success(f"{field} set to '{value}' for provider '{provider_name}'")
+
+    async def _handle_config_set_provider(self, args: List[str]) -> None:
+        """Handle '/config set-provider <name> [--api-key K] [--base-url U]
+        [--model M]'."""
+        if not args:
+            self._show_error(
+                "Usage: /config set-provider <name> "
+                "[--api-key KEY] [--base-url URL] [--model MODEL]"
+            )
+            return
+
+        provider_name = args[0]
+        flags = {"--api-key": "api_key", "--base-url": "base_url", "--model": "model"}
+        values: dict = {}
+        i = 1
+        while i < len(args):
+            token = args[i]
+            if token in flags and i + 1 < len(args):
+                values[flags[token]] = args[i + 1]
+                i += 2
+            else:
+                self._show_error(f"Unrecognized or incomplete option: {token}")
+                return
+
+        if not values:
+            self._show_error(
+                "Provide at least one of --api-key, --base-url, or --model."
+            )
+            return
+
+        try:
+            from ..core.models import ProviderConfig
+
+            config_manager = self.engine.config_manager
+
+            # API key first (encrypts; creates a minimal entry if needed).
+            if "api_key" in values:
+                config_manager.set_api_key(provider_name, values["api_key"])
+
+            existing = config_manager.get_provider_config(provider_name)
+            data = existing.model_dump() if existing else {"model": ""}
+            if "base_url" in values:
+                data["base_url"] = values["base_url"]
+            if "model" in values:
+                data["model"] = values["model"]
+            config_manager.set_provider_config(provider_name, ProviderConfig(**data))
+
+            fields = ", ".join(sorted(values))
+            self._show_success(f"Provider '{provider_name}' configured ({fields}).")
+            self._show_info(
+                "Use '/config set default_provider "
+                f"{provider_name}' to make it the default."
+            )
+        except Exception as e:
+            self._show_error(f"Failed to configure provider: {e}")
+
+    async def _handle_config_remove_provider(self, args: List[str]) -> None:
+        """Handle '/config remove-provider <name>'."""
+        if not args:
+            self._show_error("Usage: /config remove-provider <name>")
+            return
+
+        provider_name = args[0]
+        try:
+            config_manager = self.engine.config_manager
+            config = config_manager.get_config()
+
+            if provider_name not in config.providers:
+                self._show_error(f"Provider '{provider_name}' is not configured.")
+                return
+
+            del config.providers[provider_name]
+
+            # Repoint the default provider if it referenced the removed one.
+            if config.default_provider == provider_name:
+                if config.providers:
+                    config.default_provider = next(iter(config.providers))
+                    self._show_warning(
+                        "Default provider was removed; now set to "
+                        f"'{config.default_provider}'."
+                    )
+                else:
+                    self._show_warning(
+                        "Removed the last provider; configure another with "
+                        "'/config set-provider'."
+                    )
+
+            config_manager.save_config(config)
+            self._show_success(f"Provider '{provider_name}' removed.")
+        except Exception as e:
+            self._show_error(f"Failed to remove provider: {e}")
+
     async def _handle_config_get(self, key: str) -> None:
         """Handle config get operation."""
         try:
-            config_info = self.engine.get_configuration_info()
+            config_info = self.engine.get_current_config()
             if key in config_info:
                 value = config_info[key]
                 # Mask sensitive information
@@ -720,10 +884,30 @@ class CommandDispatchMixin:
         """Show configuration command help."""
         help_text = """[bold]Configuration Commands:[/bold]
 
-[cyan]/config[/cyan]                  - Show current configuration
-[cyan]/config show[/cyan]             - Show current configuration
-[cyan]/config set <key> <value>[/cyan] - Set a configuration value
-[cyan]/config get <key>[/cyan]        - Get a configuration value"""
+[cyan]/config[/cyan]                              - Show current configuration
+[cyan]/config show[/cyan]                         - Show current configuration
+[cyan]/config get <key>[/cyan]                    - Get a configuration value
+[cyan]/config set default_provider <name>[/cyan] - Set the default provider
+[cyan]/config set providers.<name>.<field> <value>[/cyan]
+                                    - Set a provider field
+                                      (api_key, base_url, model, ...)
+[cyan]/config set-provider <name> [--api-key K] [--base-url U] [--model M][/cyan]
+                                    - Create/update a provider in one step
+[cyan]/config remove-provider <name>[/cyan]       - Remove a provider
+
+[bold]Endpoints[/bold] (each is a provider you can configure):
+  claude, openrouter, openai, digitalocean
+
+[bold]Examples:[/bold]
+  /config set-provider digitalocean --api-key $DO_KEY \\
+      --base-url https://inference.do-ai.run/v1 --model llama3.3-70b-instruct
+  /config set providers.openai.base_url https://my-proxy/v1
+  /config set default_provider claude
+
+[bold]Environment overrides[/bold] (ephemeral, win over the saved config):
+  ANTHROPIC_API_KEY / OPENAI_API_KEY / OPENROUTER_API_KEY / DIGITALOCEAN_INFERENCE_KEY
+  OMNIMANCER_<PROVIDER>_API_KEY / _BASE_URL / _MODEL
+  OMNIMANCER_DEFAULT_PROVIDER"""
         self.console.print(help_text)
 
     async def _show_conversations(self) -> None:
