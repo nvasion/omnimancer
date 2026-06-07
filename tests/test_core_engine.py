@@ -236,6 +236,36 @@ class TestProviderInitialization:
             ]
 
     @pytest.mark.asyncio
+    async def test_configured_default_unavailable_does_not_use_wrong_provider(
+        self, core_engine, mock_providers
+    ):
+        """A configured default that fails to init must not silently fall back.
+
+        Regression: when e.g. ``digitalocean`` was the default but failed to
+        initialize (missing key), the engine fell through to the first available
+        provider and sent the request with the wrong provider's credentials
+        (an Anthropic key for a DigitalOcean request). It must instead leave the
+        current provider unset and surface a clear, provider-named error.
+        """
+        mock_config = core_engine.config_manager.get_config.return_value
+        mock_config.default_provider = "digitalocean"
+
+        # digitalocean is NOT among the successfully initialized providers.
+        with patch.object(
+            core_engine.provider_initializer,
+            "initialize_providers",
+            return_value=mock_providers,
+        ):
+            await core_engine.initialize_providers()
+
+        assert core_engine.current_provider is None
+        assert core_engine._unavailable_default_provider == "digitalocean"
+
+        response = await core_engine.send_message("hi")
+        assert not response.is_success
+        assert "digitalocean" in response.error
+
+    @pytest.mark.asyncio
     async def test_initialize_providers_failure(self, core_engine):
         """Test provider initialization failure."""
         with patch.object(

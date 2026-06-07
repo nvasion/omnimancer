@@ -18,6 +18,7 @@ from .bedrock import BedrockProvider
 from .claude import ClaudeProvider
 from .claude_code import ClaudeCodeProvider
 from .cohere import CohereProvider
+from .digitalocean import DigitalOceanProvider
 from .gemini import GeminiProvider
 from .mistral import MistralProvider
 from .ollama import OllamaProvider
@@ -999,4 +1000,5 @@ ProviderFactory.register_provider("azure", AzureProvider)
 ProviderFactory.register_provider("vertex", VertexAIProvider)
 ProviderFactory.register_provider("bedrock", BedrockProvider)
 ProviderFactory.register_provider("openrouter", OpenRouterProvider)
+ProviderFactory.register_provider("digitalocean", DigitalOceanProvider)
 ProviderFactory.register_provider("claude-code", ClaudeCodeProvider)

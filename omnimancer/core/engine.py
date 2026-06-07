@@ -25,6 +25,7 @@ from .chat_manager import ChatManager
 from .config_manager import ConfigManager
 from .conversation_manager import ConversationManager
 from .health_monitor import HealthMonitor
+from .hooks import HookOutcome, HooksManager
 from .provider_initializer import ProviderInitializer
 from .provider_registry import ProviderRegistry
 
@@ -81,6 +82,16 @@ class CoreEngine:
         try:
             config = self.config_manager.get_config()
 
+            # Apply ephemeral environment-variable overrides (API keys,
+            # base_url, model, default provider). Never persisted to disk.
+            # Overrides must never prevent startup, so fall back on any error.
+            try:
+                from .env_loader import apply_env_overrides
+
+                config = apply_env_overrides(config)
+            except Exception as e:
+                logger.warning(f"Skipping environment overrides: {e}")
+
             # Use the optimized provider initializer with
             # config_manager for API key decryption
             self.providers = await self.provider_initializer.initialize_providers(
@@ -107,10 +118,26 @@ class CoreEngine:
                     logger.warning(f"Failed to register provider {provider_name}: {e}")
 
             # Set default provider
-            if config.default_provider and config.default_provider in self.providers:
-                self.current_provider = self.providers[config.default_provider]
+            self._unavailable_default_provider = None
+            if config.default_provider:
+                if config.default_provider in self.providers:
+                    self.current_provider = self.providers[config.default_provider]
+                else:
+                    # The configured provider failed to initialize (most often a
+                    # missing/invalid API key). Do NOT silently fall back to a
+                    # different provider — that would send the request with the
+                    # wrong provider's credentials (e.g. an Anthropic key for a
+                    # DigitalOcean request). Leave it unset so the user gets a
+                    # clear error naming the provider.
+                    self._unavailable_default_provider = config.default_provider
+                    logger.error(
+                        "Default provider '%s' is configured but failed to "
+                        "initialize (missing or invalid API key?). Not falling "
+                        "back to another provider.",
+                        config.default_provider,
+                    )
             elif self.providers:
-                # Use first available provider as default
+                # No default configured — use first available provider.
                 self.current_provider = next(iter(self.providers.values()))
 
             # Initialize agent engine after providers are ready
@@ -180,6 +207,43 @@ class CoreEngine:
             logger.error(f"Failed to switch model: {e}")
             return False
 
+    def _no_provider_error(self) -> str:
+        """Build a clear error for when there is no usable current provider.
+
+        Names the configured provider that failed to initialize (if any) so the
+        user isn't left guessing — e.g. a DigitalOcean default whose API key is
+        missing, rather than a generic "no provider" message.
+        """
+        unavailable = getattr(self, "_unavailable_default_provider", None)
+        if unavailable:
+            return (
+                f"Provider '{unavailable}' is selected but failed to initialize "
+                f"— most likely a missing or invalid API key. Configure it (e.g. "
+                f"'/config set-provider {unavailable}' or the provider's API-key "
+                f"environment variable) and try again."
+            )
+        return "No provider available. Please configure a provider first."
+
+    async def _fire_hook(
+        self,
+        event: str,
+        context: Optional[Dict[str, Any]] = None,
+        match_target: str = "",
+    ) -> HookOutcome:
+        """Fire configured lifecycle hooks for ``event``.
+
+        Reads the current config so hook changes take effect without restart.
+        Never raises — a misbehaving hook can only veto via the returned
+        outcome, never break message sending.
+        """
+        try:
+            config = self.config_manager.get_config()
+            hooks_cfg = getattr(config, "hooks", None)
+            return await HooksManager(hooks_cfg).fire(event, context, match_target)
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning("Hook firing for '%s' failed: %s", event, e)
+            return HookOutcome(event=event)
+
     async def send_message(self, message: str) -> ChatResponse:
         """
         Send a message using the current provider.
@@ -195,10 +259,27 @@ class CoreEngine:
                 content="",
                 model_used="",
                 tokens_used=0,
-                error="No provider available. Please configure a provider first.",
+                error=self._no_provider_error(),
             )
 
         try:
+            # Fire pre-send hooks; a blocking hook can veto the send.
+            hook_ctx = {
+                "message": message,
+                "provider": self.current_provider.get_provider_name(),
+                "model": self.current_provider.model,
+            }
+            outcome = await self._fire_hook(
+                "pre_send_message", hook_ctx, match_target=message
+            )
+            if not outcome.allowed:
+                return ChatResponse(
+                    content="",
+                    model_used="",
+                    tokens_used=0,
+                    error=f"Message blocked by {outcome.reason}.",
+                )
+
             # Get progress indicator
             progress = get_progress_indicator()
 
@@ -244,6 +325,18 @@ class CoreEngine:
                 if progress and progress.enabled:
                     progress.complete_operation("engine_history", "completed")
 
+                # Observe-only post-send hooks.
+                await self._fire_hook(
+                    "post_send_message",
+                    {
+                        "message": message,
+                        "response": response.content,
+                        "provider": self.current_provider.get_provider_name(),
+                        "model": self.current_provider.model,
+                    },
+                    match_target=response.content,
+                )
+
             return response
 
         except Exception as e:
@@ -263,10 +356,28 @@ class CoreEngine:
                 content="",
                 model_used="",
                 tokens_used=0,
-                error="No provider available.",
+                error=self._no_provider_error(),
             )
 
         try:
+            outcome = await self._fire_hook(
+                "pre_send_message",
+                {
+                    "message": message,
+                    "provider": self.current_provider.get_provider_name(),
+                    "model": self.current_provider.model,
+                    "with_tools": True,
+                },
+                match_target=message,
+            )
+            if not outcome.allowed:
+                return ChatResponse(
+                    content="",
+                    model_used="",
+                    tokens_used=0,
+                    error=f"Message blocked by {outcome.reason}.",
+                )
+
             context = self.chat_manager.get_current_context()
             response = await self.current_provider.send_message_with_tools(
                 message, context, tools
@@ -574,6 +685,39 @@ class CoreEngine:
             lines.append(f"- {model.name} ({model.provider})")
 
         return "\n".join(lines)
+
+    def _get_providers_list(self) -> str:
+        """Get a formatted list of configured providers and their status."""
+        if not self.providers:
+            return "No providers configured."
+
+        current_name = (
+            self.current_provider.get_provider_name() if self.current_provider else None
+        )
+
+        lines = []
+        for name in sorted(self.providers):
+            provider = self.providers[name]
+            marker = " (current)" if name == current_name else ""
+            try:
+                model = getattr(provider, "model", None)
+            except Exception:
+                model = None
+            model_text = f" - model: {model}" if model else ""
+            lines.append(f"- {name}{marker}{model_text}")
+
+        return "\n".join(lines)
+
+    async def get_available_tools(self) -> List[Any]:
+        """Return the list of available MCP tools (empty if MCP is unavailable)."""
+        if not self.mcp_manager or not getattr(self.mcp_manager, "initialized", False):
+            return []
+
+        try:
+            return await self.mcp_manager.get_available_tools()
+        except Exception as e:
+            logger.warning(f"Failed to get available tools: {e}")
+            return []
 
     async def _get_tools_list(self) -> str:
         """Get formatted list of available MCP tools."""

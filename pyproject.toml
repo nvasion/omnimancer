@@ -96,7 +96,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--cov=omnimancer --cov-report=term-missing --cov-report=html"
+# Coverage flags are passed explicitly by CI (.gitlab-ci.yml / factory-pipeline.yml)
+# so that a bare `pytest tests/` works without pytest-cov installed.
 asyncio_mode = "auto"
 markers = [
     "security: marks tests as security-related tests"

@@ -824,6 +824,37 @@ class AgentEngine(CoreEngine):
         if batch_approval_callback:
             self.enhanced_approval.set_batch_approval_callback(batch_approval_callback)
 
+    @staticmethod
+    def _hook_context_for_operation(
+        operation: Operation,
+    ) -> Tuple[Dict[str, Any], str]:
+        """Build a JSON-safe hook payload and matcher target for an operation.
+
+        The match target is the most specific actionable string available (the
+        command, path, or URL) so matchers like ``^rm\\b`` work intuitively;
+        it falls back to the operation type otherwise.
+        """
+        op_type = (
+            operation.type.value
+            if hasattr(operation.type, "value")
+            else str(operation.type)
+        )
+        data = operation.data or {}
+        target = ""
+        for key in ("command", "path", "file_path", "url"):
+            value = data.get(key)
+            if isinstance(value, str) and value:
+                target = value
+                break
+        context: Dict[str, Any] = {
+            "tool": op_type,
+            "description": operation.description,
+            "requires_approval": operation.requires_approval,
+        }
+        if target:
+            context["target"] = target
+        return context, target or op_type
+
     async def execute_with_approval(self, operation: Operation) -> OperationResult:
         """
         Execute operation with approval workflow.
@@ -838,6 +869,17 @@ class AgentEngine(CoreEngine):
             # Generate preview
             preview = await self._generate_preview(operation)
             operation.preview = preview
+
+            # Fire tool_use_request hooks; a blocking hook can veto the tool.
+            hook_ctx, match_target = self._hook_context_for_operation(operation)
+            outcome = await self._fire_hook(
+                "tool_use_request", hook_ctx, match_target=match_target
+            )
+            if not outcome.allowed:
+                return OperationResult(
+                    success=False,
+                    error=f"Operation blocked by {outcome.reason}.",
+                )
 
             # Request approval if needed
             if operation.requires_approval:
@@ -867,6 +909,13 @@ class AgentEngine(CoreEngine):
 
             # Execute operation using appropriate manager
             result = await self._execute_operation(operation)
+
+            # Observe-only post-execution hooks.
+            post_ctx = dict(hook_ctx)
+            post_ctx["success"] = result.success
+            if result.error:
+                post_ctx["error"] = result.error
+            await self._fire_hook("post_tool", post_ctx, match_target=match_target)
 
             # Record in history
             self.operation_history.append(

@@ -32,7 +32,7 @@ class TestWorkflowOrchestrator:
     def mock_approval_manager(self):
         """Mock approval manager."""
         mock = Mock()
-        mock.request_approval = AsyncMock(return_value=True)
+        mock.request_single_approval = AsyncMock(return_value=True)
         return mock
 
     @pytest.fixture
@@ -191,7 +191,7 @@ class TestWorkflowOrchestrator:
         result = await orchestrator.execute_workflow("approval_test", sample_context)
 
         # Check that approval was requested
-        orchestrator.approval_manager.request_approval.assert_called()
+        orchestrator.approval_manager.request_single_approval.assert_called()
 
         # Check that step completed
         completed_steps = [

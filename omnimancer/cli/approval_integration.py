@@ -165,6 +165,15 @@ class CLIApprovalIntegration:
             Tuple of (approved: bool, was_cancelled: bool)
         """
         try:
+            # Honor previously "remembered" decisions before prompting again.
+            # This callback is the path the agent engine actually uses, so the
+            # auto-approval check must live here (not only in
+            # request_approval_for_operation).
+            if self.enable_auto_approval:
+                auto_approval = await self._check_auto_approval(operation)
+                if auto_approval is not None:
+                    return (auto_approval, False)
+
             # Create approval request from operation
             approval_request = ApprovalRequest(
                 operation_type=operation.type.value,

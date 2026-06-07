@@ -539,8 +539,12 @@ class TestPerplexityProviderCapabilities:
     """Test provider capability methods."""
 
     def test_supports_tools_online_model(self, perplexity_provider):
-        """Test tool support for online models."""
-        assert perplexity_provider.supports_tools() is True
+        """Online models perform built-in search, not user function-calling.
+
+        Perplexity does not implement ``send_message_with_tools``, so it must
+        report no tool support to avoid a runtime ``NotImplementedError``.
+        """
+        assert perplexity_provider.supports_tools() is False
 
     def test_supports_tools_offline_model(self, offline_perplexity_provider):
         """Test tool support for offline models."""

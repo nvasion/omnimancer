@@ -386,7 +386,9 @@ class WorkflowOrchestrator:
         self.console.print(f"Description: {step.description}")
 
         # Use the approval manager if available
-        if self.approval_manager and hasattr(self.approval_manager, "request_approval"):
+        if self.approval_manager and hasattr(
+            self.approval_manager, "request_single_approval"
+        ):
             # Create a basic operation object for the approval manager
             from .types import Operation, OperationType
 
@@ -396,7 +398,7 @@ class WorkflowOrchestrator:
                 data={"step_name": step.name, "description": step.description},
                 requires_approval=True,
             )
-            approved = await self.approval_manager.request_approval(operation)
+            approved = await self.approval_manager.request_single_approval(operation)
             if approved:
                 self.console.print("[green]✓ Approved[/green]")
             else:

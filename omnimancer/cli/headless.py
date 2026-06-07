@@ -137,6 +137,8 @@ class HeadlessOutputEmitter:
         usage: dict,
         cost: float,
         stop_reason: Optional[str],
+        tool_calls: Optional[list] = None,
+        num_turns: int = 0,
     ) -> None:
         if self._format == OutputFormat.TEXT:
             if content != self._last_content:
@@ -144,9 +146,14 @@ class HeadlessOutputEmitter:
                 self._stdout.flush()
         elif self._format == OutputFormat.JSON:
             blob = {
+                "type": "result",
+                "subtype": "success",
+                "is_error": False,
                 "result": content,
                 "session_id": self._session_id,
                 "model": model,
+                "num_turns": num_turns,
+                "tool_calls": tool_calls or [],
                 "usage": usage,
                 "total_cost_usd": cost,
                 "stop_reason": stop_reason,
@@ -157,19 +164,43 @@ class HeadlessOutputEmitter:
             self._write_json_line(
                 {
                     "type": "result",
+                    "subtype": "success",
+                    "is_error": False,
                     "result": content,
                     "model": model,
+                    "num_turns": num_turns,
                     "usage": usage,
                     "total_cost_usd": cost,
                     "stop_reason": stop_reason,
                 }
             )
 
-    def emit_error(self, message: str) -> None:
+    def emit_error(self, message: str, tool_calls: Optional[list] = None) -> None:
+        # Always surface a human-readable line on stderr (stdout stays
+        # reserved for the structured result in JSON modes).
         self._stderr.write(f"Error: {message}\n")
         self._stderr.flush()
-        if self._format == OutputFormat.STREAM_JSON:
-            self._write_json_line({"type": "error", "message": message})
+
+        if self._format == OutputFormat.JSON:
+            self._stdout.write(
+                json.dumps(
+                    {
+                        "type": "result",
+                        "subtype": "error",
+                        "is_error": True,
+                        "error": message,
+                        "session_id": self._session_id,
+                        "tool_calls": tool_calls or [],
+                    },
+                    default=str,
+                )
+                + "\n"
+            )
+            self._stdout.flush()
+        elif self._format == OutputFormat.STREAM_JSON:
+            self._write_json_line(
+                {"type": "error", "is_error": True, "message": message}
+            )
 
 
 class HeadlessRunner:
@@ -208,15 +239,23 @@ class HeadlessRunner:
         last_content = ""
         last_model = model
         last_stop_reason = "end_turn"
+        # Record of the actions the agent took, surfaced in the JSON result.
+        tool_log: list = []
+        turns = 0
+        # Detect runaway loops where a weak model repeats the same tool call.
+        seen_calls: dict = {}
 
         for iteration in range(MAX_TOOL_ITERATIONS):
+            turns = iteration + 1
             response = await self._engine.send_message_with_tools(
                 current_message, tools
             )
             self._tokens.add(response)
 
             if not response.is_success:
-                self._emitter.emit_error(response.error or "Unknown error")
+                self._emitter.emit_error(
+                    response.error or "Unknown error", tool_calls=tool_log
+                )
                 return 1
 
             last_model = response.model_used or model
@@ -233,6 +272,21 @@ class HeadlessRunner:
             if not response.tool_calls:
                 break
 
+            repeated = False
+            for tc in response.tool_calls:
+                sig = (
+                    f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True, default=str)}"
+                )
+                seen_calls[sig] = seen_calls.get(sig, 0) + 1
+                if seen_calls[sig] >= 3:
+                    repeated = True
+            if repeated:
+                if not last_content:
+                    last_content = (
+                        "Stopped: the model kept repeating the same tool call."
+                    )
+                break
+
             result_parts = []
             for tc in response.tool_calls:
                 self._emitter.emit_tool_use(tc.name, tc.arguments)
@@ -243,21 +297,31 @@ class HeadlessRunner:
                     result.content or "",
                     result.error,
                 )
+                tool_log.append(
+                    {
+                        "name": tc.name,
+                        "arguments": tc.arguments,
+                        "error": result.error,
+                    }
+                )
 
                 if result.error:
                     result_parts.append(f"[{tc.name}] Error: {result.error}")
                 else:
-                    result_parts.append(f"[{tc.name}] Success: {result.content}")
+                    result_parts.append(f"[{tc.name}] Result: {result.content}")
 
-            current_message = (
-                "Tool results:\n\n"
-                + "\n\n".join(result_parts)
-                + f"\n\nContinue working on the task: {prompt}"
-            )
+            # Feed results back without forcing the model to "continue".
+            current_message = "Tool results:\n\n" + "\n\n".join(result_parts)
 
         usage = self._tokens.total
         self._emitter.emit_result(
-            last_content, last_model, usage, usage["total_cost_usd"], last_stop_reason
+            last_content,
+            last_model,
+            usage,
+            usage["total_cost_usd"],
+            last_stop_reason,
+            tool_calls=tool_log,
+            num_turns=turns,
         )
         return 0
 
@@ -270,6 +334,7 @@ async def run_headless(
     verbose: bool = False,
     provider: Optional[str] = None,
     model: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> int:
     from ..core.config_manager import ConfigManager
     from ..core.engine import CoreEngine
@@ -284,10 +349,20 @@ async def run_headless(
     engine = CoreEngine(config_manager)
     await engine.initialize_providers()
 
-    if model:
-        current_provider_name = engine.config_manager.get_config().default_provider
-        if current_provider_name and current_provider_name in engine.providers:
-            engine.providers[current_provider_name].model = model
+    current_provider_name = engine.config_manager.get_config().default_provider
+
+    if model and current_provider_name and current_provider_name in engine.providers:
+        engine.providers[current_provider_name].model = model
+
+    # Ephemeral endpoint override for this run (does not touch saved config).
+    # base_url is defined on the OpenAI-family/Claude providers but not on the
+    # BaseProvider contract, so set it dynamically.
+    if base_url and current_provider_name and current_provider_name in engine.providers:
+        setattr(
+            engine.providers[current_provider_name],
+            "base_url",
+            base_url.rstrip("/"),
+        )
 
     fmt = OutputFormat(output_format)
     runner = HeadlessRunner(

@@ -7,9 +7,26 @@ with user-friendly feedback and graceful operation termination.
 
 import asyncio
 import logging
+import sys
 from typing import Any, Callable, Optional
 
 from rich.console import Console
+
+
+def _clear_current_line() -> None:
+    """Clear the current terminal line reliably.
+
+    Rich's ``console.print`` mangles raw carriage returns on some terminals
+    (notably WSL), leaving stray whitespace before the next prompt. Writing the
+    CR + ANSI erase-to-end-of-line directly to stdout avoids that.
+    """
+    try:
+        if sys.stdout.isatty():
+            sys.stdout.write("\r\033[K")
+            sys.stdout.flush()
+    except Exception:
+        pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +153,7 @@ class CancellationHandler:
                 except Exception:
                     pass
             # Clear the line and print cancellation message
-            self.console.print("\r" + " " * 80 + "\r", end="")
+            _clear_current_line()
             self.console.print(f"[yellow]⚠️  {cancellation_message}[/yellow]")
             raise
         finally:
@@ -146,7 +163,7 @@ class CancellationHandler:
                 try:
                     self.status_display.stop()
                     # Clear any remaining spinner artifacts
-                    self.console.print("\r" + " " * 80 + "\r", end="")
+                    _clear_current_line()
                 except Exception:
                     pass
             self.active_operation = None
@@ -188,7 +205,7 @@ class CancellationHandler:
             try:
                 self.status_display.stop()
                 # Clear the line where the spinner was displayed
-                self.console.print("\r" + " " * 80 + "\r", end="")
+                _clear_current_line()
             except Exception:
                 pass
             logger.debug("Status display paused for user interaction")

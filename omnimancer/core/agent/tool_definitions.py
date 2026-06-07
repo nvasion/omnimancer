@@ -1,128 +1,141 @@
-"""Coding agent tool definitions for native tool calling."""
+"""Coding agent tool definitions for native tool calling.
+
+Tool names and input schemas mirror Claude Code's conventions (Read, Write,
+Edit, Bash, Glob, Grep, WebFetch) so models call them the way they expect.
+"""
 
 from ..models import ToolDefinition
 
 CODING_AGENT_TOOLS = [
     ToolDefinition(
-        name="file_read",
-        description="Read the contents of a file at the given path.",
-        parameters={
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "Absolute or relative file path to read",
-                }
-            },
-            "required": ["path"],
-        },
-        auto_approved=True,
-    ),
-    ToolDefinition(
-        name="file_write",
+        name="Read",
         description=(
-            "Write content to a file. Creates the file "
-            "if it doesn't exist, overwrites if it does."
+            "Read a file from the local filesystem. Returns the file contents. "
+            "Use offset/limit to read a slice of a large file."
         ),
         parameters={
             "type": "object",
             "properties": {
-                "path": {
+                "file_path": {
                     "type": "string",
-                    "description": "File path to write to",
+                    "description": "The absolute path to the file to read",
                 },
-                "content": {
-                    "type": "string",
-                    "description": "Content to write to the file",
+                "offset": {
+                    "type": "integer",
+                    "description": "The line number to start reading from (1-based)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "The number of lines to read",
                 },
             },
-            "required": ["path", "content"],
+            "required": ["file_path"],
         },
+        auto_approved=True,
     ),
     ToolDefinition(
-        name="file_delete",
-        description="Delete a file at the given path.",
+        name="Write",
+        description=(
+            "Write a file to the local filesystem. Creates the file if it does "
+            "not exist and overwrites it if it does."
+        ),
         parameters={
             "type": "object",
             "properties": {
-                "path": {
+                "file_path": {
                     "type": "string",
-                    "description": "File path to delete",
-                }
+                    "description": "The absolute path to the file to write",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The content to write to the file",
+                },
             },
-            "required": ["path"],
+            "required": ["file_path", "content"],
         },
     ),
     ToolDefinition(
-        name="command_exec",
+        name="Edit",
         description=(
-            "Execute a shell command and return its " "stdout, stderr, and exit code."
+            "Perform an exact string replacement in a file. The old_string must "
+            "match the file contents exactly and be unique unless replace_all is "
+            "set."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "The absolute path to the file to modify",
+                },
+                "old_string": {
+                    "type": "string",
+                    "description": "The text to replace",
+                },
+                "new_string": {
+                    "type": "string",
+                    "description": (
+                        "The text to replace it with (must differ from old_string)"
+                    ),
+                },
+                "replace_all": {
+                    "type": "boolean",
+                    "description": "Replace all occurrences (default false)",
+                },
+            },
+            "required": ["file_path", "old_string", "new_string"],
+        },
+    ),
+    ToolDefinition(
+        name="Bash",
+        description=(
+            "Execute a bash command and return its stdout, stderr, and exit code."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "command": {
                     "type": "string",
-                    "description": "Shell command to execute",
+                    "description": "The command to execute",
                 },
-                "working_dir": {
+                "timeout": {
+                    "type": "integer",
+                    "description": "Optional timeout in milliseconds",
+                },
+                "description": {
                     "type": "string",
-                    "description": "Working directory for the command (optional)",
+                    "description": (
+                        "Clear, concise description of what this command does in "
+                        "5-10 words, in active voice"
+                    ),
+                },
+                "run_in_background": {
+                    "type": "boolean",
+                    "description": "Set to true to run this command in the background",
                 },
             },
             "required": ["command"],
         },
     ),
     ToolDefinition(
-        name="find_files",
-        description="Find files matching a glob pattern recursively.",
-        parameters={
-            "type": "object",
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": (
-                        "Glob pattern to match " "(e.g. '**/*.py', 'src/**/*.ts')"
-                    ),
-                },
-                "directory": {
-                    "type": "string",
-                    "description": (
-                        "Root directory to search from "
-                        "(optional, defaults to current "
-                        "directory)"
-                    ),
-                },
-            },
-            "required": ["pattern"],
-        },
-        auto_approved=True,
-    ),
-    ToolDefinition(
-        name="search_text",
+        name="Glob",
         description=(
-            "Search for text or regex pattern in files. "
-            "Returns matching lines with file paths "
-            "and line numbers."
+            "Fast file pattern matching. Returns paths of files matching a glob "
+            "pattern (e.g. '**/*.py', 'src/**/*.ts')."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "Text or regex pattern to search for",
+                    "description": "The glob pattern to match files against",
                 },
-                "directory": {
+                "path": {
                     "type": "string",
                     "description": (
-                        "Directory to search in "
-                        "(optional, defaults to current "
-                        "directory)"
+                        "The directory to search in (defaults to the current "
+                        "working directory)"
                     ),
-                },
-                "file_pattern": {
-                    "type": "string",
-                    "description": "Glob pattern to filter files (e.g. '*.py')",
                 },
             },
             "required": ["pattern"],
@@ -130,26 +143,76 @@ CODING_AGENT_TOOLS = [
         auto_approved=True,
     ),
     ToolDefinition(
-        name="web_request",
-        description="Make an HTTP request and return the response.",
+        name="Grep",
+        description=(
+            "Search file contents using a regular expression. Returns matching "
+            "file paths by default; use output_mode='content' for matching lines."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "The regular expression pattern to search for",
+                },
+                "path": {
+                    "type": "string",
+                    "description": "File or directory to search in (defaults to cwd)",
+                },
+                "glob": {
+                    "type": "string",
+                    "description": "Glob to filter files (e.g. '*.py', '*.{ts,tsx}')",
+                },
+                "output_mode": {
+                    "type": "string",
+                    "enum": ["content", "files_with_matches", "count"],
+                    "description": (
+                        "content shows matching lines, files_with_matches shows "
+                        "file paths (default), count shows match counts"
+                    ),
+                },
+                "-i": {
+                    "type": "boolean",
+                    "description": "Case-insensitive search",
+                },
+                "-n": {
+                    "type": "boolean",
+                    "description": (
+                        "Show line numbers (output_mode='content' only, default true)"
+                    ),
+                },
+                "-C": {
+                    "type": "integer",
+                    "description": "Lines of context before and after each match",
+                },
+                "head_limit": {
+                    "type": "integer",
+                    "description": "Limit output to the first N lines/entries",
+                },
+            },
+            "required": ["pattern"],
+        },
+        auto_approved=True,
+    ),
+    ToolDefinition(
+        name="WebFetch",
+        description="Fetch content from a URL and return the response body.",
         parameters={
             "type": "object",
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "URL to request",
+                    "description": "The URL to fetch content from",
                 },
-                "method": {
+                "prompt": {
                     "type": "string",
-                    "description": "HTTP method (GET, POST, etc.)",
-                    "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
-                },
-                "body": {
-                    "type": "string",
-                    "description": "Request body (for POST/PUT/PATCH)",
+                    "description": (
+                        "What to extract or look for in the fetched content"
+                    ),
                 },
             },
             "required": ["url"],
         },
+        auto_approved=True,
     ),
 ]

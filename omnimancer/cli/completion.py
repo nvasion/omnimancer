@@ -169,6 +169,7 @@ class CompletionMixin:
                     "claude",
                     "gemini",
                     "openrouter",
+                    "digitalocean",
                     "azure",
                     "bedrock",
                     "mistral",

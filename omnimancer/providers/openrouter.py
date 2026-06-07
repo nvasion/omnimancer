@@ -52,6 +52,9 @@ class OpenRouterProvider(BaseProvider):
         """
         super().__init__(api_key, model or "anthropic/claude-3.5-sonnet", **kwargs)
 
+        # Allow overriding the API endpoint (OpenAI-compatible aggregators/proxies)
+        self.base_url = (kwargs.get("base_url") or self.BASE_URL).rstrip("/")
+
         # OpenRouter-specific configuration
         self.openrouter_referrer = kwargs.get(
             "openrouter_referrer", "https://github.com/omnimancer-cli"
@@ -109,7 +112,7 @@ class OpenRouterProvider(BaseProvider):
             try:
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
-                        f"{self.BASE_URL}/chat/completions",
+                        f"{self.base_url}/chat/completions",
                         headers=self._get_headers(),
                         json=payload,
                         timeout=30.0,
@@ -195,7 +198,7 @@ class OpenRouterProvider(BaseProvider):
             try:
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
-                        f"{self.BASE_URL}/chat/completions",
+                        f"{self.base_url}/chat/completions",
                         headers=self._get_headers(),
                         json=payload,
                         timeout=30.0,
@@ -247,7 +250,7 @@ class OpenRouterProvider(BaseProvider):
             try:
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
-                        f"{self.BASE_URL}/chat/completions",
+                        f"{self.base_url}/chat/completions",
                         headers=self._get_headers(),
                         json={
                             "model": self.model,

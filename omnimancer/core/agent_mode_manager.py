@@ -705,7 +705,24 @@ class AgentModeManager:
                 return
 
             with open(self.state_file, "r") as f:
-                state_data = json.load(f)
+                raw = f.read().strip()
+
+            # An empty or whitespace-only file is not an error: treat it as
+            # "no saved state" rather than letting json.load() raise.
+            if not raw:
+                logger.debug("Agent state file is empty; starting with defaults")
+                self.mode = AgentMode.ON
+                return
+
+            try:
+                state_data = json.loads(raw)
+            except json.JSONDecodeError as e:
+                # Corrupt state file: don't crash, just fall back to defaults.
+                logger.warning(
+                    f"Agent state file is corrupt ({e}); ignoring and using defaults"
+                )
+                self.mode = AgentMode.ON
+                return
 
             # Restore mode - always enable agent mode by default
             self.mode = AgentMode.ON

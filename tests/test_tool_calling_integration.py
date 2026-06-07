@@ -220,22 +220,58 @@ class TestToolCallingFlowIntegration:
         )
         mock_engine.agent_engine = agent_engine
 
-        infinite_response = ChatResponse(
-            content="Still working...",
-            model_used="claude-sonnet-4",
-            tokens_used=10,
-            timestamp=datetime.now(),
-            tool_calls=[ToolCall(name="file_read", arguments={"path": "/loop.py"})],
-        )
+        # Distinct args each call so loop-detection does not trip early; this
+        # exercises the hard iteration cap.
+        def make_response(*_args, **_kwargs):
+            make_response.n += 1
+            return ChatResponse(
+                content="Still working...",
+                model_used="claude-sonnet-4",
+                tokens_used=10,
+                timestamp=datetime.now(),
+                tool_calls=[
+                    ToolCall(
+                        name="Read",
+                        arguments={"file_path": f"/loop{make_response.n}.py"},
+                    )
+                ],
+            )
 
-        mock_engine.send_message_with_tools = AsyncMock(return_value=infinite_response)
+        make_response.n = 0
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=make_response)
 
         with patch.object(interface, "_show_assistant_message"):
-            with patch.object(interface, "_show_warning") as mock_warn:
+            with patch.object(interface, "_show_warning"):
                 with patch.object(interface.console, "print"):
                     await interface._handle_tool_calling_flow("Loop forever")
 
         assert mock_engine.send_message_with_tools.call_count == MAX_TOOL_ITERATIONS
+
+    @pytest.mark.asyncio
+    async def test_repeated_tool_call_stops_early(self, interface, mock_engine):
+        """An identical tool call repeated 3x stops the loop early."""
+        agent_engine = MagicMock()
+        agent_engine.execute_with_approval = AsyncMock(
+            return_value=OperationResult(success=True, data="OK")
+        )
+        mock_engine.agent_engine = agent_engine
+
+        repeated = ChatResponse(
+            content="",
+            model_used="claude-sonnet-4",
+            tokens_used=10,
+            timestamp=datetime.now(),
+            tool_calls=[ToolCall(name="Write", arguments={"file_path": "/same.txt"})],
+        )
+        mock_engine.send_message_with_tools = AsyncMock(return_value=repeated)
+
+        with patch.object(interface, "_show_assistant_message"):
+            with patch.object(interface, "_show_warning") as mock_warn:
+                with patch.object(interface.console, "print"):
+                    await interface._handle_tool_calling_flow("loop")
+
+        assert mock_engine.send_message_with_tools.call_count == 3
+        mock_warn.assert_called_once()
         mock_warn.assert_called_once()
 
     @pytest.mark.asyncio

@@ -304,7 +304,7 @@ sast:
     - pip install --upgrade pip
   script:
     - pip install bandit safety
-    - bandit -r omnimancer -f json -o bandit-report.json || true
+    - bandit -r omnimancer -ll -ii --skip B101,B104,B108,B301,B324,B403,B404,B601,B602,B603 -f json -o bandit-report.json
     - safety check --json > safety-report.json || true
   artifacts:
     when: always

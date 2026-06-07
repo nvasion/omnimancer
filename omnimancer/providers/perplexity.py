@@ -453,10 +453,16 @@ class PerplexityProvider(BaseProvider):
         """
         Check if Perplexity provider supports tool calling.
 
+        Perplexity's "online" models perform built-in web search automatically;
+        that is *not* the same as user-provided function-calling tools. Perplexity
+        does not implement ``send_message_with_tools``, so reporting ``True`` here
+        would make the base class raise ``NotImplementedError`` whenever tools are
+        supplied. Tool calling is therefore unsupported regardless of model.
+
         Returns:
-            True for online models that support search tools
+            False - Perplexity does not support user-provided function calling
         """
-        return self._is_online_model()
+        return False
 
     def supports_multimodal(self) -> bool:
         """

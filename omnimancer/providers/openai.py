@@ -4,8 +4,10 @@ OpenAI provider implementation for Omnimancer.
 This module provides the OpenAI API provider implementation using OpenAI's API.
 """
 
+import logging
+import re
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -19,6 +21,8 @@ from ..utils.errors import (
 )
 from .base import BaseProvider
 
+logger = logging.getLogger(__name__)
+
 
 class OpenAIProvider(BaseProvider):
     """
@@ -26,6 +30,20 @@ class OpenAIProvider(BaseProvider):
     """
 
     BASE_URL = "https://api.openai.com/v1"
+
+    # Patterns used to recover the model context window and prompt size from
+    # context-length errors returned by OpenAI-compatible servers (OpenAI,
+    # vLLM, DigitalOcean inference, etc.).
+    _CONTEXT_LIMIT_RE = re.compile(r"maximum context length is (\d+)", re.IGNORECASE)
+    _INPUT_TOKENS_RE = re.compile(
+        r"(\d+)\s+(?:input tokens|in the (?:messages|prompt))", re.IGNORECASE
+    )
+    # Tokens left as headroom when refitting max_tokens to the context window.
+    # The server's reported input size is a lower-bound estimate that can drift
+    # by a few dozen tokens between requests, so keep a generous margin.
+    _CONTEXT_FIT_BUFFER = 256
+    # How many times to refit max_tokens against successive overflow errors.
+    _CONTEXT_FIT_MAX_RETRIES = 3
 
     def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
@@ -37,6 +55,8 @@ class OpenAIProvider(BaseProvider):
             **kwargs: Additional configuration
         """
         super().__init__(api_key, model or "gpt-4", **kwargs)
+        # Allow overriding the API endpoint for OpenAI-compatible services
+        self.base_url = (kwargs.get("base_url") or self.BASE_URL).rstrip("/")
         self.max_tokens = kwargs.get("max_tokens", 4096)
         self.temperature = kwargs.get("temperature", 0.7)
 
@@ -55,22 +75,16 @@ class OpenAIProvider(BaseProvider):
             # Prepare messages for OpenAI API
             messages = self._prepare_messages(message, context)
 
-            # Make API request
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.BASE_URL}/chat/completions",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.api_key}",
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "max_tokens": self.max_tokens,
-                        "temperature": self.temperature,
-                    },
-                    timeout=30.0,
-                )
+            # Make API request (auto-fits max_tokens on context overflow)
+            response = await self._post_chat(
+                {
+                    "model": self.model,
+                    "messages": messages,
+                    "max_tokens": self.max_tokens,
+                    "temperature": self.temperature,
+                },
+                timeout=30.0,
+            )
 
             # Handle response
             return self._handle_response(response)
@@ -79,6 +93,13 @@ class OpenAIProvider(BaseProvider):
             raise NetworkError("Request to OpenAI API timed out")
         except httpx.RequestError as e:
             raise NetworkError(f"Network error: {e}")
+        except (
+            AuthenticationError,
+            RateLimitError,
+            ModelNotFoundError,
+            ProviderError,
+        ):
+            raise
         except Exception as e:
             raise ProviderError(f"Unexpected error: {e}")
 
@@ -92,7 +113,7 @@ class OpenAIProvider(BaseProvider):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.BASE_URL}/chat/completions",
+                    f"{self.base_url}/chat/completions",
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.api_key}",
@@ -133,6 +154,120 @@ class OpenAIProvider(BaseProvider):
         messages.append({"role": "user", "content": message})
 
         return messages
+
+    def _fit_max_tokens(
+        self, response: httpx.Response, current_max: Optional[int]
+    ) -> Optional[int]:
+        """
+        Inspect an error response for a context-length overflow and compute a
+        ``max_tokens`` value that would fit the model's context window.
+
+        Returns:
+            A positive int that fits, ``0`` if the prompt alone already exceeds
+            the window (no output budget possible), or ``None`` if the error is
+            not a context-length error.
+        """
+        try:
+            error_msg = response.json().get("error", {}).get("message", "") or ""
+        except Exception:
+            return None
+
+        limit_match = self._CONTEXT_LIMIT_RE.search(error_msg)
+        input_match = self._INPUT_TOKENS_RE.search(error_msg)
+        if not (limit_match and input_match):
+            return None
+
+        context_limit = int(limit_match.group(1))
+        input_tokens = int(input_match.group(1))
+        return max(context_limit - input_tokens - self._CONTEXT_FIT_BUFFER, 0)
+
+    def _require_api_key(self) -> None:
+        """Fail fast with an actionable error when no API key is configured.
+
+        Without this guard an empty key is sent as the header ``Bearer `` and
+        httpx raises a cryptic ``Illegal header value`` error that gives the user
+        no idea the real problem is a missing key (common for OpenAI-compatible
+        providers like DigitalOcean whose key lives only in an env var).
+        """
+        if self.api_key and self.api_key.strip():
+            return
+
+        provider = self.get_provider_name()
+        # Local import avoids any import cycle between providers and core.
+        from ..core.env_loader import ENV_VAR_MAPPING, _omnimancer_env_prefix
+
+        env_var = ENV_VAR_MAPPING.get(provider)
+        hint = f"Set {env_var}" if env_var else "Configure an API key"
+        hint += f" (or {_omnimancer_env_prefix(provider)}_API_KEY)"
+        raise AuthenticationError(
+            f"No API key configured for '{provider}'. {hint}, or add one with "
+            f"'/config set-provider {provider}'.",
+            provider=provider,
+        )
+
+    async def _post_chat(
+        self, request_body: Dict[str, Any], timeout: float
+    ) -> httpx.Response:
+        """
+        POST to the chat completions endpoint, retrying once with a reduced
+        ``max_tokens`` if the server rejects the request because the prompt plus
+        requested output exceeds the model's context window.
+
+        This is common with large agent contexts on OpenAI-compatible backends
+        (vLLM, DigitalOcean inference). Reducing the output budget to fit is far
+        more useful than failing outright.
+        """
+        self._require_api_key()
+
+        async def _do_post(body: Dict[str, Any]) -> httpx.Response:
+            async with httpx.AsyncClient() as client:
+                return await client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.api_key}",
+                    },
+                    json=body,
+                    timeout=timeout,
+                )
+
+        body = request_body
+        response = await _do_post(body)
+
+        # Refit max_tokens against successive overflow errors. The server's
+        # reported input size can drift slightly between requests, so a single
+        # refit may still land just over the limit; recompute from each error.
+        for _ in range(self._CONTEXT_FIT_MAX_RETRIES):
+            if response.status_code == 200:
+                return response
+
+            current_max = body.get("max_tokens")
+            fitted = self._fit_max_tokens(response, current_max)
+            if fitted is None:
+                # Not a context-length error; let the handler report it.
+                return response
+
+            if fitted <= 0:
+                raise ProviderError(
+                    "The prompt is too large for this model's context window "
+                    "even with no room left for a response. Start a new "
+                    "conversation, reduce the input, or switch to a model with a "
+                    "larger context window."
+                )
+
+            if current_max is None or fitted >= current_max:
+                # Nothing to gain by retrying with the same-or-larger budget.
+                return response
+
+            logger.info(
+                "Reducing max_tokens from %s to %s to fit the model context window",
+                current_max,
+                fitted,
+            )
+            body = {**body, "max_tokens": fitted}
+            response = await _do_post(body)
+
+        return response
 
     def _handle_response(self, response: httpx.Response) -> ChatResponse:
         """
@@ -202,16 +337,7 @@ class OpenAIProvider(BaseProvider):
             if tools:
                 request_body["tools"] = tools
 
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.BASE_URL}/chat/completions",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.api_key}",
-                    },
-                    json=request_body,
-                    timeout=60.0,
-                )
+            response = await self._post_chat(request_body, timeout=60.0)
 
             return self._handle_response_with_tools(response)
 
@@ -418,7 +544,7 @@ class OpenAIProvider(BaseProvider):
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.BASE_URL}/models", headers=headers, timeout=30.0
+                    f"{self.base_url}/models", headers=headers, timeout=30.0
                 )
                 response.raise_for_status()
 

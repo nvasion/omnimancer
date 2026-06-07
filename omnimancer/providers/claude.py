@@ -48,6 +48,8 @@ class ClaudeProvider(BaseProvider):
             **kwargs: Additional configuration (auth_type="bearer" for OAuth)
         """
         super().__init__(api_key, model or "claude-sonnet-4-6", **kwargs)
+        # Allow overriding the API endpoint (proxies, gateways, Bedrock-compatible)
+        self.base_url = (kwargs.get("base_url") or self.BASE_URL).rstrip("/")
         self.max_tokens = kwargs.get("max_tokens") or 4096
         self.temperature = kwargs.get("temperature") or 0.7
         self.auth_type = kwargs.get("auth_type", "api_key")
@@ -93,7 +95,7 @@ class ClaudeProvider(BaseProvider):
             try:
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
-                        f"{self.BASE_URL}/messages",
+                        f"{self.base_url}/messages",
                         headers=self._build_headers(),
                         json={
                             "model": self.model,
@@ -150,7 +152,7 @@ class ClaudeProvider(BaseProvider):
             try:
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
-                        f"{self.BASE_URL}/messages",
+                        f"{self.base_url}/messages",
                         headers=self._build_headers(),
                         json={
                             "model": self.model,
@@ -318,7 +320,7 @@ class ClaudeProvider(BaseProvider):
             try:
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
                     response = await client.post(
-                        f"{self.BASE_URL}/messages",
+                        f"{self.base_url}/messages",
                         headers=self._build_headers(),
                         json=request_body,
                         timeout=60.0,
@@ -457,7 +459,7 @@ class ClaudeProvider(BaseProvider):
                 async with httpx.AsyncClient(verify=ssl_verify) as client:
                     async with client.stream(
                         "POST",
-                        f"{self.BASE_URL}/messages",
+                        f"{self.base_url}/messages",
                         headers=self._build_headers(),
                         json=request_body,
                         timeout=120.0,
