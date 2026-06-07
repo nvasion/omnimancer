@@ -1,0 +1,464 @@
+[
+  {
+    "Description": "YAML parser and emitter for Python",
+    "License": "MIT License",
+    "Name": "PyYAML",
+    "URL": "https://pyyaml.org/",
+    "Version": "6.0.3"
+  },
+  {
+    "Description": "Pygments is a syntax highlighting package written in Python.",
+    "License": "BSD-2-Clause",
+    "Name": "Pygments",
+    "URL": "https://pygments.org",
+    "Version": "2.20.0"
+  },
+  {
+    "Description": "File support for asyncio.",
+    "License": "Apache Software License",
+    "Name": "aiofiles",
+    "URL": "https://github.com/Tinche/aiofiles",
+    "Version": "25.1.0"
+  },
+  {
+    "Description": "Happy Eyeballs for asyncio",
+    "License": "Python Software Foundation License",
+    "Name": "aiohappyeyeballs",
+    "URL": "https://github.com/aio-libs/aiohappyeyeballs",
+    "Version": "2.6.2"
+  },
+  {
+    "Description": "Async http client/server framework (asyncio)",
+    "License": "Apache-2.0 AND MIT",
+    "Name": "aiohttp",
+    "URL": "https://github.com/aio-libs/aiohttp",
+    "Version": "3.13.5"
+  },
+  {
+    "Description": "aiosignal: a list of registered asynchronous callbacks",
+    "License": "Apache Software License",
+    "Name": "aiosignal",
+    "URL": "https://github.com/aio-libs/aiosignal",
+    "Version": "1.4.0"
+  },
+  {
+    "Description": "Reusable constraint types to use with typing.Annotated",
+    "License": "MIT License",
+    "Name": "annotated-types",
+    "URL": "https://github.com/annotated-types/annotated-types",
+    "Version": "0.7.0"
+  },
+  {
+    "Description": "High-level concurrency and networking framework on top of asyncio or Trio",
+    "License": "MIT",
+    "Name": "anyio",
+    "URL": "https://anyio.readthedocs.io/en/stable/versionhistory.html",
+    "Version": "4.13.0"
+  },
+  {
+    "Description": "Python bindings for mypy AST serialization",
+    "License": "MIT",
+    "Name": "ast_serialize",
+    "URL": "https://github.com/mypyc/ast_serialize",
+    "Version": "0.5.0"
+  },
+  {
+    "Description": "Classes Without Boilerplate",
+    "License": "MIT",
+    "Name": "attrs",
+    "URL": "https://www.attrs.org/en/stable/changelog.html",
+    "Version": "26.1.0"
+  },
+  {
+    "Description": "Screen-scraping library",
+    "License": "MIT License",
+    "Name": "beautifulsoup4",
+    "URL": "https://www.crummy.com/software/BeautifulSoup/bs4/",
+    "Version": "4.14.3"
+  },
+  {
+    "Description": "The uncompromising code formatter.",
+    "License": "MIT",
+    "Name": "black",
+    "URL": "https://github.com/psf/black",
+    "Version": "26.5.1"
+  },
+  {
+    "Description": "Python package for providing Mozilla's CA Bundle.",
+    "License": "Mozilla Public License 2.0 (MPL 2.0)",
+    "Name": "certifi",
+    "URL": "https://github.com/certifi/python-certifi",
+    "Version": "2026.5.20"
+  },
+  {
+    "Description": "Foreign Function Interface for Python calling C code.",
+    "License": "MIT",
+    "Name": "cffi",
+    "URL": "https://cffi.readthedocs.io/en/latest/whatsnew.html",
+    "Version": "2.0.0"
+  },
+  {
+    "Description": "Universal character encoding detector",
+    "License": "0BSD",
+    "Name": "chardet",
+    "URL": "https://github.com/chardet/chardet",
+    "Version": "7.4.3"
+  },
+  {
+    "Description": "Composable command line interface toolkit",
+    "License": "BSD-3-Clause",
+    "Name": "click",
+    "URL": "https://github.com/pallets/click/",
+    "Version": "8.4.1"
+  },
+  {
+    "Description": "Code coverage measurement for Python",
+    "License": "Apache-2.0",
+    "Name": "coverage",
+    "URL": "https://github.com/coveragepy/coveragepy",
+    "Version": "7.14.1"
+  },
+  {
+    "Description": "cryptography is a package which provides cryptographic recipes and primitives to Python developers.",
+    "License": "Apache-2.0 OR BSD-3-Clause",
+    "Name": "cryptography",
+    "URL": "https://github.com/pyca/cryptography",
+    "Version": "48.0.0"
+  },
+  {
+    "Description": "cssselect parses CSS3 Selectors and translates them to XPath 1.0",
+    "License": "BSD-3-Clause",
+    "Name": "cssselect",
+    "URL": "https://github.com/scrapy/cssselect",
+    "Version": "1.4.0"
+  },
+  {
+    "Description": "the modular source code checker: pep8 pyflakes and co",
+    "License": "MIT License",
+    "Name": "flake8",
+    "URL": "https://github.com/pycqa/flake8",
+    "Version": "7.3.0"
+  },
+  {
+    "Description": "A list-like structure which implements collections.abc.MutableSequence",
+    "License": "Apache-2.0",
+    "Name": "frozenlist",
+    "URL": "https://github.com/aio-libs/frozenlist",
+    "Version": "1.8.0"
+  },
+  {
+    "Description": "A pure-Python, bring-your-own-I/O implementation of HTTP/1.1",
+    "License": "MIT License",
+    "Name": "h11",
+    "URL": "https://github.com/python-hyper/h11",
+    "Version": "0.16.0"
+  },
+  {
+    "Description": "Turn HTML into equivalent Markdown-structured text.",
+    "License": "GPL-3.0-or-later",
+    "Name": "html2text",
+    "URL": "https://github.com/Alir3z4/html2text/",
+    "Version": "2025.4.15"
+  },
+  {
+    "Description": "A minimal low-level HTTP client.",
+    "License": "BSD-3-Clause",
+    "Name": "httpcore",
+    "URL": "https://www.encode.io/httpcore/",
+    "Version": "1.0.9"
+  },
+  {
+    "Description": "The next generation HTTP client.",
+    "License": "BSD License",
+    "Name": "httpx",
+    "URL": "https://github.com/encode/httpx",
+    "Version": "0.28.1"
+  },
+  {
+    "Description": "Internationalized Domain Names in Applications (IDNA)",
+    "License": "BSD-3-Clause",
+    "Name": "idna",
+    "URL": "https://github.com/kjd/idna",
+    "Version": "3.17"
+  },
+  {
+    "Description": "brain-dead simple config-ini parsing",
+    "License": "MIT",
+    "Name": "iniconfig",
+    "URL": "https://github.com/pytest-dev/iniconfig",
+    "Version": "2.3.0"
+  },
+  {
+    "Description": "A Python utility / library to sort Python imports.",
+    "License": "MIT",
+    "Name": "isort",
+    "URL": "https://pycqa.github.io/isort/index.html",
+    "Version": "8.0.1"
+  },
+  {
+    "Description": "An implementation of JSON Schema validation for Python",
+    "License": "MIT",
+    "Name": "jsonschema",
+    "URL": "https://github.com/python-jsonschema/jsonschema",
+    "Version": "4.26.0"
+  },
+  {
+    "Description": "The JSON Schema meta-schemas and vocabularies, exposed as a Registry",
+    "License": "MIT",
+    "Name": "jsonschema-specifications",
+    "URL": "https://github.com/python-jsonschema/jsonschema-specifications",
+    "Version": "2025.9.1"
+  },
+  {
+    "Description": "Mypyc runtime library",
+    "License": "MIT",
+    "Name": "librt",
+    "URL": "https://github.com/mypyc/librt",
+    "Version": "0.11.0"
+  },
+  {
+    "Description": "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API.",
+    "License": "BSD-3-Clause",
+    "Name": "lxml",
+    "URL": "https://lxml.de/",
+    "Version": "6.1.1"
+  },
+  {
+    "Description": "HTML cleaner from lxml project",
+    "License": "BSD-3-Clause",
+    "Name": "lxml_html_clean",
+    "URL": "https://github.com/fedora-python/lxml_html_clean/",
+    "Version": "0.4.5"
+  },
+  {
+    "Description": "Python port of markdown-it. Markdown parsing, done right!",
+    "License": "MIT License",
+    "Name": "markdown-it-py",
+    "URL": "https://github.com/executablebooks/markdown-it-py",
+    "Version": "4.2.0"
+  },
+  {
+    "Description": "McCabe checker, plugin for flake8",
+    "License": "MIT License",
+    "Name": "mccabe",
+    "URL": "https://github.com/pycqa/mccabe",
+    "Version": "0.7.0"
+  },
+  {
+    "Description": "Markdown URL utilities",
+    "License": "MIT License",
+    "Name": "mdurl",
+    "URL": "https://github.com/executablebooks/mdurl",
+    "Version": "0.1.2"
+  },
+  {
+    "Description": "multidict implementation",
+    "License": "Apache License 2.0",
+    "Name": "multidict",
+    "URL": "https://github.com/aio-libs/multidict",
+    "Version": "6.7.1"
+  },
+  {
+    "Description": "Optional static typing for Python",
+    "License": "MIT",
+    "Name": "mypy",
+    "URL": "https://www.mypy-lang.org/",
+    "Version": "2.1.0"
+  },
+  {
+    "Description": "Type system extensions for programs checked with the mypy type checker.",
+    "License": "MIT",
+    "Name": "mypy_extensions",
+    "URL": "https://github.com/python/mypy_extensions",
+    "Version": "1.1.0"
+  },
+  {
+    "Description": "A unified command-line interface for multiple AI language models",
+    "License": "MIT License",
+    "Name": "omnimancer-cli",
+    "URL": "https://github.com/nvasion/omnimancer",
+    "Version": "0.1.17"
+  },
+  {
+    "Description": "Core utilities for Python packages",
+    "License": "Apache-2.0 OR BSD-2-Clause",
+    "Name": "packaging",
+    "URL": "https://github.com/pypa/packaging",
+    "Version": "26.2"
+  },
+  {
+    "Description": "Utility library for gitignore style pattern matching of file paths.",
+    "License": "Mozilla Public License 2.0 (MPL 2.0)",
+    "Name": "pathspec",
+    "URL": "https://python-path-specification.readthedocs.io/en/latest/index.html",
+    "Version": "1.1.1"
+  },
+  {
+    "Description": "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`.",
+    "License": "MIT",
+    "Name": "platformdirs",
+    "URL": "https://github.com/tox-dev/platformdirs",
+    "Version": "4.10.0"
+  },
+  {
+    "Description": "plugin and hook calling mechanisms for python",
+    "License": "MIT License",
+    "Name": "pluggy",
+    "URL": "UNKNOWN",
+    "Version": "1.6.0"
+  },
+  {
+    "Description": "Accelerated property cache",
+    "License": "Apache Software License",
+    "Name": "propcache",
+    "URL": "https://github.com/aio-libs/propcache",
+    "Version": "0.5.2"
+  },
+  {
+    "Description": "Cross-platform lib for process and system monitoring.",
+    "License": "BSD-3-Clause",
+    "Name": "psutil",
+    "URL": "https://github.com/giampaolo/psutil",
+    "Version": "7.2.2"
+  },
+  {
+    "Description": "Python style guide checker",
+    "License": "MIT",
+    "Name": "pycodestyle",
+    "URL": "https://pycodestyle.pycqa.org/",
+    "Version": "2.14.0"
+  },
+  {
+    "Description": "C parser in Python",
+    "License": "BSD-3-Clause",
+    "Name": "pycparser",
+    "URL": "https://github.com/eliben/pycparser",
+    "Version": "3.0"
+  },
+  {
+    "Description": "Data validation using Python type hints",
+    "License": "MIT",
+    "Name": "pydantic",
+    "URL": "https://github.com/pydantic/pydantic",
+    "Version": "2.13.4"
+  },
+  {
+    "Description": "Core functionality for Pydantic validation and serialization",
+    "License": "MIT",
+    "Name": "pydantic_core",
+    "URL": "https://github.com/pydantic",
+    "Version": "2.46.4"
+  },
+  {
+    "Description": "passive checker of Python programs",
+    "License": "MIT License",
+    "Name": "pyflakes",
+    "URL": "https://github.com/PyCQA/pyflakes",
+    "Version": "3.4.0"
+  },
+  {
+    "Description": "pytest: simple powerful testing with Python",
+    "License": "MIT",
+    "Name": "pytest",
+    "URL": "https://docs.pytest.org/en/latest/",
+    "Version": "9.0.3"
+  },
+  {
+    "Description": "Pytest support for asyncio",
+    "License": "Apache-2.0",
+    "Name": "pytest-asyncio",
+    "URL": "https://github.com/pytest-dev/pytest-asyncio",
+    "Version": "1.4.0"
+  },
+  {
+    "Description": "Pytest plugin for measuring coverage.",
+    "License": "MIT",
+    "Name": "pytest-cov",
+    "URL": "https://pytest-cov.readthedocs.io/en/latest/changelog.html",
+    "Version": "7.1.0"
+  },
+  {
+    "Description": "Thin-wrapper around the mock package for easier use with pytest",
+    "License": "MIT License",
+    "Name": "pytest-mock",
+    "URL": "https://github.com/pytest-dev/pytest-mock/",
+    "Version": "3.15.1"
+  },
+  {
+    "Description": "Read key-value pairs from a .env file and set them as environment variables",
+    "License": "BSD-3-Clause",
+    "Name": "python-dotenv",
+    "URL": "https://github.com/theskumar/python-dotenv",
+    "Version": "1.2.2"
+  },
+  {
+    "Description": "A Fast, spec compliant Python 3.14+ tokenizer that runs on older Pythons.",
+    "License": "MIT License",
+    "Name": "pytokens",
+    "URL": "https://github.com/tusharsadhwani/pytokens",
+    "Version": "0.4.1"
+  },
+  {
+    "Description": "fast html to text parser (article readability tool) with python 3 support",
+    "License": "Apache License 2.0",
+    "Name": "readability-lxml",
+    "URL": "http://github.com/buriy/python-readability",
+    "Version": "0.8.4.1"
+  },
+  {
+    "Description": "JSON Referencing + Python",
+    "License": "MIT",
+    "Name": "referencing",
+    "URL": "https://github.com/python-jsonschema/referencing",
+    "Version": "0.37.0"
+  },
+  {
+    "Description": "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal",
+    "License": "MIT License",
+    "Name": "rich",
+    "URL": "https://github.com/Textualize/rich",
+    "Version": "15.0.0"
+  },
+  {
+    "Description": "Python bindings to Rust's persistent data structures (rpds)",
+    "License": "MIT",
+    "Name": "rpds-py",
+    "URL": "https://github.com/crate-py/rpds",
+    "Version": "2026.5.1"
+  },
+  {
+    "Description": "A modern CSS selector implementation for Beautiful Soup.",
+    "License": "MIT",
+    "Name": "soupsieve",
+    "URL": "https://github.com/facelessuser/soupsieve",
+    "Version": "2.8.4"
+  },
+  {
+    "Description": "Python Library for Tom's Obvious, Minimal Language",
+    "License": "MIT License",
+    "Name": "toml",
+    "URL": "https://github.com/uiri/toml",
+    "Version": "0.10.2"
+  },
+  {
+    "Description": "Runtime typing introspection tools",
+    "License": "MIT",
+    "Name": "typing-inspection",
+    "URL": "https://github.com/pydantic/typing-inspection",
+    "Version": "0.4.2"
+  },
+  {
+    "Description": "Backported and Experimental Type Hints for Python 3.9+",
+    "License": "PSF-2.0",
+    "Name": "typing_extensions",
+    "URL": "https://github.com/python/typing_extensions",
+    "Version": "4.15.0"
+  },
+  {
+    "Description": "Yet another URL library",
+    "License": "Apache-2.0",
+    "Name": "yarl",
+    "URL": "https://github.com/aio-libs/yarl",
+    "Version": "1.24.2"
+  }
+]
