@@ -42,6 +42,18 @@ class CompletionManager:
                     "reset",
                 ]
             },
+            "hooks": {
+                0: ["list", "add", "remove", "on", "off"],
+                1: [
+                    "pre_send_message",
+                    "post_send_message",
+                    "tool_use_request",
+                    "post_tool",
+                ],
+            },
+            "permissions": {
+                0: ["list", "allow", "deny", "ask", "remove", "on", "off"],
+            },
             "validate": {0: ["--fix", "--auto-fix"]},
             "health": {0: ["--monitor", "--interval"]},
             "repair": {0: ["--backup", "--force"]},

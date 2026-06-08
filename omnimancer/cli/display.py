@@ -209,6 +209,27 @@ Tips:
                 "  /config get <key>\n"
                 "  /config validate [provider]"
             ),
+            "hooks": (
+                "Manage lifecycle hooks (shell commands run on events).\n\n"
+                "Usage:\n"
+                "  /hooks                       list configured hooks\n"
+                "  /hooks add <event> <name> [--matcher RE] [--blocking] "
+                "[--timeout N] <command>\n"
+                "  /hooks remove <event> <name>\n"
+                "  /hooks on | off\n\n"
+                "Events: pre_send_message, post_send_message, "
+                "tool_use_request, post_tool"
+            ),
+            "permissions": (
+                "Manage permission rules (auto allow/deny/ask for tools).\n\n"
+                "Usage:\n"
+                "  /permissions                       list rules\n"
+                "  /permissions <allow|deny|ask> <tool> [matcher]\n"
+                "  /permissions remove <allow|deny|ask> <index>\n"
+                "  /permissions on | off\n\n"
+                "tool is an operation type (file_write, command_execute, …) "
+                "or '*'. Precedence: deny > ask > allow."
+            ),
             "validate": (
                 "Validate provider configurations.\n\n"
                 "Usage: /validate [provider] [--fix]"

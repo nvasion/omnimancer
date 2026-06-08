@@ -116,6 +116,10 @@ class CommandDispatchMixin:
             await self._handle_agent_command(command)
         elif slash_cmd == SlashCommand.CONFIG:
             await self._handle_config_command(command)
+        elif slash_cmd == SlashCommand.HOOKS:
+            await self._handle_hooks_command(command)
+        elif slash_cmd == SlashCommand.PERMISSIONS:
+            await self._handle_permissions_command(command)
         elif slash_cmd is not None:
             self._show_info(f"Command {slash_cmd.value} is not yet implemented")
 
@@ -821,6 +825,240 @@ class CommandDispatchMixin:
             )
         except Exception as e:
             self._show_error(f"Failed to configure provider: {e}")
+
+    # ------------------------------------------------------------------ hooks
+
+    _HOOK_EVENTS = (
+        "pre_send_message",
+        "post_send_message",
+        "tool_use_request",
+        "post_tool",
+    )
+
+    async def _handle_hooks_command(self, command: Command) -> None:
+        """Handle '/hooks [list|add|remove|on|off]'."""
+        args = command.args
+        config = self.engine.config_manager.get_config()
+        hooks = config.hooks
+
+        if not args or args[0].lower() == "list":
+            self._show_hooks(hooks)
+            return
+
+        sub = args[0].lower()
+        if sub in ("on", "off"):
+            hooks.enabled = sub == "on"
+            self.engine.config_manager.save_config()
+            self._show_success(f"Hooks {'enabled' if hooks.enabled else 'disabled'}.")
+        elif sub == "add":
+            self._hooks_add(args[1:])
+        elif sub == "remove":
+            self._hooks_remove(args[1:])
+        else:
+            self._show_error(
+                "Usage: /hooks [list | on | off | "
+                "add <event> <name> [--matcher RE] [--blocking] "
+                "[--timeout N] <command> | remove <event> <name>]"
+            )
+
+    def _hooks_add(self, args: List[str]) -> None:
+        if len(args) < 3:
+            self._show_error(
+                "Usage: /hooks add <event> <name> [--matcher RE] "
+                "[--blocking] [--timeout N] <command>"
+            )
+            return
+        event, name, rest = args[0], args[1], args[2:]
+        if event not in self._HOOK_EVENTS:
+            self._show_error(
+                f"Unknown event '{event}'. One of: {', '.join(self._HOOK_EVENTS)}"
+            )
+            return
+
+        matcher: Optional[str] = None
+        blocking = False
+        timeout = 30
+        cmd_parts: List[str] = []
+        i = 0
+        while i < len(rest):
+            token = rest[i]
+            if token == "--matcher" and i + 1 < len(rest):
+                matcher = rest[i + 1]
+                i += 2
+            elif token == "--blocking":
+                blocking = True
+                i += 1
+            elif token == "--timeout" and i + 1 < len(rest):
+                try:
+                    timeout = int(rest[i + 1])
+                except ValueError:
+                    self._show_error("--timeout must be an integer.")
+                    return
+                i += 2
+            else:
+                cmd_parts.append(token)
+                i += 1
+
+        command_str = " ".join(cmd_parts)
+        if not command_str:
+            self._show_error("A command is required.")
+            return
+
+        try:
+            from ..core.models import HookCommand
+
+            config = self.engine.config_manager.get_config()
+            hook = HookCommand(
+                name=name,
+                command=command_str,
+                matcher=matcher,
+                blocking=blocking,
+                timeout=timeout,
+            )
+            getattr(config.hooks, event).append(hook)
+            self.engine.config_manager.save_config()
+            self._show_success(f"Added {event} hook '{name}'.")
+        except Exception as e:
+            self._show_error(f"Failed to add hook: {e}")
+
+    def _hooks_remove(self, args: List[str]) -> None:
+        if len(args) < 2:
+            self._show_error("Usage: /hooks remove <event> <name>")
+            return
+        event, name = args[0], args[1]
+        if event not in self._HOOK_EVENTS:
+            self._show_error(f"Unknown event '{event}'.")
+            return
+        config = self.engine.config_manager.get_config()
+        hook_list = getattr(config.hooks, event)
+        for idx, hook in enumerate(hook_list):
+            if hook.name == name:
+                hook_list.pop(idx)
+                self.engine.config_manager.save_config()
+                self._show_success(f"Removed {event} hook '{name}'.")
+                return
+        self._show_error(f"No {event} hook named '{name}'.")
+
+    def _show_hooks(self, hooks: Any) -> None:
+        state = "enabled" if hooks.enabled else "disabled"
+        table = Table(title=f"Hooks ({state})")
+        table.add_column("Event", style="bold")
+        table.add_column("Name", style="cyan")
+        table.add_column("Command")
+        table.add_column("Matcher", style="magenta")
+        table.add_column("Blocking", justify="center")
+        any_rows = False
+        for event in self._HOOK_EVENTS:
+            for hook in getattr(hooks, event):
+                any_rows = True
+                table.add_row(
+                    event,
+                    hook.name,
+                    hook.command,
+                    hook.matcher or "—",
+                    "yes" if hook.blocking else "no",
+                )
+        if any_rows:
+            self.console.print(table)
+        else:
+            self._show_info("No hooks configured. Add one with '/hooks add'.")
+
+    # ------------------------------------------------------------ permissions
+
+    _PERM_LISTS = {
+        "allow": "always_allow",
+        "deny": "always_deny",
+        "ask": "always_ask",
+    }
+
+    async def _handle_permissions_command(self, command: Command) -> None:
+        """Handle '/permissions [list|allow|deny|ask|remove|on|off]'."""
+        args = command.args
+        config = self.engine.config_manager.get_config()
+        perms = config.permissions
+
+        if not args or args[0].lower() == "list":
+            self._show_permissions(perms)
+            return
+
+        sub = args[0].lower()
+        if sub in ("on", "off"):
+            perms.enabled = sub == "on"
+            self.engine.config_manager.save_config()
+            self._show_success(
+                f"Permission rules {'enabled' if perms.enabled else 'disabled'}."
+            )
+        elif sub in self._PERM_LISTS:
+            self._permissions_add(sub, args[1:])
+        elif sub == "remove":
+            self._permissions_remove(args[1:])
+        else:
+            self._show_error(
+                "Usage: /permissions [list | on | off | "
+                "<allow|deny|ask> <tool> [matcher] | "
+                "remove <allow|deny|ask> <index>]"
+            )
+
+    def _permissions_add(self, kind: str, args: List[str]) -> None:
+        if not args:
+            self._show_error(
+                f"Usage: /permissions {kind} <tool> [matcher]  "
+                "(tool is an operation type like file_write, "
+                "command_execute, or '*')"
+            )
+            return
+        tool = args[0]
+        matcher = args[1] if len(args) > 1 else None
+        try:
+            from ..core.models import PermissionRule
+
+            config = self.engine.config_manager.get_config()
+            rule = PermissionRule(tool=tool, matcher=matcher)
+            getattr(config.permissions, self._PERM_LISTS[kind]).append(rule)
+            self.engine.config_manager.save_config()
+            target = f" matching /{matcher}/" if matcher else ""
+            self._show_success(f"Added {kind} rule for '{tool}'{target}.")
+        except Exception as e:
+            self._show_error(f"Failed to add rule: {e}")
+
+    def _permissions_remove(self, args: List[str]) -> None:
+        if len(args) < 2 or args[0].lower() not in self._PERM_LISTS:
+            self._show_error("Usage: /permissions remove <allow|deny|ask> <index>")
+            return
+        kind = args[0].lower()
+        try:
+            idx = int(args[1]) - 1
+        except ValueError:
+            self._show_error("Index must be a number (see '/permissions list').")
+            return
+        config = self.engine.config_manager.get_config()
+        rule_list = getattr(config.permissions, self._PERM_LISTS[kind])
+        if not (0 <= idx < len(rule_list)):
+            self._show_error(f"No {kind} rule at index {idx + 1}.")
+            return
+        removed = rule_list.pop(idx)
+        self.engine.config_manager.save_config()
+        self._show_success(f"Removed {kind} rule for '{removed.tool}'.")
+
+    def _show_permissions(self, perms: Any) -> None:
+        state = "enabled" if perms.enabled else "disabled"
+        table = Table(title=f"Permission rules ({state})")
+        table.add_column("#", justify="right", style="dim")
+        table.add_column("Decision", style="bold")
+        table.add_column("Tool", style="cyan")
+        table.add_column("Matcher", style="magenta")
+        any_rows = False
+        for kind, attr in self._PERM_LISTS.items():
+            for idx, rule in enumerate(getattr(perms, attr), start=1):
+                any_rows = True
+                table.add_row(str(idx), kind, rule.tool, rule.matcher or "—")
+        if any_rows:
+            self.console.print(table)
+        else:
+            self._show_info(
+                "No permission rules. Add one with "
+                "'/permissions deny|ask|allow <tool> [matcher]'."
+            )
 
     async def _handle_config_remove_provider(self, args: List[str]) -> None:
         """Handle '/config remove-provider <name>'."""

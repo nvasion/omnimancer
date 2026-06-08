@@ -1098,6 +1098,42 @@ class HooksConfig(BaseModel):
         return value if isinstance(value, list) else []
 
 
+class PermissionRule(BaseModel):
+    """A permission rule matched by operation type and an optional target regex.
+
+    ``tool`` is an OperationType value (e.g. ``"file_write"``,
+    ``"command_execute"``) or ``"*"`` to match any. ``matcher`` is an optional
+    regex tested against the operation's target (file path, command, or URL);
+    ``None`` matches any target.
+    """
+
+    tool: str = "*"
+    matcher: Optional[str] = None
+    note: Optional[str] = None
+
+    @field_validator("tool")
+    @classmethod
+    def validate_tool(cls, v: Any) -> Any:
+        if not v or not str(v).strip():
+            return "*"
+        return str(v).strip()
+
+
+class PermissionsConfig(BaseModel):
+    """Config-driven permission rules layered over the approval workflow.
+
+    Evaluated with precedence ``deny > ask > allow > default`` (see
+    :mod:`omnimancer.core.security.permission_rules`). ``always_allow`` rules
+    also authorize writes to sensitive project-local files (e.g. ``.env``) that
+    would otherwise require interactive approval.
+    """
+
+    enabled: bool = True
+    always_deny: List[PermissionRule] = []
+    always_ask: List[PermissionRule] = []
+    always_allow: List[PermissionRule] = []
+
+
 class Config(BaseModel):
     """Main configuration model."""
 
@@ -1107,6 +1143,7 @@ class Config(BaseModel):
     storage_path: str
     mcp: MCPConfig = MCPConfig()
     hooks: HooksConfig = HooksConfig()
+    permissions: PermissionsConfig = PermissionsConfig()
 
     # Profile management
     profiles: Dict[str, ConfigProfile] = {}

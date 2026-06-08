@@ -58,6 +58,8 @@ class SlashCommand(Enum):
     LIST_CUSTOM_MODELS = "/list-custom-models"
     AGENT = "/agent"
     CONFIG = "/config"
+    HOOKS = "/hooks"
+    PERMISSIONS = "/permissions"
 
     @classmethod
     def from_string(cls, command_str: str) -> Optional["SlashCommand"]:

@@ -552,11 +552,14 @@ class FileSystemManager:
         Used by write_file() and _perform_direct_write().
         """
         try:
-            # Security validation
+            # Security validation. An approved write (or one matching an
+            # always_allow rule) may target sensitive project-local files such
+            # as .env; hard-restricted system/credential paths stay blocked.
             security_result = await self.security.secure_file_access(
                 str(path),
                 "write",
                 content if isinstance(content, str) else None,
+                allow_sensitive=approved,
             )
             if not security_result["success"]:
                 raise FileOperationError(
@@ -1244,6 +1247,19 @@ class FileSystemManager:
             retry_count=0,
         )
 
+    @staticmethod
+    def _is_terminal_security_error(error: Exception) -> bool:
+        """True for permanent security/permission denials that must not retry."""
+        message = str(error).lower()
+        return any(
+            marker in message
+            for marker in (
+                "security check failed",
+                "permission denied by security policy",
+                "file access blocked",
+            )
+        )
+
     async def _read_before_write_with_recovery(
         self,
         path: Union[str, Path],
@@ -1477,6 +1493,17 @@ class FileSystemManager:
                 return write_result
 
             except Exception as e:
+                # A security-policy denial is permanent: retrying only re-fails
+                # and spams the log with tracebacks. Fail fast with a clean
+                # message instead of recursing.
+                if self._is_terminal_security_error(e):
+                    logger.warning("Write blocked by security policy: %s", e)
+                    return {
+                        "success": False,
+                        "error": str(e),
+                        "operation": "read_before_write",
+                    }
+
                 # Handle write error
                 write_error = FileWriteError(str(path), e)
                 error_result = self.error_handler.handle_error(

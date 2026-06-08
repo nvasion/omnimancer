@@ -71,9 +71,13 @@ class SecurityManager:
         }
 
     async def validate_operation(
-        self, operation: PermissionOperation
+        self, operation: PermissionOperation, allow_sensitive: bool = False
     ) -> Dict[str, Any]:
-        """Validate if an operation is allowed and safe to execute."""
+        """Validate if an operation is allowed and safe to execute.
+
+        ``allow_sensitive`` permits approved writes to sensitive project-local
+        files (e.g. ``.env``); hard-restricted paths remain blocked.
+        """
 
         operation_id = f"op_{self.operation_counter}"
         self.operation_counter += 1
@@ -91,7 +95,9 @@ class SecurityManager:
 
         try:
             # Step 1: Basic permission check
-            permission_allowed = self.permissions.validate_operation(operation)
+            permission_allowed = self.permissions.validate_operation(
+                operation, allow_sensitive=allow_sensitive
+            )
 
             if self.audit:
                 self.audit.log_permission_check(
@@ -322,9 +328,17 @@ class SecurityManager:
             return result
 
     async def secure_file_access(
-        self, file_path: str, operation: str, content: Optional[str] = None
+        self,
+        file_path: str,
+        operation: str,
+        content: Optional[str] = None,
+        allow_sensitive: bool = False,
     ) -> Dict[str, Any]:
-        """Securely access a file with full validation."""
+        """Securely access a file with full validation.
+
+        ``allow_sensitive`` (set when the write was approved or matches an
+        always_allow rule) permits sensitive project-local files like ``.env``.
+        """
 
         operation_id = f"file_{self.operation_counter}"
         self.operation_counter += 1
@@ -347,7 +361,9 @@ class SecurityManager:
             )
 
             # Validate operation
-            validation_result = await self.validate_operation(op)
+            validation_result = await self.validate_operation(
+                op, allow_sensitive=allow_sensitive
+            )
             result["security_info"] = validation_result
 
             if not validation_result["allowed"]:
