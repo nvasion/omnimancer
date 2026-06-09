@@ -32,7 +32,7 @@
     "License": "Apache-2.0 AND MIT",
     "Name": "aiohttp",
     "URL": "https://github.com/aio-libs/aiohttp",
-    "Version": "3.13.5"
+    "Version": "3.14.1"
   },
   {
     "Description": "aiosignal: a list of registered asynchronous callbacks",
@@ -74,7 +74,7 @@
     "License": "MIT License",
     "Name": "beautifulsoup4",
     "URL": "https://www.crummy.com/software/BeautifulSoup/bs4/",
-    "Version": "4.14.3"
+    "Version": "4.15.0"
   },
   {
     "Description": "The uncompromising code formatter.",
@@ -179,7 +179,7 @@
     "License": "BSD-3-Clause",
     "Name": "idna",
     "URL": "https://github.com/kjd/idna",
-    "Version": "3.17"
+    "Version": "3.18"
   },
   {
     "Description": "brain-dead simple config-ini parsing",
@@ -277,7 +277,7 @@
     "License": "MIT License",
     "Name": "omnimancer-cli",
     "URL": "https://github.com/nvasion/omnimancer",
-    "Version": "0.1.17"
+    "Version": "0.2.5"
   },
   {
     "Description": "Core utilities for Python packages",
