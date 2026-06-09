@@ -230,6 +230,18 @@ Tips:
                 "tool is an operation type (file_write, command_execute, …) "
                 "or '*'. Precedence: deny > ask > allow."
             ),
+            "prompts": (
+                "List and render prompts exposed by connected MCP servers.\n\n"
+                "Usage:\n"
+                "  /prompts                       list available MCP prompts\n"
+                "  /prompts <name> [key=value ...]   render a prompt"
+            ),
+            "subagents": (
+                "Run scoped child agents defined in config.\n\n"
+                "Usage:\n"
+                "  /subagents                     list configured subagents\n"
+                "  /subagents run <name> <task>   run a subagent on a task"
+            ),
             "validate": (
                 "Validate provider configurations.\n\n"
                 "Usage: /validate [provider] [--fix]"

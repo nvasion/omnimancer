@@ -120,6 +120,10 @@ class CommandDispatchMixin:
             await self._handle_hooks_command(command)
         elif slash_cmd == SlashCommand.PERMISSIONS:
             await self._handle_permissions_command(command)
+        elif slash_cmd == SlashCommand.PROMPTS:
+            await self._handle_prompts_command(command)
+        elif slash_cmd == SlashCommand.SUBAGENTS:
+            await self._handle_subagents_command(command)
         elif slash_cmd is not None:
             self._show_info(f"Command {slash_cmd.value} is not yet implemented")
 
@@ -1059,6 +1063,123 @@ class CommandDispatchMixin:
                 "No permission rules. Add one with "
                 "'/permissions deny|ask|allow <tool> [matcher]'."
             )
+
+    # ------------------------------------------------------------ MCP prompts
+
+    async def _handle_prompts_command(self, command: Command) -> None:
+        """Handle '/prompts [list | <name> [key=value ...]]'.
+
+        Lists prompts exposed by connected MCP servers, or renders one and shows
+        the result so it can be used as a prompt.
+        """
+        manager = getattr(self.engine, "mcp_manager", None)
+        if not manager:
+            self._show_info("No MCP servers configured.")
+            return
+
+        args = command.args
+        if not args or args[0].lower() == "list":
+            try:
+                prompts = await manager.get_available_prompts()
+            except Exception as e:
+                self._show_error(f"Failed to list MCP prompts: {e}")
+                return
+            self._show_mcp_prompts(prompts)
+            return
+
+        name = args[0]
+        arguments: dict = {}
+        for token in args[1:]:
+            if "=" in token:
+                key, value = token.split("=", 1)
+                arguments[key] = value
+            else:
+                self._show_error(f"Prompt arguments must be key=value (got '{token}').")
+                return
+        try:
+            rendered = await manager.get_prompt(name, arguments)
+        except Exception as e:
+            self._show_error(f"Failed to render prompt '{name}': {e}")
+            return
+        self.console.print(Panel(rendered, title=f"MCP prompt: {name}"))
+
+    def _show_mcp_prompts(self, prompts: List[dict]) -> None:
+        if not prompts:
+            self._show_info("No MCP prompts available from connected servers.")
+            return
+        table = Table(title="MCP prompts")
+        table.add_column("Name", style="cyan")
+        table.add_column("Server", style="dim")
+        table.add_column("Arguments", style="magenta")
+        table.add_column("Description")
+        for p in prompts:
+            arg_names = ", ".join(a.get("name", "") for a in (p.get("arguments") or []))
+            table.add_row(
+                p.get("name", ""),
+                p.get("server", ""),
+                arg_names or "—",
+                p.get("description") or "",
+            )
+        self.console.print(table)
+
+    # -------------------------------------------------------------- subagents
+
+    async def _handle_subagents_command(self, command: Command) -> None:
+        """Handle '/subagents [list | run <name> <task...>]'."""
+        config = self.engine.config_manager.get_config()
+        subagents = getattr(config, "subagents", {}) or {}
+        args = command.args
+
+        if not args or args[0].lower() == "list":
+            self._show_subagents(subagents)
+            return
+
+        sub = args[0].lower()
+        if sub == "run":
+            if len(args) < 3:
+                self._show_error("Usage: /subagents run <name> <task>")
+                return
+            name = args[1]
+            task = " ".join(args[2:])
+            definition = subagents.get(name)
+            if definition is None:
+                self._show_error(f"No subagent named '{name}'. See '/subagents list'.")
+                return
+            from .subagent import SubAgentRunner
+
+            self._show_info(f"Running subagent '{name}'…")
+            result = await SubAgentRunner(self.engine).run(definition, task)
+            if not result.success:
+                self._show_error(f"Subagent '{name}' failed: {result.error}")
+                return
+            tools_used = ", ".join(result.tool_calls) or "none"
+            self.console.print(
+                Panel(
+                    result.output or "(no output)",
+                    title=(
+                        f"Subagent: {name} "
+                        f"({result.iterations} turn(s), tools: {tools_used})"
+                    ),
+                )
+            )
+        else:
+            self._show_error("Usage: /subagents [list | run <name> <task>]")
+
+    def _show_subagents(self, subagents: dict) -> None:
+        if not subagents:
+            self._show_info(
+                "No subagents configured. Define them under 'subagents' in config."
+            )
+            return
+        table = Table(title="Subagents")
+        table.add_column("Name", style="cyan")
+        table.add_column("Model", style="dim")
+        table.add_column("Tools", style="magenta")
+        table.add_column("Description")
+        for name, defn in subagents.items():
+            tools = "all" if defn.tools is None else (", ".join(defn.tools) or "none")
+            table.add_row(name, defn.model or "(inherit)", tools, defn.description)
+        self.console.print(table)
 
     async def _handle_config_remove_provider(self, args: List[str]) -> None:
         """Handle '/config remove-provider <name>'."""

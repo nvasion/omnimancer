@@ -6,25 +6,25 @@ including server connection, tool discovery, tool execution, and error handling.
 """
 
 import asyncio
-import json
+import os
 import subprocess
+import sys
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import pytest_asyncio
 
 from omnimancer.core.models import (
     MCPConfig,
     MCPError,
     MCPServerConfig,
-    MCPServerError,
-    MCPToolError,
     ToolDefinition,
     ToolResult,
 )
 from omnimancer.mcp.client import MCPClient
 from omnimancer.mcp.manager import MCPManager
-from omnimancer.utils.errors import MCPConnectionError
+from omnimancer.utils.errors import MCPConnectionError, MCPTimeoutError
 
 
 @pytest.fixture
@@ -102,261 +102,129 @@ def sample_tool_definitions():
     ]
 
 
-class TestMCPClient:
-    """Test MCP client functionality."""
+TEST_SERVER = os.path.join(os.path.dirname(__file__), "mcp_test_server.py")
 
-    @pytest.mark.asyncio
-    async def test_client_initialization(self, sample_mcp_server_config):
-        """Test MCP client initialization."""
-        client = MCPClient(sample_mcp_server_config)
 
-        assert client.server_config == sample_mcp_server_config
-        assert client.process is None
-        assert client.connected is False
-        assert len(client.tools) == 0
-        assert client._request_id == 0
+@pytest.fixture
+def stdio_config():
+    """Config pointing at the real FastMCP test server (tests/mcp_test_server.py)."""
+    return MCPServerConfig(
+        name="test_server",
+        command=sys.executable,
+        args=[TEST_SERVER],
+        auto_approve=["add"],
+        timeout=30,
+    )
 
-    @pytest.mark.asyncio
-    async def test_client_connect_success(
-        self, sample_mcp_server_config, mock_mcp_process
-    ):
-        """Test successful client connection."""
-        client = MCPClient(sample_mcp_server_config)
 
-        # Mock successful responses
-        mock_responses = [
-            # Initialize response
-            json.dumps(
-                {
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "result": {
-                        "protocolVersion": "2024-11-05",
-                        "capabilities": {"tools": {}},
-                    },
-                }
-            ),
-            # Tools list response
-            json.dumps(
-                {
-                    "jsonrpc": "2.0",
-                    "id": 2,
-                    "result": {
-                        "tools": [
-                            {
-                                "name": "test_tool",
-                                "description": "A test tool",
-                                "inputSchema": {
-                                    "type": "object",
-                                    "properties": {"input": {"type": "string"}},
-                                },
-                            }
-                        ]
-                    },
-                }
-            ),
-        ]
-
-        mock_mcp_process.stdout.readline.side_effect = [
-            resp + "\n" for resp in mock_responses
-        ]
-        mock_mcp_process.stdout.readable.return_value = True
-
-        with patch("subprocess.Popen", return_value=mock_mcp_process):
-            await client.connect()
-
-        assert client.connected is True
-        assert client.process == mock_mcp_process
-        assert len(client.tools) == 1
-        assert "test_tool" in client.tools
-
-    @pytest.mark.asyncio
-    async def test_client_connect_process_fails(self, sample_mcp_server_config):
-        """Test client connection when process fails to start."""
-        client = MCPClient(sample_mcp_server_config)
-
-        mock_process = MagicMock()
-        mock_process.poll.return_value = 1  # Process exited
-        mock_process.stderr.read.return_value = "Process failed to start"
-
-        with patch("subprocess.Popen", return_value=mock_process):
-            with pytest.raises(MCPConnectionError, match="failed to start"):
-                await client.connect()
-
-        assert client.connected is False
-
-    @pytest.mark.asyncio
-    async def test_client_disconnect(self, sample_mcp_server_config, mock_mcp_process):
-        """Test client disconnection."""
-        client = MCPClient(sample_mcp_server_config)
-        client.process = mock_mcp_process
-        client.connected = True
-        client.tools = {"test_tool": MagicMock()}
-
+@pytest_asyncio.fixture
+async def connected_client(stdio_config):
+    """A live MCPClient connected to the stdio test server."""
+    client = MCPClient(stdio_config)
+    await client.connect()
+    try:
+        yield client
+    finally:
         await client.disconnect()
 
+
+class TestMCPClient:
+    """Test the SDK-based MCP client against a real stdio server."""
+
+    def test_client_initialization(self, stdio_config):
+        client = MCPClient(stdio_config)
+        assert client.server_config == stdio_config
         assert client.connected is False
-        assert client.process is None
-        assert len(client.tools) == 0
-        mock_mcp_process.terminate.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_client_list_tools_not_connected(self, sample_mcp_server_config):
-        """Test listing tools when not connected."""
-        client = MCPClient(sample_mcp_server_config)
-
-        with pytest.raises(MCPServerError, match="Not connected to MCP server"):
-            await client.list_tools()
-
-    @pytest.mark.asyncio
-    async def test_client_list_tools_success(
-        self, sample_mcp_server_config, sample_tool_definitions
-    ):
-        """Test successful tool listing."""
-        client = MCPClient(sample_mcp_server_config)
-        client.connected = True
-        client.tools = {tool.name: tool for tool in sample_tool_definitions}
-
-        tools = await client.list_tools()
-
-        assert len(tools) == 2
-        assert any(tool.name == "calculate" for tool in tools)
-        assert any(tool.name == "safe_tool" for tool in tools)
-
-    @pytest.mark.asyncio
-    async def test_client_call_tool_success(
-        self, sample_mcp_server_config, mock_mcp_process
-    ):
-        """Test successful tool execution."""
-        client = MCPClient(sample_mcp_server_config)
-        client.connected = True
-        client.process = mock_mcp_process
-        client.tools = {
-            "calculate": ToolDefinition(
-                name="calculate",
-                description="Test tool",
-                parameters={},
-                server_name="test_server",
-            )
-        }
-
-        # Mock successful tool response
-        mock_response = json.dumps(
-            {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "result": {
-                    "content": "Result: 42",
-                    "metadata": {"execution_time": 0.1},
-                },
-            }
-        )
-
-        mock_mcp_process.stdout.readline.return_value = mock_response + "\n"
-        mock_mcp_process.stdout.readable.return_value = True
-
-        result = await client.call_tool("calculate", {"expression": "6 * 7"})
-
-        assert isinstance(result, ToolResult)
-        assert result.content == "Result: 42"
-        assert result.error is None
-        assert result.metadata == {"execution_time": 0.1}
-
-    @pytest.mark.asyncio
-    async def test_client_call_tool_not_found(self, sample_mcp_server_config):
-        """Test calling a tool that doesn't exist."""
-        client = MCPClient(sample_mcp_server_config)
-        client.connected = True
-        client.tools = {}
-
-        with pytest.raises(MCPToolError, match="Tool 'nonexistent' not found"):
-            await client.call_tool("nonexistent", {})
-
-    @pytest.mark.asyncio
-    async def test_client_call_tool_execution_error(
-        self, sample_mcp_server_config, mock_mcp_process
-    ):
-        """Test tool execution error."""
-        client = MCPClient(sample_mcp_server_config)
-        client.connected = True
-        client.process = mock_mcp_process
-        client.tools = {
-            "failing_tool": ToolDefinition(
-                name="failing_tool",
-                description="A tool that fails",
-                parameters={},
-                server_name="test_server",
-            )
-        }
-
-        # Mock error response
-        mock_response = json.dumps(
-            {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "error": {"code": -1, "message": "Tool execution failed"},
-            }
-        )
-
-        mock_mcp_process.stdout.readline.return_value = mock_response + "\n"
-        mock_mcp_process.stdout.readable.return_value = True
-
-        with pytest.raises(MCPToolError, match="Tool execution failed"):
-            await client.call_tool("failing_tool", {})
-
-    @pytest.mark.asyncio
-    async def test_client_health_check_healthy(
-        self, sample_mcp_server_config, mock_mcp_process
-    ):
-        """Test health check on healthy server."""
-        client = MCPClient(sample_mcp_server_config)
-        client.connected = True
-        client.process = mock_mcp_process
-
-        # Mock ping response
-        mock_response = json.dumps({"jsonrpc": "2.0", "id": 1, "result": "pong"})
-
-        mock_mcp_process.stdout.readline.return_value = mock_response + "\n"
-        mock_mcp_process.stdout.readable.return_value = True
-
-        is_healthy = await client.health_check()
-        assert is_healthy is True
-
-    @pytest.mark.asyncio
-    async def test_client_health_check_unhealthy(self, sample_mcp_server_config):
-        """Test health check on unhealthy server."""
-        client = MCPClient(sample_mcp_server_config)
-        client.connected = False
-
-        is_healthy = await client.health_check()
-        assert is_healthy is False
-
-    def test_client_properties(self, sample_mcp_server_config, mock_mcp_process):
-        """Test client properties."""
-        client = MCPClient(sample_mcp_server_config)
-
-        # Test server_name property
-        assert client.server_name == "test_server"
-
-        # Test is_connected when not connected
         assert client.is_connected is False
+        assert client.tools == {}
 
-        # Test is_connected when connected
-        client.connected = True
-        client.process = mock_mcp_process
+    def test_transport_selection_builds_without_error(self):
+        # stdio
+        c = MCPClient(MCPServerConfig(name="s", command="echo hi", transport="stdio"))
+        c._build_transport()
+        # sse / http build their context managers from a url
+        for transport in ("sse", "http"):
+            cfg = MCPServerConfig(
+                name="r",
+                transport=transport,
+                url="https://example.com/mcp",
+                headers={"Authorization": "Bearer x"},
+            )
+            MCPClient(cfg)._build_transport()
+
+    @pytest.mark.asyncio
+    async def test_connect_discovers_tools(self, connected_client):
+        assert connected_client.is_connected is True
+        assert "add" in connected_client.tools
+        tool = connected_client.get_tool_definition("add")
+        assert tool is not None
+        assert tool.server_name == "test_server"
+        # auto_approve from config is honoured.
+        assert tool.auto_approved is True
+
+    @pytest.mark.asyncio
+    async def test_list_tools(self, connected_client):
+        tools = await connected_client.list_tools()
+        assert any(t.name == "add" for t in tools)
+
+    @pytest.mark.asyncio
+    async def test_call_tool(self, connected_client):
+        result = await connected_client.call_tool("add", {"a": 2, "b": 3})
+        assert isinstance(result, ToolResult)
+        assert result.error is None
+        assert "5" in result.content
+
+    @pytest.mark.asyncio
+    async def test_list_and_read_resources(self, connected_client):
+        resources = await connected_client.list_resources()
+        assert any(r["uri"] == "test://greeting" for r in resources)
+        content = await connected_client.read_resource("test://greeting")
+        assert "hello from resource" in content
+
+    @pytest.mark.asyncio
+    async def test_list_and_get_prompts(self, connected_client):
+        prompts = await connected_client.list_prompts()
+        names = {p["name"] for p in prompts}
+        assert "greet" in names
+        rendered = await connected_client.get_prompt("greet", {"name": "Kellan"})
+        assert "Hello, Kellan!" in rendered
+
+    @pytest.mark.asyncio
+    async def test_health_check_connected(self, connected_client):
+        assert await connected_client.health_check() is True
+
+    @pytest.mark.asyncio
+    async def test_disconnect(self, stdio_config):
+        client = MCPClient(stdio_config)
+        await client.connect()
         assert client.is_connected is True
+        await client.disconnect()
+        assert client.is_connected is False
+        assert client.connected is False
 
-        # Test get_tool_definition
-        tool_def = ToolDefinition(
-            name="test_tool",
-            description="Test",
-            parameters={},
-            server_name="test_server",
+    @pytest.mark.asyncio
+    async def test_call_tool_not_connected_raises(self, stdio_config):
+        client = MCPClient(stdio_config)
+        with pytest.raises(MCPConnectionError):
+            await client.call_tool("add", {"a": 1, "b": 2})
+
+    @pytest.mark.asyncio
+    async def test_health_check_not_connected(self, stdio_config):
+        client = MCPClient(stdio_config)
+        assert await client.health_check() is False
+
+    @pytest.mark.asyncio
+    async def test_connect_bad_command_raises(self):
+        client = MCPClient(
+            MCPServerConfig(
+                name="broken",
+                command="this-binary-does-not-exist-xyz",
+                timeout=10,
+            )
         )
-        client.tools = {"test_tool": tool_def}
-
-        assert client.get_tool_definition("test_tool") == tool_def
-        assert client.get_tool_definition("nonexistent") is None
+        with pytest.raises(MCPConnectionError):
+            await client.connect()
+        assert client.is_connected is False
 
 
 class TestMCPManager:
@@ -946,54 +814,33 @@ class TestMCPErrorHandling:
         assert is_healthy is False
 
     @pytest.mark.asyncio
-    async def test_malformed_json_response(self, sample_mcp_server_config):
-        """Test handling of malformed JSON responses."""
-        client = MCPClient(sample_mcp_server_config)
-
-        mock_process = MagicMock()
-        mock_process.stdin = MagicMock()
-        mock_process.stdout = MagicMock()
-        mock_process.stdout.readable.return_value = True
-        mock_process.stdout.readline.return_value = "invalid json\n"
-
-        client.process = mock_process
-        client.connected = True
-        client.tools = {
-            "test_tool": ToolDefinition(
-                name="test_tool",
-                description="Test",
-                parameters={},
-                server_name="test_server",
-            )
-        }
-
-        with pytest.raises(MCPToolError, match="Failed to execute tool"):
-            await client.call_tool("test_tool", {})
+    async def test_unknown_tool_returns_error_result(self):
+        """An unknown tool yields an error ToolResult (server-reported)."""
+        server = os.path.join(os.path.dirname(__file__), "mcp_test_server.py")
+        client = MCPClient(
+            MCPServerConfig(name="t", command=sys.executable, args=[server])
+        )
+        await client.connect()
+        try:
+            result = await client.call_tool("nonexistent_tool", {})
+            assert result.error is not None
+        finally:
+            await client.disconnect()
 
     @pytest.mark.asyncio
-    async def test_timeout_handling(self, sample_mcp_server_config):
-        """Test handling of request timeouts."""
-        client = MCPClient(sample_mcp_server_config)
-        client.server_config.timeout = 0.1  # Very short timeout
-
-        mock_process = MagicMock()
-        mock_process.stdin = MagicMock()
-        mock_process.stdout = MagicMock()
-        mock_process.stdout.readable.return_value = False  # No data available
-
-        client.process = mock_process
-        client.connected = True
-        client.tools = {
-            "slow_tool": ToolDefinition(
-                name="slow_tool",
-                description="A slow tool",
-                parameters={},
-                server_name="test_server",
+    async def test_connect_timeout(self):
+        """A non-MCP process that never completes the handshake times out."""
+        client = MCPClient(
+            MCPServerConfig(
+                name="hang",
+                command=sys.executable,
+                args=["-c", "import time; time.sleep(30)"],
+                timeout=2,
             )
-        }
-
-        with pytest.raises(MCPToolError, match="Failed to execute tool"):
-            await client.call_tool("slow_tool", {})
+        )
+        with pytest.raises((MCPConnectionError, MCPTimeoutError)):
+            await client.connect()
+        assert client.is_connected is False
 
     @pytest.mark.asyncio
     async def test_manager_partial_server_failure(self):
@@ -1056,3 +903,28 @@ class TestMCPErrorHandling:
             assert len(status) == 2
             assert status["working_server"]["connected"] is True
             assert status["failing_server"]["connected"] is False
+
+
+class TestMCPOptionalSDK:
+    """The app must import without the optional mcp SDK; connecting errors clearly."""
+
+    def test_require_sdk_raises_clear_error_when_missing(self):
+        import sys
+        from unittest.mock import patch
+
+        from omnimancer.mcp.client import _require_sdk
+
+        # Simulate the SDK not being installed.
+        with patch.dict(sys.modules, {"mcp": None}):
+            with pytest.raises(MCPConnectionError, match="pip install mcp"):
+                _require_sdk()
+
+    @pytest.mark.asyncio
+    async def test_connect_without_sdk_raises_clear_error(self):
+        import sys
+        from unittest.mock import patch
+
+        client = MCPClient(MCPServerConfig(name="x", command="echo hi", timeout=5))
+        with patch.dict(sys.modules, {"mcp": None}):
+            with pytest.raises(MCPConnectionError, match="pip install mcp"):
+                await client.connect()

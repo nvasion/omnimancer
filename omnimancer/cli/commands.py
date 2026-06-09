@@ -60,6 +60,8 @@ class SlashCommand(Enum):
     CONFIG = "/config"
     HOOKS = "/hooks"
     PERMISSIONS = "/permissions"
+    PROMPTS = "/prompts"
+    SUBAGENTS = "/subagents"
 
     @classmethod
     def from_string(cls, command_str: str) -> Optional["SlashCommand"]:

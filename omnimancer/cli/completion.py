@@ -54,6 +54,8 @@ class CompletionManager:
             "permissions": {
                 0: ["list", "allow", "deny", "ask", "remove", "on", "off"],
             },
+            "prompts": {0: ["list"]},
+            "subagents": {0: ["list", "run"]},
             "validate": {0: ["--fix", "--auto-fix"]},
             "health": {0: ["--monitor", "--interval"]},
             "repair": {0: ["--backup", "--force"]},

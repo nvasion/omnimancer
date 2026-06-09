@@ -166,3 +166,64 @@ class TestPermissionsCommand:
     async def test_list_empty(self, disp):
         await disp._handle_permissions_command(_cmd(SlashCommand.PERMISSIONS))
         assert disp.infos
+
+
+class TestPromptsCommand:
+    """The /prompts command surfaces MCP server prompts."""
+
+    def _disp_with_manager(self, manager):
+        d = _Dispatcher(_config())
+        d.engine.mcp_manager = manager
+        return d
+
+    @pytest.mark.asyncio
+    async def test_no_mcp_manager(self):
+        d = _Dispatcher(_config())
+        d.engine.mcp_manager = None
+        await d._handle_prompts_command(_cmd(SlashCommand.PROMPTS))
+        assert d.infos
+
+    @pytest.mark.asyncio
+    async def test_list_prompts(self):
+        from unittest.mock import AsyncMock
+
+        manager = MagicMock()
+        manager.get_available_prompts = AsyncMock(
+            return_value=[
+                {
+                    "name": "greet",
+                    "server": "s1",
+                    "arguments": [{"name": "name"}],
+                    "description": "Greet someone",
+                }
+            ]
+        )
+        d = self._disp_with_manager(manager)
+        await d._handle_prompts_command(_cmd(SlashCommand.PROMPTS, "list"))
+        d.console.print.assert_called()  # rendered a table
+
+    @pytest.mark.asyncio
+    async def test_render_prompt_with_args(self):
+        from unittest.mock import AsyncMock
+
+        manager = MagicMock()
+        manager.get_prompt = AsyncMock(return_value="Hello, Kellan!")
+        d = self._disp_with_manager(manager)
+        await d._handle_prompts_command(
+            _cmd(SlashCommand.PROMPTS, "greet", "name=Kellan")
+        )
+        manager.get_prompt.assert_awaited_once_with("greet", {"name": "Kellan"})
+        d.console.print.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_render_prompt_rejects_bad_arg(self):
+        from unittest.mock import AsyncMock
+
+        manager = MagicMock()
+        manager.get_prompt = AsyncMock(return_value="x")
+        d = self._disp_with_manager(manager)
+        await d._handle_prompts_command(
+            _cmd(SlashCommand.PROMPTS, "greet", "notkeyvalue")
+        )
+        assert d.errors
+        manager.get_prompt.assert_not_called()

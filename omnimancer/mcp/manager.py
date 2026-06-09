@@ -234,6 +234,67 @@ class MCPManager:
 
         return all_tools
 
+    async def get_available_resources(self) -> List[Dict]:
+        """Aggregate resources advertised by all connected servers."""
+        if not self.initialized:
+            return []
+        resources: List[Dict] = []
+        for client in self.clients.values():
+            if client.is_connected:
+                try:
+                    resources.extend(await client.list_resources())
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to list resources from '{client.server_name}': {e}"
+                    )
+        return resources
+
+    async def read_resource(self, uri: str, server: Optional[str] = None) -> str:
+        """Read a resource by URI, optionally from a named server."""
+        for client in self.clients.values():
+            if not client.is_connected:
+                continue
+            if server and client.server_name != server:
+                continue
+            try:
+                return await client.read_resource(uri)
+            except Exception as e:
+                logger.debug(f"read_resource on '{client.server_name}' failed: {e}")
+        raise MCPError(f"Resource '{uri}' could not be read from any server")
+
+    async def get_available_prompts(self) -> List[Dict]:
+        """Aggregate prompts advertised by all connected servers."""
+        if not self.initialized:
+            return []
+        prompts: List[Dict] = []
+        for client in self.clients.values():
+            if client.is_connected:
+                try:
+                    prompts.extend(await client.list_prompts())
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to list prompts from '{client.server_name}': {e}"
+                    )
+        return prompts
+
+    async def get_prompt(
+        self,
+        name: str,
+        arguments: Optional[Dict] = None,
+        server: Optional[str] = None,
+    ) -> str:
+        """Render a prompt by name, optionally from a named server."""
+        for client in self.clients.values():
+            if not client.is_connected:
+                continue
+            if server and client.server_name != server:
+                continue
+            try:
+                return await client.get_prompt(name, arguments or {})
+            except Exception as e:
+                logger.debug(f"get_prompt on '{client.server_name}' failed: {e}")
+        raise MCPError(f"Prompt '{name}' could not be rendered from any server")
+
     async def execute_tool(self, name: str, arguments: Dict) -> ToolResult:
         """
         Execute a tool by name with given arguments, with comprehensive error handling.

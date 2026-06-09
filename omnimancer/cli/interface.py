@@ -27,7 +27,7 @@ from ..core.agent_mode_manager import AgentModeManager
 from ..core.config_manager import ConfigManager
 from ..core.engine import CoreEngine
 from ..core.history_manager import HistoryManager
-from ..core.models import ChatResponse
+from ..core.models import ChatResponse, ToolCall
 from ..core.signal_handler import SignalHandler
 
 # UI imports
@@ -809,17 +809,23 @@ class CommandLineInterface(
             self.console.print(
                 f"[dim]Executing {len(response.tool_calls)} tool call(s)...[/dim]"
             )
+            for tc in response.tool_calls:
+                summary = self._summarize_tool_call(tc)
+                label = f"{tc.name}: {summary}" if summary else tc.name
+                self.console.print(f"  [dim]→ {label}[/dim]")
 
             results = await tool_handler.execute_tool_calls(response.tool_calls)
 
             result_parts = []
             for tc, result in zip(response.tool_calls, results):
+                summary = self._summarize_tool_call(tc)
+                label = f"{tc.name} ({summary})" if summary else tc.name
                 if result.error:
                     status = f"[{tc.name}] Error: {result.error}"
-                    self.console.print(f"  [red]✗ {tc.name}: {result.error}[/red]")
+                    self.console.print(f"  [red]✗ {label}: {result.error}[/red]")
                 else:
                     status = f"[{tc.name}] Result: {result.content}"
-                    self.console.print(f"  [green]✓ {tc.name}[/green]")
+                    self.console.print(f"  [green]✓ {label}[/green]")
                 result_parts.append(status)
 
             # Feed results back without forcing the model to "continue" — let it
@@ -898,6 +904,49 @@ class CommandLineInterface(
             tokens_used=0,
             error="Stream failed",
         )
+
+    def _summarize_tool_call(self, tool_call: ToolCall) -> str:
+        """Return a short, human-readable summary of what a tool call does.
+
+        Picks the most descriptive argument (file path, command, url, etc.) so
+        the user can see *what* each call is acting on rather than just the
+        tool name. Falls back to compact JSON of the arguments.
+        """
+        args = getattr(tool_call, "arguments", None) or {}
+        if not isinstance(args, dict):
+            return ""
+
+        # Keys ordered by how well they describe the action being taken.
+        descriptive_keys = (
+            "file_path",
+            "path",
+            "filename",
+            "command",
+            "cmd",
+            "url",
+            "pattern",
+            "query",
+            "search",
+            "text",
+            "name",
+        )
+        summary = ""
+        for key in descriptive_keys:
+            value = args.get(key)
+            if value:
+                summary = str(value)
+                break
+        else:
+            if args:
+                try:
+                    summary = json.dumps(args, default=str)
+                except (TypeError, ValueError):
+                    summary = str(args)
+
+        summary = " ".join(summary.split())
+        if len(summary) > 80:
+            summary = summary[:77] + "..."
+        return summary
 
     def _handle_keyboard_interrupt(self) -> None:
         """Handle Ctrl+C interrupt."""
