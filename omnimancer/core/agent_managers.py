@@ -172,9 +172,6 @@ class ProgramExecutor(BaseManager):
                 error=f"Unsupported command operation: {operation.type}",
             )
 
-        # Import needed classes
-        from .agent.program_executor import ExecutionConfig, ExecutionMode
-
         command = operation.data["command"]
         args = operation.data.get("args", [])
         working_dir = operation.data.get("working_dir", None)
@@ -193,27 +190,12 @@ class ProgramExecutor(BaseManager):
                 ),
             )
 
-        # Create execution config from operation data
-        ExecutionConfig(
-            timeout_seconds=operation.data.get(
-                "timeout", self.default_config.timeout_seconds
-            ),
-            max_memory_mb=operation.data.get(
-                "max_memory_mb", self.default_config.max_memory_mb
-            ),
-            working_directory=working_dir,
-            execution_mode=ExecutionMode(
-                operation.data.get("execution_mode", "development")
-            ),
-            enable_streaming=operation.data.get("enable_streaming", True),
-            require_approval=False,  # Approval already handled by execute_with_approval
-        )
-
         # Use backward compatible method for tests
         return await self._execute_command(  # type: ignore[call-arg]
             command,
             args,
             working_dir,
+            timeout_seconds=operation.data.get("timeout"),
         )
 
     async def preview_operation(self, operation: Operation) -> str:
@@ -311,6 +293,7 @@ class ProgramExecutor(BaseManager):
         command: str,
         args: Optional[List[str]] = None,
         working_dir: Optional[str] = None,  # type: ignore[valid-type]
+        timeout_seconds: Optional[int] = None,
     ) -> OperationResult:
         """
         Execute command for backward compatibility with tests.
@@ -319,6 +302,7 @@ class ProgramExecutor(BaseManager):
             command: Command to execute
             args: Command arguments
             working_dir: Working directory for execution
+            timeout_seconds: Per-command timeout (defaults to manager setting)
 
         Returns:
             OperationResult with execution details
@@ -331,7 +315,7 @@ class ProgramExecutor(BaseManager):
 
         # Create execution config
         config = ExecutionConfig(
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=timeout_seconds or self.timeout_seconds,
             max_memory_mb=self.default_config.max_memory_mb,
             working_directory=working_dir,  # type: ignore[name-defined]
             execution_mode=ExecutionMode.FULL_ACCESS,

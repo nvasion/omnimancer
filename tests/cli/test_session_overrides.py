@@ -55,3 +55,63 @@ class TestApplySessionOverrides:
         cfg = cm.get_config()
         assert "openrouter" in cfg.providers
         assert cfg.providers["openrouter"].model == "anthropic/claude"
+
+
+class TestDangerouslySkipPermissionsWiring:
+    """--dangerously-skip-permissions must skip approvals in interactive mode too.
+
+    Regression: the flag was honoured in headless (-p) mode but silently ignored
+    in the interactive REPL (only --no-approval worked there).
+    """
+
+    def _invoke(self, argv):
+        import sys
+        from unittest.mock import MagicMock
+
+        import pytest
+
+        import omnimancer.cli.interface as iface
+
+        captured = {}
+
+        class _FakeCLI:
+            def __init__(self, engine, no_approval=False):
+                captured["no_approval"] = no_approval
+
+            def start(self):
+                return None
+
+        orig = {
+            "CommandLineInterface": iface.CommandLineInterface,
+            "CoreEngine": iface.CoreEngine,
+            "ConfigManager": iface.ConfigManager,
+            "apply_session_overrides": iface.apply_session_overrides,
+            "argv": sys.argv,
+        }
+        iface.CommandLineInterface = _FakeCLI
+        iface.CoreEngine = lambda cm: MagicMock()
+        iface.ConfigManager = lambda c: MagicMock()
+        iface.apply_session_overrides = lambda *a, **k: None
+        sys.argv = argv
+        try:
+            with pytest.raises(SystemExit):
+                iface.main()
+        finally:
+            iface.CommandLineInterface = orig["CommandLineInterface"]
+            iface.CoreEngine = orig["CoreEngine"]
+            iface.ConfigManager = orig["ConfigManager"]
+            iface.apply_session_overrides = orig["apply_session_overrides"]
+            sys.argv = orig["argv"]
+        return captured
+
+    def test_flag_enables_no_approval_interactive(self):
+        captured = self._invoke(["omn", "--dangerously-skip-permissions"])
+        assert captured["no_approval"] is True
+
+    def test_no_approval_flag_enables_interactive(self):
+        captured = self._invoke(["omn", "--no-approval"])
+        assert captured["no_approval"] is True
+
+    def test_default_keeps_approvals_on(self):
+        captured = self._invoke(["omn"])
+        assert captured["no_approval"] is False

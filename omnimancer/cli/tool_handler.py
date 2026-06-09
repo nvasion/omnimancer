@@ -2,6 +2,8 @@
 
 import json
 import logging
+import re
+import shlex
 from typing import Any, List, Optional
 
 from ..core.agent.tool_definitions import CODING_AGENT_TOOLS
@@ -99,6 +101,8 @@ class ToolHandler:
                 return await self._execute_edit(tool_call)
             if tool_call.name in _READ_TOOLS:
                 return await self._execute_read(tool_call)
+            if tool_call.name in _GLOB_TOOLS or tool_call.name in _GREP_TOOLS:
+                return await self._execute_search(tool_call)
 
             operation = self._tool_call_to_operation(tool_call)
             if operation is None:
@@ -208,9 +212,86 @@ class ToolHandler:
         plural = "s" if replaced != 1 else ""
         return ToolResult(content=f"Edited {path} ({replaced} replacement{plural})")
 
+    @staticmethod
+    def _translate_regex(pattern: str) -> str:
+        """Translate PCRE-only character classes to POSIX equivalents.
+
+        Models write ripgrep/PCRE-style regexes; `grep -E` (ERE) covers most
+        of that syntax but has no \\d or \\D.
+        """
+        return pattern.replace(r"\d", "[0-9]").replace(r"\D", "[^0-9]")
+
+    @staticmethod
+    def _expand_braces(glob: str) -> List[str]:
+        """Expand '*.{ts,tsx}' into ['*.ts', '*.tsx'] — fnmatch (used by
+        grep --include) has no brace expansion."""
+        match = re.search(r"\{([^{}]*)\}", glob)
+        if not match:
+            return [glob]
+        head, tail = glob[: match.start()], glob[match.end() :]
+        expanded: List[str] = []
+        for alternative in match.group(1).split(","):
+            expanded.extend(ToolHandler._expand_braces(head + alternative + tail))
+        return expanded
+
+    @staticmethod
+    def _build_find_command(pattern: str, directory: str) -> str:
+        """Translate a glob pattern into a `find` command.
+
+        `find -name` matches basenames only, so a pattern containing `/`
+        (e.g. '**/*.py') would silently match nothing. Patterns with interior
+        slashes use `-path`, where `*` also crosses directory separators.
+        """
+        if "/" not in pattern:
+            predicate = f"-name {shlex.quote(pattern)}"
+        elif pattern.startswith("**/") and "/" not in pattern[3:]:
+            # find already recurses; '**/' adds nothing for a basename match.
+            predicate = f"-name {shlex.quote(pattern[3:])}"
+        else:
+            full = f"{directory.rstrip('/')}/{pattern}"
+            # In -path's fnmatch, '*' crosses '/', so '**' collapses to '*'.
+            while "**" in full:
+                full = full.replace("**", "*")
+            predicate = f"-path {shlex.quote(full)}"
+        return f"find {shlex.quote(directory)} -type f {predicate}{_FIND_PRUNE}"
+
+    async def _execute_search(self, tool_call: ToolCall) -> ToolResult:
+        """Run Glob/Grep and make empty results explicit.
+
+        An empty search must read as "found nothing" — a silent/blank result
+        (or grep's exit code 1 surfacing as a failure) gives the model no
+        signal, so it retries the identical call until the loop detector
+        kills the turn.
+        """
+        operation = self._tool_call_to_operation(tool_call)
+        result = await self.agent_engine.execute_with_approval(operation)
+
+        data = result.data if isinstance(result.data, dict) else {}
+        stdout = (
+            data.get("stdout")
+            if data
+            else (result.data if isinstance(result.data, str) else "")
+        ) or ""
+        returncode = data.get("returncode")
+
+        # grep exits 1 when nothing matched — a valid empty result, not an error.
+        no_match_exit = tool_call.name in _GREP_TOOLS and returncode == 1
+        if result.success or no_match_exit:
+            if stdout.strip():
+                return ToolResult(content=_truncate_tool_output(stdout.strip()))
+            pattern = tool_call.arguments.get("pattern", "")
+            noun = "files found" if tool_call.name in _GLOB_TOOLS else "matches found"
+            return ToolResult(
+                content=(
+                    f"No {noun} matching pattern '{pattern}'. "
+                    "Try a different pattern or location."
+                )
+            )
+        return self._operation_result_to_tool_result(result)
+
     def _build_grep_command(self, args: dict) -> str:
         """Build a `grep` command from Claude Code-style Grep arguments."""
-        pattern = args.get("pattern", "")
+        pattern = self._translate_regex(args.get("pattern", ""))
         directory = args.get("path") or args.get("directory") or "."
         glob = args.get("glob") or args.get("file_pattern")
         output_mode = args.get("output_mode", "files_with_matches")
@@ -219,7 +300,9 @@ class ToolHandler:
         context = args.get("-C") or args.get("context")
         head_limit = args.get("head_limit")
 
-        flags = ["-r"]
+        # -E: models write extended-regex syntax (alternation, +, groups),
+        # which plain grep treats as literal characters.
+        flags = ["-r", "-E"]
         if case_insensitive:
             flags.append("-i")
         if output_mode == "files_with_matches":
@@ -232,9 +315,13 @@ class ToolHandler:
             if context:
                 flags.append(f"-C {int(context)}")
 
-        cmd = f"grep {' '.join(flags)} '{pattern}' {directory}{_GREP_EXCLUDES}"
+        cmd = (
+            f"grep {' '.join(flags)} {shlex.quote(pattern)} "
+            f"{shlex.quote(directory)}{_GREP_EXCLUDES}"
+        )
         if glob:
-            cmd += f" --include='{glob}'"
+            for expanded in self._expand_braces(glob):
+                cmd += f" --include={shlex.quote(expanded)}"
         if head_limit:
             cmd += f" | head -n {int(head_limit)}"
         return cmd
@@ -297,11 +384,7 @@ class ToolHandler:
             return Operation(
                 type=OperationType.COMMAND_EXECUTE,
                 description=f"Find files: {pattern}",
-                data={
-                    "command": (
-                        f"find {directory} -type f -name '{pattern}'{_FIND_PRUNE}"
-                    )
-                },
+                data={"command": self._build_find_command(pattern, directory)},
                 requires_approval=False,
             )
 
@@ -328,6 +411,8 @@ class ToolHandler:
         return None
 
     def _operation_result_to_tool_result(self, result: OperationResult) -> ToolResult:
+        if isinstance(result.data, dict) and "stdout" in result.data:
+            return self._command_result_to_tool_result(result)
         if result.success:
             content = (
                 result.data
@@ -340,3 +425,32 @@ class ToolHandler:
             if result.was_cancelled:
                 error_msg = "Operation cancelled by user"
             return ToolResult(content="", error=error_msg)
+
+    @staticmethod
+    def _command_result_to_tool_result(result: OperationResult) -> ToolResult:
+        """Convert a command OperationResult, preserving stdout on failure.
+
+        Tools like pytest report their failures on stdout with a nonzero
+        exit code — dropping stdout there leaves the model blind to why the
+        command failed.
+        """
+        if result.was_cancelled:
+            return ToolResult(content="", error="Operation cancelled by user")
+
+        data = result.data
+        stdout = (data.get("stdout") or "").strip()
+        stderr = (data.get("stderr") or "").strip()
+        returncode = data.get("returncode")
+
+        if result.success:
+            content = stdout or stderr or "OK (command produced no output)"
+            return ToolResult(content=_truncate_tool_output(content))
+
+        parts = [f"Command exited with code {returncode}."]
+        if stderr:
+            parts.append(f"stderr:\n{stderr}")
+        if stdout:
+            parts.append(f"stdout:\n{stdout}")
+        if len(parts) == 1 and result.error:
+            parts.append(result.error)
+        return ToolResult(content="", error=_truncate_tool_output("\n".join(parts)))

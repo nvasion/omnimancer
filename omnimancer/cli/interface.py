@@ -1005,7 +1005,7 @@ def main() -> None:
         "--dangerously-skip-permissions",
         is_flag=True,
         default=False,
-        help="Auto-approve all tool operations (headless mode)",
+        help="Auto-approve all tool operations (interactive and headless)",
     )
     @click.option(
         "--provider",
@@ -1083,7 +1083,10 @@ def main() -> None:
             apply_session_overrides(config_manager, provider, model, base_url)
 
             engine = CoreEngine(config_manager)
-            cli = CommandLineInterface(engine, no_approval=no_approval)
+            cli = CommandLineInterface(
+                engine,
+                no_approval=no_approval or dangerously_skip_permissions,
+            )
             cli.start()
 
         except KeyboardInterrupt:
