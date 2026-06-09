@@ -4,6 +4,14 @@ A multi-model coding agent for the terminal. One tool, any LLM.
 
 Omnimancer works like `claude -p` but isn't locked to a single provider. Point it at Claude, OpenAI, Gemini, Bedrock, Ollama, or any of 13+ supported backends and get a coding agent that reads files, writes code, runs commands, and iterates autonomously — with streaming responses, token/cost tracking, and structured JSON output for pipeline integration.
 
+Beyond the basics, it ships with:
+
+- **MCP support** (stdio, SSE, and HTTP transports) for tools, resources, and prompts
+- **Lifecycle hooks** — run shell commands on message/tool events, with blocking veto power
+- **Permission rules** — declarative allow/deny/ask rules per tool with regex matchers
+- **Subagents** — scoped child agents with their own prompt, tool whitelist, and model
+- **Layered security** — approval workflow, sensitive-path protection, and project-boundary enforcement
+
 ## Install
 
 ```bash
@@ -34,7 +42,13 @@ omn -p "summarize this" --output-format stream-json         # streaming JSON
 
 # Auto-approve all tool operations (CI/scripts)
 omn -p "fix the failing tests" --dangerously-skip-permissions
+
+# Verbose output / explicit config file
+omn -p "audit the security module" --verbose --config ~/.omnimancer/config.json
 ```
+
+The `--provider`, `--model`, and `--base-url` flags are **session overrides**: they
+modify the in-memory config for this run only and are never written back to disk.
 
 Headless mode with `--output-format json` emits a single structured result
 object — including the tool calls the agent made along the way:
@@ -71,9 +85,10 @@ each `tool_use`, each `tool_result`, then the final `result`), use
 ### Interactive mode
 
 ```bash
-omn                        # start interactive REPL
-omn --provider openai      # start with a specific provider
-omn --no-approval          # skip approval prompts
+omn                                  # start interactive REPL
+omn --provider openai                # start with a specific provider (session-only)
+omn --no-approval                    # skip approval prompts
+omn --dangerously-skip-permissions   # auto-approve all tool operations
 ```
 
 Interactive mode gives you a REPL with streaming responses, token/cost display, and agent capabilities:
@@ -109,8 +124,9 @@ When agent mode is enabled (`/agent on`), the AI can autonomously:
 - **Execute shell commands** with security validation
 - **Search codebases** with fuzzy file matching (70% similarity threshold)
 - **Make HTTP requests** for API testing
+- **Call MCP tools** from connected MCP servers
 
-All destructive operations require explicit approval. Reads and searches are auto-approved.
+All destructive operations require explicit approval (or are governed by your [permission rules](#permission-rules)). Reads and searches are auto-approved.
 
 Providers that support native tool calling (Claude, OpenAI, Gemini) use structured function calls. Others fall back to operation markers parsed from the response text.
 
@@ -119,6 +135,31 @@ Providers that support native tool calling (Claude, OpenAI, Gemini) use structur
 >>> fix the failing test in tests/test_auth.py
 [agent reads test file, reads source, edits code, runs pytest, iterates]
   tokens: 4210 in / 1893 out | ~$0.0412
+```
+
+### Subagents
+
+Subagents are scoped child agents with their own system prompt, tool whitelist, model override, and iteration cap. Each run uses an isolated conversation context, so a subagent never pollutes your main session — and its errors are caught and reported instead of crashing the REPL.
+
+Define them in `config.json`:
+
+```json
+"subagents": {
+  "reviewer": {
+    "description": "Reviews code for bugs and style issues",
+    "prompt": "You are a meticulous code reviewer...",
+    "tools": ["Read", "Grep", "Bash"],
+    "model": null,
+    "max_iterations": 10
+  }
+}
+```
+
+Tool names match the agent's toolset (`Read`, `Write`, `Edit`, `Bash`, `Glob`, `Grep`, `WebFetch`). `tools: null` inherits all tools; `model: null` inherits the session model.
+
+```
+>>> /subagents                          # list configured subagents
+>>> /subagents run reviewer check src/auth.py for security issues
 ```
 
 ## Supported Providers
@@ -149,21 +190,135 @@ Providers that support native tool calling (Claude, OpenAI, Gemini) use structur
 | `/quit` | Exit (also: `/exit`, Ctrl+D) |
 | `/clear` | Clear terminal screen |
 | `/switch <provider> [model]` | Switch provider or model |
-| `/models [filter]` | List available models |
+| `/models [filter]` | List available models (alias: `/model`) |
 | `/providers` | List all providers with status |
 | `/agent on\|off\|status` | Toggle agent mode |
+| `/subagents [run <name> <task>]` | List or run scoped child agents |
 | `/config show\|get\|set` | View or modify configuration |
 | `/config set-provider <name> [--api-key …] [--base-url …] [--model …]` | Create/update a provider |
 | `/config remove-provider <name>` | Remove a provider |
-| `/validate [provider]` | Validate provider configurations |
-| `/health [provider]` | Check provider health |
+| `/hooks [list\|on\|off\|add\|remove]` | Manage lifecycle hooks |
+| `/permissions [list\|on\|off\|allow\|deny\|ask\|remove]` | Manage permission rules |
 | `/save [name]` | Save conversation |
 | `/load [name]` | Load conversation |
 | `/list` | List saved conversations |
-| `/history` | Manage conversation history |
+| `/history [recent\|search\|clear\|export\|stats]` | Manage conversation history |
 | `/tools` | Show available MCP tools |
-| `/mcp status\|health\|reload` | MCP server management |
+| `/prompts [list\|<name> [key=value …]]` | List and render MCP prompts |
+| `/mcp [status\|reload\|connect\|disconnect\|health] [server]` | MCP server management |
+| `/add-model <name> <provider> [description]` | Register a custom model |
+| `/remove-model <name> <provider>` | Unregister a custom model |
+| `/list-custom-models` | List registered custom models |
 | `/status` | System status |
+
+You can also define your own slash commands: drop `.json` or `.py` command
+definitions into `~/.omnimancer/commands/` and they're loaded at startup.
+
+## MCP servers
+
+Omnimancer's MCP layer is built on the official [`mcp` SDK](https://pypi.org/project/mcp/) and supports three transports — **stdio** (local subprocess), **SSE**, and **streamable HTTP** (remote) — and three MCP features: **tools** (exposed to the agent and listed via `/tools`), **resources**, and **prompts** (listed and rendered via `/prompts`).
+
+Configure servers in `config.json`:
+
+```json
+"mcp": {
+  "enabled": true,
+  "servers": {
+    "filesystem": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/project"],
+      "env": {},
+      "enabled": true,
+      "auto_approve": ["read_file"],
+      "timeout": 30
+    },
+    "remote-api": {
+      "transport": "http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {"Authorization": "Bearer ..."},
+      "enabled": true
+    }
+  }
+}
+```
+
+Stdio servers need `command` (plus optional `args`/`env`); SSE and HTTP servers need `url` (plus optional `headers` — e.g. a bearer token for authenticated servers). `auto_approve` lists tool names that skip the approval prompt for that server.
+
+Manage servers at runtime with `/mcp status`, `/mcp connect [server]`, `/mcp disconnect [server]`, `/mcp reload [server]`, and `/mcp health [server]`.
+
+MCP is optional: if the `mcp` package isn't installed, everything else still works — connecting to a server just tells you to `pip install mcp`.
+
+## Hooks
+
+Hooks run shell commands at lifecycle events — for logging, notifications, linting, or policy enforcement. Four events are available:
+
+| Event | Fires | Can block? |
+|-------|-------|:---:|
+| `pre_send_message` | Before a message is sent to the provider | Yes |
+| `post_send_message` | After a successful provider response | No |
+| `tool_use_request` | Before an agent tool/operation runs | Yes |
+| `post_tool` | After a tool/operation completes | No |
+
+A **blocking** hook vetoes the action if it exits non-zero (or times out). Hooks receive the event payload as JSON on stdin, plus `OMNIMANCER_HOOK_*` environment variables (`OMNIMANCER_HOOK_EVENT`, `OMNIMANCER_HOOK_MESSAGE`, …) for shell one-liners. Hook errors never crash the app.
+
+Manage from the CLI:
+
+```
+>>> /hooks                                   # list configured hooks
+>>> /hooks add post_tool notify --timeout 10 notify-send "tool ran"
+>>> /hooks add tool_use_request guard --matcher "rm -rf" --blocking exit 1
+>>> /hooks remove post_tool notify
+>>> /hooks off                               # disable all hooks globally
+```
+
+`--matcher` is a regex tested against the event's target (message text, file path, command) — the hook only fires on a match. Hooks are stored in `config.json` under `hooks`:
+
+```json
+"hooks": {
+  "enabled": true,
+  "tool_use_request": [
+    {"name": "guard", "command": "exit 1", "matcher": "rm -rf", "blocking": true, "timeout": 30}
+  ]
+}
+```
+
+## Permission rules
+
+Permission rules decide what the agent may do before the approval prompt is ever shown. Each rule matches a tool (an operation type like `file_write`, `command_execute`, `web_request` — or `*` for any) plus an optional regex on the target (file path, command, URL).
+
+Precedence: **deny > ask > allow > default** (normal approval workflow).
+
+```
+>>> /permissions                             # list rules
+>>> /permissions deny command_execute "rm -rf"
+>>> /permissions ask file_write ".*prod.*"
+>>> /permissions allow file_write "\.env$"   # authorize project-local .env writes
+>>> /permissions remove deny 1               # remove rule by index
+>>> /permissions off                         # disable rules globally
+```
+
+- `deny` rules refuse without prompting.
+- `ask` rules force a prompt even if the operation was previously "remembered" as approved.
+- `allow` rules auto-approve — and also authorize writes to sensitive-named files (like `.env`) inside the project.
+
+Rules live in `config.json` under `permissions` (`always_deny` / `always_ask` / `always_allow` lists).
+
+## Security model
+
+Three layers govern every agent operation, in order:
+
+1. **Permission rules** — your declarative deny/ask/allow rules (above).
+2. **Approval workflow** — interactive y/n with diff preview; approvals can be "remembered" per session.
+3. **Low-level security gate** — path and command validation that runs regardless of approval.
+
+The security gate distinguishes:
+
+- **Hard-restricted paths** — never writable, even with approval: system directories (`/etc`, `/sys`, `/proc`, `/boot`, `/usr/bin`, …), `~/.ssh`, `~/.aws/credentials`, `~/.config/gcloud`.
+- **Sensitive name patterns** — denied by default but overridable by explicit approval or an `always_allow` rule: `.env*`, `*secret*`, `*key*`, `*token*`, `*password*`, `*credentials*`, `*.db`/`*.sqlite*`.
+- **Project boundary** — writes must stay inside the directory `omn` was launched from (or a temp dir).
+
+Plus: command whitelist/blacklist, sandboxed execution, read-before-write logic, and automatic backups of existing files before modification.
 
 ## Configuration
 
@@ -308,17 +463,22 @@ export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 omnimancer/
 ├── cli/                    # CLI interface (modular)
 │   ├── interface.py       # Core REPL loop, streaming integration
+│   ├── headless.py        # -p pipeline mode (text/json/stream-json)
 │   ├── command_dispatch.py # Slash command handlers
 │   ├── agent_loop.py      # Marker-based agent workflow
 │   ├── tool_handler.py    # Native tool call execution
+│   ├── subagent.py        # Scoped child agent runner
 │   ├── system_prompts.py  # Prompt building
 │   ├── display.py         # Terminal output & token status
 │   └── completion.py      # Tab completion
 ├── core/                   # Engine & business logic
 │   ├── engine.py          # Provider abstraction & streaming delegation
 │   ├── agent_engine.py    # Autonomous agent capabilities
+│   ├── agent_managers.py  # Executor/web/MCP/approval manager facades
+│   ├── hooks.py           # Lifecycle hooks manager
 │   ├── models.py          # Data models (ChatResponse, StreamEvent, etc.)
-│   └── agent/             # File ops, approval, security
+│   ├── agent/             # File ops, approval, tool definitions
+│   └── security/          # Permission rules, path validation, sandboxing
 ├── providers/              # 13+ AI provider implementations
 │   ├── base.py            # Provider interface (streaming fallback)
 │   ├── claude.py          # Anthropic (native streaming & tool calling)
@@ -326,7 +486,9 @@ omnimancer/
 │   └── ...
 ├── ui/                     # Terminal UI components
 │   └── streaming_display.py # Rich Live streaming display
-└── mcp/                    # Model Context Protocol
+└── mcp/                    # Model Context Protocol (official mcp SDK)
+    ├── client.py          # Per-server lifecycle (stdio/SSE/HTTP)
+    └── manager.py         # Multi-server orchestration
 ```
 
 ### Streaming architecture
@@ -350,7 +512,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-Tests follow TDD. 1,260 tests across providers, CLI, streaming, agent operations, and integration scenarios.
+Tests follow TDD. 1,460 tests across providers, CLI, streaming, agent operations, hooks, permissions, MCP, and integration scenarios (including a real MCP stdio server exercised end-to-end).
 
 ## License
 

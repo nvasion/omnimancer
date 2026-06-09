@@ -28,6 +28,7 @@ from .health_monitor import HealthMonitor
 from .hooks import HookOutcome, HooksManager
 from .provider_initializer import ProviderInitializer
 from .provider_registry import ProviderRegistry
+from .security.permission_rules import PermissionDecision, PermissionRuleEngine
 
 logger = logging.getLogger(__name__)
 
@@ -243,6 +244,20 @@ class CoreEngine:
         except Exception as e:  # pragma: no cover - defensive
             logger.warning("Hook firing for '%s' failed: %s", event, e)
             return HookOutcome(event=event)
+
+    def _permission_decision(self, tool: str, target: str = "") -> PermissionDecision:
+        """Evaluate config-driven permission rules for an operation.
+
+        Reads the current config so rule edits take effect without restart.
+        Returns DEFAULT (normal approval workflow) on any error.
+        """
+        try:
+            config = self.config_manager.get_config()
+            perms = getattr(config, "permissions", None)
+            return PermissionRuleEngine(perms).evaluate(tool, target)
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning("Permission rule evaluation failed: %s", e)
+            return PermissionDecision.DEFAULT
 
     async def send_message(self, message: str) -> ChatResponse:
         """

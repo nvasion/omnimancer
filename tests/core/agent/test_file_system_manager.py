@@ -30,7 +30,7 @@ async def mock_security():
     security = Mock(spec=SecurityManager)
 
     # Mock successful security checks by default
-    async def mock_secure_file_access(path, operation, content=None):
+    async def mock_secure_file_access(path, operation, content=None, **kwargs):
         return {
             "success": True,
             "operation_id": "test_op",
@@ -491,7 +491,7 @@ class TestFileSystemManagerErrorHandling:
         # Create mock security that denies access
         mock_security = Mock(spec=SecurityManager)
 
-        async def mock_secure_file_access(path, operation, content=None):
+        async def mock_secure_file_access(path, operation, content=None, **kwargs):
             return {
                 "success": False,
                 "error": "Access denied by security policy",
@@ -514,7 +514,7 @@ class TestFileSystemManagerErrorHandling:
         """Test handling of security-denied file writes."""
         mock_security = Mock(spec=SecurityManager)
 
-        async def mock_secure_file_access(path, operation, content=None):
+        async def mock_secure_file_access(path, operation, content=None, **kwargs):
             return {"success": False, "error": "Write access denied"}
 
         mock_security.secure_file_access = mock_secure_file_access

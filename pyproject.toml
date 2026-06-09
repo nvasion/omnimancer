@@ -43,6 +43,7 @@ dependencies = [
     "readability-lxml>=0.8.1",
     "PyYAML>=6.0.0",
     "toml>=0.10.2",
+    "mcp>=1.0.0",
 ]
 
 [project.optional-dependencies]

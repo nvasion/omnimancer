@@ -153,7 +153,11 @@ CODING_AGENT_TOOLS = [
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "The regular expression pattern to search for",
+                    "description": (
+                        "The regular expression to search for (POSIX extended "
+                        "regex: alternation, +, ? and groups work; use [0-9] "
+                        "rather than \\d)"
+                    ),
                 },
                 "path": {
                     "type": "string",

@@ -343,6 +343,196 @@ class TestToolHandlerExecution:
         assert result.error == "engine crash"
 
 
+class TestGlobPatternTranslation:
+    """Glob patterns must translate to `find` predicates that can match.
+
+    `find -name` matches basenames only — a pattern containing `/` (like the
+    '**/*.py' the tool schema suggests) silently matches nothing.
+    """
+
+    def _cmd(self, tool_handler, pattern, path=None):
+        args = {"pattern": pattern}
+        if path:
+            args["path"] = path
+        return tool_handler._tool_call_to_operation(
+            ToolCall(name="Glob", arguments=args)
+        ).data["command"]
+
+    def test_leading_recursive_glob_uses_name(self, tool_handler):
+        cmd = self._cmd(tool_handler, "**/Dockerfile*")
+        assert "-name 'Dockerfile*'" in cmd
+        assert "**" not in cmd
+
+    def test_interior_slash_uses_path_predicate(self, tool_handler):
+        cmd = self._cmd(tool_handler, "src/**/*.ts")
+        assert "-path" in cmd
+        assert "**" not in cmd
+
+    def test_simple_pattern_still_uses_name(self, tool_handler):
+        cmd = self._cmd(tool_handler, "*.py")
+        assert "-name '*.py'" in cmd
+
+    def test_pattern_with_single_quote_is_escaped(self, tool_handler):
+        cmd = self._cmd(tool_handler, "it's*")
+        # The quote must not terminate the shell string (injection vector
+        # for an auto-approved tool).
+        assert "'; " not in cmd
+        assert "it" in cmd
+
+    def test_injection_attempt_stays_inside_quotes(self, tool_handler):
+        cmd = self._cmd(tool_handler, "'; rm -rf ~; '")
+        # shlex-quoted: the malicious payload must remain a single shell word.
+        import shlex
+
+        words = shlex.split(cmd.split(" -name ", 1)[1].split(" -not", 1)[0])
+        assert words == ["'; rm -rf ~; '"]
+
+    def test_directory_with_space_is_quoted(self, tool_handler):
+        cmd = self._cmd(tool_handler, "*.py", path="my dir")
+        assert "'my dir'" in cmd
+
+
+class TestGrepCommandTranslation:
+    """Grep must use ERE, escape model input, and expand brace globs."""
+
+    def _cmd(self, tool_handler, **args):
+        return tool_handler._tool_call_to_operation(
+            ToolCall(name="Grep", arguments=args)
+        ).data["command"]
+
+    def test_uses_extended_regex(self, tool_handler):
+        cmd = self._cmd(tool_handler, pattern="foo|bar")
+        assert "-E" in cmd.split()
+
+    def test_translates_pcre_digit_class(self, tool_handler):
+        cmd = self._cmd(tool_handler, pattern=r"v\d+")
+        assert "[0-9]" in cmd
+        assert r"\d" not in cmd
+
+    def test_pattern_with_single_quote_is_escaped(self, tool_handler):
+        import shlex
+
+        cmd = self._cmd(tool_handler, pattern="it's")
+        # Must parse as valid shell with the pattern as one word.
+        assert "it's" in shlex.split(cmd.split("|")[0])
+
+    def test_brace_glob_expands_to_multiple_includes(self, tool_handler):
+        cmd = self._cmd(tool_handler, pattern="X", glob="*.{ts,tsx}")
+        assert "--include='*.ts'" in cmd
+        assert "--include='*.tsx'" in cmd
+        assert "{" not in cmd
+
+    def test_directory_with_space_is_quoted(self, tool_handler):
+        cmd = self._cmd(tool_handler, pattern="X", path="my dir")
+        assert "'my dir'" in cmd
+
+
+def _command_result(stdout="", stderr="", returncode=0, success=None):
+    if success is None:
+        success = returncode == 0
+    return OperationResult(
+        success=success,
+        data={"stdout": stdout, "stderr": stderr, "returncode": returncode},
+        error=(stderr or None) if not success else None,
+    )
+
+
+class TestSearchResultSemantics:
+    """Empty search results must be explicit, not silent or fake failures."""
+
+    @pytest.mark.asyncio
+    async def test_glob_empty_result_says_no_files(
+        self, tool_handler, mock_agent_engine
+    ):
+        mock_agent_engine.execute_with_approval.return_value = _command_result()
+        result = await tool_handler.execute_tool_call(
+            ToolCall(name="Glob", arguments={"pattern": "**/Dockerfile*"})
+        )
+        assert result.error is None
+        assert "No files found" in result.content
+        assert "**/Dockerfile*" in result.content
+
+    @pytest.mark.asyncio
+    async def test_glob_returns_stdout_not_json(self, tool_handler, mock_agent_engine):
+        mock_agent_engine.execute_with_approval.return_value = _command_result(
+            stdout="./a/Dockerfile\n./b/Dockerfile.dev\n"
+        )
+        result = await tool_handler.execute_tool_call(
+            ToolCall(name="Glob", arguments={"pattern": "**/Dockerfile*"})
+        )
+        assert result.error is None
+        assert result.content == "./a/Dockerfile\n./b/Dockerfile.dev"
+
+    @pytest.mark.asyncio
+    async def test_grep_no_match_exit_1_is_not_an_error(
+        self, tool_handler, mock_agent_engine
+    ):
+        # grep exits 1 when nothing matches — a valid empty result.
+        mock_agent_engine.execute_with_approval.return_value = _command_result(
+            returncode=1
+        )
+        result = await tool_handler.execute_tool_call(
+            ToolCall(name="Grep", arguments={"pattern": "NoSuchThing"})
+        )
+        assert result.error is None
+        assert "No matches found" in result.content
+
+    @pytest.mark.asyncio
+    async def test_grep_real_failure_still_errors(
+        self, tool_handler, mock_agent_engine
+    ):
+        mock_agent_engine.execute_with_approval.return_value = _command_result(
+            stderr="grep: bad regex", returncode=2
+        )
+        result = await tool_handler.execute_tool_call(
+            ToolCall(name="Grep", arguments={"pattern": "("})
+        )
+        assert result.error is not None
+        assert "bad regex" in result.error
+
+
+class TestCommandResultFidelity:
+    """Bash results must carry stdout even on failure (pytest writes there)."""
+
+    @pytest.mark.asyncio
+    async def test_failed_command_keeps_stdout(self, tool_handler, mock_agent_engine):
+        mock_agent_engine.execute_with_approval.return_value = _command_result(
+            stdout="FAILED tests/test_x.py::test_y - AssertionError",
+            stderr="",
+            returncode=1,
+        )
+        result = await tool_handler.execute_tool_call(
+            ToolCall(name="Bash", arguments={"command": "pytest"})
+        )
+        assert result.error is not None
+        assert "FAILED tests/test_x.py::test_y" in result.error
+        assert "exit" in result.error.lower() or "code 1" in result.error
+
+    @pytest.mark.asyncio
+    async def test_successful_command_returns_stdout_not_json(
+        self, tool_handler, mock_agent_engine
+    ):
+        mock_agent_engine.execute_with_approval.return_value = _command_result(
+            stdout="hello\n"
+        )
+        result = await tool_handler.execute_tool_call(
+            ToolCall(name="Bash", arguments={"command": "echo hello"})
+        )
+        assert result.error is None
+        assert result.content == "hello"
+
+    @pytest.mark.asyncio
+    async def test_successful_command_with_no_output_is_explicit(
+        self, tool_handler, mock_agent_engine
+    ):
+        mock_agent_engine.execute_with_approval.return_value = _command_result()
+        result = await tool_handler.execute_tool_call(
+            ToolCall(name="Bash", arguments={"command": "true"})
+        )
+        assert result.error is None
+        assert result.content  # never empty — the model needs a signal
+
+
 class TestToolDefinitions:
     """Test the coding agent tool definitions."""
 

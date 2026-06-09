@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from ..utils.errors import MCPError
 
@@ -876,12 +876,24 @@ class ProviderConfig(BaseModel):
 
 
 class MCPServerConfig(BaseModel):
-    """Configuration for an MCP server."""
+    """Configuration for an MCP server.
+
+    Supports three transports:
+      * ``stdio`` (default) — launch a local subprocess (requires ``command``).
+      * ``sse`` / ``http`` — connect to a remote server (requires ``url``);
+        ``headers`` carries auth (e.g. ``{"Authorization": "Bearer ..."}``).
+    """
 
     name: str
-    command: str
+    # stdio transport
+    command: str = ""
     args: List[str] = []
     env: Dict[str, str] = {}
+    # remote (sse/http) transport
+    transport: str = "stdio"
+    url: Optional[str] = None
+    headers: Dict[str, str] = {}
+    # common
     enabled: bool = True
     auto_approve: List[str] = []
     timeout: int = 30
@@ -893,12 +905,29 @@ class MCPServerConfig(BaseModel):
             raise ValueError("MCP server name cannot be empty")
         return v.strip()
 
-    @field_validator("command")
+    @field_validator("transport")
     @classmethod
-    def validate_command(cls, v: Any) -> Any:
-        if not v or not v.strip():
-            raise ValueError("MCP server command cannot be empty")
-        return v.strip()
+    def validate_transport(cls, v: Any) -> Any:
+        normalized = str(v or "stdio").strip().lower().replace("-", "_")
+        if normalized in ("streamable_http", "streamablehttp"):
+            normalized = "http"
+        if normalized not in ("stdio", "sse", "http"):
+            raise ValueError(
+                f"Unknown MCP transport '{v}'. Use 'stdio', 'sse', or 'http'."
+            )
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_transport_fields(self) -> "MCPServerConfig":
+        if self.transport == "stdio":
+            if not self.command or not self.command.strip():
+                raise ValueError("MCP stdio server requires a 'command'.")
+            self.command = self.command.strip()
+        else:  # sse / http
+            if not self.url or not str(self.url).strip():
+                raise ValueError(f"MCP {self.transport} server requires a 'url'.")
+            self.url = str(self.url).strip()
+        return self
 
 
 class MCPConfig(BaseModel):
@@ -1098,6 +1127,66 @@ class HooksConfig(BaseModel):
         return value if isinstance(value, list) else []
 
 
+class PermissionRule(BaseModel):
+    """A permission rule matched by operation type and an optional target regex.
+
+    ``tool`` is an OperationType value (e.g. ``"file_write"``,
+    ``"command_execute"``) or ``"*"`` to match any. ``matcher`` is an optional
+    regex tested against the operation's target (file path, command, or URL);
+    ``None`` matches any target.
+    """
+
+    tool: str = "*"
+    matcher: Optional[str] = None
+    note: Optional[str] = None
+
+    @field_validator("tool")
+    @classmethod
+    def validate_tool(cls, v: Any) -> Any:
+        if not v or not str(v).strip():
+            return "*"
+        return str(v).strip()
+
+
+class PermissionsConfig(BaseModel):
+    """Config-driven permission rules layered over the approval workflow.
+
+    Evaluated with precedence ``deny > ask > allow > default`` (see
+    :mod:`omnimancer.core.security.permission_rules`). ``always_allow`` rules
+    also authorize writes to sensitive project-local files (e.g. ``.env``) that
+    would otherwise require interactive approval.
+    """
+
+    enabled: bool = True
+    always_deny: List[PermissionRule] = []
+    always_ask: List[PermissionRule] = []
+    always_allow: List[PermissionRule] = []
+
+
+class SubAgentDefinition(BaseModel):
+    """A scoped child agent that can be spawned to handle a focused task.
+
+    A subagent runs its own isolated tool-calling loop with a restricted tool
+    set (``tools`` allowlist; ``None`` = inherit all), an optional model
+    override, and its own system ``prompt`` — without polluting the parent
+    conversation.
+    """
+
+    name: str
+    description: str = ""
+    prompt: str = ""
+    tools: Optional[List[str]] = None
+    model: Optional[str] = None
+    max_iterations: int = 10
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: Any) -> Any:
+        if not v or not str(v).strip():
+            raise ValueError("Subagent name cannot be empty")
+        return str(v).strip()
+
+
 class Config(BaseModel):
     """Main configuration model."""
 
@@ -1107,6 +1196,8 @@ class Config(BaseModel):
     storage_path: str
     mcp: MCPConfig = MCPConfig()
     hooks: HooksConfig = HooksConfig()
+    permissions: PermissionsConfig = PermissionsConfig()
+    subagents: Dict[str, SubAgentDefinition] = {}
 
     # Profile management
     profiles: Dict[str, ConfigProfile] = {}

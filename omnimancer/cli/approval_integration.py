@@ -307,6 +307,11 @@ class CLIApprovalIntegration:
         if not self.enable_auto_approval:
             return None
 
+        # An always_ask permission rule forces a prompt, overriding any
+        # remembered auto-approval for this operation.
+        if operation.data.get("_force_prompt"):
+            return None
+
         try:
             # Generate operation signature for matching
             operation_signature = self._generate_operation_signature(operation)

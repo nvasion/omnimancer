@@ -369,7 +369,9 @@ class TestProgramExecutor:
             result = await executor.execute_operation(operation)
 
             assert result.success is True
-            mock_execute.assert_called_once_with("ls", ["-l"], None)
+            mock_execute.assert_called_once_with(
+                "ls", ["-l"], None, timeout_seconds=None
+            )
 
     @pytest.mark.asyncio
     async def test_preview_operation(self, executor):

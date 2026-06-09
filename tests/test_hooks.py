@@ -9,12 +9,7 @@ from omnimancer.core.agent.types import Operation, OperationResult, OperationTyp
 from omnimancer.core.agent_engine import AgentEngine
 from omnimancer.core.engine import CoreEngine
 from omnimancer.core.hooks import HooksManager
-from omnimancer.core.models import (
-    Config,
-    HookCommand,
-    HooksConfig,
-    ProviderConfig,
-)
+from omnimancer.core.models import Config, HookCommand, HooksConfig, ProviderConfig
 
 
 def _hook(command: str, **kw) -> HookCommand:

@@ -39,6 +39,10 @@ class PermissionController:
 
     def __init__(self) -> None:
         self.restricted_paths = self._get_default_restricted_paths()
+        # Sensitive name patterns (e.g. .env, *secret*) are denied by default but
+        # may be overridden by explicit approval / an always_allow rule, unlike
+        # the hard-restricted system paths above which are never writable.
+        self.sensitive_patterns = self._get_default_sensitive_patterns()
         self.allowed_commands = self._get_default_allowed_commands()
         self.permission_rules = self._get_default_permission_rules()
 
@@ -46,17 +50,19 @@ class PermissionController:
         self._approval_memory: Dict[str, Dict[str, Any]] = {}
 
     def _get_default_restricted_paths(self) -> Set[str]:
-        """Get default set of restricted file paths."""
+        """Hard-restricted paths — never writable, even with approval.
+
+        These are system locations and credential stores where an agent write
+        is almost never legitimate. Sensitive *project-local* files (.env,
+        secrets) live in :meth:`_get_default_sensitive_patterns` instead, so they
+        can be overridden by explicit approval.
+        """
         return {
             # SSH and security keys
             ".ssh",
             "~/.ssh",
             "/home/*/.ssh",
             "/Users/*/.ssh",
-            # Environment and config files
-            ".env",
-            ".env.local",
-            ".env.production",
             # System directories
             "/etc",
             "/System",
@@ -68,18 +74,31 @@ class PermissionController:
             "/usr/bin",
             "/usr/sbin",
             "/sbin",
-            # Database files
+            # Cloud credential stores
+            ".aws/credentials",
+            ".config/gcloud",
+        }
+
+    def _get_default_sensitive_patterns(self) -> Set[str]:
+        """Sensitive name patterns — denied by default, overridable by approval.
+
+        These commonly hold secrets, but writing them in one's own project is a
+        legitimate, frequent operation (e.g. creating a ``.env``). They are
+        blocked unless the caller passes ``allow_sensitive=True`` (set when the
+        user approves or an always_allow rule matches).
+        """
+        return {
+            ".env",
+            ".env.local",
+            ".env.production",
             "*.db",
             "*.sqlite",
             "*.sqlite3",
-            # Credential files
             "*credentials*",
             "*password*",
             "*secret*",
             "*token*",
             "*key*",
-            ".aws/credentials",
-            ".config/gcloud",
         }
 
     def _get_default_allowed_commands(self) -> Set[str]:
@@ -158,16 +177,32 @@ class PermissionController:
             "service_control": PermissionLevel.ADMIN,
         }
 
-    def validate_path_access(self, path: str, operation: str = "read") -> bool:
-        """Validate if path access is allowed."""
+    def validate_path_access(
+        self, path: str, operation: str = "read", allow_sensitive: bool = False
+    ) -> bool:
+        """Validate if path access is allowed.
+
+        Args:
+            path: Target path.
+            operation: read | write | delete | execute.
+            allow_sensitive: When True, sensitive name patterns (.env, secrets)
+                are permitted — set after explicit approval or an always_allow
+                rule. Hard-restricted system/credential paths are still denied.
+        """
         try:
             # Normalize path
             normalized_path = str(Path(path).resolve())
 
-            # Check against restricted paths
+            # Hard-restricted paths are denied regardless of approval.
             for restricted in self.restricted_paths:
                 if self._path_matches_pattern(normalized_path, restricted):
                     return False
+
+            # Sensitive name patterns are denied unless explicitly allowed.
+            if not allow_sensitive:
+                for pattern in self.sensitive_patterns:
+                    if self._path_matches_pattern(normalized_path, pattern):
+                        return False
 
             # Additional checks for write operations
             if operation in ["write", "delete", "execute"]:
@@ -219,8 +254,15 @@ class PermissionController:
 
         return True
 
-    def validate_operation(self, operation: PermissionOperation) -> bool:
-        """Validate if an operation is allowed."""
+    def validate_operation(
+        self, operation: PermissionOperation, allow_sensitive: bool = False
+    ) -> bool:
+        """Validate if an operation is allowed.
+
+        ``allow_sensitive`` is forwarded to path validation so an approved /
+        always-allowed write to a sensitive project-local file (e.g. ``.env``)
+        succeeds while hard-restricted paths stay blocked.
+        """
         op_type = operation.operation_type
 
         # Check if operation type is allowed
@@ -231,7 +273,9 @@ class PermissionController:
         if operation.path:
             required_level = self.permission_rules[op_type]
             access_type = self._permission_level_to_access_type(required_level)
-            if not self.validate_path_access(operation.path, access_type):
+            if not self.validate_path_access(
+                operation.path, access_type, allow_sensitive=allow_sensitive
+            ):
                 return False
 
         # Validate command if provided
