@@ -855,7 +855,8 @@ class TestHeadlessRunner:
     async def test_repeated_tool_call_stops_early(self):
         from omnimancer.cli.headless import HeadlessRunner, OutputFormat
 
-        # Same tool call every time → loop detection should stop after 3.
+        # Same tool call every time → executed twice, nudged twice, then
+        # the run stops on the 5th occurrence rather than running to the cap.
         repeated = ChatResponse(
             content="",
             model_used="test",
@@ -882,5 +883,6 @@ class TestHeadlessRunner:
 
         exit_code = await runner.run("loop")
         assert exit_code == 0
-        # Stops on the 3rd identical call rather than running to the cap.
-        assert mock_engine.send_message_with_tools.call_count == 3
+        assert mock_engine.send_message_with_tools.call_count == 5
+        # Only the first two occurrences actually executed.
+        assert mock_agent_engine.execute_with_approval.call_count == 2

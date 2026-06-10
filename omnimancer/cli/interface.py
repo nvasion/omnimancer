@@ -30,6 +30,7 @@ from ..core.history_manager import HistoryManager
 from ..core.models import (
     ChatResponse,
     ToolCall,
+    ToolResult,
     ToolResultRecord,
     parse_described_tool_calls,
 )
@@ -50,7 +51,12 @@ from .commands import Command, parse_command
 from .completion import CompletionManager, CompletionMixin
 from .display import DisplayManager, DisplayMixin
 from .system_prompts import build_agent_prompt, get_agent_capabilities_prompt
-from .tool_handler import MAX_TOOL_ITERATIONS, ToolHandler
+from .tool_handler import (
+    DUPLICATE_CALL_NUDGE,
+    MAX_TOOL_ITERATIONS,
+    RepeatedCallTracker,
+    ToolHandler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -772,9 +778,9 @@ class CommandLineInterface(
         provider = getattr(self.engine, "current_provider", None)
         use_streaming = provider and provider.supports_streaming()
 
-        # Detect runaway loops: a weak model may repeat the same tool call
-        # forever. Stop if an identical call is issued too many times.
-        seen_calls: dict = {}
+        # Identical repeated calls get skipped with a corrective nudge; the
+        # turn is aborted only if the model keeps repeating despite nudges.
+        repeat_tracker = RepeatedCallTracker()
 
         iterations = 0
         while True:
@@ -809,18 +815,16 @@ class CommandLineInterface(
                     return
                 response.tool_calls = recovered
 
-            repeated = False
-            for tc in response.tool_calls:
-                sig = (
-                    f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True, default=str)}"
-                )
-                seen_calls[sig] = seen_calls.get(sig, 0) + 1
-                if seen_calls[sig] >= 3:
-                    repeated = True
-            if repeated:
+            repeat_tracker.record(response.tool_calls)
+            offender = repeat_tracker.abort_offender(response.tool_calls)
+            if offender is not None:
+                summary = self._summarize_tool_call(offender)
+                label = f"{offender.name} ({summary})" if summary else offender.name
                 self._show_warning(
-                    "Stopping: the model kept repeating the same tool call. "
-                    "Try rephrasing your request or using a more capable model."
+                    f"Stopping: the model repeated the same tool call "
+                    f"{repeat_tracker.count(offender)} times ({label}) despite "
+                    "duplicate warnings. Try rephrasing your request or using "
+                    "a more capable model."
                 )
                 return
 
@@ -832,7 +836,16 @@ class CommandLineInterface(
                 label = f"{tc.name}: {summary}" if summary else tc.name
                 self.console.print(f"  [dim]→ {label}[/dim]")
 
-            results = await tool_handler.execute_tool_calls(response.tool_calls)
+            # Execute each call, skipping exact repeats with a nudge so the
+            # model can recover instead of the turn being killed.
+            results = []
+            skipped = set()
+            for i, tc in enumerate(response.tool_calls):
+                if repeat_tracker.is_duplicate(tc):
+                    skipped.add(i)
+                    results.append(ToolResult(content=DUPLICATE_CALL_NUDGE))
+                else:
+                    results.append(await tool_handler.execute_tool_call(tc))
 
             result_parts = []
             records = []
@@ -844,6 +857,11 @@ class CommandLineInterface(
                 if result.error:
                     status = f"[{label}] Error: {result.error}"
                     self.console.print(f"  [red]✗ {label}: {result.error}[/red]")
+                elif i in skipped:
+                    status = f"[{label}] {result.content}"
+                    self.console.print(
+                        f"  [yellow]↻ {label} — duplicate call, skipped[/yellow]"
+                    )
                 else:
                     status = f"[{label}] Result: {result.content}"
                     self.console.print(f"  [green]✓ {label}[/green]")

@@ -12,11 +12,17 @@ from typing import Any, Dict, Optional
 
 from ..core.models import (
     ChatResponse,
+    ToolResult,
     ToolResultRecord,
     parse_described_tool_calls,
 )
 from .system_prompts import build_agent_prompt
-from .tool_handler import MAX_TOOL_ITERATIONS, ToolHandler
+from .tool_handler import (
+    DUPLICATE_CALL_NUDGE,
+    MAX_TOOL_ITERATIONS,
+    RepeatedCallTracker,
+    ToolHandler,
+)
 
 
 class OutputFormat(Enum):
@@ -250,8 +256,9 @@ class HeadlessRunner:
         # Record of the actions the agent took, surfaced in the JSON result.
         tool_log: list = []
         turns = 0
-        # Detect runaway loops where a weak model repeats the same tool call.
-        seen_calls: dict = {}
+        # Identical repeated calls get skipped with a corrective nudge; the
+        # run is aborted only if the model keeps repeating despite nudges.
+        repeat_tracker = RepeatedCallTracker()
 
         for iteration in range(self._max_iterations):
             turns = iteration + 1
@@ -286,18 +293,14 @@ class HeadlessRunner:
                     break
                 response.tool_calls = recovered
 
-            repeated = False
-            for tc in response.tool_calls:
-                sig = (
-                    f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True, default=str)}"
-                )
-                seen_calls[sig] = seen_calls.get(sig, 0) + 1
-                if seen_calls[sig] >= 3:
-                    repeated = True
-            if repeated:
+            repeat_tracker.record(response.tool_calls)
+            offender = repeat_tracker.abort_offender(response.tool_calls)
+            if offender is not None:
                 if not last_content:
                     last_content = (
-                        "Stopped: the model kept repeating the same tool call."
+                        f"Stopped: the model repeated the same tool call "
+                        f"{repeat_tracker.count(offender)} times "
+                        f"({offender.name}) despite duplicate warnings."
                     )
                 break
 
@@ -306,7 +309,12 @@ class HeadlessRunner:
             for i, tc in enumerate(response.tool_calls):
                 self._emitter.emit_tool_use(tc.name, tc.arguments)
 
-                result = await tool_handler.execute_tool_call(tc)
+                # Skip exact repeats with a nudge so the model can recover
+                # instead of the run being killed.
+                if repeat_tracker.is_duplicate(tc):
+                    result = ToolResult(content=DUPLICATE_CALL_NUDGE)
+                else:
+                    result = await tool_handler.execute_tool_call(tc)
                 self._emitter.emit_tool_result(
                     tc.name,
                     result.content or "",

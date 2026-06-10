@@ -567,6 +567,54 @@ class TestCommandResultFidelity:
         assert result.content  # never empty — the model needs a signal
 
 
+class TestRepeatedCallTracker:
+    """Identical repeated calls are nudged before the turn is aborted.
+
+    Aborting on the 3rd identical call punished the user for model confusion
+    (and killed turns where a re-run was legitimate, e.g. re-Read after Edit).
+    """
+
+    def _tracker(self):
+        from omnimancer.cli.tool_handler import RepeatedCallTracker
+
+        return RepeatedCallTracker()
+
+    def _call(self, name="Read", **args):
+        return ToolCall(name=name, arguments=args)
+
+    def test_first_two_occurrences_execute_normally(self):
+        tracker = self._tracker()
+        tc = self._call(path="/a.py")
+        tracker.record([tc])
+        assert not tracker.is_duplicate(tc)
+        tracker.record([tc])
+        assert not tracker.is_duplicate(tc)
+
+    def test_third_occurrence_is_duplicate_not_abort(self):
+        tracker = self._tracker()
+        tc = self._call(path="/a.py")
+        for _ in range(3):
+            tracker.record([tc])
+        assert tracker.is_duplicate(tc)
+        assert tracker.abort_offender([tc]) is None
+
+    def test_fifth_occurrence_aborts_and_names_offender(self):
+        tracker = self._tracker()
+        tc = self._call(path="/a.py")
+        for _ in range(5):
+            tracker.record([tc])
+        offender = tracker.abort_offender([tc])
+        assert offender is tc
+        assert tracker.count(tc) == 5
+
+    def test_different_arguments_are_not_duplicates(self):
+        tracker = self._tracker()
+        for offset in range(10):
+            tc = self._call(path="/a.py", offset=offset)
+            tracker.record([tc])
+            assert not tracker.is_duplicate(tc)
+
+
 class TestToolDefinitions:
     """Test the coding agent tool definitions."""
 

@@ -444,8 +444,15 @@ class TestToolCallingFlowIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_repeated_tool_call_stops_early(self, interface, mock_engine):
-        """An identical tool call repeated 3x stops the loop early."""
+    async def test_repeated_tool_call_aborts_after_ignored_nudges(
+        self, interface, mock_engine
+    ):
+        """A call repeated forever is nudged twice, then the turn aborts.
+
+        Occurrences 1-2 execute (re-runs can be legitimate), 3-4 are skipped
+        with a corrective nudge, and the 5th aborts with a warning naming
+        the offending call.
+        """
         agent_engine = MagicMock()
         agent_engine.execute_with_approval = AsyncMock(
             return_value=OperationResult(success=True, data="OK")
@@ -466,9 +473,55 @@ class TestToolCallingFlowIntegration:
                 with patch.object(interface.console, "print"):
                     await interface._handle_tool_calling_flow("loop")
 
-        assert mock_engine.send_message_with_tools.call_count == 3
+        assert mock_engine.send_message_with_tools.call_count == 5
+        # Only the first two occurrences actually executed.
+        assert agent_engine.execute_with_approval.call_count == 2
         mock_warn.assert_called_once()
-        mock_warn.assert_called_once()
+        warning = mock_warn.call_args[0][0]
+        assert "Write" in warning
+
+    @pytest.mark.asyncio
+    async def test_duplicate_call_nudged_then_model_recovers(
+        self, interface, mock_engine
+    ):
+        """The 3rd identical call is skipped with a nudge, not executed —
+        and the turn continues so the model can still finish."""
+        agent_engine = MagicMock()
+        agent_engine.execute_with_approval = AsyncMock(
+            return_value=OperationResult(success=True, data="OK")
+        )
+        mock_engine.agent_engine = agent_engine
+
+        same_call = ChatResponse(
+            content="",
+            model_used="m",
+            tokens_used=10,
+            timestamp=datetime.now(),
+            tool_calls=[ToolCall(name="Read", arguments={"file_path": "/a.py"})],
+        )
+        final = ChatResponse(
+            content="Here is my answer.",
+            model_used="m",
+            tokens_used=5,
+            timestamp=datetime.now(),
+            tool_calls=None,
+        )
+        mock_engine.send_message_with_tools = AsyncMock(
+            side_effect=[same_call, same_call, same_call, final]
+        )
+
+        with patch.object(interface, "_show_assistant_message"):
+            with patch.object(interface, "_show_warning") as mock_warn:
+                with patch.object(interface.console, "print"):
+                    await interface._handle_tool_calling_flow("loop")
+
+        # 3rd occurrence skipped: only 2 executions, no abort, turn completed.
+        assert agent_engine.execute_with_approval.call_count == 2
+        assert mock_engine.send_message_with_tools.call_count == 4
+        mock_warn.assert_not_called()
+        # The model was told the call was a duplicate.
+        nudge_message = mock_engine.send_message_with_tools.call_args_list[3][0][0]
+        assert "Duplicate" in nudge_message
 
     @pytest.mark.asyncio
     async def test_no_agent_engine_shows_error(self, interface, mock_engine):
