@@ -13,7 +13,11 @@ from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
-from ..core.agent.approval_manager import BatchApprovalRequest, EnhancedApprovalManager
+from ..core.agent.approval_manager import (
+    BatchApprovalRequest,
+    ChangePreview,
+    EnhancedApprovalManager,
+)
 from ..core.agent.types import Operation, OperationType
 from ..core.security.approval_workflow import ApprovalRequest, RiskLevel
 from ..core.security.permission_controller import PermissionController
@@ -181,24 +185,7 @@ class CLIApprovalIntegration:
                 risk_level=RiskLevel.MEDIUM,  # Default, can be enhanced
             )
 
-            # Create change preview from operation
-            # Map OperationType to ChangeType (they have matching values)
-            from ..core.agent.approval_manager import ChangePreview, ChangeType
-
-            try:
-                change_type = ChangeType(operation.type.value)
-            except ValueError:
-                # Default to FILE_MODIFY if type not in ChangeType enum
-                change_type = ChangeType.FILE_MODIFY
-
-            change_preview = ChangePreview(
-                change_type=change_type,
-                description=operation.description,
-                # Use string preview as proposed_state
-                proposed_state=operation.preview,
-                metadata=operation.data,
-                reversible=operation.reversible,
-            )
+            change_preview = await self._build_change_preview(operation)
 
             # Present approval dialog and get user decision
             decision = await self.prompt_handler.prompt_for_approval(
@@ -225,6 +212,44 @@ class CLIApprovalIntegration:
         except Exception as e:
             logger.error(f"Error in single approval handler: {e}", exc_info=True)
             return (False, False)
+
+    async def _build_change_preview(self, operation: Operation) -> ChangePreview:
+        """Build the ChangePreview shown in the approval dialog.
+
+        File writes and deletes go through the approval manager's rich
+        generators, which read the current file and produce a real unified
+        diff. Other operation types get a generic preview built from the
+        operation's own description/preview strings.
+        """
+        from ..core.agent.approval_manager import ChangePreview, ChangeType
+
+        if operation.type in (OperationType.FILE_WRITE, OperationType.FILE_DELETE):
+            try:
+                preview = await self.approval_manager.generate_operation_preview(
+                    operation
+                )
+                # The operation's description ("Edit file: ...") is more
+                # specific than the generator's generic one.
+                if operation.description:
+                    preview.description = operation.description
+                return preview
+            except Exception as e:
+                logger.debug(f"Rich preview failed, using generic preview: {e}")
+
+        try:
+            change_type = ChangeType(operation.type.value)
+        except ValueError:
+            # Default to FILE_MODIFY if type not in ChangeType enum
+            change_type = ChangeType.FILE_MODIFY
+
+        return ChangePreview(
+            change_type=change_type,
+            description=operation.description,
+            # Use string preview as proposed_state
+            proposed_state=operation.preview,
+            metadata=operation.data,
+            reversible=operation.reversible,
+        )
 
     async def _handle_batch_approval(
         self, batch_request: BatchApprovalRequest

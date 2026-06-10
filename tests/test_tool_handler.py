@@ -311,6 +311,40 @@ class TestToolHandlerExecution:
         result = await tool_handler.execute_tool_call(tc)
 
         assert result.error == "Operation cancelled by user"
+        assert result.cancelled is True
+
+    @pytest.mark.asyncio
+    async def test_denied_result_not_marked_cancelled(
+        self, tool_handler, mock_agent_engine
+    ):
+        """'n' (deny) only rejects one operation — the turn continues."""
+        mock_agent_engine.execute_with_approval.return_value = OperationResult(
+            success=False, error="Operation not approved by user"
+        )
+
+        tc = ToolCall(name="command_exec", arguments={"command": "ls"})
+        result = await tool_handler.execute_tool_call(tc)
+
+        assert result.error
+        assert result.cancelled is False
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_stops_after_cancellation(
+        self, tool_handler, mock_agent_engine
+    ):
+        """'q' (quit) must not prompt for the remaining calls in the batch."""
+        mock_agent_engine.execute_with_approval.return_value = OperationResult(
+            success=False, error="User rejected", was_cancelled=True
+        )
+
+        tool_calls = [
+            ToolCall(name="command_exec", arguments={"command": "ls"}),
+            ToolCall(name="command_exec", arguments={"command": "pwd"}),
+        ]
+        results = await tool_handler.execute_tool_calls(tool_calls)
+
+        assert mock_agent_engine.execute_with_approval.call_count == 1
+        assert results[-1].cancelled is True
 
     @pytest.mark.asyncio
     async def test_execute_unknown_tool(self, tool_handler):

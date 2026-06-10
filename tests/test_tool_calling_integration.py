@@ -90,6 +90,49 @@ class TestToolCallingFlowIntegration:
         agent_engine.execute_with_approval.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_tool_results_labeled_with_arguments(self, interface, mock_engine):
+        """Results fed back to the model identify the call they belong to.
+
+        A bare '[Read] Result: ...' gives the model no way to tell which file
+        a result came from (or that it already read it), so weak models
+        re-issue the same call until the loop detector kills the turn.
+        """
+        agent_engine = MagicMock()
+        agent_engine.execute_with_approval = AsyncMock(
+            return_value=OperationResult(success=True, data="file contents")
+        )
+        mock_engine.agent_engine = agent_engine
+
+        first_response = ChatResponse(
+            content="",
+            model_used="m",
+            tokens_used=10,
+            timestamp=datetime.now(),
+            tool_calls=[
+                ToolCall(name="file_read", arguments={"path": "/src/main.py"})
+            ],
+        )
+        second_response = ChatResponse(
+            content="Done.",
+            model_used="m",
+            tokens_used=5,
+            timestamp=datetime.now(),
+            tool_calls=None,
+        )
+        mock_engine.send_message_with_tools = AsyncMock(
+            side_effect=[first_response, second_response]
+        )
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+
+        with patch.object(interface, "_show_assistant_message"):
+            with patch.object(interface.console, "print"):
+                await interface._handle_tool_calling_flow("Read main.py")
+
+        results_message = mock_engine.send_message_with_tools.call_args_list[1][0][0]
+        assert "/src/main.py" in results_message
+        assert "file contents" in results_message
+
+    @pytest.mark.asyncio
     async def test_text_only_response_no_loop(self, interface, mock_engine):
         """Provider returns text with no tool calls — no loop, just display."""
         mock_engine.agent_engine = MagicMock()
@@ -112,6 +155,127 @@ class TestToolCallingFlowIntegration:
             "Python is a programming language.", "claude-sonnet-4"
         )
         assert mock_engine.send_message_with_tools.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_cancellation_drops_back_to_prompt(self, interface, mock_engine):
+        """'q' at the approval prompt ends the whole turn.
+
+        Regression: cancellation was fed back to the model as an ordinary
+        tool error, so the model just tried another command and the user
+        got prompted again instead of getting their prompt back.
+        """
+        agent_engine = MagicMock()
+        agent_engine.execute_with_approval = AsyncMock(
+            return_value=OperationResult(
+                success=False, error="User rejected", was_cancelled=True
+            )
+        )
+        mock_engine.agent_engine = agent_engine
+
+        response = ChatResponse(
+            content="",
+            model_used="m",
+            tokens_used=10,
+            timestamp=datetime.now(),
+            tool_calls=[ToolCall(name="command_exec", arguments={"command": "ls"})],
+        )
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=[response])
+
+        with patch.object(interface, "_show_assistant_message"):
+            with patch.object(interface.console, "print"):
+                await interface._handle_tool_calling_flow("list files")
+
+        # No second round trip: the cancellation is not sent back to the model.
+        assert mock_engine.send_message_with_tools.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_native_tool_history_branch(self, interface, mock_engine):
+        """Native providers get structured results, not flattened text.
+
+        The continuation request must carry tool results as recorded
+        structured history (assistant.tool_calls + role:"tool") with an
+        empty user message — flattened "Tool results:" text violates the
+        chat template and makes models leak template tokens as text.
+        """
+        agent_engine = MagicMock()
+        agent_engine.execute_with_approval = AsyncMock(
+            return_value=OperationResult(success=True, data="auth code")
+        )
+        mock_engine.agent_engine = agent_engine
+
+        first = ChatResponse(
+            content="",
+            model_used="m",
+            tokens_used=10,
+            timestamp=datetime.now(),
+            tool_calls=[
+                ToolCall(name="file_read", arguments={"path": "/a"}, id="call_9")
+            ],
+        )
+        final = ChatResponse(
+            content="Done.",
+            model_used="m",
+            tokens_used=5,
+            timestamp=datetime.now(),
+            tool_calls=None,
+        )
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=[first, final])
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.provider_supports_native_tool_history = MagicMock(
+            return_value=True
+        )
+        mock_engine.record_tool_results = MagicMock()
+
+        with patch.object(interface, "_show_assistant_message"):
+            with patch.object(interface.console, "print"):
+                await interface._handle_tool_calling_flow("read a")
+
+        # Results recorded structurally, paired to the call's id.
+        mock_engine.record_tool_results.assert_called_once()
+        text, records = mock_engine.record_tool_results.call_args[0]
+        assert "Tool results" in text
+        assert records[0].tool_call_id == "call_9"
+        assert records[0].content == "auth code"
+        # Continuation request sends no flattened results text.
+        assert mock_engine.send_message_with_tools.call_args_list[1][0][0] == ""
+
+    @pytest.mark.asyncio
+    async def test_text_mimicked_tool_call_is_recovered(self, interface, mock_engine):
+        """A '[Called tools: ...]' emitted as TEXT still executes.
+
+        Regression: weak models mimic the history notation instead of issuing
+        native tool calls; the turn ended silently at the prompt instead of
+        running the call the model clearly intended.
+        """
+        agent_engine = MagicMock()
+        agent_engine.execute_with_approval = AsyncMock(
+            return_value=OperationResult(success=True, data="src/auth.ts")
+        )
+        mock_engine.agent_engine = agent_engine
+
+        mimicked = ChatResponse(
+            content='[Called tools: Grep({"pattern": "auth", "glob": "*.ts"})]',
+            model_used="qwen",
+            tokens_used=10,
+            timestamp=datetime.now(),
+            tool_calls=None,
+        )
+        final = ChatResponse(
+            content="Found it in src/auth.ts.",
+            model_used="qwen",
+            tokens_used=5,
+            timestamp=datetime.now(),
+            tool_calls=None,
+        )
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=[mimicked, final])
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+
+        with patch.object(interface, "_show_assistant_message"):
+            with patch.object(interface.console, "print"):
+                await interface._handle_tool_calling_flow("find the auth code")
+
+        agent_engine.execute_with_approval.assert_called_once()
+        assert mock_engine.send_message_with_tools.call_count == 2
 
     @pytest.mark.asyncio
     async def test_error_response_stops_flow(self, interface, mock_engine):
@@ -211,17 +375,14 @@ class TestToolCallingFlowIntegration:
         second_call_msg = mock_engine.send_message_with_tools.call_args_list[1][0][0]
         assert "Permission denied" in second_call_msg
 
-    @pytest.mark.asyncio
-    async def test_max_iterations_guard(self, interface, mock_engine):
-        """Flow stops after MAX_TOOL_ITERATIONS."""
+    def _endless_tool_responses(self, mock_engine):
+        """Distinct tool calls forever, so only the iteration logic stops us."""
         agent_engine = MagicMock()
         agent_engine.execute_with_approval = AsyncMock(
             return_value=OperationResult(success=True, data="OK")
         )
         mock_engine.agent_engine = agent_engine
 
-        # Distinct args each call so loop-detection does not trip early; this
-        # exercises the hard iteration cap.
         def make_response(*_args, **_kwargs):
             make_response.n += 1
             return ChatResponse(
@@ -240,12 +401,47 @@ class TestToolCallingFlowIntegration:
         make_response.n = 0
         mock_engine.send_message_with_tools = AsyncMock(side_effect=make_response)
 
+    @pytest.mark.asyncio
+    async def test_iteration_checkin_declined_stops(self, interface, mock_engine):
+        """After MAX_TOOL_ITERATIONS the user is asked; declining stops.
+
+        A hard cap that kills legitimate long-running work mid-turn is wrong —
+        the user decides whether the agent keeps going.
+        """
+        self._endless_tool_responses(mock_engine)
+
         with patch.object(interface, "_show_assistant_message"):
             with patch.object(interface, "_show_warning"):
                 with patch.object(interface.console, "print"):
-                    await interface._handle_tool_calling_flow("Loop forever")
+                    with patch.object(
+                        interface,
+                        "_confirm_continue_iterations",
+                        return_value=False,
+                    ) as confirm:
+                        await interface._handle_tool_calling_flow("Loop forever")
 
+        confirm.assert_called_once()
         assert mock_engine.send_message_with_tools.call_count == MAX_TOOL_ITERATIONS
+
+    @pytest.mark.asyncio
+    async def test_iteration_checkin_accepted_continues(self, interface, mock_engine):
+        """Confirming the check-in lets the agent run past the cap."""
+        self._endless_tool_responses(mock_engine)
+
+        with patch.object(interface, "_show_assistant_message"):
+            with patch.object(interface, "_show_warning"):
+                with patch.object(interface.console, "print"):
+                    with patch.object(
+                        interface,
+                        "_confirm_continue_iterations",
+                        side_effect=[True, False],
+                    ) as confirm:
+                        await interface._handle_tool_calling_flow("Loop forever")
+
+        assert confirm.call_count == 2
+        assert (
+            mock_engine.send_message_with_tools.call_count == 2 * MAX_TOOL_ITERATIONS
+        )
 
     @pytest.mark.asyncio
     async def test_repeated_tool_call_stops_early(self, interface, mock_engine):

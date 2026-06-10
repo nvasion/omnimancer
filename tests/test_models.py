@@ -591,3 +591,68 @@ class TestStreamEvent:
 
         event = StreamEvent(type=StreamEventType.ERROR, error="Connection lost")
         assert event.error == "Connection lost"
+
+
+class TestParseDescribedToolCalls:
+    """parse_described_tool_calls recovers calls a model emitted as text.
+
+    Weak models mimic the "[Called tools: ...]" history notation instead of
+    issuing native tool calls; the parser turns that text back into ToolCall
+    objects so the agent loop can keep going.
+    """
+
+    def test_round_trips_describe_output(self):
+        from omnimancer.core.models import (
+            ToolCall,
+            describe_tool_calls,
+            parse_described_tool_calls,
+        )
+
+        calls = [
+            ToolCall(name="Grep", arguments={"pattern": "auth", "glob": "*.ts"}),
+            ToolCall(name="Read", arguments={"file_path": "/src/main.py"}),
+        ]
+        parsed = parse_described_tool_calls(describe_tool_calls(calls))
+
+        assert [(c.name, c.arguments) for c in parsed] == [
+            (c.name, c.arguments) for c in calls
+        ]
+
+    def test_plain_text_returns_empty(self):
+        from omnimancer.core.models import parse_described_tool_calls
+
+        assert parse_described_tool_calls("The auth flow looks correct.") == []
+        assert parse_described_tool_calls("") == []
+        assert parse_described_tool_calls(None) == []
+
+    def test_nested_json_with_braces_and_commas(self):
+        from omnimancer.core.models import parse_described_tool_calls
+
+        text = (
+            '[Called tools: Grep({"glob": "*.{ts,tsx}", '
+            '"output_mode": "files_with_matches", '
+            '"pattern": "AUTH_SESSION_KEY|automarketer_auth_session"})]'
+        )
+        parsed = parse_described_tool_calls(text)
+
+        assert len(parsed) == 1
+        assert parsed[0].name == "Grep"
+        assert parsed[0].arguments["glob"] == "*.{ts,tsx}"
+
+    def test_marker_embedded_in_other_text(self):
+        from omnimancer.core.models import parse_described_tool_calls
+
+        text = (
+            "Let me search for that.\n"
+            '[Called tools: Bash({"command": "git log --oneline -5"})]'
+        )
+        parsed = parse_described_tool_calls(text)
+
+        assert len(parsed) == 1
+        assert parsed[0].name == "Bash"
+        assert parsed[0].arguments == {"command": "git log --oneline -5"}
+
+    def test_malformed_json_is_skipped(self):
+        from omnimancer.core.models import parse_described_tool_calls
+
+        assert parse_described_tool_calls("[Called tools: Grep({'bad': json})]") == []

@@ -259,6 +259,16 @@ class BaseProvider(ABC):
         """
         return False
 
+    def supports_native_tool_history(self) -> bool:
+        """
+        Whether this provider can replay tool exchanges in its native
+        protocol (e.g. OpenAI assistant.tool_calls + role:"tool" messages).
+
+        Providers returning False receive tool results flattened into plain
+        text instead.
+        """
+        return False
+
     def get_max_tokens(self) -> int:
         """
         Get the maximum number of tokens supported by the current model.

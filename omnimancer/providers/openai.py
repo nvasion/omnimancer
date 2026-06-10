@@ -131,27 +131,71 @@ class OpenAIProvider(BaseProvider):
         except Exception:
             return False
 
+    def supports_native_tool_history(self) -> bool:
+        return True
+
     def _prepare_messages(
         self, message: str, context: ChatContext
-    ) -> List[Dict[str, str]]:
+    ) -> List[Dict[str, Any]]:
         """
         Prepare messages for OpenAI API format.
 
+        Tool exchanges recorded with structured data are serialized in the
+        native protocol (assistant.tool_calls + role:"tool" messages) —
+        flattened text violates the chat template and makes models leak
+        template tokens (<tool_call>, <function=...) as plain text.
+
         Args:
-            message: Current user message
+            message: Current user message ("" for a continuation request
+                whose tool results are already in the context)
             context: Conversation context
 
         Returns:
             List of messages formatted for OpenAI API
         """
-        messages = []
+        import json
 
-        # Add context messages
+        messages: List[Dict[str, Any]] = []
+
         for msg in context.messages:
-            messages.append({"role": msg.role.value, "content": msg.content})
+            tool_calls = getattr(msg, "tool_calls", None)
+            tool_results = getattr(msg, "tool_results", None)
+            if tool_calls:
+                raw = getattr(msg, "raw_content", None)
+                content = raw if raw is not None else msg.content
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": content or None,
+                        "tool_calls": [
+                            {
+                                "id": tc.id or f"call_{i}",
+                                "type": "function",
+                                "function": {
+                                    "name": tc.name,
+                                    "arguments": json.dumps(
+                                        tc.arguments, default=str
+                                    ),
+                                },
+                            }
+                            for i, tc in enumerate(tool_calls)
+                        ],
+                    }
+                )
+            elif tool_results:
+                for record in tool_results:
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": record.tool_call_id,
+                            "content": record.content,
+                        }
+                    )
+            else:
+                messages.append({"role": msg.role.value, "content": msg.content})
 
-        # Add current message
-        messages.append({"role": "user", "content": message})
+        if message:
+            messages.append({"role": "user", "content": message})
 
         return messages
 
@@ -389,7 +433,7 @@ class OpenAIProvider(BaseProvider):
                     import json
 
                     tool_calls = []
-                    for tc in raw_tool_calls:
+                    for i, tc in enumerate(raw_tool_calls):
                         func = tc.get("function", {})
                         args = func.get("arguments", "{}")
                         if isinstance(args, str):
@@ -398,6 +442,9 @@ class OpenAIProvider(BaseProvider):
                             ToolCall(
                                 name=func.get("name", ""),
                                 arguments=args,
+                                # Some OpenAI-compatible servers omit ids;
+                                # synthesize one so results can pair to calls.
+                                id=tc.get("id") or f"call_{i}",
                             )
                         )
 

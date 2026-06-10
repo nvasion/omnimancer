@@ -331,6 +331,10 @@ class ToolHandler:
         for tc in tool_calls:
             result = await self.execute_tool_call(tc)
             results.append(result)
+            # "q" at the approval prompt cancels the turn — don't keep
+            # prompting for the remaining calls in this batch.
+            if result.cancelled:
+                break
         return results
 
     def _tool_call_to_operation(self, tool_call: ToolCall) -> Optional[Operation]:
@@ -424,7 +428,9 @@ class ToolHandler:
             error_msg = result.error or "Operation failed"
             if result.was_cancelled:
                 error_msg = "Operation cancelled by user"
-            return ToolResult(content="", error=error_msg)
+            return ToolResult(
+                content="", error=error_msg, cancelled=result.was_cancelled
+            )
 
     @staticmethod
     def _command_result_to_tool_result(result: OperationResult) -> ToolResult:
@@ -435,7 +441,9 @@ class ToolHandler:
         command failed.
         """
         if result.was_cancelled:
-            return ToolResult(content="", error="Operation cancelled by user")
+            return ToolResult(
+                content="", error="Operation cancelled by user", cancelled=True
+            )
 
         data = result.data
         stdout = (data.get("stdout") or "").strip()

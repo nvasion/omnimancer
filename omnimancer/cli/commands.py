@@ -390,7 +390,10 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
             if filter_type not in valid_filters:
                 filters_str = ", ".join(valid_filters)
                 raise ValueError(
-                    "Invalid filter type. Valid" f" filters: {filters_str}"
+                    f"Invalid filter type. Valid filters: {filters_str}. "
+                    "To register a new model use "
+                    "/add-model <model> <provider> — or just "
+                    "/switch <provider> <model>."
                 )
 
             # Validate second argument based on filter type
