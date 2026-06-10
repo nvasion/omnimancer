@@ -17,6 +17,7 @@ from ..core.models import (
     StreamEvent,
     StreamEventType,
     ToolDefinition,
+    describe_tool_calls,
 )
 from ..providers.base import BaseProvider
 from ..ui.progress_indicator import OperationType, get_progress_indicator
@@ -398,10 +399,24 @@ class CoreEngine:
                 message, context, tools
             )
 
-            self.chat_manager.add_user_message(message)
+            # A continuation request ("" after recorded tool results) adds
+            # nothing the model needs to see as a user turn.
+            if message:
+                self.chat_manager.add_user_message(message)
             if response.is_success:
+                # Record the tool calls alongside the text — tool results come
+                # back as plain text, so without this the model can't see which
+                # calls it already made and repeats them. The structured form
+                # rides along for providers that replay history natively.
+                recorded = response.content or ""
+                calls_note = describe_tool_calls(response.tool_calls)
+                if calls_note:
+                    recorded = f"{recorded}\n{calls_note}".strip()
                 self.chat_manager.add_assistant_message(
-                    response.content, self.current_provider.model
+                    recorded,
+                    self.current_provider.model,
+                    tool_calls=response.tool_calls,
+                    raw_content=response.content,
                 )
 
             return response
@@ -446,6 +461,20 @@ class CoreEngine:
             return False
         return self.current_provider.supports_tools()
 
+    def provider_supports_native_tool_history(self) -> bool:
+        if not self.current_provider:
+            return False
+        return bool(self.current_provider.supports_native_tool_history())
+
+    def record_tool_results(self, content: str, records: list) -> None:
+        """Record tool results as a user turn with structured pairing.
+
+        `content` is the flattened text every provider can read; `records`
+        (ToolResultRecord) lets native providers replay them as role:"tool"
+        messages. The next request is then sent with an empty message.
+        """
+        self.chat_manager.add_user_message(content, tool_results=records)
+
     def get_available_models(self) -> List[ModelInfo]:
         """Get all available models from all providers."""
         all_models = []
@@ -464,6 +493,21 @@ class CoreEngine:
                 logger.warning(
                     f"Failed to get models from" f" provider {provider_name}: {e}"
                 )
+
+        # Custom models (added via /add-model or /switch) live in config,
+        # not in any provider's static catalog.
+        seen = {(m.provider, m.name) for m in all_models}
+        try:
+            for custom in self.config_manager.get_custom_models():
+                if (custom.provider, custom.name) in seen:
+                    continue
+                if isinstance(custom, EnhancedModelInfo):
+                    all_models.append(custom.to_model_info())
+                else:
+                    all_models.append(custom)
+                seen.add((custom.provider, custom.name))
+        except Exception as e:
+            logger.warning(f"Failed to merge custom models: {e}")
 
         return all_models
 

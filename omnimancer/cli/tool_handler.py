@@ -14,6 +14,60 @@ logger = logging.getLogger(__name__)
 
 MAX_TOOL_ITERATIONS = 25
 
+# Identical-call repetition policy: the 1st and 2nd occurrences execute
+# normally (re-running a call can be legitimate — e.g. re-Read after an Edit),
+# later occurrences are skipped and replaced with a corrective nudge, and the
+# turn is aborted only if the model keeps repeating despite the nudges.
+DUPLICATE_NUDGE_THRESHOLD = 3
+DUPLICATE_ABORT_THRESHOLD = 5
+
+DUPLICATE_CALL_NUDGE = (
+    "Duplicate call skipped: you already made this exact call and received "
+    "its result earlier in this conversation. Use that result, change the "
+    "arguments, or give your final answer — do not repeat the call."
+)
+
+
+class RepeatedCallTracker:
+    """Counts identical tool calls within one agent turn.
+
+    A repeated identical call usually means the model lost track of an
+    earlier result. Skipping it with a nudge lets the model recover;
+    aborting is the last resort once nudges are ignored.
+    """
+
+    def __init__(self) -> None:
+        self._counts: dict = {}
+
+    @staticmethod
+    def _signature(tool_call: ToolCall) -> str:
+        return (
+            f"{tool_call.name}:"
+            f"{json.dumps(tool_call.arguments, sort_keys=True, default=str)}"
+        )
+
+    def record(self, tool_calls: List[ToolCall]) -> None:
+        """Count one occurrence of each call in a response."""
+        for tc in tool_calls:
+            sig = self._signature(tc)
+            self._counts[sig] = self._counts.get(sig, 0) + 1
+
+    def count(self, tool_call: ToolCall) -> int:
+        return self._counts.get(self._signature(tool_call), 0)
+
+    def is_duplicate(self, tool_call: ToolCall) -> bool:
+        """True when this occurrence should be skipped and nudged."""
+        return self.count(tool_call) >= DUPLICATE_NUDGE_THRESHOLD
+
+    def abort_offender(self, tool_calls: List[ToolCall]) -> Optional[ToolCall]:
+        """The call that exhausted its nudges, if any — abort the turn."""
+        worst: Optional[ToolCall] = None
+        for tc in tool_calls:
+            if self.count(tc) >= DUPLICATE_ABORT_THRESHOLD:
+                if worst is None or self.count(tc) > self.count(worst):
+                    worst = tc
+        return worst
+
 # Cap the size of any single tool result fed back into the model context.
 # Unbounded results (e.g. `find`/`grep` walking .venv, or reading a huge file)
 # would otherwise balloon the conversation until it exceeds the model's context
@@ -331,6 +385,10 @@ class ToolHandler:
         for tc in tool_calls:
             result = await self.execute_tool_call(tc)
             results.append(result)
+            # "q" at the approval prompt cancels the turn — don't keep
+            # prompting for the remaining calls in this batch.
+            if result.cancelled:
+                break
         return results
 
     def _tool_call_to_operation(self, tool_call: ToolCall) -> Optional[Operation]:
@@ -424,7 +482,9 @@ class ToolHandler:
             error_msg = result.error or "Operation failed"
             if result.was_cancelled:
                 error_msg = "Operation cancelled by user"
-            return ToolResult(content="", error=error_msg)
+            return ToolResult(
+                content="", error=error_msg, cancelled=result.was_cancelled
+            )
 
     @staticmethod
     def _command_result_to_tool_result(result: OperationResult) -> ToolResult:
@@ -435,7 +495,9 @@ class ToolHandler:
         command failed.
         """
         if result.was_cancelled:
-            return ToolResult(content="", error="Operation cancelled by user")
+            return ToolResult(
+                content="", error="Operation cancelled by user", cancelled=True
+            )
 
         data = result.data
         stdout = (data.get("stdout") or "").strip()

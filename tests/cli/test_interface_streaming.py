@@ -145,8 +145,36 @@ class TestStreamToolResponse:
 
         mock_engine.chat_manager.add_user_message.assert_called_once_with("User msg")
         mock_engine.chat_manager.add_assistant_message.assert_called_once_with(
-            "Response text", "test-model"
+            "Response text",
+            "test-model",
+            tool_calls=None,
+            raw_content="Response text",
         )
+
+    @pytest.mark.asyncio
+    async def test_records_tool_calls_in_history(self, interface, mock_engine):
+        """The assistant turn recorded in history must mention its tool calls.
+
+        Otherwise the next iteration's context shows an empty assistant
+        message followed by an unlabeled result — the model can't tell it
+        already made the call and repeats it.
+        """
+        events = make_tool_stream_events(
+            "Reading file.", "file_read", {"path": "/a.py"}
+        )
+
+        async def fake_stream(msg, tools):
+            for e in events:
+                yield e
+
+        mock_engine.send_message_with_tools_stream = fake_stream
+
+        with patch("omnimancer.ui.streaming_display.Live"):
+            await interface._stream_tool_response("Read a.py", [])
+
+        recorded = mock_engine.chat_manager.add_assistant_message.call_args[0][0]
+        assert "file_read" in recorded
+        assert "/a.py" in recorded
 
     @pytest.mark.asyncio
     async def test_returns_error_on_empty_stream(self, interface, mock_engine):

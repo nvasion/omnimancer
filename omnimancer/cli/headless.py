@@ -10,9 +10,19 @@ import uuid
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from ..core.models import ChatResponse
+from ..core.models import (
+    ChatResponse,
+    ToolResult,
+    ToolResultRecord,
+    parse_described_tool_calls,
+)
 from .system_prompts import build_agent_prompt
-from .tool_handler import MAX_TOOL_ITERATIONS, ToolHandler
+from .tool_handler import (
+    DUPLICATE_CALL_NUDGE,
+    MAX_TOOL_ITERATIONS,
+    RepeatedCallTracker,
+    ToolHandler,
+)
 
 
 class OutputFormat(Enum):
@@ -212,10 +222,14 @@ class HeadlessRunner:
         output_format: OutputFormat = OutputFormat.TEXT,
         no_approval: bool = False,
         verbose: bool = False,
+        max_iterations: Optional[int] = None,
     ) -> None:
         self._engine = engine
         self._no_approval = no_approval
         self._verbose = verbose
+        # Headless runs are unattended, so a cap (not a check-in prompt) is
+        # the safety net; --max-iterations sizes it to the job.
+        self._max_iterations = max_iterations or MAX_TOOL_ITERATIONS
         session_id = str(uuid.uuid4())
         self._emitter = HeadlessOutputEmitter(output_format, session_id, verbose)
         self._tokens = TokenAccumulator()
@@ -242,10 +256,11 @@ class HeadlessRunner:
         # Record of the actions the agent took, surfaced in the JSON result.
         tool_log: list = []
         turns = 0
-        # Detect runaway loops where a weak model repeats the same tool call.
-        seen_calls: dict = {}
+        # Identical repeated calls get skipped with a corrective nudge; the
+        # run is aborted only if the model keeps repeating despite nudges.
+        repeat_tracker = RepeatedCallTracker()
 
-        for iteration in range(MAX_TOOL_ITERATIONS):
+        for iteration in range(self._max_iterations):
             turns = iteration + 1
             response = await self._engine.send_message_with_tools(
                 current_message, tools
@@ -269,29 +284,37 @@ class HeadlessRunner:
                     last_stop_reason,
                 )
 
+            # The model may mimic the "[Called tools: ...]" history notation
+            # as plain text instead of issuing native tool calls — recover
+            # those so the run doesn't end with the work undone.
             if not response.tool_calls:
-                break
+                recovered = parse_described_tool_calls(response.content)
+                if not recovered:
+                    break
+                response.tool_calls = recovered
 
-            repeated = False
-            for tc in response.tool_calls:
-                sig = (
-                    f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True, default=str)}"
-                )
-                seen_calls[sig] = seen_calls.get(sig, 0) + 1
-                if seen_calls[sig] >= 3:
-                    repeated = True
-            if repeated:
+            repeat_tracker.record(response.tool_calls)
+            offender = repeat_tracker.abort_offender(response.tool_calls)
+            if offender is not None:
                 if not last_content:
                     last_content = (
-                        "Stopped: the model kept repeating the same tool call."
+                        f"Stopped: the model repeated the same tool call "
+                        f"{repeat_tracker.count(offender)} times "
+                        f"({offender.name}) despite duplicate warnings."
                     )
                 break
 
             result_parts = []
-            for tc in response.tool_calls:
+            records = []
+            for i, tc in enumerate(response.tool_calls):
                 self._emitter.emit_tool_use(tc.name, tc.arguments)
 
-                result = await tool_handler.execute_tool_call(tc)
+                # Skip exact repeats with a nudge so the model can recover
+                # instead of the run being killed.
+                if repeat_tracker.is_duplicate(tc):
+                    result = ToolResult(content=DUPLICATE_CALL_NUDGE)
+                else:
+                    result = await tool_handler.execute_tool_call(tc)
                 self._emitter.emit_tool_result(
                     tc.name,
                     result.content or "",
@@ -305,13 +328,29 @@ class HeadlessRunner:
                     }
                 )
 
+                # Label results with the call's arguments so the model can
+                # tell which call each result belongs to.
+                label = f"{tc.name}({json.dumps(tc.arguments, default=str)})"
                 if result.error:
-                    result_parts.append(f"[{tc.name}] Error: {result.error}")
+                    result_parts.append(f"[{label}] Error: {result.error}")
                 else:
-                    result_parts.append(f"[{tc.name}] Result: {result.content}")
+                    result_parts.append(f"[{label}] Result: {result.content}")
+                records.append(
+                    ToolResultRecord(
+                        tool_call_id=tc.id or f"call_{i}",
+                        content=result.error or result.content,
+                    )
+                )
 
             # Feed results back without forcing the model to "continue".
-            current_message = "Tool results:\n\n" + "\n\n".join(result_parts)
+            results_text = "Tool results:\n\n" + "\n\n".join(result_parts)
+            if self._engine.provider_supports_native_tool_history() is True:
+                # Native protocol: structured history + empty continuation
+                # message (see interface._handle_tool_calling_flow).
+                self._engine.record_tool_results(results_text, records)
+                current_message = ""
+            else:
+                current_message = results_text
 
         usage = self._tokens.total
         self._emitter.emit_result(
@@ -335,6 +374,7 @@ async def run_headless(
     provider: Optional[str] = None,
     model: Optional[str] = None,
     base_url: Optional[str] = None,
+    max_iterations: Optional[int] = None,
 ) -> int:
     from ..core.config_manager import ConfigManager
     from ..core.engine import CoreEngine
@@ -370,5 +410,6 @@ async def run_headless(
         output_format=fmt,
         no_approval=no_approval,
         verbose=verbose,
+        max_iterations=max_iterations,
     )
     return await runner.run(prompt)

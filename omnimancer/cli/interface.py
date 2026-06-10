@@ -27,7 +27,13 @@ from ..core.agent_mode_manager import AgentModeManager
 from ..core.config_manager import ConfigManager
 from ..core.engine import CoreEngine
 from ..core.history_manager import HistoryManager
-from ..core.models import ChatResponse, ToolCall
+from ..core.models import (
+    ChatResponse,
+    ToolCall,
+    ToolResult,
+    ToolResultRecord,
+    parse_described_tool_calls,
+)
 from ..core.signal_handler import SignalHandler
 
 # UI imports
@@ -45,7 +51,12 @@ from .commands import Command, parse_command
 from .completion import CompletionManager, CompletionMixin
 from .display import DisplayManager, DisplayMixin
 from .system_prompts import build_agent_prompt, get_agent_capabilities_prompt
-from .tool_handler import MAX_TOOL_ITERATIONS, ToolHandler
+from .tool_handler import (
+    DUPLICATE_CALL_NUDGE,
+    MAX_TOOL_ITERATIONS,
+    RepeatedCallTracker,
+    ToolHandler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -767,11 +778,19 @@ class CommandLineInterface(
         provider = getattr(self.engine, "current_provider", None)
         use_streaming = provider and provider.supports_streaming()
 
-        # Detect runaway loops: a weak model may repeat the same tool call
-        # forever. Stop if an identical call is issued too many times.
-        seen_calls: dict = {}
+        # Identical repeated calls get skipped with a corrective nudge; the
+        # turn is aborted only if the model keeps repeating despite nudges.
+        repeat_tracker = RepeatedCallTracker()
 
-        for iteration in range(MAX_TOOL_ITERATIONS):
+        iterations = 0
+        while True:
+            # Long-running work shouldn't be killed by a hard cap — check in
+            # with the user instead and let them decide.
+            if iterations and iterations % MAX_TOOL_ITERATIONS == 0:
+                if not self._confirm_continue_iterations(iterations):
+                    self._show_warning("Agent turn stopped.")
+                    return
+            iterations += 1
             if use_streaming:
                 response = await self._stream_tool_response(current_message, tools)
             else:
@@ -788,21 +807,24 @@ class CommandLineInterface(
             self._show_token_status(response)
 
             # No tool calls → the model gave its final answer; we're done.
+            # Unless it mimicked the "[Called tools: ...]" history notation
+            # as plain text — recover those so the turn doesn't end silently.
             if not response.tool_calls:
-                return
+                recovered = parse_described_tool_calls(response.content)
+                if not recovered:
+                    return
+                response.tool_calls = recovered
 
-            repeated = False
-            for tc in response.tool_calls:
-                sig = (
-                    f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True, default=str)}"
-                )
-                seen_calls[sig] = seen_calls.get(sig, 0) + 1
-                if seen_calls[sig] >= 3:
-                    repeated = True
-            if repeated:
+            repeat_tracker.record(response.tool_calls)
+            offender = repeat_tracker.abort_offender(response.tool_calls)
+            if offender is not None:
+                summary = self._summarize_tool_call(offender)
+                label = f"{offender.name} ({summary})" if summary else offender.name
                 self._show_warning(
-                    "Stopping: the model kept repeating the same tool call. "
-                    "Try rephrasing your request or using a more capable model."
+                    f"Stopping: the model repeated the same tool call "
+                    f"{repeat_tracker.count(offender)} times ({label}) despite "
+                    "duplicate warnings. Try rephrasing your request or using "
+                    "a more capable model."
                 )
                 return
 
@@ -814,30 +836,78 @@ class CommandLineInterface(
                 label = f"{tc.name}: {summary}" if summary else tc.name
                 self.console.print(f"  [dim]→ {label}[/dim]")
 
-            results = await tool_handler.execute_tool_calls(response.tool_calls)
+            # Execute each call, skipping exact repeats with a nudge so the
+            # model can recover instead of the turn being killed.
+            results = []
+            skipped = set()
+            for i, tc in enumerate(response.tool_calls):
+                if repeat_tracker.is_duplicate(tc):
+                    skipped.add(i)
+                    results.append(ToolResult(content=DUPLICATE_CALL_NUDGE))
+                else:
+                    results.append(await tool_handler.execute_tool_call(tc))
 
             result_parts = []
-            for tc, result in zip(response.tool_calls, results):
+            records = []
+            for i, (tc, result) in enumerate(zip(response.tool_calls, results)):
                 summary = self._summarize_tool_call(tc)
                 label = f"{tc.name} ({summary})" if summary else tc.name
+                # Label results with the call's target so the model can tell
+                # which call each result belongs to.
                 if result.error:
-                    status = f"[{tc.name}] Error: {result.error}"
+                    status = f"[{label}] Error: {result.error}"
                     self.console.print(f"  [red]✗ {label}: {result.error}[/red]")
+                elif i in skipped:
+                    status = f"[{label}] {result.content}"
+                    self.console.print(
+                        f"  [yellow]↻ {label} — duplicate call, skipped[/yellow]"
+                    )
                 else:
-                    status = f"[{tc.name}] Result: {result.content}"
+                    status = f"[{label}] Result: {result.content}"
                     self.console.print(f"  [green]✓ {label}[/green]")
                 result_parts.append(status)
+                records.append(
+                    ToolResultRecord(
+                        tool_call_id=tc.id or f"call_{i}",
+                        content=result.error or result.content,
+                    )
+                )
+
+            # "q" at the approval prompt cancels the whole turn — drop back
+            # to the prompt instead of letting the model try something else.
+            if any(r.cancelled for r in results):
+                self.console.print(
+                    "[yellow]🚫 Agent turn cancelled — back to prompt.[/yellow]"
+                )
+                return
 
             # Feed results back without forcing the model to "continue" — let it
             # decide whether more work is needed or it's time to answer.
-            current_message = "Tool results:\n\n" + "\n\n".join(result_parts)
+            results_text = "Tool results:\n\n" + "\n\n".join(result_parts)
+            if self.engine.provider_supports_native_tool_history() is True:
+                # Native protocol: record results as structured history and
+                # continue with an empty message — flattened "Tool results:"
+                # text violates the chat template and makes models leak
+                # template tokens as plain text.
+                self.engine.record_tool_results(results_text, records)
+                current_message = ""
+            else:
+                current_message = results_text
 
-        self._show_warning(
-            "Reached maximum tool call iterations" f" ({MAX_TOOL_ITERATIONS})."
+    def _confirm_continue_iterations(self, iterations: int) -> bool:
+        """Ask whether the agent should keep working past the check-in point."""
+        self.console.print(
+            f"[yellow]⚠ The agent has run {iterations} tool iterations "
+            "without finishing.[/yellow]"
         )
+        try:
+            answer = self.console.input("Keep going? [Y/n]: ")
+        except (KeyboardInterrupt, EOFError):
+            return False
+        return answer.strip().lower() not in ("n", "no")
 
     async def _stream_tool_response(self, message: str, tools: Any) -> "ChatResponse":
-        from ..core.models import ChatResponse, StreamEventType
+        from ..core.models import ChatResponse, StreamEventType, describe_tool_calls
         from ..ui.streaming_display import StreamingDisplay
 
         display = StreamingDisplay(self.console)
@@ -855,14 +925,31 @@ class CommandLineInterface(
             display.stop()
 
         if final_response:
-            final_response.tool_calls = (
+            # Prefer the response's own tool calls (they carry provider ids);
+            # the display's reconstruction is the fallback for providers whose
+            # final stream event lacks them.
+            final_response.tool_calls = final_response.tool_calls or (
                 display.tool_calls if display.tool_calls else None
             )
             final_response.content = display.accumulated_text
-            self.engine.chat_manager.add_user_message(message)
+            # "" is a continuation request — its tool results are already
+            # recorded as structured history.
+            if message:
+                self.engine.chat_manager.add_user_message(message)
             if final_response.is_success:
+                # Record tool calls with the text — tool results return as
+                # plain text, so history must show which calls were made or
+                # the model re-issues them. The structured form rides along
+                # for providers that replay history natively.
+                recorded = final_response.content or ""
+                calls_note = describe_tool_calls(final_response.tool_calls)
+                if calls_note:
+                    recorded = f"{recorded}\n{calls_note}".strip()
                 self.engine.chat_manager.add_assistant_message(
-                    final_response.content, final_response.model_used
+                    recorded,
+                    final_response.model_used,
+                    tool_calls=final_response.tool_calls,
+                    raw_content=final_response.content,
                 )
             return final_response
 
@@ -1002,6 +1089,13 @@ def main() -> None:
         help="Verbose output in headless mode",
     )
     @click.option(
+        "--max-iterations",
+        "max_iterations",
+        type=int,
+        default=None,
+        help="Tool iteration cap for headless mode (default: 25)",
+    )
+    @click.option(
         "--dangerously-skip-permissions",
         is_flag=True,
         default=False,
@@ -1034,6 +1128,7 @@ def main() -> None:
         prompt: Any,
         output_format: Any,
         verbose: Any,
+        max_iterations: Any,
         dangerously_skip_permissions: Any,
         provider: Any,
         model: Any,
@@ -1071,6 +1166,7 @@ def main() -> None:
                     provider=provider,
                     model=model,
                     base_url=base_url,
+                    max_iterations=max_iterations,
                 )
             )
             sys.exit(exit_code)

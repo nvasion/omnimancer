@@ -388,6 +388,47 @@ class TestMessageSending:
             mock_add_assistant.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_send_message_with_tools_records_tool_calls_in_history(
+        self, core_engine, mock_provider
+    ):
+        """The recorded assistant turn must mention the tool calls it made.
+
+        Recording only the text drops the tool calls from history, so on the
+        next iteration the model sees an empty assistant message followed by
+        an unlabeled result and re-issues the same call.
+        """
+        from omnimancer.core.models import ToolCall
+
+        core_engine.current_provider = mock_provider
+        mock_provider.send_message_with_tools = AsyncMock(
+            return_value=ChatResponse(
+                content="",
+                model_used="gpt-4",
+                tokens_used=10,
+                tool_calls=[
+                    ToolCall(name="Read", arguments={"file_path": "/src/a.py"})
+                ],
+            )
+        )
+
+        with (
+            patch.object(
+                core_engine.chat_manager,
+                "get_current_context",
+                return_value=Mock(),
+            ),
+            patch.object(
+                core_engine.chat_manager, "add_assistant_message"
+            ) as mock_add_assistant,
+        ):
+            response = await core_engine.send_message_with_tools("Read a.py", [])
+
+        assert response.is_success is True
+        recorded = mock_add_assistant.call_args[0][0]
+        assert "Read" in recorded
+        assert "/src/a.py" in recorded
+
+    @pytest.mark.asyncio
     async def test_send_message_no_provider(self, core_engine):
         """Test sending message with no provider."""
         response = await core_engine.send_message("Hello")
@@ -925,3 +966,154 @@ class TestEdgeCases:
         assert isinstance(results[2], bool)
         # Fourth should be dict
         assert isinstance(results[3], dict)
+
+
+class TestCustomModelsInCatalog:
+    """Custom models registered via /add-model or /switch appear in /models."""
+
+    def test_get_available_models_includes_custom(
+        self, core_engine, mock_providers, mock_config_manager
+    ):
+        from datetime import datetime
+
+        from omnimancer.core.models import EnhancedModelInfo
+
+        core_engine.providers = mock_providers
+        mock_config_manager.get_custom_models.return_value = [
+            EnhancedModelInfo(
+                name="qwen3-coder-flash",
+                provider="digitalocean",
+                description="Added on the fly",
+                max_tokens=4096,
+                cost_per_million_input=1.0,
+                cost_per_million_output=3.0,
+                swe_score=50.0,
+                available=True,
+                supports_tools=True,
+                supports_multimodal=False,
+                latest_version=False,
+                deprecated=False,
+                release_date=datetime.now(),
+                context_window=4096,
+                is_free=False,
+            )
+        ]
+
+        names = [m.name for m in core_engine.get_available_models()]
+        assert "qwen3-coder-flash" in names
+
+    def test_custom_duplicate_of_provider_model_not_doubled(
+        self, core_engine, mock_providers, mock_config_manager
+    ):
+        from datetime import datetime
+
+        from omnimancer.core.models import EnhancedModelInfo
+
+        core_engine.providers = mock_providers
+        provider_models = core_engine.get_available_models()
+        existing = provider_models[0]
+
+        mock_config_manager.get_custom_models.return_value = [
+            EnhancedModelInfo(
+                name=existing.name,
+                provider=existing.provider,
+                description="duplicate",
+                max_tokens=4096,
+                cost_per_million_input=1.0,
+                cost_per_million_output=3.0,
+                swe_score=50.0,
+                available=True,
+                supports_tools=True,
+                supports_multimodal=False,
+                latest_version=False,
+                deprecated=False,
+                release_date=datetime.now(),
+                context_window=4096,
+                is_free=False,
+            )
+        ]
+
+        names = [
+            (m.provider, m.name) for m in core_engine.get_available_models()
+        ]
+        assert names.count((existing.provider, existing.name)) == 1
+
+
+class TestNativeToolHistoryRecording:
+    """Engine records structured tool data alongside the legacy text."""
+
+    def _tool_response(self):
+        from omnimancer.core.models import ToolCall
+
+        return ChatResponse(
+            content="thinking",
+            model_used="gpt-4",
+            tokens_used=10,
+            tool_calls=[
+                ToolCall(name="file_read", arguments={"path": "/a"}, id="call_1")
+            ],
+        )
+
+    @pytest.mark.asyncio
+    async def test_assistant_message_keeps_structured_tool_calls(
+        self, core_engine, mock_providers
+    ):
+        from omnimancer.core.models import MessageRole
+
+        core_engine.current_provider = mock_providers["openai"]
+        core_engine.current_provider.send_message_with_tools = AsyncMock(
+            return_value=self._tool_response()
+        )
+
+        await core_engine.send_message_with_tools("read a", [])
+
+        messages = core_engine.chat_manager.get_current_context().messages
+        assistant = [m for m in messages if m.role == MessageRole.ASSISTANT][-1]
+        # Legacy text form preserved for non-native providers / persistence...
+        assert "[Called tools:" in assistant.content
+        # ...plus the structured form for native serialization.
+        assert assistant.tool_calls[0].id == "call_1"
+        assert assistant.raw_content == "thinking"
+
+    @pytest.mark.asyncio
+    async def test_empty_continuation_message_not_recorded(
+        self, core_engine, mock_providers
+    ):
+        from omnimancer.core.models import MessageRole
+
+        core_engine.current_provider = mock_providers["openai"]
+        core_engine.current_provider.send_message_with_tools = AsyncMock(
+            return_value=ChatResponse(
+                content="done", model_used="gpt-4", tokens_used=5
+            )
+        )
+
+        await core_engine.send_message_with_tools("", [])
+
+        messages = core_engine.chat_manager.get_current_context().messages
+        assert not [m for m in messages if m.role == MessageRole.USER]
+
+    def test_record_tool_results_attaches_records(self, core_engine):
+        from omnimancer.core.models import MessageRole, ToolResultRecord
+
+        core_engine.record_tool_results(
+            "Tool results:\n\n[file_read] Result: auth code",
+            [ToolResultRecord(tool_call_id="call_1", content="auth code")],
+        )
+
+        message = core_engine.chat_manager.get_current_context().messages[-1]
+        assert message.role == MessageRole.USER
+        assert "Tool results" in message.content
+        assert message.tool_results[0].tool_call_id == "call_1"
+
+    def test_provider_supports_native_tool_history(
+        self, core_engine, mock_providers
+    ):
+        core_engine.current_provider = None
+        assert core_engine.provider_supports_native_tool_history() is False
+
+        core_engine.current_provider = mock_providers["openai"]
+        core_engine.current_provider.supports_native_tool_history = Mock(
+            return_value=True
+        )
+        assert core_engine.provider_supports_native_tool_history() is True

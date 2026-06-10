@@ -464,6 +464,156 @@ class TestHeadlessRunner:
         assert "result" in types
 
     @pytest.mark.asyncio
+    async def test_native_tool_history_branch(self):
+        """Native providers get structured results in headless mode too."""
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        first = ChatResponse(
+            content="",
+            model_used="test-model",
+            tokens_used=20,
+            stop_reason="tool_use",
+            tool_calls=[
+                ToolCall(name="file_read", arguments={"path": "/a"}, id="call_7")
+            ],
+        )
+        final = ChatResponse(
+            content="Done.",
+            model_used="test-model",
+            tokens_used=10,
+            stop_reason="end_turn",
+            tool_calls=None,
+        )
+
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.provider_supports_native_tool_history = MagicMock(
+            return_value=True
+        )
+        mock_engine.record_tool_results = MagicMock()
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=[first, final])
+
+        mock_agent_engine = MagicMock()
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=MagicMock(
+                success=True, data="contents", error=None, was_cancelled=False
+            )
+        )
+        mock_engine.agent_engine = mock_agent_engine
+
+        runner = HeadlessRunner(
+            engine=mock_engine,
+            output_format=OutputFormat.TEXT,
+            no_approval=True,
+            verbose=False,
+        )
+        runner._emitter._stdout = StringIO()
+
+        exit_code = await runner.run("read a")
+        assert exit_code == 0
+
+        mock_engine.record_tool_results.assert_called_once()
+        _, records = mock_engine.record_tool_results.call_args[0]
+        assert records[0].tool_call_id == "call_7"
+        assert mock_engine.send_message_with_tools.call_args_list[1][0][0] == ""
+
+    @pytest.mark.asyncio
+    async def test_text_mimicked_tool_call_is_recovered(self):
+        """A '[Called tools: ...]' emitted as text still executes (headless)."""
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        mimicked = ChatResponse(
+            content='[Called tools: file_read({"path": "/main.py"})]',
+            model_used="test-model",
+            tokens_used=20,
+            stop_reason="end_turn",
+            tool_calls=None,
+        )
+        final = ChatResponse(
+            content="Done.",
+            model_used="test-model",
+            tokens_used=10,
+            stop_reason="end_turn",
+            tool_calls=None,
+        )
+
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=[mimicked, final])
+
+        mock_agent_engine = MagicMock()
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=MagicMock(
+                success=True,
+                data="print('hello')",
+                error=None,
+                was_cancelled=False,
+            )
+        )
+        mock_engine.agent_engine = mock_agent_engine
+
+        stdout_buf = StringIO()
+        runner = HeadlessRunner(
+            engine=mock_engine,
+            output_format=OutputFormat.STREAM_JSON,
+            no_approval=True,
+            verbose=False,
+        )
+        runner._emitter._stdout = stdout_buf
+
+        exit_code = await runner.run("read main.py")
+        assert exit_code == 0
+
+        mock_agent_engine.execute_with_approval.assert_called_once()
+        assert mock_engine.send_message_with_tools.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_tool_results_labeled_with_arguments(self):
+        """Results fed back to the model identify the call they belong to."""
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        first_response = ChatResponse(
+            content="",
+            model_used="test-model",
+            tokens_used=20,
+            stop_reason="tool_use",
+            tool_calls=[ToolCall(name="file_read", arguments={"path": "/main.py"})],
+        )
+        second_response = ChatResponse(
+            content="Done.",
+            model_used="test-model",
+            tokens_used=10,
+            stop_reason="end_turn",
+            tool_calls=None,
+        )
+
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.send_message_with_tools = AsyncMock(
+            side_effect=[first_response, second_response]
+        )
+        mock_agent_engine = MagicMock()
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=MagicMock(
+                success=True, data="contents", error=None, was_cancelled=False
+            )
+        )
+        mock_engine.agent_engine = mock_agent_engine
+
+        runner = HeadlessRunner(
+            engine=mock_engine,
+            output_format=OutputFormat.TEXT,
+            no_approval=True,
+            verbose=False,
+        )
+        runner._emitter._stdout = StringIO()
+
+        await runner.run("read main.py")
+
+        results_message = mock_engine.send_message_with_tools.call_args_list[1][0][0]
+        assert "/main.py" in results_message
+
+    @pytest.mark.asyncio
     async def test_json_output_format(self):
         from omnimancer.cli.headless import HeadlessRunner, OutputFormat
 
@@ -657,10 +807,56 @@ class TestHeadlessRunner:
         assert mock_engine.send_message_with_tools.call_count == MAX_TOOL_ITERATIONS
 
     @pytest.mark.asyncio
+    async def test_max_iterations_override(self):
+        """--max-iterations raises (or lowers) the headless cap."""
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        def make_response(*_args, **_kwargs):
+            make_response.n += 1
+            return ChatResponse(
+                content="Working...",
+                model_used="test",
+                tokens_used=10,
+                stop_reason="tool_use",
+                tool_calls=[
+                    ToolCall(
+                        name="Read", arguments={"file_path": f"/y{make_response.n}"}
+                    )
+                ],
+            )
+
+        make_response.n = 0
+
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=make_response)
+
+        mock_agent_engine = MagicMock()
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=MagicMock(
+                success=True, data="ok", error=None, was_cancelled=False
+            )
+        )
+        mock_engine.agent_engine = mock_agent_engine
+
+        runner = HeadlessRunner(
+            engine=mock_engine,
+            output_format=OutputFormat.TEXT,
+            no_approval=True,
+            verbose=False,
+            max_iterations=2,
+        )
+        runner._emitter._stdout = StringIO()
+
+        await runner.run("loop")
+        assert mock_engine.send_message_with_tools.call_count == 2
+
+    @pytest.mark.asyncio
     async def test_repeated_tool_call_stops_early(self):
         from omnimancer.cli.headless import HeadlessRunner, OutputFormat
 
-        # Same tool call every time → loop detection should stop after 3.
+        # Same tool call every time → executed twice, nudged twice, then
+        # the run stops on the 5th occurrence rather than running to the cap.
         repeated = ChatResponse(
             content="",
             model_used="test",
@@ -687,5 +883,6 @@ class TestHeadlessRunner:
 
         exit_code = await runner.run("loop")
         assert exit_code == 0
-        # Stops on the 3rd identical call rather than running to the cap.
-        assert mock_engine.send_message_with_tools.call_count == 3
+        assert mock_engine.send_message_with_tools.call_count == 5
+        # Only the first two occurrences actually executed.
+        assert mock_agent_engine.execute_with_approval.call_count == 2

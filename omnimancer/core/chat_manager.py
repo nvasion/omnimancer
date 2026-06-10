@@ -54,12 +54,15 @@ class ChatManager:
         context = self.get_current_context()
         context.current_model = model
 
-    def add_user_message(self, content: str) -> None:
+    def add_user_message(
+        self, content: str, tool_results: Optional[list] = None
+    ) -> None:
         """
         Add a user message to the current context.
 
         Args:
-            content: Message content
+            content: Message content (flattened text form)
+            tool_results: Optional ToolResultRecord list for native replay
         """
         context = self.get_current_context()
         message = ChatMessage(
@@ -67,16 +70,25 @@ class ChatManager:
             content=content,
             timestamp=datetime.now(),
             model_used=context.current_model,
+            tool_results=tool_results,
         )
         context.add_message(message)
 
-    def add_assistant_message(self, content: str, model_used: str) -> None:
+    def add_assistant_message(
+        self,
+        content: str,
+        model_used: str,
+        tool_calls: Optional[list] = None,
+        raw_content: Optional[str] = None,
+    ) -> None:
         """
         Add an assistant message to the current context.
 
         Args:
-            content: Message content
+            content: Message content (flattened text form, incl. tool notes)
             model_used: Model that generated the message
+            tool_calls: Optional ToolCall list for native replay
+            raw_content: Content without the appended tool-call note
         """
         context = self.get_current_context()
         message = ChatMessage(
@@ -84,6 +96,8 @@ class ChatManager:
             content=content,
             timestamp=datetime.now(),
             model_used=model_used,
+            tool_calls=tool_calls,
+            raw_content=raw_content,
         )
         context.add_message(message)
 

@@ -45,6 +45,9 @@ omn -p "fix the failing tests" --dangerously-skip-permissions
 
 # Verbose output / explicit config file
 omn -p "audit the security module" --verbose --config ~/.omnimancer/config.json
+
+# Raise the tool-iteration cap for big jobs (default: 25)
+omn -p "migrate every test file to pytest fixtures" --max-iterations 100
 ```
 
 The `--provider`, `--model`, and `--base-url` flags are **session overrides**: they
@@ -189,7 +192,7 @@ Tool names match the agent's toolset (`Read`, `Write`, `Edit`, `Bash`, `Glob`, `
 | `/help [command]` | Show help (optionally for a specific command) |
 | `/quit` | Exit (also: `/exit`, Ctrl+D) |
 | `/clear` | Clear terminal screen |
-| `/switch <provider> [model]` | Switch provider or model |
+| `/switch <provider> [model]` | Switch provider or model (uncataloged models are registered on the fly) |
 | `/models [filter]` | List available models (alias: `/model`) |
 | `/providers` | List all providers with status |
 | `/agent on\|off\|status` | Toggle agent mode |

@@ -30,12 +30,25 @@ class StreamEventType(Enum):
 
 @dataclass
 class ChatMessage:
-    """Represents a single chat message."""
+    """Represents a single chat message.
+
+    `content` is always the flattened text form — every provider, persistence,
+    and mid-conversation provider switches rely on it. The optional structured
+    fields carry the same tool exchange in native form so protocol-aware
+    providers (OpenAI-compatible) can serialize it as real tool messages
+    instead of text the model is tempted to mimic.
+    """
 
     role: MessageRole
     content: str
     timestamp: datetime
     model_used: str
+    # Assistant turns: the tool calls made, and the content without the
+    # appended "[Called tools: ...]" note.
+    tool_calls: Optional[List["ToolCall"]] = None
+    raw_content: Optional[str] = None
+    # User turns that carry tool results back to the model.
+    tool_results: Optional[List["ToolResultRecord"]] = None
 
 
 @dataclass
@@ -97,6 +110,77 @@ class ToolCall:
     name: str
     arguments: Dict[str, Any]
     server_name: Optional[str] = None
+    # Provider-assigned call id (OpenAI protocol pairs results to calls by id).
+    id: Optional[str] = None
+
+
+@dataclass
+class ToolResultRecord:
+    """A tool result paired to the call that produced it, for native replay."""
+
+    tool_call_id: str
+    content: str
+
+
+def describe_tool_calls(tool_calls: Optional[List["ToolCall"]]) -> str:
+    """One-line textual record of tool calls, for conversation history.
+
+    Tool calls are fed back to the model as plain text, so the history must
+    say which calls the assistant made — otherwise the model sees an empty
+    assistant turn followed by an unlabeled result and repeats the call.
+    """
+    import json
+
+    if not tool_calls:
+        return ""
+    calls = ", ".join(
+        f"{tc.name}({json.dumps(tc.arguments, sort_keys=True, default=str)})"
+        for tc in tool_calls
+    )
+    return f"[Called tools: {calls}]"
+
+
+def parse_described_tool_calls(content: Optional[str]) -> List["ToolCall"]:
+    """Inverse of describe_tool_calls — recover calls a model emitted as text.
+
+    Weak models sometimes mimic the "[Called tools: ...]" history notation
+    instead of issuing native tool calls. Without recovery the agent loop
+    sees no tool calls and silently ends the turn, even though the model
+    clearly intended to act. Returns [] when the marker is absent or the
+    arguments aren't valid JSON.
+    """
+    import json
+    import re
+
+    if not content:
+        return []
+    marker = re.search(r"\[Called tools:\s*", content)
+    if not marker:
+        return []
+
+    body = content[marker.end() :]
+    decoder = json.JSONDecoder()
+    name_pattern = re.compile(r"([A-Za-z_][\w.-]*)\s*\(")
+    calls: List[ToolCall] = []
+    pos = 0
+    while True:
+        match = name_pattern.search(body, pos)
+        if not match:
+            break
+        idx = match.end()
+        while idx < len(body) and body[idx].isspace():
+            idx += 1
+        try:
+            arguments, end = decoder.raw_decode(body, idx)
+        except ValueError:
+            pos = match.end()
+            continue
+        if not isinstance(arguments, dict):
+            pos = end
+            continue
+        calls.append(ToolCall(name=match.group(1), arguments=arguments))
+        pos = end
+    return calls
 
 
 @dataclass
@@ -106,6 +190,9 @@ class ToolResult:
     content: str
     error: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    # User chose "quit" at the approval prompt — abort the whole agent turn,
+    # not just this operation (a plain deny leaves this False).
+    cancelled: bool = False
 
 
 @dataclass

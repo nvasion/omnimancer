@@ -192,3 +192,146 @@ class TestOpenAIToolCalling:
                 await openai_provider.send_message_with_tools(
                     "Read file", sample_chat_context, sample_tools
                 )
+
+
+class TestOpenAINativeToolHistory:
+    """The within-turn tool exchange must follow the native OpenAI protocol.
+
+    Flattening tool calls/results into plain text violates the chat template
+    the model was trained on — capable models then leak template tokens
+    (<tool_call>, <function=...) as text instead of issuing native calls.
+    """
+
+    def test_supports_native_tool_history(self, openai_provider):
+        from omnimancer.providers.base import BaseProvider
+
+        assert openai_provider.supports_native_tool_history() is True
+        assert BaseProvider.supports_native_tool_history(openai_provider) is False
+
+    @pytest.mark.asyncio
+    async def test_tool_call_id_parsed_from_response(
+        self,
+        openai_provider,
+        sample_chat_context,
+        sample_tools,
+        mock_tool_call_response,
+    ):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_tool_call_response
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                return_value=mock_response
+            )
+            response = await openai_provider.send_message_with_tools(
+                "Read main.py", sample_chat_context, sample_tools
+            )
+
+        assert response.tool_calls[0].id == "call_abc"
+
+    @pytest.mark.asyncio
+    async def test_missing_tool_call_id_is_synthesized(
+        self,
+        openai_provider,
+        sample_chat_context,
+        sample_tools,
+        mock_tool_call_response,
+    ):
+        del mock_tool_call_response["choices"][0]["message"]["tool_calls"][0]["id"]
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_tool_call_response
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                return_value=mock_response
+            )
+            response = await openai_provider.send_message_with_tools(
+                "Read main.py", sample_chat_context, sample_tools
+            )
+
+        assert response.tool_calls[0].id
+
+    @pytest.mark.asyncio
+    async def test_structured_history_serialized_natively(
+        self, openai_provider, sample_tools, mock_text_response
+    ):
+        """Recorded tool exchanges become assistant.tool_calls + role:"tool"."""
+        import json
+
+        from omnimancer.core.models import ToolCall, ToolResultRecord
+
+        context = ChatContext(
+            messages=[
+                ChatMessage(
+                    role=MessageRole.USER,
+                    content="find the auth code",
+                    timestamp=datetime.now(),
+                    model_used="gpt-4",
+                ),
+                ChatMessage(
+                    role=MessageRole.ASSISTANT,
+                    content='I\'ll search.\n[Called tools: file_read({"path": "/a"})]',
+                    timestamp=datetime.now(),
+                    model_used="gpt-4",
+                    raw_content="I'll search.",
+                    tool_calls=[
+                        ToolCall(
+                            name="file_read",
+                            arguments={"path": "/a"},
+                            id="call_1",
+                        )
+                    ],
+                ),
+                ChatMessage(
+                    role=MessageRole.USER,
+                    content="Tool results:\n\n[file_read] Result: auth code",
+                    timestamp=datetime.now(),
+                    model_used="gpt-4",
+                    tool_results=[
+                        ToolResultRecord(tool_call_id="call_1", content="auth code")
+                    ],
+                ),
+            ],
+            current_model="gpt-4",
+            session_id="s",
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_text_response
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_post = AsyncMock(return_value=mock_response)
+            mock_client.return_value.__aenter__.return_value.post = mock_post
+
+            await openai_provider.send_message_with_tools("", context, sample_tools)
+
+            call_kwargs = mock_post.call_args
+            body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+
+        messages = body["messages"]
+        # No empty trailing user message for a continuation request.
+        assert messages[-1]["role"] == "tool"
+
+        assistant = messages[1]
+        assert assistant["role"] == "assistant"
+        assert assistant["content"] == "I'll search."
+        tc = assistant["tool_calls"][0]
+        assert tc["id"] == "call_1"
+        assert tc["type"] == "function"
+        assert tc["function"]["name"] == "file_read"
+        assert json.loads(tc["function"]["arguments"]) == {"path": "/a"}
+
+        tool_msg = messages[2]
+        assert tool_msg == {
+            "role": "tool",
+            "tool_call_id": "call_1",
+            "content": "auth code",
+        }
+
+        # The flattened legacy text must not leak into the native request.
+        assert not any(
+            "[Called tools" in (m.get("content") or "") for m in messages
+        )

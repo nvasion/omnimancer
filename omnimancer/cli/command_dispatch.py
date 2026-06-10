@@ -284,6 +284,16 @@ class CommandDispatchMixin:
                 except Exception:
                     continue
 
+            # Merge in custom models (added via /add-model or /switch) —
+            # they live in config, not in any provider's static catalog.
+            try:
+                for custom in self.engine.config_manager.get_custom_models():
+                    bucket = all_models.setdefault(custom.provider, [])
+                    if not any(m.name == custom.name for m in bucket):
+                        bucket.append(custom)
+            except Exception:
+                pass
+
             # Apply filtering
             if filter_type == "provider" and filter_value:
                 all_models = {
@@ -411,6 +421,36 @@ class CommandDispatchMixin:
         except Exception as e:
             return f"Error displaying models: {e}"
 
+    def _register_model_on_the_fly(self, provider_name: str, model_name: str) -> None:
+        """Register an uncataloged model as a custom model so /switch works.
+
+        The entry persists in config, shows up in /models, and can be removed
+        with /remove-model if the endpoint turns out to reject it.
+        """
+        model_info = EnhancedModelInfo(
+            name=model_name,
+            provider=provider_name,
+            description="Added on the fly via /switch",
+            max_tokens=4096,
+            cost_per_million_input=0.0,
+            cost_per_million_output=0.0,
+            swe_score=50.0,
+            available=True,
+            supports_tools=True,
+            supports_multimodal=False,
+            latest_version=False,
+            deprecated=False,
+            release_date=datetime.now(),
+            context_window=4096,
+            is_free=False,
+        )
+        self.engine.config_manager.add_custom_model(model_info)
+        self._show_warning(
+            f"Model '{model_name}' isn't in the {provider_name} catalog — "
+            "registered it as a custom model and switching anyway. "
+            f"(/remove-model {model_name} {provider_name} to undo)"
+        )
+
     async def _handle_switch_command(self, command: Command) -> None:
         """Handle switch command with enhanced provider type support."""
         args = command.args
@@ -484,34 +524,10 @@ class CommandDispatchMixin:
                     all_model_names = model_names + custom_model_names
 
                     if model_name not in all_model_names:
-                        self._show_error(
-                            f"Model '{model_name}' not"
-                            " available for provider"
-                            f" '{provider_name}'."
-                        )
-                        if all_model_names:
-                            # Show suggestions for similar model names
-                            suggestions = [
-                                m
-                                for m in all_model_names
-                                if model_name.lower() in m.lower()
-                                or m.lower() in model_name.lower()
-                            ]
-                            if suggestions:
-                                models_str = ", ".join(suggestions[:5])
-                                self._show_info(
-                                    "Available models for"
-                                    f" {provider_name}:"
-                                    f" {models_str}"
-                                )
-                            else:
-                                models_str = ", ".join(all_model_names[:5])
-                                self._show_info(
-                                    "Available models for"
-                                    f" {provider_name}:"
-                                    f" {models_str}"
-                                )
-                        return
+                        # Static catalogs are forever stale and the endpoint
+                        # accepts any model string — register it on the fly
+                        # instead of refusing.
+                        self._register_model_on_the_fly(provider_name, model_name)
 
                 success = await self.engine.switch_model(provider_name, model_name)
 

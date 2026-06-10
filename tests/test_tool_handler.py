@@ -311,6 +311,40 @@ class TestToolHandlerExecution:
         result = await tool_handler.execute_tool_call(tc)
 
         assert result.error == "Operation cancelled by user"
+        assert result.cancelled is True
+
+    @pytest.mark.asyncio
+    async def test_denied_result_not_marked_cancelled(
+        self, tool_handler, mock_agent_engine
+    ):
+        """'n' (deny) only rejects one operation — the turn continues."""
+        mock_agent_engine.execute_with_approval.return_value = OperationResult(
+            success=False, error="Operation not approved by user"
+        )
+
+        tc = ToolCall(name="command_exec", arguments={"command": "ls"})
+        result = await tool_handler.execute_tool_call(tc)
+
+        assert result.error
+        assert result.cancelled is False
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_stops_after_cancellation(
+        self, tool_handler, mock_agent_engine
+    ):
+        """'q' (quit) must not prompt for the remaining calls in the batch."""
+        mock_agent_engine.execute_with_approval.return_value = OperationResult(
+            success=False, error="User rejected", was_cancelled=True
+        )
+
+        tool_calls = [
+            ToolCall(name="command_exec", arguments={"command": "ls"}),
+            ToolCall(name="command_exec", arguments={"command": "pwd"}),
+        ]
+        results = await tool_handler.execute_tool_calls(tool_calls)
+
+        assert mock_agent_engine.execute_with_approval.call_count == 1
+        assert results[-1].cancelled is True
 
     @pytest.mark.asyncio
     async def test_execute_unknown_tool(self, tool_handler):
@@ -531,6 +565,54 @@ class TestCommandResultFidelity:
         )
         assert result.error is None
         assert result.content  # never empty — the model needs a signal
+
+
+class TestRepeatedCallTracker:
+    """Identical repeated calls are nudged before the turn is aborted.
+
+    Aborting on the 3rd identical call punished the user for model confusion
+    (and killed turns where a re-run was legitimate, e.g. re-Read after Edit).
+    """
+
+    def _tracker(self):
+        from omnimancer.cli.tool_handler import RepeatedCallTracker
+
+        return RepeatedCallTracker()
+
+    def _call(self, name="Read", **args):
+        return ToolCall(name=name, arguments=args)
+
+    def test_first_two_occurrences_execute_normally(self):
+        tracker = self._tracker()
+        tc = self._call(path="/a.py")
+        tracker.record([tc])
+        assert not tracker.is_duplicate(tc)
+        tracker.record([tc])
+        assert not tracker.is_duplicate(tc)
+
+    def test_third_occurrence_is_duplicate_not_abort(self):
+        tracker = self._tracker()
+        tc = self._call(path="/a.py")
+        for _ in range(3):
+            tracker.record([tc])
+        assert tracker.is_duplicate(tc)
+        assert tracker.abort_offender([tc]) is None
+
+    def test_fifth_occurrence_aborts_and_names_offender(self):
+        tracker = self._tracker()
+        tc = self._call(path="/a.py")
+        for _ in range(5):
+            tracker.record([tc])
+        offender = tracker.abort_offender([tc])
+        assert offender is tc
+        assert tracker.count(tc) == 5
+
+    def test_different_arguments_are_not_duplicates(self):
+        tracker = self._tracker()
+        for offset in range(10):
+            tc = self._call(path="/a.py", offset=offset)
+            tracker.record([tc])
+            assert not tracker.is_duplicate(tc)
 
 
 class TestToolDefinitions:
