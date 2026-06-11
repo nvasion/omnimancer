@@ -19,7 +19,7 @@ from rich.prompt import Confirm
 from rich.table import Table
 
 # Internal imports - Core
-from ..core.models import EnhancedModelInfo
+from ..core.models import EnhancedModelInfo, FallbackConfig
 from ..providers.factory import ProviderFactory
 
 # Internal imports - CLI
@@ -124,6 +124,8 @@ class CommandDispatchMixin:
             await self._handle_prompts_command(command)
         elif slash_cmd == SlashCommand.SUBAGENTS:
             await self._handle_subagents_command(command)
+        elif slash_cmd == SlashCommand.FALLBACK:
+            await self._handle_fallback_command(command)
         elif slash_cmd is not None:
             self._show_info(f"Command {slash_cmd.value} is not yet implemented")
 
@@ -1858,3 +1860,228 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
 
         except Exception as e:
             self._show_error(f"Failed to list custom models: {e}")
+
+    # ------------------------------------------------------------------
+    # /fallback
+    # ------------------------------------------------------------------
+
+    # --- helpers ----------------------------------------------------------
+
+    @staticmethod
+    def _validate_toggle_arg(arg: str) -> Optional[bool]:
+        """Return True/False for 'on'/'off', or None if the value is invalid.
+
+        Centralises validation of boolean toggle arguments so individual
+        subhandlers don't duplicate the same ``if toggle not in ("on", "off")``
+        check.
+        """
+        if arg == "on":
+            return True
+        if arg == "off":
+            return False
+        return None
+
+    def _persist_fallback_config(self, fb: FallbackConfig) -> None:
+        """Persist *fb* to disk and immediately sync the engine.
+
+        This single method replaces the repeated trio of:
+          ``config.fallback = fb``
+          ``self.engine.config_manager.save_config()``
+          ``self.engine.configure_fallback()``
+        across every subcommand handler.
+        """
+        config = self.engine.config_manager.get_config()
+        config.fallback = fb
+        self.engine.config_manager.save_config()
+        # Sync the engine's runtime handler immediately so changes take effect
+        # without requiring a restart.
+        self.engine.configure_fallback()
+
+    # --- dispatcher -------------------------------------------------------
+
+    async def _handle_fallback_command(self, command: Command) -> None:
+        """Handle the /fallback command family.
+
+        Sub-commands
+        ------------
+        /fallback                         show current fallback configuration
+        /fallback status                  same as above
+        /fallback auto [on|off]           toggle or query auto-fallback
+        /fallback order <p1> <p2> …       set the ordered fallback provider list
+        /fallback order clear             clear the fallback order (use any)
+        /fallback on-rate-limit [on|off]  toggle fallback on 429 errors
+        /fallback on-quota [on|off]       toggle fallback on quota errors
+        /fallback help                    show this help text
+        """
+        try:
+            config = self.engine.config_manager.get_config()
+            # Use a fresh FallbackConfig() default if the config object does
+            # not yet have a fallback section (e.g., existing installs).
+            fb: FallbackConfig = getattr(config, "fallback", FallbackConfig())
+
+            args = list(command.args) if command.args else []
+            sub = args[0].lower() if args else "status"
+
+            dispatch: dict[str, Any] = {
+                "status": lambda: self._show_fallback_status(fb),
+                "":       lambda: self._show_fallback_status(fb),
+                "help":   self._show_fallback_help,
+                "auto":             lambda: self._handle_auto_subcommand(fb, args),
+                "order":            lambda: self._handle_order_subcommand(fb, args),
+                "on-rate-limit":    lambda: self._handle_on_rate_limit_subcommand(fb, args),
+                "on-quota":         lambda: self._handle_on_quota_subcommand(fb, args),
+            }
+
+            handler = dispatch.get(sub)
+            if handler is None:
+                self._show_error(
+                    f"Unknown sub-command '{sub}'. Run [cyan]/fallback help[/cyan] for usage."
+                )
+            else:
+                result = handler()
+                # Subhandlers may be coroutines in the future; await if needed.
+                if asyncio.iscoroutine(result):
+                    await result
+
+        except ValueError as exc:
+            # Raised by subhandlers for invalid user input.
+            self._show_error(str(exc))
+        except Exception as exc:
+            logger.debug("Fallback command error", exc_info=True)
+            self._show_error(f"Failed to update fallback config: {exc}")
+
+    # --- subhandlers ------------------------------------------------------
+
+    def _handle_auto_subcommand(self, fb: FallbackConfig, args: list[str]) -> None:
+        """Handle ``/fallback auto [on|off]``."""
+        if len(args) < 2:
+            state = "on" if fb.auto_fallback else "off"
+            self._show_info(
+                f"Auto-fallback is currently [bold]{state}[/bold]. "
+                f"Use [cyan]/fallback auto on[/cyan] or "
+                f"[cyan]/fallback auto off[/cyan] to change."
+            )
+            return
+
+        enabled = self._validate_toggle_arg(args[1].lower())
+        if enabled is None:
+            raise ValueError("Usage: /fallback auto [on|off]")
+
+        fb.auto_fallback = enabled
+        self._persist_fallback_config(fb)
+        label = "enabled" if enabled else "disabled"
+        self._show_success(f"Auto-fallback {label}.")
+
+    def _handle_order_subcommand(self, fb: FallbackConfig, args: list[str]) -> None:
+        """Handle ``/fallback order [<p1> <p2> … | clear]``."""
+        if len(args) < 2:
+            order_str = " → ".join(fb.fallback_order) if fb.fallback_order else "(any)"
+            self._show_info(f"Current fallback order: {order_str}")
+            return
+
+        if args[1].lower() == "clear":
+            fb.fallback_order = []
+            self._persist_fallback_config(fb)
+            self._show_success("Fallback order cleared (will use any available provider).")
+            return
+
+        # Validate that each name is a known provider.
+        known = set(self.engine.providers.keys())
+        new_order: list[str] = []
+        unknown: list[str] = []
+        for name in args[1:]:
+            if name in known:
+                new_order.append(name)
+            else:
+                unknown.append(name)
+
+        if unknown:
+            self._show_warning(
+                f"Unknown provider(s) skipped: {', '.join(unknown)}. "
+                f"Known: {', '.join(sorted(known)) or 'none'}"
+            )
+        if not new_order:
+            raise ValueError("No valid providers specified. Nothing changed.")
+
+        fb.fallback_order = new_order
+        self._persist_fallback_config(fb)
+        self._show_success(f"Fallback order set: {' → '.join(new_order)}")
+
+    def _handle_on_rate_limit_subcommand(self, fb: FallbackConfig, args: list[str]) -> None:
+        """Handle ``/fallback on-rate-limit [on|off]``."""
+        if len(args) < 2:
+            state = "on" if fb.fallback_on_rate_limit else "off"
+            self._show_info(f"Fallback on rate-limit (429) is [bold]{state}[/bold].")
+            return
+
+        enabled = self._validate_toggle_arg(args[1].lower())
+        if enabled is None:
+            raise ValueError("Usage: /fallback on-rate-limit [on|off]")
+
+        fb.fallback_on_rate_limit = enabled
+        self._persist_fallback_config(fb)
+        label = "enabled" if enabled else "disabled"
+        self._show_success(f"Fallback on rate-limit {label}.")
+
+    def _handle_on_quota_subcommand(self, fb: FallbackConfig, args: list[str]) -> None:
+        """Handle ``/fallback on-quota [on|off]``."""
+        if len(args) < 2:
+            state = "on" if fb.fallback_on_quota else "off"
+            self._show_info(f"Fallback on quota errors is [bold]{state}[/bold].")
+            return
+
+        enabled = self._validate_toggle_arg(args[1].lower())
+        if enabled is None:
+            raise ValueError("Usage: /fallback on-quota [on|off]")
+
+        fb.fallback_on_quota = enabled
+        self._persist_fallback_config(fb)
+        label = "enabled" if enabled else "disabled"
+        self._show_success(f"Fallback on quota errors {label}.")
+
+    # --- display helpers --------------------------------------------------
+
+    def _show_fallback_status(self, fb: FallbackConfig) -> None:
+        """Print a Rich table with the current fallback configuration."""
+        table = Table(title="Fallback Configuration", show_header=True, header_style="bold cyan")
+        table.add_column("Setting", style="bold")
+        table.add_column("Value")
+        table.add_column("Description", style="dim")
+
+        auto_label = "[green]on[/green]" if fb.auto_fallback else "[yellow]off[/yellow]"
+        rl_label   = "[green]on[/green]" if fb.fallback_on_rate_limit else "[yellow]off[/yellow]"
+        q_label    = "[green]on[/green]" if fb.fallback_on_quota else "[yellow]off[/yellow]"
+        order_str  = " [dim]→[/dim] ".join(fb.fallback_order) if fb.fallback_order else "[dim](any available)[/dim]"
+
+        table.add_row("auto",          auto_label, "Switch without asking")
+        table.add_row("on-rate-limit", rl_label,   "Fallback on 429 / rate-limit")
+        table.add_row("on-quota",      q_label,    "Fallback on quota exceeded")
+        table.add_row("order",         order_str,  "Ordered list of providers to try")
+
+        self.console.print(table)
+        self.console.print(
+            "\n[dim]Tip: [cyan]/fallback auto on[/cyan] to auto-switch silently, "
+            "[cyan]/fallback order claude openai[/cyan] to set priority.[/dim]"
+        )
+
+    def _show_fallback_help(self) -> None:
+        """Print /fallback usage."""
+        help_text = (
+            "[bold cyan]/fallback[/bold cyan] — manage rate-limit fallback behaviour\n\n"
+            "[bold]Sub-commands[/bold]\n"
+            "  [cyan]/fallback[/cyan]                         show current configuration\n"
+            "  [cyan]/fallback auto on|off[/cyan]             auto-switch on rate limit (no prompt)\n"
+            "  [cyan]/fallback order <p1> <p2> …[/cyan]       set ordered fallback providers\n"
+            "  [cyan]/fallback order clear[/cyan]              clear order (use any available)\n"
+            "  [cyan]/fallback on-rate-limit on|off[/cyan]    enable/disable fallback on 429\n"
+            "  [cyan]/fallback on-quota on|off[/cyan]         enable/disable fallback on quota errors\n\n"
+            "[bold]Examples[/bold]\n"
+            "  [dim]/fallback auto on[/dim]                   silently switch when rate-limited\n"
+            "  [dim]/fallback order claude openai gemini[/dim]  try in this order\n"
+            "  [dim]/fallback order clear[/dim]               reset to default (any provider)\n\n"
+            "When [bold]auto[/bold] is off (default), omnimancer will pause and ask:\n"
+            "  [yellow]⚠ Rate limit hit on claude. Fall back to openai? [Y/n][/yellow]"
+        )
+        self.console.print(
+            Panel(help_text, title="Fallback Help", border_style="cyan")
+        )

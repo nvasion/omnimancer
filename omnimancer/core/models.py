@@ -1274,6 +1274,31 @@ class SubAgentDefinition(BaseModel):
         return str(v).strip()
 
 
+class FallbackConfig(BaseModel):
+    """Configuration for automatic rate-limit / quota fallback behaviour.
+
+    When a provider returns a 429 (rate limit) or quota-exceeded error omnimancer
+    can either automatically switch to the next provider in ``fallback_order``
+    (``auto_fallback=True``) or pause and ask the user interactively
+    (``auto_fallback=False``, the default).
+
+    ``fallback_order`` is an ordered list of provider names.  The first entry
+    that is available and different from the current provider will be tried.
+    If the list is empty, omnimancer picks *any* configured provider that is
+    not the failing one.
+    """
+
+    fallback_order: List[str] = []
+    auto_fallback: bool = False
+    fallback_on_rate_limit: bool = True
+    fallback_on_quota: bool = False
+
+    @field_validator("fallback_order")
+    @classmethod
+    def validate_fallback_order(cls, v: Any) -> Any:
+        return [str(p).strip() for p in v if str(p).strip()]
+
+
 class Config(BaseModel):
     """Main configuration model."""
 
@@ -1285,6 +1310,7 @@ class Config(BaseModel):
     hooks: HooksConfig = HooksConfig()
     permissions: PermissionsConfig = PermissionsConfig()
     subagents: Dict[str, SubAgentDefinition] = {}
+    fallback: FallbackConfig = FallbackConfig()
 
     # Profile management
     profiles: Dict[str, ConfigProfile] = {}

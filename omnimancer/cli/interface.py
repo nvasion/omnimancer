@@ -166,6 +166,9 @@ class CommandLineInterface(
         # Enhanced input disabled to avoid arrow key display issues
         self.enhanced_input = None
 
+        # Register the interactive rate-limit fallback approval callback.
+        self._register_fallback_callback()
+
     def start(self) -> None:
         """Start the interactive CLI session."""
         asyncio.run(self._async_start())
@@ -296,6 +299,57 @@ class CommandLineInterface(
     def stop(self) -> None:
         """Stop the CLI session."""
         self.running = False
+
+    # ------------------------------------------------------------------
+    # Rate-limit fallback
+    # ------------------------------------------------------------------
+
+    def _register_fallback_callback(self) -> None:
+        """Wire up the interactive approval callback on the engine."""
+        try:
+            self.engine.set_fallback_approval_callback(
+                self._fallback_approval_callback
+            )
+        except Exception as exc:
+            logger.debug("Could not register fallback callback: %s", exc)
+
+    async def _fallback_approval_callback(
+        self,
+        current_provider: str,
+        next_provider: str,
+        error: str,
+    ) -> bool:
+        """Show a prompt asking whether to fall back to *next_provider*.
+
+        Called by the engine when a rate-limit error is detected and
+        ``auto_fallback`` is False.  Returns True to proceed with the switch.
+        """
+        # Keep the display clean — print to a fresh line.
+        self.console.print()
+        self.console.print(
+            f"[bold yellow]⚠  Rate limit hit on [cyan]{current_provider}[/cyan].[/bold yellow]"
+        )
+        # Show a brief excerpt of the error for context.
+        brief = (error[:120] + "…") if len(error) > 120 else error
+        self.console.print(f"   [dim]{brief}[/dim]")
+        self.console.print(
+            f"   [bold]Fall back to [cyan]{next_provider}[/cyan]?[/bold]"
+        )
+
+        try:
+            answer = self.console.input("   [Y/n]: ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            self.console.print("[dim]Fallback declined.[/dim]")
+            return False
+
+        approved = answer in ("", "y", "yes")
+        if approved:
+            self.console.print(
+                f"[green]✓ Switching to [cyan]{next_provider}[/cyan]…[/green]"
+            )
+        else:
+            self.console.print("[dim]Fallback declined.[/dim]")
+        return approved
 
     def _initialize_console_with_fallback(self) -> Console:
         """
