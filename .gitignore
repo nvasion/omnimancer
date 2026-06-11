@@ -210,3 +210,10 @@ node_modules/
 # OS specific
 
 .factory/worktrees/
+
+# Workflow and testing
+junit*.xml
+bandit*.json
+safety*.json
+dependency*.json
+licenses.json

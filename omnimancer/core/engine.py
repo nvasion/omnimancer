@@ -8,7 +8,7 @@ Version: 1.0.0
 """
 
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from ..core.models import (
     ChatResponse,
@@ -21,7 +21,7 @@ from ..core.models import (
 )
 from ..providers.base import BaseProvider
 from ..ui.progress_indicator import OperationType, get_progress_indicator
-from ..utils.errors import ConfigurationError
+from ..utils.errors import ConfigurationError, RateLimitError
 from .chat_manager import ChatManager
 from .config_manager import ConfigManager
 from .conversation_manager import ConversationManager
@@ -29,6 +29,7 @@ from .health_monitor import HealthMonitor
 from .hooks import HookOutcome, HooksManager
 from .provider_initializer import ProviderInitializer
 from .provider_registry import ProviderRegistry
+from .rate_limit_fallback import ApprovalCallback, RateLimitFallbackHandler
 from .security.permission_rules import PermissionDecision, PermissionRuleEngine
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,10 @@ class CoreEngine:
 
         # Initialize agent engine for autonomous operations
         self.agent_engine = None
+
+        # Rate-limit fallback handler — configured from Config.fallback on
+        # every send, so runtime edits via /fallback take effect immediately.
+        self._fallback_handler = RateLimitFallbackHandler()
 
     async def initialize_providers(self) -> None:
         """Initialize all configured providers."""
@@ -226,6 +231,74 @@ class CoreEngine:
             )
         return "No provider available. Please configure a provider first."
 
+    # ------------------------------------------------------------------
+    # Fallback wiring
+    # ------------------------------------------------------------------
+
+    def set_fallback_approval_callback(self, callback: ApprovalCallback) -> None:
+        """Register the interactive approval callback (typically set by the CLI).
+
+        The callback signature is::
+
+            async def callback(current: str, next_: str, error: str) -> bool
+
+        Return ``True`` to proceed with the switch, ``False`` to abort.
+        """
+        self._fallback_handler.set_approval_callback(callback)
+
+    def configure_fallback(self) -> None:
+        """Sync fallback settings from the current Config.
+
+        Called automatically before every send so that runtime changes made
+        via ``/fallback`` are picked up without restarting.
+        """
+        try:
+            config = self.config_manager.get_config()
+            fallback_cfg = getattr(config, "fallback", None)
+            if fallback_cfg is not None:
+                self._fallback_handler.update_from_config(fallback_cfg)
+        except Exception as exc:
+            logger.debug("configure_fallback skipped: %s", exc)
+
+    async def _apply_rate_limit_fallback(
+        self,
+        error_str: str,
+    ) -> Optional[str]:
+        """Try to obtain approval for a provider switch.
+
+        Returns the name of the approved next provider, or ``None`` if no
+        fallback should be attempted (not configured, no candidate, or user
+        declined).
+        """
+        if not self.current_provider:
+            return None
+        if not self._fallback_handler.should_fallback(error_str):
+            return None
+
+        current_name = self.current_provider.get_provider_name()
+        available = list(self.providers.keys())
+        next_name = self._fallback_handler.get_next_provider(current_name, available)
+
+        if not next_name:
+            logger.debug("Rate-limit fallback: no alternative provider available.")
+            return None
+
+        approved = await self._fallback_handler.request_approval(
+            current_name, next_name, error_str
+        )
+        if not approved:
+            return None
+
+        return next_name
+
+    async def _do_provider_switch(self, next_name: str) -> None:
+        """Switch current_provider to *next_name* and update chat state."""
+        self.current_provider = self.providers[next_name]
+        self.chat_manager.set_current_model(self.current_provider.model)
+        logger.info("Rate-limit fallback: switched to provider '%s'.", next_name)
+
+    # ------------------------------------------------------------------
+
     async def _fire_hook(
         self,
         event: str,
@@ -278,6 +351,9 @@ class CoreEngine:
                 error=self._no_provider_error(),
             )
 
+        # Sync fallback config so runtime changes via /fallback take effect.
+        self.configure_fallback()
+
         try:
             # Fire pre-send hooks; a blocking hook can veto the send.
             hook_ctx = {
@@ -310,14 +386,56 @@ class CoreEngine:
             if progress and progress.enabled:
                 progress.complete_operation("engine_context", "completed")
 
-            # Send message to provider
+            # Send message to provider (catch RateLimitError explicitly so we
+            # can offer a fallback before falling through to the generic handler)
             if progress and progress.enabled:
                 progress.start_operation(
                     "engine_provider",
                     OperationType.NETWORK,
                     f"Sending to {self.current_provider.get_provider_name()}",
                 )
-            response = await self.current_provider.send_message(message, context)
+            try:
+                response = await self.current_provider.send_message(message, context)
+            except RateLimitError as exc:
+                # Convert to a response so we can run the same fallback path.
+                response = ChatResponse(
+                    content="",
+                    model_used="",
+                    tokens_used=0,
+                    error=str(exc),
+                )
+
+            # ---- Rate-limit fallback ----------------------------------------
+            if not response.is_success:
+                error_str = response.error or ""
+                next_name = await self._apply_rate_limit_fallback(error_str)
+                if next_name:
+                    await self._do_provider_switch(next_name)
+                    if progress and progress.enabled:
+                        progress.start_operation(
+                            "engine_provider_fallback",
+                            OperationType.NETWORK,
+                            f"Retrying with {self.current_provider.get_provider_name()}",
+                        )
+                    try:
+                        fb_context = self.chat_manager.get_current_context()
+                        response = await self.current_provider.send_message(
+                            message, fb_context
+                        )
+                    except Exception as exc:
+                        response = ChatResponse(
+                            content="",
+                            model_used="",
+                            tokens_used=0,
+                            error=f"Fallback provider failed: {exc}",
+                        )
+                    if progress and progress.enabled:
+                        progress.complete_operation(
+                            "engine_provider_fallback",
+                            "completed" if response.is_success else "failed",
+                        )
+            # -----------------------------------------------------------------
+
             if progress and progress.enabled:
                 progress.complete_operation(
                     "engine_provider",
@@ -375,6 +493,9 @@ class CoreEngine:
                 error=self._no_provider_error(),
             )
 
+        # Sync fallback config so runtime changes via /fallback take effect.
+        self.configure_fallback()
+
         try:
             outcome = await self._fire_hook(
                 "pre_send_message",
@@ -395,9 +516,38 @@ class CoreEngine:
                 )
 
             context = self.chat_manager.get_current_context()
-            response = await self.current_provider.send_message_with_tools(
-                message, context, tools
-            )
+
+            try:
+                response = await self.current_provider.send_message_with_tools(
+                    message, context, tools
+                )
+            except RateLimitError as exc:
+                response = ChatResponse(
+                    content="",
+                    model_used="",
+                    tokens_used=0,
+                    error=str(exc),
+                )
+
+            # ---- Rate-limit fallback ----------------------------------------
+            if not response.is_success:
+                error_str = response.error or ""
+                next_name = await self._apply_rate_limit_fallback(error_str)
+                if next_name:
+                    await self._do_provider_switch(next_name)
+                    try:
+                        fb_context = self.chat_manager.get_current_context()
+                        response = await self.current_provider.send_message_with_tools(
+                            message, fb_context, tools
+                        )
+                    except Exception as exc:
+                        response = ChatResponse(
+                            content="",
+                            model_used="",
+                            tokens_used=0,
+                            error=f"Fallback provider failed: {exc}",
+                        )
+            # -----------------------------------------------------------------
 
             # A continuation request ("" after recorded tool results) adds
             # nothing the model needs to see as a user turn.
@@ -437,9 +587,37 @@ class CoreEngine:
                 error="No provider available.",
             )
             return
+
+        # Sync fallback config on every call.
+        self.configure_fallback()
+
         context = self.chat_manager.get_current_context()
+        rate_limit_error: Optional[str] = None
+
         async for event in self.current_provider.send_message_stream(message, context):
+            if event.type == StreamEventType.ERROR:
+                err = event.error or ""
+                if self._fallback_handler.should_fallback(err):
+                    # Hold the error; don't yield it yet — try fallback first.
+                    rate_limit_error = err
+                    break
             yield event
+
+        if rate_limit_error:
+            next_name = await self._apply_rate_limit_fallback(rate_limit_error)
+            if next_name:
+                await self._do_provider_switch(next_name)
+                fb_context = self.chat_manager.get_current_context()
+                async for event in self.current_provider.send_message_stream(
+                    message, fb_context
+                ):
+                    yield event
+            else:
+                # No fallback available / user declined — surface original error.
+                yield StreamEvent(
+                    type=StreamEventType.ERROR,
+                    error=rate_limit_error,
+                )
 
     async def send_message_with_tools_stream(
         self, message: str, tools: List[ToolDefinition]
@@ -450,11 +628,37 @@ class CoreEngine:
                 error="No provider available.",
             )
             return
+
+        # Sync fallback config on every call.
+        self.configure_fallback()
+
         context = self.chat_manager.get_current_context()
+        rate_limit_error: Optional[str] = None
+
         async for event in self.current_provider.send_message_with_tools_stream(
             message, context, tools
         ):
+            if event.type == StreamEventType.ERROR:
+                err = event.error or ""
+                if self._fallback_handler.should_fallback(err):
+                    rate_limit_error = err
+                    break
             yield event
+
+        if rate_limit_error:
+            next_name = await self._apply_rate_limit_fallback(rate_limit_error)
+            if next_name:
+                await self._do_provider_switch(next_name)
+                fb_context = self.chat_manager.get_current_context()
+                async for event in self.current_provider.send_message_with_tools_stream(
+                    message, fb_context, tools
+                ):
+                    yield event
+            else:
+                yield StreamEvent(
+                    type=StreamEventType.ERROR,
+                    error=rate_limit_error,
+                )
 
     def provider_supports_tools(self) -> bool:
         if not self.current_provider:
