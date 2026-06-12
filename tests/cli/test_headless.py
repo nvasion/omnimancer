@@ -487,9 +487,7 @@ class TestHeadlessRunner:
 
         mock_engine = MagicMock()
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
-        mock_engine.provider_supports_native_tool_history = MagicMock(
-            return_value=True
-        )
+        mock_engine.provider_supports_native_tool_history = MagicMock(return_value=True)
         mock_engine.record_tool_results = MagicMock()
         mock_engine.send_message_with_tools = AsyncMock(side_effect=[first, final])
 

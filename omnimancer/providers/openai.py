@@ -173,9 +173,7 @@ class OpenAIProvider(BaseProvider):
                                 "type": "function",
                                 "function": {
                                     "name": tc.name,
-                                    "arguments": json.dumps(
-                                        tc.arguments, default=str
-                                    ),
+                                    "arguments": json.dumps(tc.arguments, default=str),
                                 },
                             }
                             for i, tc in enumerate(tool_calls)

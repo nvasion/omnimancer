@@ -9,16 +9,16 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from omnimancer.core.models import ChatContext, ChatResponse, FallbackConfig, MessageRole
+from omnimancer.core.models import (
+    ChatResponse,
+    FallbackConfig,
+)
 from omnimancer.core.rate_limit_fallback import RateLimitFallbackHandler
 from omnimancer.utils.errors import RateLimitError
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -98,7 +98,9 @@ class TestErrorClassification:
     )
     def test_is_rate_limit_error_positive(self, error_str: str):
         handler = RateLimitFallbackHandler()
-        assert handler.is_rate_limit_error(error_str), f"Expected rate-limit match for: {error_str}"
+        assert handler.is_rate_limit_error(
+            error_str
+        ), f"Expected rate-limit match for: {error_str}"
 
     @pytest.mark.parametrize(
         "error_str",
@@ -112,7 +114,9 @@ class TestErrorClassification:
     )
     def test_is_rate_limit_error_negative(self, error_str: str):
         handler = RateLimitFallbackHandler()
-        assert not handler.is_rate_limit_error(error_str), f"Unexpected rate-limit match for: {error_str}"
+        assert not handler.is_rate_limit_error(
+            error_str
+        ), f"Unexpected rate-limit match for: {error_str}"
 
     @pytest.mark.parametrize(
         "error_str",
@@ -196,17 +200,13 @@ class TestProviderSelection:
         assert result == "claude"
 
     def test_fallback_order_current_not_in_order(self):
-        handler = RateLimitFallbackHandler(
-            fallback_order=["openai", "gemini"]
-        )
+        handler = RateLimitFallbackHandler(fallback_order=["openai", "gemini"])
         # "mistral" is not in fallback_order — should still return first order entry
         result = handler.get_next_provider("mistral", ["mistral", "openai", "gemini"])
         assert result == "openai"
 
     def test_fallback_order_none_available_uses_any(self):
-        handler = RateLimitFallbackHandler(
-            fallback_order=["openai", "gemini"]
-        )
+        handler = RateLimitFallbackHandler(fallback_order=["openai", "gemini"])
         # Neither openai nor gemini is available — falls back to any candidate
         result = handler.get_next_provider("claude", ["claude", "mistral"])
         assert result == "mistral"
@@ -336,24 +336,15 @@ class MockProvider:
 
 def make_engine(providers: dict):
     """Build a minimal CoreEngine-like object for integration tests."""
-    from unittest.mock import MagicMock
-
-    from omnimancer.core.engine import CoreEngine
-    from omnimancer.core.models import (
-        ChatSettings,
-        Config,
-        FallbackConfig,
-        MCPConfig,
-        ProviderConfig,
-    )
+    import json
+    import os
 
     # Build a real ConfigManager backed by a tempfile so we don't need disk I/O.
-    import tempfile, json, os
-    from omnimancer.core.config_manager import ConfigManager
+    import tempfile
 
-    provider_cfgs = {
-        name: ProviderConfig(model="test-model") for name in providers
-    }
+    from omnimancer.core.config_manager import ConfigManager
+    from omnimancer.core.engine import CoreEngine
+
     first = next(iter(providers))
 
     tmpdir = tempfile.mkdtemp()
@@ -362,6 +353,7 @@ def make_engine(providers: dict):
 
     # Generate a Fernet key manually
     from cryptography.fernet import Fernet
+
     key = Fernet.generate_key()
     with open(key_path, "wb") as f:
         f.write(key)
@@ -399,7 +391,10 @@ class TestEngineIntegration:
 
         response = await engine.send_message("hello")
         assert not response.is_success
-        assert "429" in (response.error or "").lower() or "rate limit" in (response.error or "").lower()
+        assert (
+            "429" in (response.error or "").lower()
+            or "rate limit" in (response.error or "").lower()
+        )
 
     @pytest.mark.asyncio
     async def test_auto_fallback_switches_provider(self):
@@ -511,7 +506,8 @@ class TestEngineIntegration:
 
     @pytest.mark.asyncio
     async def test_fallback_response_error_triggers_switch(self):
-        """A rate-limit error inside ChatResponse.error (not exception) also triggers fallback."""
+        """A rate-limit error in ChatResponse.error (not raised) also triggers
+        fallback."""
         primary = MockProvider("claude")
         fallback_p = MockProvider("openai")
 

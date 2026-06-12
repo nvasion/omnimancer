@@ -8,7 +8,7 @@ Version: 1.0.0
 """
 
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 from ..core.models import (
     ChatResponse,
@@ -415,7 +415,8 @@ class CoreEngine:
                         progress.start_operation(
                             "engine_provider_fallback",
                             OperationType.NETWORK,
-                            f"Retrying with {self.current_provider.get_provider_name()}",
+                            "Retrying with "
+                            f"{self.current_provider.get_provider_name()}",
                         )
                     try:
                         fb_context = self.chat_manager.get_current_context()

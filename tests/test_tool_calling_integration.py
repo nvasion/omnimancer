@@ -108,9 +108,7 @@ class TestToolCallingFlowIntegration:
             model_used="m",
             tokens_used=10,
             timestamp=datetime.now(),
-            tool_calls=[
-                ToolCall(name="file_read", arguments={"path": "/src/main.py"})
-            ],
+            tool_calls=[ToolCall(name="file_read", arguments={"path": "/src/main.py"})],
         )
         second_response = ChatResponse(
             content="Done.",
@@ -221,9 +219,7 @@ class TestToolCallingFlowIntegration:
         )
         mock_engine.send_message_with_tools = AsyncMock(side_effect=[first, final])
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
-        mock_engine.provider_supports_native_tool_history = MagicMock(
-            return_value=True
-        )
+        mock_engine.provider_supports_native_tool_history = MagicMock(return_value=True)
         mock_engine.record_tool_results = MagicMock()
 
         with patch.object(interface, "_show_assistant_message"):
@@ -402,46 +398,34 @@ class TestToolCallingFlowIntegration:
         mock_engine.send_message_with_tools = AsyncMock(side_effect=make_response)
 
     @pytest.mark.asyncio
-    async def test_iteration_checkin_declined_stops(self, interface, mock_engine):
-        """After MAX_TOOL_ITERATIONS the user is asked; declining stops.
+    async def test_no_iteration_checkin_in_interactive(self, interface, mock_engine):
+        """Long turns run past MAX_TOOL_ITERATIONS without prompting the user.
 
-        A hard cap that kills legitimate long-running work mid-turn is wrong —
-        the user decides whether the agent keeps going.
+        Interactive mode has Ctrl+C as the escape hatch and the repeat
+        tracker for actual runaway loops — a periodic "keep going?" prompt
+        only interrupts legitimate long-running work. Headless mode keeps
+        its own hard cap.
         """
+        total = MAX_TOOL_ITERATIONS + 5
         self._endless_tool_responses(mock_engine)
+        endless = mock_engine.send_message_with_tools.side_effect
+
+        def finite_responses(*args, **kwargs):
+            response = endless(*args, **kwargs)
+            if mock_engine.send_message_with_tools.call_count >= total:
+                response.tool_calls = []
+            return response
+
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=finite_responses)
 
         with patch.object(interface, "_show_assistant_message"):
             with patch.object(interface, "_show_warning"):
                 with patch.object(interface.console, "print"):
-                    with patch.object(
-                        interface,
-                        "_confirm_continue_iterations",
-                        return_value=False,
-                    ) as confirm:
-                        await interface._handle_tool_calling_flow("Loop forever")
+                    with patch.object(interface.console, "input") as console_input:
+                        await interface._handle_tool_calling_flow("Loop a while")
 
-        confirm.assert_called_once()
-        assert mock_engine.send_message_with_tools.call_count == MAX_TOOL_ITERATIONS
-
-    @pytest.mark.asyncio
-    async def test_iteration_checkin_accepted_continues(self, interface, mock_engine):
-        """Confirming the check-in lets the agent run past the cap."""
-        self._endless_tool_responses(mock_engine)
-
-        with patch.object(interface, "_show_assistant_message"):
-            with patch.object(interface, "_show_warning"):
-                with patch.object(interface.console, "print"):
-                    with patch.object(
-                        interface,
-                        "_confirm_continue_iterations",
-                        side_effect=[True, False],
-                    ) as confirm:
-                        await interface._handle_tool_calling_flow("Loop forever")
-
-        assert confirm.call_count == 2
-        assert (
-            mock_engine.send_message_with_tools.call_count == 2 * MAX_TOOL_ITERATIONS
-        )
+        console_input.assert_not_called()
+        assert mock_engine.send_message_with_tools.call_count == total
 
     @pytest.mark.asyncio
     async def test_repeated_tool_call_aborts_after_ignored_nudges(

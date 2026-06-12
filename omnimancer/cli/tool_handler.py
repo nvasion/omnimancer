@@ -4,7 +4,7 @@ import json
 import logging
 import re
 import shlex
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..core.agent.tool_definitions import CODING_AGENT_TOOLS
 from ..core.agent.types import Operation, OperationResult, OperationType
@@ -37,7 +37,7 @@ class RepeatedCallTracker:
     """
 
     def __init__(self) -> None:
-        self._counts: dict = {}
+        self._counts: Dict[str, int] = {}
 
     @staticmethod
     def _signature(tool_call: ToolCall) -> str:
@@ -67,6 +67,7 @@ class RepeatedCallTracker:
                 if worst is None or self.count(tc) > self.count(worst):
                     worst = tc
         return worst
+
 
 # Cap the size of any single tool result fed back into the model context.
 # Unbounded results (e.g. `find`/`grep` walking .venv, or reading a huge file)

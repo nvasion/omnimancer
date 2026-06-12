@@ -51,12 +51,7 @@ from .commands import Command, parse_command
 from .completion import CompletionManager, CompletionMixin
 from .display import DisplayManager, DisplayMixin
 from .system_prompts import build_agent_prompt, get_agent_capabilities_prompt
-from .tool_handler import (
-    DUPLICATE_CALL_NUDGE,
-    MAX_TOOL_ITERATIONS,
-    RepeatedCallTracker,
-    ToolHandler,
-)
+from .tool_handler import DUPLICATE_CALL_NUDGE, RepeatedCallTracker, ToolHandler
 
 logger = logging.getLogger(__name__)
 
@@ -307,9 +302,7 @@ class CommandLineInterface(
     def _register_fallback_callback(self) -> None:
         """Wire up the interactive approval callback on the engine."""
         try:
-            self.engine.set_fallback_approval_callback(
-                self._fallback_approval_callback
-            )
+            self.engine.set_fallback_approval_callback(self._fallback_approval_callback)
         except Exception as exc:
             logger.debug("Could not register fallback callback: %s", exc)
 
@@ -327,7 +320,8 @@ class CommandLineInterface(
         # Keep the display clean — print to a fresh line.
         self.console.print()
         self.console.print(
-            f"[bold yellow]⚠  Rate limit hit on [cyan]{current_provider}[/cyan].[/bold yellow]"
+            f"[bold yellow]⚠  Rate limit hit on "
+            f"[cyan]{current_provider}[/cyan].[/bold yellow]"
         )
         # Show a brief excerpt of the error for context.
         brief = (error[:120] + "…") if len(error) > 120 else error
@@ -836,15 +830,10 @@ class CommandLineInterface(
         # turn is aborted only if the model keeps repeating despite nudges.
         repeat_tracker = RepeatedCallTracker()
 
-        iterations = 0
+        # No iteration cap in interactive mode — the user can interrupt at any
+        # time, and the repeat tracker catches actual runaway loops. Headless
+        # mode keeps its own hard cap.
         while True:
-            # Long-running work shouldn't be killed by a hard cap — check in
-            # with the user instead and let them decide.
-            if iterations and iterations % MAX_TOOL_ITERATIONS == 0:
-                if not self._confirm_continue_iterations(iterations):
-                    self._show_warning("Agent turn stopped.")
-                    return
-            iterations += 1
             if use_streaming:
                 response = await self._stream_tool_response(current_message, tools)
             else:
@@ -947,18 +936,6 @@ class CommandLineInterface(
                 current_message = ""
             else:
                 current_message = results_text
-
-    def _confirm_continue_iterations(self, iterations: int) -> bool:
-        """Ask whether the agent should keep working past the check-in point."""
-        self.console.print(
-            f"[yellow]⚠ The agent has run {iterations} tool iterations "
-            "without finishing.[/yellow]"
-        )
-        try:
-            answer = self.console.input("Keep going? [Y/n]: ")
-        except (KeyboardInterrupt, EOFError):
-            return False
-        return answer.strip().lower() not in ("n", "no")
 
     async def _stream_tool_response(self, message: str, tools: Any) -> "ChatResponse":
         from ..core.models import ChatResponse, StreamEventType, describe_tool_calls
