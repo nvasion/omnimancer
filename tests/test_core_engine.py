@@ -1033,9 +1033,7 @@ class TestCustomModelsInCatalog:
             )
         ]
 
-        names = [
-            (m.provider, m.name) for m in core_engine.get_available_models()
-        ]
+        names = [(m.provider, m.name) for m in core_engine.get_available_models()]
         assert names.count((existing.provider, existing.name)) == 1
 
 
@@ -1083,9 +1081,7 @@ class TestNativeToolHistoryRecording:
 
         core_engine.current_provider = mock_providers["openai"]
         core_engine.current_provider.send_message_with_tools = AsyncMock(
-            return_value=ChatResponse(
-                content="done", model_used="gpt-4", tokens_used=5
-            )
+            return_value=ChatResponse(content="done", model_used="gpt-4", tokens_used=5)
         )
 
         await core_engine.send_message_with_tools("", [])
@@ -1106,9 +1102,7 @@ class TestNativeToolHistoryRecording:
         assert "Tool results" in message.content
         assert message.tool_results[0].tool_call_id == "call_1"
 
-    def test_provider_supports_native_tool_history(
-        self, core_engine, mock_providers
-    ):
+    def test_provider_supports_native_tool_history(self, core_engine, mock_providers):
         core_engine.current_provider = None
         assert core_engine.provider_supports_native_tool_history() is False
 

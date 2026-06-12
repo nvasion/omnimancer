@@ -332,6 +332,4 @@ class TestOpenAINativeToolHistory:
         }
 
         # The flattened legacy text must not leak into the native request.
-        assert not any(
-            "[Called tools" in (m.get("content") or "") for m in messages
-        )
+        assert not any("[Called tools" in (m.get("content") or "") for m in messages)

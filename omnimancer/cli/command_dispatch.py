@@ -1924,18 +1924,21 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
 
             dispatch: dict[str, Any] = {
                 "status": lambda: self._show_fallback_status(fb),
-                "":       lambda: self._show_fallback_status(fb),
-                "help":   self._show_fallback_help,
-                "auto":             lambda: self._handle_auto_subcommand(fb, args),
-                "order":            lambda: self._handle_order_subcommand(fb, args),
-                "on-rate-limit":    lambda: self._handle_on_rate_limit_subcommand(fb, args),
-                "on-quota":         lambda: self._handle_on_quota_subcommand(fb, args),
+                "": lambda: self._show_fallback_status(fb),
+                "help": self._show_fallback_help,
+                "auto": lambda: self._handle_auto_subcommand(fb, args),
+                "order": lambda: self._handle_order_subcommand(fb, args),
+                "on-rate-limit": lambda: self._handle_on_rate_limit_subcommand(
+                    fb, args
+                ),
+                "on-quota": lambda: self._handle_on_quota_subcommand(fb, args),
             }
 
             handler = dispatch.get(sub)
             if handler is None:
                 self._show_error(
-                    f"Unknown sub-command '{sub}'. Run [cyan]/fallback help[/cyan] for usage."
+                    f"Unknown sub-command '{sub}'. "
+                    "Run [cyan]/fallback help[/cyan] for usage."
                 )
             else:
                 result = handler()
@@ -1982,7 +1985,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
         if args[1].lower() == "clear":
             fb.fallback_order = []
             self._persist_fallback_config(fb)
-            self._show_success("Fallback order cleared (will use any available provider).")
+            self._show_success(
+                "Fallback order cleared (will use any available provider)."
+            )
             return
 
         # Validate that each name is a known provider.
@@ -2007,7 +2012,9 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
         self._persist_fallback_config(fb)
         self._show_success(f"Fallback order set: {' → '.join(new_order)}")
 
-    def _handle_on_rate_limit_subcommand(self, fb: FallbackConfig, args: list[str]) -> None:
+    def _handle_on_rate_limit_subcommand(
+        self, fb: FallbackConfig, args: list[str]
+    ) -> None:
         """Handle ``/fallback on-rate-limit [on|off]``."""
         if len(args) < 2:
             state = "on" if fb.fallback_on_rate_limit else "off"
@@ -2043,20 +2050,30 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
 
     def _show_fallback_status(self, fb: FallbackConfig) -> None:
         """Print a Rich table with the current fallback configuration."""
-        table = Table(title="Fallback Configuration", show_header=True, header_style="bold cyan")
+        table = Table(
+            title="Fallback Configuration", show_header=True, header_style="bold cyan"
+        )
         table.add_column("Setting", style="bold")
         table.add_column("Value")
         table.add_column("Description", style="dim")
 
         auto_label = "[green]on[/green]" if fb.auto_fallback else "[yellow]off[/yellow]"
-        rl_label   = "[green]on[/green]" if fb.fallback_on_rate_limit else "[yellow]off[/yellow]"
-        q_label    = "[green]on[/green]" if fb.fallback_on_quota else "[yellow]off[/yellow]"
-        order_str  = " [dim]→[/dim] ".join(fb.fallback_order) if fb.fallback_order else "[dim](any available)[/dim]"
+        rl_label = (
+            "[green]on[/green]" if fb.fallback_on_rate_limit else "[yellow]off[/yellow]"
+        )
+        q_label = (
+            "[green]on[/green]" if fb.fallback_on_quota else "[yellow]off[/yellow]"
+        )
+        order_str = (
+            " [dim]→[/dim] ".join(fb.fallback_order)
+            if fb.fallback_order
+            else "[dim](any available)[/dim]"
+        )
 
-        table.add_row("auto",          auto_label, "Switch without asking")
-        table.add_row("on-rate-limit", rl_label,   "Fallback on 429 / rate-limit")
-        table.add_row("on-quota",      q_label,    "Fallback on quota exceeded")
-        table.add_row("order",         order_str,  "Ordered list of providers to try")
+        table.add_row("auto", auto_label, "Switch without asking")
+        table.add_row("on-rate-limit", rl_label, "Fallback on 429 / rate-limit")
+        table.add_row("on-quota", q_label, "Fallback on quota exceeded")
+        table.add_row("order", order_str, "Ordered list of providers to try")
 
         self.console.print(table)
         self.console.print(
@@ -2067,21 +2084,29 @@ Newest Entry: {stats['newest_entry'] or 'None'}"""
     def _show_fallback_help(self) -> None:
         """Print /fallback usage."""
         help_text = (
-            "[bold cyan]/fallback[/bold cyan] — manage rate-limit fallback behaviour\n\n"
+            "[bold cyan]/fallback[/bold cyan] — manage rate-limit fallback "
+            "behaviour\n\n"
             "[bold]Sub-commands[/bold]\n"
-            "  [cyan]/fallback[/cyan]                         show current configuration\n"
-            "  [cyan]/fallback auto on|off[/cyan]             auto-switch on rate limit (no prompt)\n"
-            "  [cyan]/fallback order <p1> <p2> …[/cyan]       set ordered fallback providers\n"
-            "  [cyan]/fallback order clear[/cyan]              clear order (use any available)\n"
-            "  [cyan]/fallback on-rate-limit on|off[/cyan]    enable/disable fallback on 429\n"
-            "  [cyan]/fallback on-quota on|off[/cyan]         enable/disable fallback on quota errors\n\n"
+            "  [cyan]/fallback[/cyan]                         "
+            "show current configuration\n"
+            "  [cyan]/fallback auto on|off[/cyan]             "
+            "auto-switch on rate limit (no prompt)\n"
+            "  [cyan]/fallback order <p1> <p2> …[/cyan]       "
+            "set ordered fallback providers\n"
+            "  [cyan]/fallback order clear[/cyan]              "
+            "clear order (use any available)\n"
+            "  [cyan]/fallback on-rate-limit on|off[/cyan]    "
+            "enable/disable fallback on 429\n"
+            "  [cyan]/fallback on-quota on|off[/cyan]         "
+            "enable/disable fallback on quota errors\n\n"
             "[bold]Examples[/bold]\n"
-            "  [dim]/fallback auto on[/dim]                   silently switch when rate-limited\n"
-            "  [dim]/fallback order claude openai gemini[/dim]  try in this order\n"
-            "  [dim]/fallback order clear[/dim]               reset to default (any provider)\n\n"
+            "  [dim]/fallback auto on[/dim]                   "
+            "silently switch when rate-limited\n"
+            "  [dim]/fallback order claude openai gemini[/dim]  "
+            "try in this order\n"
+            "  [dim]/fallback order clear[/dim]               "
+            "reset to default (any provider)\n\n"
             "When [bold]auto[/bold] is off (default), omnimancer will pause and ask:\n"
             "  [yellow]⚠ Rate limit hit on claude. Fall back to openai? [Y/n][/yellow]"
         )
-        self.console.print(
-            Panel(help_text, title="Fallback Help", border_style="cyan")
-        )
+        self.console.print(Panel(help_text, title="Fallback Help", border_style="cyan"))

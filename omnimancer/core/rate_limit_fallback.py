@@ -16,7 +16,10 @@ falls back only when ``auto_fallback=True``.
 from __future__ import annotations
 
 import logging
-from typing import Awaitable, Callable, List, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional
+
+if TYPE_CHECKING:
+    from .models import FallbackConfig
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +108,7 @@ class RateLimitFallbackHandler:
     # Configuration
     # ------------------------------------------------------------------
 
-    def update_from_config(self, config: "FallbackConfig") -> None:  # noqa: F821
+    def update_from_config(self, config: FallbackConfig) -> None:
         """Sync settings from a :class:`FallbackConfig` instance."""
         from .models import FallbackConfig  # local import to avoid circular
 
