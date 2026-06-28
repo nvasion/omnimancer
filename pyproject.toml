@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omnimancer-cli"
-version = "0.2.7"
+version = "0.2.10"
 description = "A unified command-line interface for multiple AI language models"
 readme = "README.md"
 requires-python = ">=3.10"
