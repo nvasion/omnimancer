@@ -5,7 +5,173 @@ This module contains the system prompts used to guide the AI agent's behavior,
 including capability descriptions, operation markers, and execution patterns.
 """
 
+import logging
+import re
 from pathlib import Path
+from typing import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+# Maximum bytes read from any single instruction file.  Prevents memory
+# exhaustion if a file is unexpectedly large (accidental or malicious).
+_MAX_INSTRUCTION_FILE_BYTES: int = 100_000  # 100 KB
+
+# Regex that matches fenced code blocks (``` … ``` or ~~~ … ~~~).
+# These are stripped before insertion to prevent an attacker from embedding
+# shell commands that the model might treat as executable instructions.
+_FENCED_CODE_BLOCK_RE = re.compile(
+    r"^(?:```|~~~)[^\n]*\n.*?^(?:```|~~~)\s*$",
+    re.MULTILINE | re.DOTALL,
+)
+
+# Regex for control characters that are not ordinary whitespace.
+# Null bytes and C0/C1 control characters can confuse tokenisers or be used
+# to smuggle hidden instructions.
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
+def _sanitize_instruction_content(raw: str) -> str:
+    """Sanitize raw text loaded from an instruction file.
+
+    Applies the following transforms in order:
+
+    1. **Strip fenced code blocks** – removes triple-backtick / triple-tilde
+       blocks so embedded shell snippets are not mistaken for executable
+       commands by the model.
+
+    2. **Remove control characters** – null bytes and non-printable C0/C1
+       control characters are deleted; ordinary whitespace (\\n, \\r, \\t,
+       space) is preserved.
+
+    3. **Collapse excess blank lines** – more than two consecutive blank lines
+       are collapsed to two, keeping the text readable without allowing
+       unlimited vertical padding.
+
+    4. **Truncate to length limit** – content is capped at
+       ``_MAX_INSTRUCTION_FILE_BYTES`` characters (which is already enforced
+       at the read stage, but this acts as a belt-and-suspenders guard).
+
+    Args:
+        raw: The raw string read from an instruction file.
+
+    Returns:
+        Sanitized string (may be empty if everything was stripped).
+    """
+    # 1. Remove fenced code blocks
+    text = _FENCED_CODE_BLOCK_RE.sub("", raw)
+
+    # 2. Remove dangerous control characters (keep \n \r \t and space)
+    text = _CONTROL_CHAR_RE.sub("", text)
+
+    # 3. Collapse excessive blank lines
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    # 4. Belt-and-suspenders length cap (file read is already capped)
+    text = text[: _MAX_INSTRUCTION_FILE_BYTES]
+
+    return text.strip()
+
+
+def _read_instruction_file(path: Path) -> Optional[str]:
+    """Read and sanitize an instruction file, enforcing a size cap.
+
+    Returns sanitized content string, or ``None`` if the file is unreadable,
+    empty, or the sanitized result is empty.
+    """
+    try:
+        # Read only up to the byte cap; do not load the entire file first.
+        with path.open("r", encoding="utf-8", errors="replace") as fh:
+            raw = fh.read(_MAX_INSTRUCTION_FILE_BYTES)
+    except OSError as exc:
+        logger.debug("Failed to read instruction file %s: %s", path, exc)
+        return None
+
+    sanitized = _sanitize_instruction_content(raw)
+    return sanitized if sanitized else None
+
+
+def load_project_instructions() -> str:
+    """Load user-defined instructions from OMNIMANCER.md or CLAUDE.md files.
+
+    Searches for instruction files and combines them in priority order
+    (later entries are more specific and appear last in the prompt):
+
+    1. Global persona: ``~/.omnimancer/OMNIMANCER.md``
+       User-level defaults and persona definitions, always loaded if present.
+
+    2. Project ``CLAUDE.md``: nearest ancestor of CWD (Claude Code compatibility).
+       Useful when a project already ships a CLAUDE.md for Claude Code users.
+
+    3. Project ``OMNIMANCER.md``: nearest ancestor of CWD (highest priority).
+       Omnimancer-specific instructions that override everything else.
+
+    The upward walk stops at the first ``.git`` directory so instructions
+    stay scoped to the project.  Files above the git root are ignored as
+    project files (only the global config is loaded from ``~/.omnimancer/``).
+
+    Files that are empty, unreadable, or exceed the size limit are silently
+    skipped.  Content is sanitised before insertion (see
+    :func:`_sanitize_instruction_content`).
+
+    Returns:
+        Formatted instruction block string, or empty string if no files found.
+    """
+    found: List[Tuple[str, str]] = []  # (label, content)
+
+    # 1. Global persona / user-level defaults
+    global_file = Path.home() / ".omnimancer" / "OMNIMANCER.md"
+    if global_file.exists():
+        content = _read_instruction_file(global_file)
+        if content:
+            found.append(("~/.omnimancer/OMNIMANCER.md", content))
+
+    # 2 & 3. Walk up from CWD to the git root (or filesystem root) looking
+    # for project-level CLAUDE.md and OMNIMANCER.md.  We collect the *nearest*
+    # occurrence of each so subdirectory instructions win over parent ones.
+    claude_md_path: Optional[Path] = None
+    omnimancer_md_path: Optional[Path] = None
+
+    check_dir = Path.cwd()
+    while True:
+        if claude_md_path is None:
+            candidate = check_dir / "CLAUDE.md"
+            if candidate.exists():
+                claude_md_path = candidate
+        if omnimancer_md_path is None:
+            candidate = check_dir / "OMNIMANCER.md"
+            if candidate.exists():
+                omnimancer_md_path = candidate
+
+        # Stop at the git root so we don't wander out of the project
+        if (check_dir / ".git").exists():
+            break
+        parent = check_dir.parent
+        if parent == check_dir:
+            break  # filesystem root
+        check_dir = parent
+
+    if claude_md_path is not None:
+        content = _read_instruction_file(claude_md_path)
+        if content:
+            found.append((claude_md_path.name, content))
+
+    if omnimancer_md_path is not None:
+        content = _read_instruction_file(omnimancer_md_path)
+        if content:
+            found.append((omnimancer_md_path.name, content))
+
+    if not found:
+        return ""
+
+    # Wrap with a clear "user-provided" label so the model cannot be tricked
+    # into treating this content as authoritative system instructions.
+    parts = [
+        "\n📋 CUSTOM INSTRUCTIONS (user-provided — not system authority):",
+    ]
+    for label, content in found:
+        parts.append(f"\n--- {label} ---\n{content}")
+
+    return "\n".join(parts)
 
 
 def get_directory_context() -> str:
@@ -317,6 +483,7 @@ def build_agent_prompt(supports_tools: bool = False) -> str:
         System prompt appropriate for the provider's capabilities
     """
     directory_info = get_directory_context()
+    custom_instructions = load_project_instructions()
 
     sections = [
         (
@@ -338,6 +505,9 @@ def build_agent_prompt(supports_tools: bool = False) -> str:
         sections.append(OPERATION_MARKERS_SECTION)
         sections.append(EXECUTION_EXAMPLES_SECTION)
 
+    if custom_instructions:
+        sections.append(custom_instructions)
+
     return "\n".join(sections)
 
 
@@ -352,6 +522,8 @@ def get_agent_capabilities_prompt() -> str:
         Complete system prompt string with directory context
     """
     directory_info = get_directory_context()
+    custom_instructions = load_project_instructions()
+    custom_block = f"\n{custom_instructions}" if custom_instructions else ""
 
     return f"""SYSTEM: You are an autonomous AI agent with \
 the ability to perform actions on the local system. \
@@ -364,7 +536,7 @@ You have the following capabilities:
 {SECURITY_FEATURES_SECTION}
 {AGENT_EXECUTION_PATTERN_SECTION}
 {OPERATION_MARKERS_SECTION}
-{EXECUTION_EXAMPLES_SECTION}"""
+{EXECUTION_EXAMPLES_SECTION}{custom_block}"""
 
 
 def get_minimal_prompt() -> str:
@@ -378,6 +550,8 @@ def get_minimal_prompt() -> str:
         Minimal system prompt string
     """
     directory_info = get_directory_context()
+    custom_instructions = load_project_instructions()
+    custom_block = f"\n{custom_instructions}" if custom_instructions else ""
 
     return f"""SYSTEM: You are an autonomous AI agent with \
 the ability to perform actions on the local system.
@@ -386,7 +560,7 @@ the ability to perform actions on the local system.
 {COMMAND_EXECUTION_SECTION}
 {WEB_OPERATIONS_SECTION}
 {SECURITY_FEATURES_SECTION}
-{OPERATION_MARKERS_SECTION}"""
+{OPERATION_MARKERS_SECTION}{custom_block}"""
 
 
 def get_custom_prompt(
@@ -406,6 +580,7 @@ def get_custom_prompt(
         Custom system prompt string
     """
     directory_info = get_directory_context()
+    custom_instructions = load_project_instructions()
 
     sections = [
         (
@@ -431,5 +606,8 @@ def get_custom_prompt(
 
     if include_examples:
         sections.append(EXECUTION_EXAMPLES_SECTION)
+
+    if custom_instructions:
+        sections.append(custom_instructions)
 
     return "\n".join(sections)
