@@ -375,13 +375,22 @@ class FileSystemManager:
         path: Union[str, Path],
         encoding: str = "utf-8",
         binary: bool = False,
+        allow_sensitive: bool = False,
     ) -> Union[str, bytes]:
-        """Read file content with security validation and error handling."""
+        """Read file content with security validation and error handling.
+
+        ``allow_sensitive`` permits reading sensitive project-local files (e.g.
+        ``.env``). It is set for internal reads that are part of an already
+        approved operation — such as the read-before-write diff/backup step —
+        so the existing content can be shown and preserved.
+        """
 
         path = Path(path).resolve()
 
         # Security validation
-        result = await self.security.secure_file_access(str(path), "read")
+        result = await self.security.secure_file_access(
+            str(path), "read", allow_sensitive=allow_sensitive
+        )
         if not result["success"]:
             raise FileOperationError(f"Security check failed: {result['error']}")
 
@@ -1284,7 +1293,11 @@ class FileSystemManager:
 
             if file_exists:
                 try:
-                    current_content = await self.read_file(path, encoding=encoding)
+                    # This read is part of an approved write; allow sensitive
+                    # files (e.g. .env) so the diff and backup still work.
+                    current_content = await self.read_file(
+                        path, encoding=encoding, allow_sensitive=True
+                    )
                 except Exception as e:
                     # Handle file read error
                     read_error = FileReadError(str(path), e)

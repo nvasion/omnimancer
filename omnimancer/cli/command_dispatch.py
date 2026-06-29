@@ -1259,7 +1259,10 @@ class CommandDispatchMixin:
 
     def _show_config_help(self) -> None:
         """Show configuration command help."""
-        help_text = """[bold]Configuration Commands:[/bold]
+        from ..providers.factory import ProviderFactory
+
+        endpoints = ", ".join(sorted(ProviderFactory.get_available_providers()))
+        help_text = f"""[bold]Configuration Commands:[/bold]
 
 [cyan]/config[/cyan]                              - Show current configuration
 [cyan]/config show[/cyan]                         - Show current configuration
@@ -1273,7 +1276,7 @@ class CommandDispatchMixin:
 [cyan]/config remove-provider <name>[/cyan]       - Remove a provider
 
 [bold]Endpoints[/bold] (each is a provider you can configure):
-  claude, openrouter, openai, digitalocean
+  {endpoints}
 
 [bold]Examples:[/bold]
   /config set-provider digitalocean --api-key $DO_KEY \\

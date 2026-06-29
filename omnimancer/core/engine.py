@@ -951,26 +951,40 @@ class CoreEngine:
         return "\n".join(lines)
 
     def _get_providers_list(self) -> str:
-        """Get a formatted list of configured providers and their status."""
-        if not self.providers:
-            return "No providers configured."
+        """Get a formatted list of configured and available providers."""
+        from ..providers.factory import ProviderFactory
 
         current_name = (
             self.current_provider.get_provider_name() if self.current_provider else None
         )
 
         lines = []
-        for name in sorted(self.providers):
-            provider = self.providers[name]
-            marker = " (current)" if name == current_name else ""
-            try:
-                model = getattr(provider, "model", None)
-            except Exception:
-                model = None
-            model_text = f" - model: {model}" if model else ""
-            lines.append(f"- {name}{marker}{model_text}")
+        if self.providers:
+            lines.append("Configured:")
+            for name in sorted(self.providers):
+                provider = self.providers[name]
+                marker = " (current)" if name == current_name else ""
+                try:
+                    model = getattr(provider, "model", None)
+                except Exception:
+                    model = None
+                model_text = f" - model: {model}" if model else ""
+                lines.append(f"  - {name}{marker}{model_text}")
 
-        return "\n".join(lines)
+        # Surface registered providers the user has not configured yet so they
+        # remain discoverable (configure with /config set-provider <name>).
+        available = sorted(
+            name
+            for name in ProviderFactory.get_available_providers()
+            if name not in self.providers
+        )
+        if available:
+            if lines:
+                lines.append("")
+            lines.append("Available (not configured):")
+            lines.append("  " + ", ".join(available))
+
+        return "\n".join(lines) if lines else "No providers available."
 
     async def get_available_tools(self) -> List[Any]:
         """Return the list of available MCP tools (empty if MCP is unavailable)."""
