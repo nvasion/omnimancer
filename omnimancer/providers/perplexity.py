@@ -276,6 +276,13 @@ class PerplexityProvider(BaseProvider):
     def get_model_info(self) -> EnhancedModelInfo:
         """
         Get information about the current Perplexity model.
+
+        Note: ``supports_tools`` is ``False`` for all Perplexity models, including
+        the online/search-enabled ones.  Perplexity's built-in web search is an
+        automatic model feature, not user-provided function calling via
+        ``send_message_with_tools``.  Since ``PerplexityProvider`` does not
+        implement that method, advertising ``supports_tools=True`` would cause a
+        ``NotImplementedError`` at runtime.
         """
         model_configs = {
             "llama-3.1-sonar-small-128k-online": {
@@ -284,7 +291,8 @@ class PerplexityProvider(BaseProvider):
                 "cost_per_million_input": 0.2,
                 "cost_per_million_output": 0.2,
                 "swe_score": 45.2,
-                "supports_tools": True,
+                # Built-in web search ≠ user-provided function calling tools.
+                "supports_tools": False,
                 "supports_multimodal": False,
             },
             "llama-3.1-sonar-large-128k-online": {
@@ -293,7 +301,8 @@ class PerplexityProvider(BaseProvider):
                 "cost_per_million_input": 1.0,
                 "cost_per_million_output": 1.0,
                 "swe_score": 52.4,
-                "supports_tools": True,
+                # Built-in web search ≠ user-provided function calling tools.
+                "supports_tools": False,
                 "supports_multimodal": False,
             },
             "llama-3.1-sonar-huge-128k-online": {
@@ -302,7 +311,8 @@ class PerplexityProvider(BaseProvider):
                 "cost_per_million_input": 5.0,
                 "cost_per_million_output": 5.0,
                 "swe_score": 58.1,
-                "supports_tools": True,
+                # Built-in web search ≠ user-provided function calling tools.
+                "supports_tools": False,
                 "supports_multimodal": False,
             },
             "llama-3.1-sonar-small-128k-chat": {
@@ -363,6 +373,12 @@ class PerplexityProvider(BaseProvider):
     def get_available_models(self) -> List[Union[ModelInfo, EnhancedModelInfo]]:
         """
         Get list of available Perplexity models.
+
+        Note: all models report ``supports_tools=False``.  Perplexity's built-in
+        web search (available on *-online models) is an automatic model feature,
+        not user-provided function calling via ``send_message_with_tools``.  Since
+        ``PerplexityProvider`` does not implement that method, advertising
+        ``supports_tools=True`` would cause a ``NotImplementedError`` at runtime.
         """
         models = [
             EnhancedModelInfo(
@@ -374,7 +390,8 @@ class PerplexityProvider(BaseProvider):
                 cost_per_million_output=0.2,
                 swe_score=45.2,
                 available=True,
-                supports_tools=True,
+                # Built-in web search ≠ user-provided function calling tools.
+                supports_tools=False,
                 supports_multimodal=False,
                 context_window=127072,
                 is_free=False,
@@ -389,7 +406,8 @@ class PerplexityProvider(BaseProvider):
                 cost_per_million_output=1.0,
                 swe_score=52.4,
                 available=True,
-                supports_tools=True,
+                # Built-in web search ≠ user-provided function calling tools.
+                supports_tools=False,
                 supports_multimodal=False,
                 context_window=127072,
                 is_free=False,
@@ -404,7 +422,8 @@ class PerplexityProvider(BaseProvider):
                 cost_per_million_output=5.0,
                 swe_score=58.1,
                 available=True,
-                supports_tools=True,
+                # Built-in web search ≠ user-provided function calling tools.
+                supports_tools=False,
                 supports_multimodal=False,
                 latest_version=True,
                 context_window=127072,
@@ -477,7 +496,13 @@ class PerplexityProvider(BaseProvider):
         """
         Check if Perplexity provider supports streaming responses.
 
+        ``PerplexityProvider`` does not override ``send_message_stream()``;
+        only ``ClaudeProvider`` implements real token-by-token streaming.
+        Returning ``True`` here while the method is unimplemented would cause
+        a ``NotImplementedError`` at runtime whenever a caller requested
+        streaming output.
+
         Returns:
-            True - Perplexity supports streaming
+            False - PerplexityProvider has no streaming implementation
         """
-        return True
+        return False

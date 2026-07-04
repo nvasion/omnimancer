@@ -23,7 +23,9 @@ from omnimancer.core.provider_capabilities import (
 )
 from omnimancer.core.provider_initializer import ProviderInitializer
 from omnimancer.providers.base import BaseProvider
+from omnimancer.providers.claude import ClaudeProvider
 from omnimancer.providers.factory import ProviderFactory
+from omnimancer.providers.perplexity import PerplexityProvider
 
 # All registered provider names, resolved once.
 PROVIDER_NAMES = ProviderFactory.get_available_providers()
@@ -42,6 +44,17 @@ CONSTRUCT_KWARGS = {
 def _implements_tools(cls: type) -> bool:
     """True if the provider class overrides send_message_with_tools."""
     return cls.send_message_with_tools is not BaseProvider.send_message_with_tools
+
+
+def _implements_streaming(cls: type) -> bool:
+    """True if the provider class overrides send_message_stream.
+
+    Uses identity comparison on the unbound method objects so that the check
+    works correctly for subclasses.  Note: this assumes no intermediate abstract
+    base class redefines ``send_message_stream`` as a pass-through; if such a
+    class were added, the identity check would give a false negative.
+    """
+    return cls.send_message_stream is not BaseProvider.send_message_stream
 
 
 @pytest.mark.parametrize("name", PROVIDER_NAMES)
@@ -76,6 +89,38 @@ def test_registry_tools_match_implementation(name):
 
 
 @pytest.mark.parametrize("name", PROVIDER_NAMES)
+def test_registry_streaming_match_implementation(name):
+    """Registry must advertise streaming support iff the provider wires it.
+
+    Analogous to the tools contract: ``supports_streaming`` in the registry
+    must match whether the provider class actually overrides
+    ``send_message_stream``.  Currently only ``ClaudeProvider`` does so.
+    """
+    cls = ProviderInitializer.get_provider_class(name)
+    assert cls is not None, f"could not resolve provider class for {name!r}"
+    caps = get_provider_capabilities(name)
+    implements = _implements_streaming(cls)
+    assert caps.supports_streaming == implements, (
+        f"{name!r}: registry supports_streaming={caps.supports_streaming} but "
+        f"send_message_stream implemented={implements}. These must agree — "
+        f"only providers that override send_message_stream() should be True."
+    )
+
+
+def test_claude_implements_streaming():
+    """Positive guard: ClaudeProvider must implement send_message_stream.
+
+    This test validates that the ``_implements_streaming`` helper correctly
+    identifies the one provider that *does* implement streaming, ensuring
+    the helper is not vacuously True or False for all providers.
+    """
+    assert _implements_streaming(ClaudeProvider), (
+        "ClaudeProvider must override send_message_stream() — "
+        "it is the only provider with a real streaming implementation."
+    )
+
+
+@pytest.mark.parametrize("name", PROVIDER_NAMES)
 def test_instance_tools_never_overclaim(name):
     """A constructible default instance must not claim tools it cannot deliver.
 
@@ -92,4 +137,59 @@ def test_instance_tools_never_overclaim(name):
         assert _implements_tools(cls), (
             f"{name!r}: supports_tools() is True but send_message_with_tools "
             f"is not implemented — this raises NotImplementedError at runtime."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Perplexity-specific tests
+# ---------------------------------------------------------------------------
+
+
+def test_perplexity_get_model_info_tools_is_false():
+    """get_model_info() must never report supports_tools=True for any model.
+
+    Perplexity's built-in web search (on -online models) is not the same as
+    user-provided function calling; advertising tools support would cause a
+    NotImplementedError at runtime since send_message_with_tools is not
+    implemented.
+
+    Online model names are fetched dynamically from get_available_models() to
+    stay in sync when the model list changes.
+    """
+    provider = PerplexityProvider(api_key="test-key")
+
+    # Dynamically find online models rather than hardcoding names, so this
+    # test stays correct when the model list changes.
+    online_model_names = [
+        m.name for m in provider.get_available_models() if "online" in m.name
+    ]
+    assert (
+        online_model_names
+    ), "Expected at least one online model in get_available_models()"
+
+    for model_name in online_model_names:
+        provider_with_model = PerplexityProvider(api_key="test-key", model=model_name)
+        info = provider_with_model.get_model_info()
+        assert info.supports_tools is False, (
+            f"get_model_info() for {model_name!r} reports supports_tools=True. "
+            "Built-in web search is not user-provided function calling — "
+            "send_message_with_tools is not implemented on PerplexityProvider."
+        )
+
+
+def test_perplexity_get_available_models_tools_is_false():
+    """get_available_models() must never report supports_tools=True for any model.
+
+    Validates both online and chat models in the full catalog returned by
+    get_available_models().
+    """
+    provider = PerplexityProvider(api_key="test-key")
+    models = provider.get_available_models()
+    assert models, "Expected at least one model from get_available_models()"
+
+    for model in models:
+        assert model.supports_tools is False, (
+            f"get_available_models() reports supports_tools=True for {model.name!r}. "
+            "PerplexityProvider does not implement send_message_with_tools — "
+            "Built-in web search is not user-provided function calling."
         )
