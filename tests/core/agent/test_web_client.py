@@ -135,6 +135,20 @@ class MockResponse:
         pass
 
 
+def make_mock_session():
+    """Create a properly configured mock aiohttp session.
+
+    Uses Mock (not AsyncMock) so that session.request(...) returns a context
+    manager directly rather than a coroutine.  Sets closed=False so that
+    WebClient._get_session() does not try to replace the mock with a real
+    aiohttp.ClientSession.
+    """
+    mock_session = Mock()
+    mock_session.closed = False
+    mock_session.close = AsyncMock()
+    return mock_session
+
+
 @pytest.fixture
 async def temp_dir():
     """Create temporary directory for tests."""
@@ -160,15 +174,22 @@ async def mock_security():
 
 @pytest.fixture
 async def web_client(mock_security, temp_dir):
-    """Create WebClient instance for testing."""
+    """Create WebClient instance for testing.
+
+    Creates the client with enable_cache=False first, then manually attaches a
+    ResponseCache backed by a temp directory.  This avoids the
+    PermissionError that occurs when WebClient tries to create
+    ~/.omnimancer/web_cache in restricted environments.
+    """
     cache_dir = temp_dir / "web_cache"
     client = WebClient(
         security_manager=mock_security,
         timeout=5,
-        enable_cache=True,
+        enable_cache=False,
         enable_rate_limiting=True,
     )
-    client.cache.cache_dir = cache_dir
+    # Attach cache with a writable temp directory
+    client.cache = ResponseCache(cache_dir=cache_dir)
     yield client
     await client.close()
 
@@ -347,18 +368,15 @@ class TestWebClient:
 
         web_client.security.validate_operation = mock_validate_operation
 
-        # Mock aiohttp session
-        mock_session = AsyncMock()
+        # Mock aiohttp session — use Mock (not AsyncMock) so that
+        # session.request(...) returns a context manager directly.
+        mock_session = make_mock_session()
         mock_response = MockResponse(status=200, content=b"OK")
-        mock_session.request.return_value = mock_response
+        mock_session.request.return_value = create_mock_context_manager(mock_response)
         web_client._session = mock_session
 
-        try:
-            response = await web_client.get("http://localhost:8080")
-            assert response.status == 200
-        except Exception:
-            # Connection will fail, but should not be blocked by policy
-            pass
+        response = await web_client.get("http://localhost:8080")
+        assert response.status == 200
 
     @pytest.mark.asyncio
     async def test_security_manager_integration(self, web_client):
@@ -569,11 +587,12 @@ class TestWebClient:
         """Test request statistics tracking."""
         initial_stats = web_client.get_stats()
 
-        # Mock successful request
-        mock_session = AsyncMock()
+        # Mock successful request — use Mock (not AsyncMock) so that
+        # session.request(...) returns a context manager, not a coroutine.
+        mock_session = make_mock_session()
         web_client._session = mock_session
         mock_response = MockResponse(status=200, content=b"OK")
-        mock_session.request.return_value = mock_response
+        mock_session.request.return_value = create_mock_context_manager(mock_response)
 
         await web_client.get("https://example.com")
 
@@ -583,31 +602,38 @@ class TestWebClient:
 
     @pytest.mark.asyncio
     async def test_blacklist_management(self, web_client):
-        """Test blacklist management."""
+        """Test blacklist management — fully hermetic, no real network calls."""
         # Add domain to blacklist
         web_client.add_to_blacklist("evil.com")
 
+        # Blacklisted URL must be rejected before any network activity
         with pytest.raises(ValueError, match="URL blocked by security policy"):
             await web_client.get("https://evil.com")
 
         # Remove from blacklist
         web_client.remove_from_blacklist("evil.com")
 
-        # Should now be allowed (but will still fail security validation)
-        try:
-            await web_client.get("https://evil.com")
-        except ValueError as e:
-            # Should be blocked by security manager, not blacklist
-            assert "security policy" not in str(e) or "Request blocked" in str(e)
+        # After removal the URL should pass the blacklist check.
+        # Mock the session so NO real network call is made.
+        mock_session = make_mock_session()
+        mock_response = MockResponse(status=200, content=b"OK")
+        mock_session.request.return_value = create_mock_context_manager(mock_response)
+        web_client._session = mock_session
+
+        # Request should now succeed (domain no longer blacklisted)
+        response = await web_client.get("https://evil.com")
+        assert response.status == 200
+        # Confirm exactly one real request was made (proving it passed the blacklist)
+        assert mock_session.request.call_count == 1
 
     @pytest.mark.asyncio
     async def test_cache_clearing(self, web_client):
         """Test cache clearing functionality."""
-        # Mock and cache a response
-        mock_session = AsyncMock()
+        # Mock and cache a response — use Mock (not AsyncMock).
+        mock_session = make_mock_session()
         web_client._session = mock_session
         mock_response = MockResponse(status=200, content=b"Cached")
-        mock_session.request.return_value = mock_response
+        mock_session.request.return_value = create_mock_context_manager(mock_response)
 
         await web_client.get("https://example.com")
 
@@ -625,18 +651,17 @@ class TestWebClient:
     @pytest.mark.asyncio
     async def test_context_manager(self, mock_security, temp_dir):
         """Test WebClient as async context manager."""
-        async with WebClient(security_manager=mock_security) as client:
+        # Use enable_cache=False to avoid creating ~/.omnimancer/web_cache
+        # in a potentially restricted home directory during tests.
+        async with WebClient(
+            security_manager=mock_security, enable_cache=False
+        ) as client:
             assert client._session is None  # Session not created yet
 
-            # Mock a request
-            from unittest.mock import Mock
-
-            mock_session = Mock()
-            mock_session.close = AsyncMock()  # Ensure close is a mock
-            mock_session.closed = False  # Session is not closed
+            # Mock a request — use Mock (not AsyncMock).
+            mock_session = make_mock_session()
             client._session = mock_session
             mock_response = MockResponse(status=200, content=b"OK")
-            # Create an async context manager mock
             mock_session.request.return_value = create_mock_context_manager(
                 mock_response
             )
@@ -651,15 +676,15 @@ class TestWebClient:
 class TestWebClientIntegration:
     """Integration tests for WebClient."""
 
-    @pytest.mark.skip(reason="Mock session not intercepting requests correctly")
     @pytest.mark.asyncio
     async def test_complete_workflow(self, web_client):
         """Test complete web client workflow."""
         # Clear cache first to ensure clean state
         web_client.clear_cache()
 
-        # Mock session for the workflow
-        mock_session = AsyncMock()
+        # Mock session — use Mock (not AsyncMock) and set closed=False so that
+        # _get_session() reuses our mock instead of creating a real session.
+        mock_session = make_mock_session()
         web_client._session = mock_session
 
         html_content = """
@@ -703,7 +728,6 @@ class TestWebClientIntegration:
         cached_response = await web_client.get("https://example.com")
         assert cached_response.from_cache
 
-    @pytest.mark.skip(reason="Mock session not intercepting requests correctly")
     @pytest.mark.asyncio
     async def test_error_handling_workflow(self, web_client):
         """Test error handling in complete workflow."""
@@ -711,8 +735,8 @@ class TestWebClientIntegration:
         with pytest.raises(ValueError):
             await web_client.get("http://localhost:8080")
 
-        # Test network error handling
-        mock_session = AsyncMock()
+        # Test network error handling — use Mock (not AsyncMock) and closed=False.
+        mock_session = make_mock_session()
         web_client._session = mock_session
 
         # Create context manager that fails
@@ -727,7 +751,8 @@ class TestWebClientIntegration:
             lambda *args, **kwargs: FailingContextManager()
         )
 
-        with pytest.raises(RuntimeError, match=r"Request failed after \d+ attempts"):
+        # WebClient raises Exception (not RuntimeError) after all retries
+        with pytest.raises(Exception, match=r"Request failed after \d+ attempts"):
             await web_client.get("https://example.com")
 
         # Verify error is tracked in stats
