@@ -487,7 +487,9 @@ class TestPerplexityProviderModelInfo:
         assert model_info.cost_per_million_input == 0.2
         assert model_info.cost_per_million_output == 0.2
         assert model_info.swe_score == 45.2
-        assert model_info.supports_tools is True
+        # Perplexity has no send_message_with_tools implementation, so every
+        # model (online included) must report no tool support.
+        assert model_info.supports_tools is False
         assert model_info.supports_multimodal is False
         assert model_info.is_free is False
 
@@ -526,11 +528,11 @@ class TestPerplexityProviderModelInfo:
         assert len(online_models) == 3
         assert len(chat_models) == 2
 
-        # Check that online models support tools
+        # No Perplexity model supports user function-calling (online models do
+        # built-in web search, not tool use), so none report tool support.
         for model in online_models:
-            assert model.supports_tools is True
+            assert model.supports_tools is False
 
-        # Check that chat models don't support tools
         for model in chat_models:
             assert model.supports_tools is False
 
@@ -555,8 +557,9 @@ class TestPerplexityProviderCapabilities:
         assert perplexity_provider.supports_multimodal() is False
 
     def test_supports_streaming(self, perplexity_provider):
-        """Test streaming support."""
-        assert perplexity_provider.supports_streaming() is True
+        """Perplexity does not override send_message_stream, so it must not
+        advertise streaming support."""
+        assert perplexity_provider.supports_streaming() is False
 
 
 class TestPerplexityProviderMessagePreparation:
