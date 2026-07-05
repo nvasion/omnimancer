@@ -67,7 +67,7 @@ def _sanitize_instruction_content(raw: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     # 4. Belt-and-suspenders length cap (file read is already capped)
-    text = text[: _MAX_INSTRUCTION_FILE_BYTES]
+    text = text[:_MAX_INSTRUCTION_FILE_BYTES]
 
     return text.strip()
 

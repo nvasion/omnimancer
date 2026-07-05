@@ -8,11 +8,13 @@ Version: 1.0.0
 """
 
 import logging
+import re
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from ..core.models import (
     ChatResponse,
     EnhancedModelInfo,
+    MCPServerConfig,
     ModelInfo,
     StreamEvent,
     StreamEventType,
@@ -42,6 +44,14 @@ class CoreEngine:
     This class manages providers, configuration, chat sessions,
     and provides the main interface for the CLI.
     """
+
+    # --- MCP command constants -------------------------------------------------
+    #: Valid MCP server name pattern: letters, digits, hyphens, underscores.
+    _SERVER_NAME_RE: re.Pattern = re.compile(r"^[A-Za-z0-9_\-]+$")
+    #: Transports accepted for remote MCP servers.
+    _VALID_MCP_TRANSPORTS: frozenset = frozenset({"sse", "http"})
+    #: Shell metacharacters that must not appear in a stdio command executable.
+    _SHELL_METACHAR_RE: re.Pattern = re.compile(r"[;&|><`$\n\r]")
 
     def __init__(self, config_manager: ConfigManager):
         """
@@ -1067,6 +1077,10 @@ class CoreEngine:
                 return await self._mcp_status()
             elif command == "reload":
                 return await self._mcp_reload()
+            elif command == "add":
+                return await self._mcp_add(command_parts[1:])
+            elif command == "remove":
+                return await self._mcp_remove(command_parts[1:])
             elif command == "connect":
                 server_name = command_parts[1] if len(command_parts) > 1 else None
                 return await self._mcp_connect(server_name)
@@ -1086,6 +1100,223 @@ class CoreEngine:
         except Exception as e:
             logger.error(f"Error handling MCP command '{command}': {e}")
             return f"Error executing MCP command: {str(e)}"
+
+    # ------------------------------------------------------------------
+    # MCP management helpers
+    # ------------------------------------------------------------------
+
+    def _validate_stdio_command(self, command: str) -> Optional[str]:
+        """Validate that a stdio command executable name is safe.
+
+        Rejects strings that contain shell metacharacters so that the
+        MCPManager cannot inadvertently trigger shell injection if the
+        command is ever passed to a shell-mode subprocess.
+
+        Args:
+            command: The executable name or path to validate.
+
+        Returns:
+            An error message string when invalid, ``None`` when valid.
+        """
+        if not command:
+            return "Error: Command cannot be empty."
+        if self._SHELL_METACHAR_RE.search(command):
+            return (
+                "Error: Command contains unsafe shell characters "
+                "(; | & > < ` $ newline). "
+                "Use a plain executable name or absolute path."
+            )
+        return None
+
+    def _validate_mcp_url(self, url: str) -> Optional[str]:
+        """Validate a URL supplied for a remote MCP server.
+
+        Only ``http://`` and ``https://`` schemes are accepted to prevent
+        SSRF via non-HTTP transports.
+
+        Args:
+            url: The URL string to validate.
+
+        Returns:
+            An error message string when invalid, ``None`` when valid.
+        """
+        if not re.match(r"^https?://", url, re.IGNORECASE):
+            return (
+                "Error: Only http:// and https:// URLs are "
+                "supported for remote MCP servers."
+            )
+        return None
+
+    def _parse_remote_mcp_args(
+        self, name: str, rest: List[str]
+    ) -> "tuple[Optional[MCPServerConfig], Optional[str]]":
+        """Parse ``--url``-style arguments for a remote MCP server.
+
+        Args:
+            name: The (already validated) server name.
+            rest: Remaining argument tokens starting with ``--url``.
+
+        Returns:
+            ``(config, None)`` on success or ``(None, error_message)`` on
+            failure.
+        """
+        if len(rest) < 2:
+            return None, "Error: --url requires a URL argument."
+
+        url = rest[1]
+        url_error = self._validate_mcp_url(url)
+        if url_error:
+            return None, url_error
+
+        transport = "sse"
+        i = 2
+        while i < len(rest):
+            if rest[i] == "--transport" and i + 1 < len(rest):
+                transport = rest[i + 1]
+                i += 2
+            else:
+                i += 1
+
+        if transport not in self._VALID_MCP_TRANSPORTS:
+            valid = ", ".join(sorted(self._VALID_MCP_TRANSPORTS))
+            return None, (
+                f"Error: Invalid transport '{transport}'. "
+                f"Supported values are: {valid}."
+            )
+
+        return MCPServerConfig(name=name, transport=transport, url=url), None
+
+    async def _mcp_add(self, args: List[str]) -> str:
+        """Add a new MCP server configuration (stdio or remote).
+
+        Args:
+            args: Tokenised sub-command arguments, e.g.
+                ``["myserver", "npx", "-y", "…"]`` for stdio or
+                ``["remote", "--url", "http://…", "--transport", "sse"]``.
+        """
+        if not self.mcp_manager:
+            return "MCP is not configured."
+
+        if len(args) < 2:
+            return (
+                "Usage:\n"
+                "  /mcp add <name> <command> [args...]          (stdio)\n"
+                "  /mcp add <name> --url <url> [--transport sse|http]"
+                "  (remote)\n\n"
+                "Examples:\n"
+                "  /mcp add myserver npx -y"
+                " @modelcontextprotocol/server-filesystem /path\n"
+                "  /mcp add myserver --url http://localhost:8080/mcp"
+                " --transport sse"
+            )
+
+        name = args[0]
+
+        # Validate server name — no path separators or special characters
+        if not name or not name.strip():
+            return "Error: Server name cannot be empty."
+        if not self._SERVER_NAME_RE.match(name):
+            return (
+                "Error: Server name may only contain letters, digits, "
+                "hyphens, and underscores."
+            )
+
+        # Check for duplicate
+        if name in self.mcp_manager.mcp_config.servers:
+            return (
+                f"Error: MCP server '{name}' is already configured. "
+                f"Remove it first with /mcp remove {name}."
+            )
+
+        rest = args[1:]
+
+        try:
+            if rest[0] == "--url":
+                server_config, error = self._parse_remote_mcp_args(name, rest)
+                if error:
+                    return error
+            else:
+                cmd_error = self._validate_stdio_command(rest[0])
+                if cmd_error:
+                    return cmd_error
+                server_config = MCPServerConfig(
+                    name=name, command=rest[0], args=rest[1:]
+                )
+
+            assert server_config is not None  # guaranteed by branches above
+
+            # Persist to config first — if this fails, runtime state is
+            # still clean (server has not yet been inserted).
+            self.config_manager.set_mcp_server_config(name, server_config)
+            # Update runtime state only after successful persistence.
+            self.mcp_manager.mcp_config.servers[name] = server_config
+
+            logger.info(f"Added MCP server '{name}'")
+            return (
+                f"MCP server '{name}' added successfully. "
+                f"Use /mcp connect {name} to connect."
+            )
+        except ValueError as e:
+            return f"Error: {e}"
+        except (OSError, KeyError, TypeError, AttributeError) as e:
+            # OSError covers disk/permission failures from the persistence
+            # layer; the others cover unexpected runtime state errors.
+            logger.exception(f"Failed to add MCP server '{name}': {e}")
+            return (
+                "An unexpected error occurred while adding the server. "
+                "Check logs for details."
+            )
+
+    async def _mcp_remove(self, args: List[str]) -> str:
+        """Remove an MCP server configuration and disconnect if connected.
+
+        Persistence is updated before the runtime state so that a failure
+        in the config layer leaves the runtime consistent.  The disconnect
+        step is best-effort: a failure there does **not** abort the removal.
+
+        Args:
+            args: Tokenised sub-command arguments; the first element must
+                be the server name to remove.
+        """
+        if not self.mcp_manager:
+            return "MCP is not configured."
+
+        if not args:
+            return "Usage: /mcp remove <name>"
+
+        name = args[0]
+
+        # Check if server exists
+        if name not in self.mcp_manager.mcp_config.servers:
+            return f"Error: MCP server '{name}' is not configured."
+
+        try:
+            # Remove from persistent config first — if this raises, the
+            # runtime state is still consistent (nothing changed yet).
+            removed = self.config_manager.remove_mcp_server_config(name)
+            if not removed:
+                return f"Error: Failed to remove server '{name}' from configuration."
+
+            # Remove from runtime config only after successful persistence.
+            if name in self.mcp_manager.mcp_config.servers:
+                del self.mcp_manager.mcp_config.servers[name]
+
+            # Disconnect if connected — best-effort, must not abort removal.
+            try:
+                await self.mcp_manager.shutdown_servers(name)
+            except Exception as disc_err:
+                logger.warning(f"Could not disconnect '{name}' cleanly: {disc_err}")
+
+            logger.info(f"Removed MCP server '{name}'")
+            return f"MCP server '{name}' removed successfully."
+        except (OSError, KeyError, TypeError, AttributeError) as e:
+            # OSError covers disk/permission failures from the persistence
+            # layer; the others cover unexpected runtime state errors.
+            logger.exception(f"Failed to remove MCP server '{name}': {e}")
+            return (
+                "An unexpected error occurred while removing the server. "
+                "Check logs for details."
+            )
 
     async def _mcp_status(self) -> str:
         """Get MCP system status."""
@@ -1131,24 +1362,52 @@ class CoreEngine:
             return f"Error reloading MCP servers: {str(e)}"
 
     async def _mcp_connect(self, server_name: Optional[str] = None) -> str:
-        """Connect to MCP server(s)."""
+        """Connect to a named MCP server, or to all servers if no name given.
+
+        When *server_name* is provided, any existing connection for that
+        server is cleanly closed before a fresh ``MCPClient`` is created and
+        registered.  When *server_name* is ``None``, ``initialize_servers``
+        is called on the MCPManager to (re-)connect all configured servers.
+
+        Args:
+            server_name: Name of the specific server to connect, or ``None``
+                to connect all configured servers.
+        """
         if not self.mcp_manager:
             return "MCP is not configured."
 
         try:
             if server_name:
-                # For specific server, we'd need a method to connect individual servers
-                return (
-                    f"Connecting to specific server"
-                    f" '{server_name}' is not yet"
-                    " implemented. Use reload to"
-                    " reconnect all servers."
-                )
+                server_config = self.mcp_manager.mcp_config.servers.get(server_name)
+                if not server_config:
+                    return (
+                        f"Error: Server '{server_name}' is not configured. "
+                        "Use /mcp add to add it first."
+                    )
+
+                # Disconnect existing connection if any
+                if server_name in self.mcp_manager.clients:
+                    existing = self.mcp_manager.clients[server_name]
+                    if existing.is_connected:
+                        await existing.disconnect()
+
+                # Import MCPClient locally to avoid circular import risk
+                from ..mcp.client import MCPClient
+
+                client = MCPClient(server_config)
+                await client.connect()
+                self.mcp_manager.clients[server_name] = client
+                logger.info(f"Connected to MCP server '{server_name}'")
+                return f"Successfully connected to MCP server '{server_name}'."
             else:
                 await self.mcp_manager.initialize_servers()
                 return "Attempted to connect to all MCP servers."
         except Exception as e:
-            return f"Error connecting to MCP servers: {str(e)}"
+            logger.exception(f"Error connecting to MCP server '{server_name}': {e}")
+            return (
+                f"Error connecting to server '{server_name}': "
+                "An error occurred. Check logs for details."
+            )
 
     async def _mcp_disconnect(self, server_name: Optional[str] = None) -> str:
         """Disconnect from MCP server(s)."""
@@ -1272,19 +1531,27 @@ class CoreEngine:
 MCP Commands:
 =============
 
-/mcp status     - Show MCP system status
-/mcp health     - Show server health status
-/mcp servers    - List all configured servers
-/mcp tools      - List all available tools
-/mcp tools <server> - List tools from specific server
-/mcp reload     - Reload MCP configuration
-/mcp connect [server] - Connect to server(s)
-/mcp disconnect [server] - Disconnect from server(s)
+/mcp status              - Show MCP system status
+/mcp health              - Show server health status
+/mcp servers             - List all configured servers
+/mcp tools               - List all available tools
+/mcp tools <server>      - List tools from a specific server
+/mcp reload              - Reload MCP configuration
+/mcp connect [server]    - Connect to a specific server or all servers
+/mcp disconnect [server] - Disconnect from a specific server or all servers
+/mcp add <name> <command> [args...]
+                         - Add a stdio MCP server
+/mcp add <name> --url <url> [--transport sse|http]
+                         - Add a remote MCP server
+/mcp remove <name>       - Remove a configured MCP server
 
 Examples:
   /mcp status
   /mcp tools filesystem
-  /mcp health
+  /mcp add fs npx -y @modelcontextprotocol/server-filesystem /tmp
+  /mcp add remote --url http://localhost:8080/mcp --transport sse
+  /mcp connect fs
+  /mcp remove fs
 """
         return help_text.strip()
 
