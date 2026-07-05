@@ -850,6 +850,87 @@ class TestHeadlessRunner:
         assert mock_engine.send_message_with_tools.call_count == 2
 
     @pytest.mark.asyncio
+    async def test_no_approval_flag_auto_approves_operations(self):
+        """no_approval must install an auto-approve callback on the engine.
+
+        Regression: HeadlessRunner stored no_approval but never used it. No
+        approval callback exists in headless mode, and ApprovalManager denies
+        by default without one, so every write/exec failed with "Operation
+        not approved by user" — even when spawned with
+        --dangerously-skip-permissions.
+        """
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+        from omnimancer.core.agent.types import Operation, OperationType
+        from omnimancer.core.agent_managers import ApprovalManager
+
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.send_message_with_tools = AsyncMock(
+            return_value=ChatResponse(
+                content="done",
+                model_used="m",
+                tokens_used=1,
+                stop_reason="end_turn",
+                tool_calls=None,
+            )
+        )
+        agent_engine = MagicMock()
+        agent_engine.approval = ApprovalManager()
+        mock_engine.agent_engine = agent_engine
+
+        runner = HeadlessRunner(
+            engine=mock_engine, output_format=OutputFormat.TEXT, no_approval=True
+        )
+        runner._emitter._stdout = StringIO()
+        assert await runner.run("hi") == 0
+
+        op = Operation(
+            type=OperationType.FILE_WRITE,
+            description="write a file",
+            data={"path": "/x"},
+            requires_approval=True,
+        )
+        assert await agent_engine.approval.request_approval(op) is True
+        # The enhanced approval path must be covered too.
+        agent_engine.enhanced_approval.set_approval_callback.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_without_no_approval_operations_still_denied(self):
+        """Without the flag, headless keeps its deny-by-default behavior."""
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+        from omnimancer.core.agent.types import Operation, OperationType
+        from omnimancer.core.agent_managers import ApprovalManager
+
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.send_message_with_tools = AsyncMock(
+            return_value=ChatResponse(
+                content="done",
+                model_used="m",
+                tokens_used=1,
+                stop_reason="end_turn",
+                tool_calls=None,
+            )
+        )
+        agent_engine = MagicMock()
+        agent_engine.approval = ApprovalManager()
+        mock_engine.agent_engine = agent_engine
+
+        runner = HeadlessRunner(
+            engine=mock_engine, output_format=OutputFormat.TEXT, no_approval=False
+        )
+        runner._emitter._stdout = StringIO()
+        assert await runner.run("hi") == 0
+
+        op = Operation(
+            type=OperationType.FILE_WRITE,
+            description="write a file",
+            data={"path": "/x"},
+            requires_approval=True,
+        )
+        assert await agent_engine.approval.request_approval(op) is False
+
+    @pytest.mark.asyncio
     async def test_repeated_tool_call_stops_early(self):
         from omnimancer.cli.headless import HeadlessRunner, OutputFormat
 

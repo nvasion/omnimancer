@@ -1,11 +1,8 @@
 """Tests for system prompt builder."""
 
-import os
 from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from omnimancer.cli.system_prompts import (
     _MAX_INSTRUCTION_FILE_BYTES,
@@ -454,7 +451,7 @@ class TestSanitizeInstructionContent:
         assert _sanitize_instruction_content("   \n\n\t  ") == ""
 
     def test_fake_capability_injection_stripped_if_in_code_block(self):
-        """Attempts to inject capability declarations via code blocks are neutralised."""
+        """Capability declarations injected via code blocks are neutralised."""
         content = (
             "Normal instruction.\n"
             "```\n"

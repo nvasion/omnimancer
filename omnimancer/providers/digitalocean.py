@@ -20,6 +20,7 @@ class DigitalOceanProvider(OpenAIProvider):
     """
 
     BASE_URL = "https://inference.do-ai.run/v1"
+    PROVIDER_LABEL = "DigitalOcean"
 
     def __init__(self, api_key: str, model: str = "", **kwargs: Any) -> None:
         """
