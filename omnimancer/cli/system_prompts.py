@@ -67,7 +67,7 @@ def _sanitize_instruction_content(raw: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     # 4. Belt-and-suspenders length cap (file read is already capped)
-    text = text[: _MAX_INSTRUCTION_FILE_BYTES]
+    text = text[:_MAX_INSTRUCTION_FILE_BYTES]
 
     return text.strip()
 
@@ -355,9 +355,8 @@ Examples:
   pdf2docx[/COMMAND_EXEC]
 
 🌐 Web Operations:
-- [WEB_REQUEST:url] - Make a web request
-- [WEB_GET:url] - HTTP GET request
-- [WEB_POST:url] data [/WEB_POST] - HTTP POST request
+- [WEB_REQUEST:url] - HTTP GET request to the given URL
+- [WEB_GET:url] - HTTP GET request to the given URL
 
 SECURITY & APPROVAL SYSTEM:
 - File writes are AUTOMATICALLY shown to user for approval
