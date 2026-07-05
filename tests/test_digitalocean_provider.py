@@ -1,5 +1,7 @@
 """Tests for the DigitalOcean inference provider and custom base_url support."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from omnimancer.core.models import ChatContext
@@ -9,7 +11,23 @@ from omnimancer.providers.digitalocean import DigitalOceanProvider
 from omnimancer.providers.factory import ProviderFactory
 from omnimancer.providers.openai import OpenAIProvider
 from omnimancer.providers.openrouter import OpenRouterProvider
-from omnimancer.utils.errors import AuthenticationError
+from omnimancer.utils.errors import (
+    AuthenticationError,
+    ModelNotFoundError,
+    ProviderError,
+    RateLimitError,
+)
+
+
+def _response(status, json_body=None, text="boom"):
+    resp = MagicMock()
+    resp.status_code = status
+    if json_body is None:
+        resp.json = MagicMock(side_effect=ValueError("not json"))
+    else:
+        resp.json = MagicMock(return_value=json_body)
+    resp.text = text
+    return resp
 
 
 class TestDigitalOceanProvider:
@@ -71,6 +89,86 @@ class TestDigitalOceanProvider:
         assert "DIGITALOCEAN_INFERENCE_KEY" in msg
         # The misleading low-level header error must not surface.
         assert "Illegal header value" not in msg
+
+
+class TestDigitalOceanErrorSurfacing:
+    """DigitalOcean error bodies must surface their real message.
+
+    Regression: DO returns errors as ``{"id": ..., "message": ...}`` rather
+    than OpenAI's ``{"error": {"message": ...}}``, so every non-401/404/429
+    failure was reported as the useless "OpenAI API error: Unknown error".
+    """
+
+    def _provider(self, model="qwen3.5-397b-a17b"):
+        return DigitalOceanProvider(api_key="k", model=model)
+
+    def test_do_shaped_error_message_surfaces(self):
+        resp = _response(
+            403,
+            {"id": "forbidden", "message": "Model access denied for this key"},
+        )
+        with pytest.raises(ProviderError) as exc:
+            self._provider()._handle_response(resp)
+        msg = str(exc.value)
+        assert "Model access denied for this key" in msg
+        assert "Unknown error" not in msg
+
+    def test_error_names_digitalocean_not_openai(self):
+        resp = _response(400, {"id": "bad_request", "message": "nope"})
+        with pytest.raises(ProviderError) as exc:
+            self._provider()._handle_response(resp)
+        msg = str(exc.value)
+        assert "DigitalOcean" in msg
+        assert "OpenAI" not in msg
+
+    def test_openai_shaped_error_still_surfaces(self):
+        resp = _response(400, {"error": {"message": "Invalid request"}})
+        with pytest.raises(ProviderError, match="Invalid request"):
+            self._provider()._handle_response(resp)
+
+    def test_error_as_plain_string_surfaces(self):
+        resp = _response(400, {"error": "model is overloaded"})
+        with pytest.raises(ProviderError, match="model is overloaded"):
+            self._provider()._handle_response(resp)
+
+    def test_fastapi_detail_shape_surfaces(self):
+        resp = _response(422, {"detail": "Invalid model name"})
+        with pytest.raises(ProviderError, match="Invalid model name"):
+            self._provider()._handle_response(resp)
+
+    def test_non_json_body_reports_status(self):
+        resp = _response(502, json_body=None)
+        with pytest.raises(ProviderError, match="HTTP 502"):
+            self._provider()._handle_response(resp)
+
+    def test_404_includes_body_message_and_model(self):
+        resp = _response(404, {"id": "not_found", "message": "model does not exist"})
+        with pytest.raises(ModelNotFoundError) as exc:
+            self._provider()._handle_response(resp)
+        msg = str(exc.value)
+        assert "qwen3.5-397b-a17b" in msg
+        assert "model does not exist" in msg
+
+    def test_401_includes_body_message(self):
+        resp = _response(
+            401, {"id": "Unauthorized", "message": "Unable to authenticate you"}
+        )
+        with pytest.raises(AuthenticationError) as exc:
+            self._provider()._handle_response(resp)
+        msg = str(exc.value)
+        assert "DigitalOcean" in msg
+        assert "Unable to authenticate you" in msg
+
+    def test_429_names_provider(self):
+        resp = _response(429, {"id": "rate_limited", "message": "slow down"})
+        with pytest.raises(RateLimitError) as exc:
+            self._provider()._handle_response(resp)
+        assert "DigitalOcean" in str(exc.value)
+
+    def test_openai_provider_keeps_openai_label(self):
+        resp = _response(400, {"error": {"message": "bad"}})
+        with pytest.raises(ProviderError, match="OpenAI API error: bad"):
+            OpenAIProvider(api_key="k")._handle_response(resp)
 
 
 @pytest.mark.parametrize(

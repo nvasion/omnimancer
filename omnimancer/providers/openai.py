@@ -31,6 +31,11 @@ class OpenAIProvider(BaseProvider):
 
     BASE_URL = "https://api.openai.com/v1"
 
+    # Human-readable provider name used in error messages. Subclasses for
+    # OpenAI-compatible services (e.g. DigitalOcean) override this so errors
+    # name the service the user actually configured.
+    PROVIDER_LABEL = "OpenAI"
+
     # Patterns used to recover the model context window and prompt size from
     # context-length errors returned by OpenAI-compatible servers (OpenAI,
     # vLLM, DigitalOcean inference, etc.).
@@ -209,10 +214,7 @@ class OpenAIProvider(BaseProvider):
             the window (no output budget possible), or ``None`` if the error is
             not a context-length error.
         """
-        try:
-            error_msg = response.json().get("error", {}).get("message", "") or ""
-        except Exception:
-            return None
+        error_msg = self._extract_error_message(response) or ""
 
         limit_match = self._CONTEXT_LIMIT_RE.search(error_msg)
         input_match = self._INPUT_TOKENS_RE.search(error_msg)
@@ -342,20 +344,52 @@ class OpenAIProvider(BaseProvider):
             else:
                 raise ProviderError("Empty response from OpenAI API")
 
-        elif response.status_code == 401:
-            raise AuthenticationError("Invalid OpenAI API key")
-        elif response.status_code == 429:
-            raise RateLimitError("OpenAI API rate limit exceeded")
-        elif response.status_code == 404:
-            raise ModelNotFoundError(f"OpenAI model '{self.model}' not found")
-        else:
-            try:
-                error_data = response.json()
-                error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            except Exception:
-                error_msg = f"HTTP {response.status_code}"
+        label = self.PROVIDER_LABEL
+        detail = self._extract_error_message(response)
+        suffix = f": {detail}" if detail else ""
 
-            raise ProviderError(f"OpenAI API error: {error_msg}")
+        if response.status_code == 401:
+            raise AuthenticationError(f"Invalid {label} API key{suffix}")
+        elif response.status_code == 429:
+            raise RateLimitError(f"{label} API rate limit exceeded{suffix}")
+        elif response.status_code == 404:
+            raise ModelNotFoundError(f"{label} model '{self.model}' not found{suffix}")
+        else:
+            error_msg = detail or f"HTTP {response.status_code}"
+            raise ProviderError(f"{label} API error: {error_msg}")
+
+    @staticmethod
+    def _extract_error_message(response: httpx.Response) -> Optional[str]:
+        """Pull a human-readable message out of an error response body.
+
+        OpenAI-compatible backends disagree on the error shape: OpenAI nests
+        it under ``error.message``, DigitalOcean returns a top-level
+        ``message`` (``{"id": ..., "message": ...}``), FastAPI gateways use
+        ``detail``, and some servers return ``error`` as a plain string.
+        Returns None when no message can be recovered (e.g. non-JSON body).
+        """
+        try:
+            data = response.json()
+        except Exception:
+            return None
+        if not isinstance(data, dict):
+            return None
+
+        error = data.get("error")
+        if isinstance(error, dict):
+            msg = error.get("message")
+            if msg:
+                return str(msg)
+        elif isinstance(error, str) and error:
+            return error
+
+        for key in ("message", "detail"):
+            value = data.get(key)
+            if isinstance(value, str) and value:
+                return value
+            if value:
+                return str(value)
+        return None
 
     async def send_message_with_tools(
         self,

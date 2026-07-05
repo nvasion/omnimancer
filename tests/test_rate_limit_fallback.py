@@ -13,10 +13,7 @@ from datetime import datetime
 
 import pytest
 
-from omnimancer.core.models import (
-    ChatResponse,
-    FallbackConfig,
-)
+from omnimancer.core.models import ChatResponse, FallbackConfig
 from omnimancer.core.rate_limit_fallback import RateLimitFallbackHandler
 from omnimancer.utils.errors import RateLimitError
 
