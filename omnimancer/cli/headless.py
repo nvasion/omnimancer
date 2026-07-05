@@ -234,11 +234,35 @@ class HeadlessRunner:
         self._emitter = HeadlessOutputEmitter(output_format, session_id, verbose)
         self._tokens = TokenAccumulator()
 
+    @staticmethod
+    def _enable_auto_approval(agent_engine: Any) -> None:
+        """Approve every operation, honoring --dangerously-skip-permissions.
+
+        Headless runs are unattended: no approval callback is ever installed,
+        and both approval managers deny by default without one, so a headless
+        agent could never write a file or run a command regardless of the
+        flag. Config-driven permission DENY rules and hooks still apply — they
+        are checked before the approval step.
+        """
+
+        async def _approve(_request: Any) -> bool:
+            return True
+
+        approval = getattr(agent_engine, "approval", None)
+        if approval is not None:
+            approval.set_approval_callback(_approve)
+        enhanced = getattr(agent_engine, "enhanced_approval", None)
+        if enhanced is not None:
+            enhanced.set_approval_callback(_approve)
+
     async def run(self, prompt: str) -> int:
         agent_engine = getattr(self._engine, "agent_engine", None)
         if not agent_engine:
             self._emitter.emit_error("Agent engine not available.")
             return 1
+
+        if self._no_approval:
+            self._enable_auto_approval(agent_engine)
 
         model = self._engine.config_manager.get_config().default_provider or "unknown"
         self._emitter.emit_init(model)
