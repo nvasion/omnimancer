@@ -355,9 +355,8 @@ Examples:
   pdf2docx[/COMMAND_EXEC]
 
 🌐 Web Operations:
-- [WEB_REQUEST:url] - Make a web request
-- [WEB_GET:url] - HTTP GET request
-- [WEB_POST:url] data [/WEB_POST] - HTTP POST request
+- [WEB_REQUEST:url] - HTTP GET request to the given URL
+- [WEB_GET:url] - HTTP GET request to the given URL
 
 SECURITY & APPROVAL SYSTEM:
 - File writes are AUTOMATICALLY shown to user for approval

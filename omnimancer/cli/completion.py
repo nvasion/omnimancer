@@ -26,7 +26,19 @@ class CompletionManager:
             command = command[1:]
 
         static_completions = {
-            "mcp": {0: ["status", "reload", "connect", "disconnect", "health"]},
+            "mcp": {
+                0: [
+                    "status",
+                    "reload",
+                    "connect",
+                    "disconnect",
+                    "health",
+                    "servers",
+                    "tools",
+                    "add",
+                    "remove",
+                ]
+            },
             "history": {0: ["list", "clear", "export", "import"]},
             "config": {
                 0: [

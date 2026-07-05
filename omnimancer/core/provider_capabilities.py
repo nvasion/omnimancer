@@ -87,7 +87,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
         # though Claude Code itself uses tools natively.
         supports_tools=False,
         supports_multimodal=True,
-        supports_streaming=True,
+        # NOTE: ClaudeCodeProvider does not override send_message_stream(); only
+        # ClaudeProvider (anthropic SDK) implements real streaming.  Setting this
+        # False keeps the registry honest — callers must not assume streaming.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=False,
         supports_vision=True,
@@ -101,7 +104,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ProviderType.OPENAI: ProviderCapabilities(
         supports_tools=True,
         supports_multimodal=True,
-        supports_streaming=True,
+        # NOTE: OpenAIProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=True,
@@ -112,7 +118,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ProviderType.GEMINI: ProviderCapabilities(
         supports_tools=True,
         supports_multimodal=True,
-        supports_streaming=True,
+        # NOTE: GeminiProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=True,
@@ -134,7 +143,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
         # it upstream. Keep False until the provider implements it.
         supports_tools=False,
         supports_multimodal=False,
-        supports_streaming=True,
+        # NOTE: CohereProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=False,
         supports_vision=False,
@@ -145,7 +157,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ProviderType.MISTRAL: ProviderCapabilities(
         supports_tools=True,
         supports_multimodal=False,
-        supports_streaming=True,
+        # NOTE: MistralProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=False,
@@ -157,7 +172,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ProviderType.OLLAMA: ProviderCapabilities(
         supports_tools=False,
         supports_multimodal=False,
-        supports_streaming=True,
+        # NOTE: OllamaProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=False,
         supports_vision=False,
@@ -175,7 +193,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ProviderType.PERPLEXITY: ProviderCapabilities(
         supports_tools=False,
         supports_multimodal=False,
-        supports_streaming=True,
+        # NOTE: PerplexityProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=False,
         supports_vision=False,
@@ -192,7 +213,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
         supports_tools=True,
         # Grok vision models support image input; the provider reports True.
         supports_multimodal=True,
-        supports_streaming=True,
+        # NOTE: XAIProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=True,
@@ -208,7 +232,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ProviderType.AZURE: ProviderCapabilities(
         supports_tools=True,
         supports_multimodal=True,
-        supports_streaming=True,
+        # NOTE: AzureProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=True,
@@ -220,7 +247,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ProviderType.VERTEX: ProviderCapabilities(
         supports_tools=True,
         supports_multimodal=True,
-        supports_streaming=True,
+        # NOTE: VertexProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=True,
@@ -232,7 +262,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ProviderType.BEDROCK: ProviderCapabilities(
         supports_tools=True,
         supports_multimodal=True,
-        supports_streaming=True,
+        # NOTE: BedrockProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=True,
@@ -247,7 +280,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
         # is model-dependent at runtime (see OpenRouterProvider.supports_*()).
         supports_tools=True,
         supports_multimodal=True,
-        supports_streaming=True,
+        # NOTE: OpenRouterProvider does not override send_message_stream(); only
+        # ClaudeProvider implements real streaming. Keep False so the registry
+        # matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=True,
@@ -262,7 +298,10 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
         # models are text-only; actual support is model-dependent at runtime.
         supports_tools=True,
         supports_multimodal=False,
-        supports_streaming=True,
+        # NOTE: DigitalOceanProvider inherits from OpenAIProvider which does not
+        # override send_message_stream(); only ClaudeProvider implements real
+        # streaming. Keep False so the registry matches the actual implementation.
+        supports_streaming=False,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=False,
