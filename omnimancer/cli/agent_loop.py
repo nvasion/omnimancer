@@ -6,6 +6,7 @@ via the agent engine, with a continuous workflow loop for multi-step tasks.
 """
 
 import asyncio
+import ipaddress
 import logging
 import re
 import shlex
@@ -13,8 +14,97 @@ import subprocess
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import urlparse, urlunparse
 
 from ..core.agent.types import Operation, OperationType
+
+# ---------------------------------------------------------------------------
+# Web request constants and helpers
+# ---------------------------------------------------------------------------
+
+#: Maximum characters returned from a single web response.
+_MAX_WEB_RESPONSE_CHARS: int = 10_000
+
+#: Hostnames that must never be contacted – cloud/VM metadata endpoints.
+_BLOCKED_METADATA_HOSTNAMES: frozenset = frozenset(
+    {
+        "169.254.169.254",  # AWS IMDSv1/v2, GCP, Azure shared endpoint
+        "metadata.google.internal",  # GCP metadata server
+        "fd00:ec2::254",  # AWS IPv6 IMDS
+        "metadata.internal",  # Azure internal alias
+    }
+)
+
+#: Compiled patterns for web operation markers.
+_WEB_GET_PATTERN = re.compile(r"\[WEB_GET:([^\]]+)\]")
+_WEB_REQUEST_PATTERN = re.compile(r"\[WEB_REQUEST:([^\]]+)\]")
+_WEB_POST_PATTERN = re.compile(r"\[WEB_POST:([^\]]+)\]")
+
+
+def _check_url_safety(url: str) -> Optional[str]:
+    """Validate whether *url* is safe to request.
+
+    Enforces:
+    - HTTP or HTTPS schemes only.
+    - No embedded credentials (``user:pass@host``).
+    - No loopback, private, link-local, or reserved addresses.
+    - No known cloud/VM metadata endpoints.
+
+    Returns an error-message string when the URL is unsafe, ``None`` if OK.
+    """
+    try:
+        parsed = urlparse(url.strip())
+    except Exception:
+        return "Invalid URL format"
+
+    if parsed.scheme not in ("http", "https"):
+        return f"Unsupported scheme '{parsed.scheme}':" " only http/https allowed"
+
+    if parsed.username or parsed.password:
+        return "URLs with embedded credentials are not allowed"
+
+    hostname = parsed.hostname
+    if not hostname:
+        return "URL has no hostname"
+
+    hostname_lower = hostname.lower()
+
+    # Block well-known localhost names before IP parsing.
+    if hostname_lower in ("localhost", "::1", "0.0.0.0"):
+        return f"Requests to '{hostname}' are not allowed"
+
+    # Block cloud metadata hostnames.
+    if hostname_lower in _BLOCKED_METADATA_HOSTNAMES:
+        return f"Requests to cloud metadata endpoint '{hostname}' are blocked"
+
+    # Reject private/reserved IP addresses.
+    try:
+        addr = ipaddress.ip_address(hostname_lower)
+        if (
+            addr.is_private
+            or addr.is_loopback
+            or addr.is_link_local
+            or addr.is_reserved
+        ):
+            return f"Requests to private/reserved IP '{hostname}'" " are not allowed"
+    except ValueError:
+        pass  # Hostname is a domain name – that's fine.
+
+    return None  # URL passed all safety checks.
+
+
+def _sanitize_url_for_log(url: str) -> str:
+    """Return *url* with credentials and query-string stripped for safe logging."""
+    try:
+        parsed = urlparse(url)
+        netloc = parsed.hostname or ""
+        if parsed.port:
+            netloc = f"{netloc}:{parsed.port}"
+        safe = parsed._replace(netloc=netloc, query="", fragment="")
+        return urlunparse(safe)
+    except Exception:
+        return "<invalid-url>"
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +121,113 @@ class AgentLoopMixin:
 
     def _show_assistant_message(self, content: str, model: str) -> None: ...
     def _show_error(self, message: str) -> None: ...
+
+    async def _execute_web_request(
+        self,
+        marker_text: str,
+        url: str,
+        http_method: str,
+        current_response: str,
+    ) -> tuple[str, bool]:
+        """Execute a single web-request marker and return the updated response.
+
+        Validates the *url* for safety, requests user approval, issues the
+        request via the agent engine, and inlines the result.
+
+        Args:
+            marker_text: The raw marker string to replace (e.g. ``[WEB_GET:…]``).
+            url: The target URL extracted from the marker.
+            http_method: HTTP verb – ``"GET"`` or ``"POST"``.
+            current_response: The response text being built up.
+
+        Returns:
+            A ``(updated_response, was_cancelled)`` tuple.  When ``was_cancelled``
+            is ``True`` the returned string already contains the
+            ``__WORKFLOW_CANCELLED__`` sentinel and the caller must return
+            immediately.
+        """
+        safe_url = _sanitize_url_for_log(url)
+
+        url_error = _check_url_safety(url)
+        if url_error:
+            return (
+                current_response.replace(
+                    marker_text,
+                    f"❌ Web request blocked: {url_error}",
+                ),
+                False,
+            )
+
+        agent_engine = getattr(self.engine, "agent_engine", None)
+        if not agent_engine:
+            return (
+                current_response.replace(
+                    marker_text,
+                    "❌ Agent engine not available"
+                    " - web requests disabled for security",
+                ),
+                False,
+            )
+
+        operation = Operation(
+            type=OperationType.WEB_REQUEST,
+            description=f"{http_method} request to: {safe_url}",
+            data={"url": url, "method": http_method},
+            requires_approval=True,
+        )
+
+        try:
+            result = await agent_engine.execute_with_approval(operation)
+
+            if result.success:
+                if isinstance(result.data, dict):
+                    content = result.data.get("content", "")
+                    if not isinstance(content, str):
+                        content = str(content)
+                else:
+                    content = str(result.data or "")
+
+                if len(content) > _MAX_WEB_RESPONSE_CHARS:
+                    content = (
+                        content[:_MAX_WEB_RESPONSE_CHARS]
+                        + "\n\n[... response truncated ...]"
+                    )
+
+                return (
+                    current_response.replace(
+                        marker_text,
+                        f"🌐 {http_method} {safe_url}\n{content}",
+                    ),
+                    False,
+                )
+            else:
+                if result.was_cancelled:
+                    updated = current_response.replace(
+                        marker_text,
+                        "🚫 Agent workflow cancelled by user",
+                    )
+                    return updated + "\n\n__WORKFLOW_CANCELLED__", True
+                else:
+                    return (
+                        current_response.replace(
+                            marker_text,
+                            f"❌ Web request failed: {result.error}",
+                        ),
+                        False,
+                    )
+
+        except Exception as e:
+            logger.error(
+                f"Web request execution failed: {e}",
+                exc_info=True,
+            )
+            return (
+                current_response.replace(
+                    marker_text,
+                    f"❌ Web request error: {str(e)}",
+                ),
+                False,
+            )
 
     async def _execute_continuous_workflow(
         self, original_message: str, initial_response: Any
@@ -68,7 +265,9 @@ class AgentLoopMixin:
                 r"\[FILE_WRITE:[^\]]+\\?\].*?\[/FILE_WRITE\]",
                 r"\[FILE_READ:[^\]]+\\?\]",
                 r"\[COMMAND_EXEC\].*?\[/COMMAND_EXEC\]",
-                r"\[WEB_REQUEST:[^\]]+\\?\]",
+                r"\[WEB_REQUEST:[^\]]+\]",
+                r"\[WEB_GET:[^\]]+\]",
+                r"\[WEB_POST:[^\]]+\]",
                 r"\[SAFE_EXEC\].*?\[/SAFE_EXEC\]",
             ]
 
@@ -621,6 +820,22 @@ class AgentLoopMixin:
                         match.group(0),
                         f"❌ Command execution error: {str(e)}",
                     )
+
+            # WEB_GET, WEB_REQUEST, and WEB_POST markers – each handled via the
+            # shared _execute_web_request helper which validates safety, requests
+            # user approval, and inlines the response content.
+            for marker_pattern, http_method in (
+                (_WEB_GET_PATTERN, "GET"),
+                (_WEB_REQUEST_PATTERN, "GET"),
+                (_WEB_POST_PATTERN, "POST"),
+            ):
+                for match in marker_pattern.finditer(response_content):
+                    url = match.group(1).strip()
+                    updated_response, cancelled = await self._execute_web_request(
+                        match.group(0), url, http_method, updated_response
+                    )
+                    if cancelled:
+                        return updated_response
 
         except Exception as e:
             self._show_error(f"Error parsing operations: {e}")
