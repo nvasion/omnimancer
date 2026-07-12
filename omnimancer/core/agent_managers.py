@@ -159,6 +159,10 @@ class ProgramExecutor(BaseManager):
         }
         self.timeout_seconds = self.default_config.timeout_seconds
 
+        # Full-trust mode (unattended headless runs where an outer sandbox is
+        # the security boundary) — see set_full_trust().
+        self.full_trust = False
+
     async def execute_operation(self, operation: Operation) -> OperationResult:
         """Execute command operation using enhanced executor.
 
@@ -261,6 +265,22 @@ class ProgramExecutor(BaseManager):
         """Terminate a running command."""
         return await self.enhanced_executor.terminate_command(execution_id)
 
+    def set_full_trust(self, enabled: bool) -> None:
+        """Enable full-trust mode for unattended runs.
+
+        The caller (e.g. a headless agent inside a container) is the security
+        boundary: the forbidden-command list and argument sanitization stop
+        blocking, and the default per-command timeout is raised so real build/
+        test runs can finish. Explicit per-operation timeouts are still honored.
+        """
+        self.full_trust = enabled
+        if enabled:
+            self.timeout_seconds = 600
+            self.default_config.timeout_seconds = 600
+        validator = getattr(self.enhanced_executor, "validator", None)
+        if validator is not None:
+            validator.full_trust = enabled
+
     def _validate_command(self, command: str) -> bool:
         """
         Validate command for backward compatibility with tests.
@@ -278,6 +298,10 @@ class ProgramExecutor(BaseManager):
             Security is provided through the approval system's risk assessment
             and user confirmation. Only explicitly dangerous commands are blocked.
         """
+        # Full trust: forbidden-command blocking is disabled.
+        if self.full_trust:
+            return True
+
         # Extract the base command (first word)
         base_command = command.strip().split()[0] if command.strip() else ""
 

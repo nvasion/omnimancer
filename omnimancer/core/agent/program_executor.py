@@ -86,6 +86,10 @@ class CommandValidator:
     """Validates commands against security policies."""
 
     def __init__(self) -> None:
+        # Full-trust mode (unattended headless runs where an outer sandbox is
+        # the security boundary): argument sanitization is skipped so shell
+        # constructs (pipes, &&, redirects) reach the shell executor intact.
+        self.full_trust = False
         self.command_categories = {
             CommandCategory.SAFE_READ: {
                 "ls",
@@ -295,6 +299,11 @@ class CommandValidator:
 
     def validate_command_args(self, command: str, args: List[str]) -> List[str]:
         """Validate and sanitize command arguments."""
+        # Full trust: commands run via the shell on purpose — pipes, &&, and
+        # redirects are legitimate agent usage there.
+        if self.full_trust:
+            return list(args)
+
         import re
 
         # Define dangerous shell metacharacters and patterns

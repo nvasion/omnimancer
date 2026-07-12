@@ -255,6 +255,26 @@ class HeadlessRunner:
         if enhanced is not None:
             enhanced.set_approval_callback(_approve)
 
+    @staticmethod
+    def _enable_full_trust(agent_engine: Any) -> None:
+        """Relax the hard security layers for unattended full-trust runs.
+
+        Auto-approval alone is not enough: the command argument sanitizer
+        (pipes, &&, redirects), the forbidden-command list, the sensitive
+        filename patterns (*key*, *token*, .env, ...), and the 30s default
+        command timeout all block operations before/outside the approval
+        step, so a --dangerously-skip-permissions run still could not do real
+        work. The caller (e.g. a CI or agent container) is the security
+        boundary; hard-restricted system paths (~/.ssh, /etc, ...) stay
+        blocked.
+        """
+        executor = getattr(agent_engine, "executor", None)
+        if executor is not None and hasattr(executor, "set_full_trust"):
+            executor.set_full_trust(True)
+        file_system = getattr(agent_engine, "file_system", None)
+        if file_system is not None and hasattr(file_system, "set_full_trust"):
+            file_system.set_full_trust(True)
+
     async def run(self, prompt: str) -> int:
         agent_engine = getattr(self._engine, "agent_engine", None)
         if not agent_engine:
@@ -263,6 +283,7 @@ class HeadlessRunner:
 
         if self._no_approval:
             self._enable_auto_approval(agent_engine)
+            self._enable_full_trust(agent_engine)
 
         model = self._engine.config_manager.get_config().default_provider or "unknown"
         self._emitter.emit_init(model)

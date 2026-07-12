@@ -46,6 +46,11 @@ class PermissionController:
         self.allowed_commands = self._get_default_allowed_commands()
         self.permission_rules = self._get_default_permission_rules()
 
+        # Full-trust mode (unattended headless runs where an outer sandbox is
+        # the security boundary): sensitive name patterns and the command
+        # allowlist stop blocking. Hard-restricted paths still deny.
+        self.full_trust = False
+
         # Initialize approval memory storage
         self._approval_memory: Dict[str, Dict[str, Any]] = {}
 
@@ -193,10 +198,15 @@ class PermissionController:
             # Normalize path
             normalized_path = str(Path(path).resolve())
 
-            # Hard-restricted paths are denied regardless of approval.
+            # Hard-restricted paths are denied regardless of approval —
+            # including full-trust mode.
             for restricted in self.restricted_paths:
                 if self._path_matches_pattern(normalized_path, restricted):
                     return False
+
+            # Full trust treats every operation as explicitly allowed.
+            if self.full_trust:
+                allow_sensitive = True
 
             # Sensitive name patterns are denied unless explicitly allowed.
             if not allow_sensitive:
@@ -238,6 +248,11 @@ class PermissionController:
 
     def validate_command(self, command: str) -> bool:
         """Validate if command execution is allowed."""
+        # Full trust: the allowlist and pattern checks stop blocking — the
+        # outer sandbox is the security boundary.
+        if self.full_trust:
+            return True
+
         # Extract base command (first word)
         base_command = command.strip().split()[0]
 
