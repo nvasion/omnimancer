@@ -656,3 +656,52 @@ class TestParseDescribedToolCalls:
         from omnimancer.core.models import parse_described_tool_calls
 
         assert parse_described_tool_calls("[Called tools: Grep({'bad': json})]") == []
+
+
+class TestToolCallArgumentNormalization:
+    """ToolCall normalizes arguments that arrive as JSON-encoded strings.
+
+    OpenAI-protocol servers send function.arguments as a JSON string (and
+    some models double-encode it). Providers that passed the raw value
+    through crashed the tool handler with "'str' object has no attribute
+    'get'".
+    """
+
+    def test_json_string_arguments_become_dict(self):
+        from omnimancer.core.models import ToolCall
+
+        tc = ToolCall(name="Glob", arguments='{"pattern": "**/*.py"}')
+        assert tc.arguments == {"pattern": "**/*.py"}
+
+    def test_double_encoded_arguments_become_dict(self):
+        import json
+
+        from omnimancer.core.models import ToolCall
+
+        double = json.dumps(json.dumps({"pattern": "TODO"}))
+        tc = ToolCall(name="Grep", arguments=double)
+        assert tc.arguments == {"pattern": "TODO"}
+
+    def test_none_arguments_become_empty_dict(self):
+        from omnimancer.core.models import ToolCall
+
+        tc = ToolCall(name="Read", arguments=None)
+        assert tc.arguments == {}
+
+    def test_dict_arguments_unchanged(self):
+        from omnimancer.core.models import ToolCall
+
+        tc = ToolCall(name="Read", arguments={"file_path": "/src/main.py"})
+        assert tc.arguments == {"file_path": "/src/main.py"}
+
+    def test_unparseable_string_left_for_handler_to_report(self):
+        from omnimancer.core.models import ToolCall
+
+        tc = ToolCall(name="Glob", arguments="not json at all")
+        assert tc.arguments == "not json at all"
+
+    def test_non_object_json_left_for_handler_to_report(self):
+        from omnimancer.core.models import ToolCall
+
+        tc = ToolCall(name="Glob", arguments="[1, 2, 3]")
+        assert tc.arguments == "[1, 2, 3]"

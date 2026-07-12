@@ -113,6 +113,29 @@ class ToolCall:
     # Provider-assigned call id (OpenAI protocol pairs results to calls by id).
     id: Optional[str] = None
 
+    def __post_init__(self) -> None:
+        """Normalize arguments that arrive as a JSON-encoded string.
+
+        OpenAI-protocol servers send ``function.arguments`` as a JSON string,
+        and some models double-encode it. A value that doesn't decode to an
+        object is left as-is so the tool handler can report it to the model.
+        """
+        import json
+
+        if self.arguments is None:
+            self.arguments = {}
+            return
+        decoded: Any = self.arguments
+        for _ in range(2):
+            if not isinstance(decoded, str):
+                break
+            try:
+                decoded = json.loads(decoded)
+            except ValueError:
+                return
+        if isinstance(decoded, dict):
+            self.arguments = decoded
+
 
 @dataclass
 class ToolResultRecord:

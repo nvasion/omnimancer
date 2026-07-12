@@ -763,9 +763,11 @@ class TestXAIProviderResponseHandling:
         assert response.tool_calls is not None
         assert len(response.tool_calls) == 1
         assert response.tool_calls[0].name == "web_search"
-        assert '"query": "latest AI developments 2024"' in str(
-            response.tool_calls[0].arguments
-        )
+        # The wire protocol sends arguments as a JSON string; the provider
+        # must deliver them as a dict.
+        assert response.tool_calls[0].arguments == {
+            "query": "latest AI developments 2024"
+        }
 
     def test_handle_response_with_error_json(self, xai_provider):
         """Test handling response with JSON error message."""

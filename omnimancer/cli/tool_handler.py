@@ -150,6 +150,18 @@ class ToolHandler:
         return list(CODING_AGENT_TOOLS)
 
     async def execute_tool_call(self, tool_call: ToolCall) -> ToolResult:
+        # ToolCall normalizes JSON-string arguments on construction; anything
+        # still not a dict here is malformed — tell the model instead of
+        # crashing on args.get(...) inside a handler.
+        if not isinstance(tool_call.arguments, dict):
+            return ToolResult(
+                content="",
+                error=(
+                    f"Malformed arguments for {tool_call.name}: expected a "
+                    f"JSON object, got: {str(tool_call.arguments)[:200]}. "
+                    "Re-issue the call with the parameters as a JSON object."
+                ),
+            )
         try:
             # Read and Edit need post-processing / multi-step logic.
             if tool_call.name in _EDIT_TOOLS:
