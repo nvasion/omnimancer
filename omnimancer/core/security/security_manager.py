@@ -327,6 +327,17 @@ class SecurityManager:
             result["stderr"] = f"Security manager error: {str(e)}"
             return result
 
+    def set_full_trust(self, enabled: bool) -> None:
+        """Enable/disable full-trust mode on the permission controller.
+
+        Full trust is for unattended runs (e.g. headless agents inside a
+        container) where the caller is the security boundary: sensitive name
+        patterns and the command allowlist stop blocking operations. The
+        hard-restricted system paths in PermissionController.restricted_paths
+        still deny.
+        """
+        self.permissions.full_trust = enabled
+
     async def secure_file_access(
         self,
         file_path: str,

@@ -79,6 +79,14 @@ class FileSystemManager:
         # Operation tracking
         self.active_operations: Dict[str, Dict[str, Any]] = {}
 
+    def set_full_trust(self, enabled: bool) -> None:
+        """Enable/disable full-trust mode on the underlying security manager.
+
+        In full trust, sensitive name patterns (.env, *key*, *token*, ...)
+        stop blocking reads/writes; hard-restricted system paths still deny.
+        """
+        self.security.set_full_trust(enabled)
+
     async def _request_approval_if_needed(self, operation: Operation) -> bool:
         """Request approval for operation if approval manager is configured."""
         if not self.require_approval or not self.approval_manager:
