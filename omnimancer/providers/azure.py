@@ -363,19 +363,23 @@ class AzureProvider(BaseProvider):
 
             if choices and len(choices) > 0:
                 message = choices[0].get("message", {})
-                content = message.get("content", "")
+                # Tool-call responses carry "content": null — coalesce to "".
+                content = message.get("content") or ""
                 usage = data.get("usage", {})
 
-                # Extract tool calls if present
+                # Extract tool calls if present. The wire protocol sends
+                # function.arguments as a JSON string; ToolCall normalizes
+                # it to a dict on construction.
                 tool_calls = []
                 if "tool_calls" in message:
-                    for tool_call in message["tool_calls"]:
+                    for i, tool_call in enumerate(message["tool_calls"]):
                         if tool_call.get("type") == "function":
                             function = tool_call.get("function", {})
                             tool_calls.append(
                                 ToolCall(
                                     name=function.get("name", ""),
                                     arguments=function.get("arguments", {}),
+                                    id=tool_call.get("id") or f"call_{i}",
                                 )
                             )
 

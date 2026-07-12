@@ -332,7 +332,8 @@ class OpenAIProvider(BaseProvider):
 
             if choices and len(choices) > 0:
                 message = choices[0].get("message", {})
-                content = message.get("content", "")
+                # Tool-call responses carry "content": null — coalesce to "".
+                content = message.get("content") or ""
                 usage = data.get("usage", {})
 
                 return ChatResponse(
@@ -462,18 +463,16 @@ class OpenAIProvider(BaseProvider):
                 tool_calls = None
                 raw_tool_calls = msg.get("tool_calls")
                 if raw_tool_calls:
-                    import json
-
                     tool_calls = []
                     for i, tc in enumerate(raw_tool_calls):
                         func = tc.get("function", {})
-                        args = func.get("arguments", "{}")
-                        if isinstance(args, str):
-                            args = json.loads(args)
                         tool_calls.append(
                             ToolCall(
+                                # ToolCall normalizes JSON-string arguments
+                                # (including double-encoded ones) on
+                                # construction.
                                 name=func.get("name", ""),
-                                arguments=args,
+                                arguments=func.get("arguments", {}),
                                 # Some OpenAI-compatible servers omit ids;
                                 # synthesize one so results can pair to calls.
                                 id=tc.get("id") or f"call_{i}",

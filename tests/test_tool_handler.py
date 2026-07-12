@@ -354,6 +354,21 @@ class TestToolHandlerExecution:
         assert result.error == "Unknown tool: unknown"
 
     @pytest.mark.asyncio
+    async def test_non_dict_arguments_return_corrective_error(
+        self, tool_handler, mock_agent_engine
+    ):
+        """A provider that ships unparseable arguments must yield a clear
+        error the model can act on — not "'str' object has no attribute
+        'get'" from inside the handler."""
+        tc = ToolCall(name="Glob", arguments="**/*.py")
+        result = await tool_handler.execute_tool_call(tc)
+
+        assert result.error is not None
+        assert "JSON object" in result.error
+        assert "attribute" not in result.error
+        mock_agent_engine.execute_with_approval.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_execute_multiple_tool_calls(self, tool_handler, mock_agent_engine):
         tool_calls = [
             ToolCall(name="file_read", arguments={"path": "/a.py"}),

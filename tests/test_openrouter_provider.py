@@ -613,6 +613,103 @@ class TestOpenRouterProviderToolCalling:
             assert tools[0]["function"]["name"] == "fetch_url"
 
 
+class TestOpenRouterProviderToolResponseParsing:
+    """Parsing of tool-call responses (OpenAI wire protocol)."""
+
+    def test_string_arguments_parsed_to_dict(
+        self, openrouter_provider, mock_tool_response
+    ):
+        """function.arguments arrives as a JSON string — it must reach the
+        tool handler as a dict, not crash it with 'str' has no 'get'."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_tool_response
+
+        response = openrouter_provider._handle_response_with_tools(mock_response)
+
+        assert response.tool_calls[0].arguments == {"url": "https://example.com"}
+
+    def test_tool_call_id_preserved_or_synthesized(self, openrouter_provider):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_abc",
+                                "type": "function",
+                                "function": {"name": "Glob", "arguments": "{}"},
+                            },
+                            {
+                                "type": "function",
+                                "function": {"name": "Grep", "arguments": "{}"},
+                            },
+                        ],
+                    }
+                }
+            ],
+            "model": "anthropic/claude-3.5-sonnet",
+            "usage": {"total_tokens": 10},
+        }
+
+        response = openrouter_provider._handle_response_with_tools(mock_response)
+
+        assert response.tool_calls[0].id == "call_abc"
+        assert response.tool_calls[1].id == "call_1"
+
+    def test_null_content_with_model_fallback_warning(self, openrouter_provider):
+        """Tool-call responses carry content:null; combined with OpenRouter
+        routing to a different model this used to raise TypeError
+        ('can only concatenate str (not "NoneType") to str')."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {
+                                    "name": "Glob",
+                                    "arguments": '{"pattern": "*.py"}',
+                                },
+                            }
+                        ],
+                    }
+                }
+            ],
+            "model": "some/other-model",
+            "usage": {"total_tokens": 12},
+        }
+
+        response = openrouter_provider._handle_response_with_tools(mock_response)
+
+        assert "Model Fallback Notice" in response.content
+        assert response.tool_calls[0].arguments == {"pattern": "*.py"}
+
+    def test_null_content_without_tools_fallback_warning(self, openrouter_provider):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"role": "assistant", "content": None}}],
+            "model": "some/other-model",
+            "usage": {"total_tokens": 3},
+        }
+
+        response = openrouter_provider._handle_response(mock_response)
+
+        assert isinstance(response.content, str)
+        assert "Model Fallback Notice" in response.content
+
+
 # ---------------------------------------------------------------------------
 # TestOpenRouterProviderCredentialValidation
 # ---------------------------------------------------------------------------
