@@ -78,9 +78,7 @@ class TestPermissionControllerFullTrust:
         controller = PermissionController()
         controller.full_trust = True
         assert (
-            controller.validate_path_access(
-                os.path.expanduser("~/.ssh/id_rsa"), "read"
-            )
+            controller.validate_path_access(os.path.expanduser("~/.ssh/id_rsa"), "read")
             is False
         )
         assert controller.validate_path_access("/etc/passwd", "write") is False
