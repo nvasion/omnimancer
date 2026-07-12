@@ -250,14 +250,51 @@ class FileSystemManager:
         """
         Simple boolean check for file existence.
 
+        Performs a lightweight path-validation check followed by an async
+        filesystem probe.  Unlike :meth:`check_file_exists`, this method does
+        *not* invoke the full security-audit pipeline (permission logging, risk
+        assessment, approval workflow).  It is intended for high-frequency
+        callers (e.g. batch operations) that need a fast boolean answer.
+
+        .. warning::
+            This method enforces path-level access controls — hard-restricted
+            system paths (``/etc``, ``~/.ssh``, cloud-credential stores, etc.)
+            and sensitive-name patterns are still blocked via
+            :meth:`~omnimancer.core.security.permission_controller.PermissionController.validate_path_access`.
+            However, it skips the per-operation audit-log entries produced by
+            :meth:`~omnimancer.core.security.SecurityManager.secure_file_access`.
+            Do not use this method where per-access audit trails are required.
+
         Args:
-            path: Path to check for existence
+            path: Path to check for existence.
 
         Returns:
-            True if file exists and is accessible, False otherwise
+            True if the path passes security validation and exists on the
+            filesystem; False if the path is security-denied or does not exist.
         """
-        result = await self.check_file_exists(path)
-        return result["exists"] and result["error"] is None
+        try:
+            resolved = Path(path).resolve()
+        except (OSError, ValueError) as e:
+            logger.warning("file_exists: invalid path %r: %s", path, e)
+            return False
+
+        # Validate path against security policy without invoking the expensive
+        # audit pipeline.  This blocks hard-restricted system paths and
+        # sensitive-name patterns (e.g. /etc, ~/.ssh, *.db) the same way the
+        # full pipeline would.
+        if not self.security.permissions.validate_path_access(str(resolved), "read"):
+            logger.warning(
+                "file_exists: access denied by security policy for %s", resolved
+            )
+            return False
+
+        try:
+            exists = await aiofiles.os.path.exists(resolved)
+            logger.debug("file_exists: %s → %s", resolved, exists)
+            return exists
+        except OSError as e:
+            logger.warning("file_exists: OS error checking %s: %s", resolved, e)
+            return False
 
     async def write_file_with_confirmation(
         self,
