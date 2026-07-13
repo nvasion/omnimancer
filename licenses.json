@@ -60,7 +60,7 @@
     "License": "MIT",
     "Name": "anyio",
     "URL": "https://anyio.readthedocs.io/en/stable/versionhistory.html",
-    "Version": "4.14.1"
+    "Version": "4.14.2"
   },
   {
     "Description": "Python bindings for mypy AST serialization",
@@ -123,7 +123,7 @@
     "License": "Apache-2.0",
     "Name": "coverage",
     "URL": "https://github.com/coveragepy/coveragepy",
-    "Version": "7.15.0"
+    "Version": "7.15.1"
   },
   {
     "Description": "cryptography is a package which provides cryptographic recipes and primitives to Python developers.",
@@ -298,7 +298,7 @@
     "License": "MIT License",
     "Name": "omnimancer-cli",
     "URL": "https://github.com/nvasion/omnimancer",
-    "Version": "0.2.15"
+    "Version": "0.2.17"
   },
   {
     "Description": "Core utilities for Python packages",
