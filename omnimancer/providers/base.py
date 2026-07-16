@@ -6,6 +6,8 @@ to ensure consistent behavior across different AI services.
 """
 
 import json
+import logging
+import os
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Dict, List, Union
 
@@ -19,6 +21,8 @@ from ..core.models import (
     ToolDefinition,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class BaseProvider(ABC):
     """
@@ -27,6 +31,32 @@ class BaseProvider(ABC):
     All AI provider implementations must inherit from this class and implement
     the required abstract methods to ensure consistent behavior.
     """
+
+    # Default chat-completion timeout. Large models on serverless backends
+    # (e.g. 300B+ models on DigitalOcean inference) can take well over a
+    # minute to first byte with tool-heavy agent prompts — hardcoded 30s/60s
+    # timeouts made those models unusable in headless runs.
+    DEFAULT_REQUEST_TIMEOUT = 120.0
+
+    @classmethod
+    def _resolve_request_timeout(cls, configured: Any) -> float:
+        """
+        Resolve the chat-completion timeout: explicit config wins, then the
+        OMNIMANCER_REQUEST_TIMEOUT environment variable, then the default.
+        Invalid or non-positive values fall back to the default.
+        """
+        for raw in (configured, os.environ.get("OMNIMANCER_REQUEST_TIMEOUT")):
+            if raw is None or raw == "":
+                continue
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                logger.warning("Ignoring invalid request timeout %r", raw)
+                continue
+            if value > 0:
+                return value
+            logger.warning("Ignoring non-positive request timeout %r", raw)
+        return cls.DEFAULT_REQUEST_TIMEOUT
 
     def __init__(self, api_key: str, model: str, **kwargs: Any) -> None:
         """

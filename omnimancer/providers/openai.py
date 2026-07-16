@@ -57,13 +57,18 @@ class OpenAIProvider(BaseProvider):
         Args:
             api_key: OpenAI API key
             model: OpenAI model to use (e.g., 'gpt-4', 'gpt-4o', 'gpt-3.5-turbo')
-            **kwargs: Additional configuration
+            **kwargs: Additional configuration. Supports ``request_timeout``
+                (seconds) for chat completions; the ``OMNIMANCER_REQUEST_TIMEOUT``
+                environment variable is used when the kwarg is not given.
         """
         super().__init__(api_key, model or "gpt-4", **kwargs)
         # Allow overriding the API endpoint for OpenAI-compatible services
         self.base_url = (kwargs.get("base_url") or self.BASE_URL).rstrip("/")
         self.max_tokens = kwargs.get("max_tokens", 4096)
         self.temperature = kwargs.get("temperature", 0.7)
+        self.request_timeout = self._resolve_request_timeout(
+            kwargs.get("request_timeout")
+        )
 
     async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
         """
@@ -88,7 +93,7 @@ class OpenAIProvider(BaseProvider):
                     "max_tokens": self.max_tokens,
                     "temperature": self.temperature,
                 },
-                timeout=30.0,
+                timeout=self.request_timeout,
             )
 
             # Handle response
@@ -249,6 +254,19 @@ class OpenAIProvider(BaseProvider):
             provider=provider,
         )
 
+    async def _post_once(self, body: Dict[str, Any], timeout: float) -> httpx.Response:
+        """Single POST to the chat completions endpoint."""
+        async with httpx.AsyncClient() as client:
+            return await client.post(
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                },
+                json=body,
+                timeout=timeout,
+            )
+
     async def _post_chat(
         self, request_body: Dict[str, Any], timeout: float
     ) -> httpx.Response:
@@ -264,16 +282,18 @@ class OpenAIProvider(BaseProvider):
         self._require_api_key()
 
         async def _do_post(body: Dict[str, Any]) -> httpx.Response:
-            async with httpx.AsyncClient() as client:
-                return await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.api_key}",
-                    },
-                    json=body,
-                    timeout=timeout,
+            # Serverless backends (notably DigitalOcean inference) sporadically
+            # time out on an otherwise-fine request; one retry absorbs those
+            # transient stalls instead of failing the whole agent run.
+            try:
+                return await self._post_once(body, timeout)
+            except httpx.TimeoutException:
+                logger.warning(
+                    "%s chat completion timed out after %.0fs — retrying once",
+                    self.PROVIDER_LABEL,
+                    timeout,
                 )
+                return await self._post_once(body, timeout)
 
         body = request_body
         response = await _do_post(body)
@@ -414,7 +434,7 @@ class OpenAIProvider(BaseProvider):
             if tools:
                 request_body["tools"] = tools
 
-            response = await self._post_chat(request_body, timeout=60.0)
+            response = await self._post_chat(request_body, timeout=self.request_timeout)
 
             return self._handle_response_with_tools(response)
 
