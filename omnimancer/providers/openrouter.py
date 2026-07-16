@@ -67,6 +67,9 @@ class OpenRouterProvider(BaseProvider):
         self.top_p = kwargs.get("top_p", 1.0)
         self.frequency_penalty = kwargs.get("frequency_penalty", 0.0)
         self.presence_penalty = kwargs.get("presence_penalty", 0.0)
+        self.request_timeout = self._resolve_request_timeout(
+            kwargs.get("request_timeout")
+        )
 
         # Cost optimization settings
         self.enable_fallback = kwargs.get("enable_fallback", True)
@@ -115,7 +118,7 @@ class OpenRouterProvider(BaseProvider):
                         f"{self.base_url}/chat/completions",
                         headers=self._get_headers(),
                         json=payload,
-                        timeout=30.0,
+                        timeout=self.request_timeout,
                     )
 
                 # If we get here, the request succeeded
@@ -201,7 +204,7 @@ class OpenRouterProvider(BaseProvider):
                         f"{self.base_url}/chat/completions",
                         headers=self._get_headers(),
                         json=payload,
-                        timeout=30.0,
+                        timeout=self.request_timeout,
                     )
 
                 # If we get here, the request succeeded
