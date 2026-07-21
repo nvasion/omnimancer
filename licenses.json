@@ -123,7 +123,7 @@
     "License": "Apache-2.0",
     "Name": "coverage",
     "URL": "https://github.com/coveragepy/coveragepy",
-    "Version": "7.15.1"
+    "Version": "7.15.2"
   },
   {
     "Description": "cryptography is a package which provides cryptographic recipes and primitives to Python developers.",
@@ -284,7 +284,7 @@
     "License": "MIT",
     "Name": "mypy",
     "URL": "https://www.mypy-lang.org/",
-    "Version": "2.2.0"
+    "Version": "2.3.0"
   },
   {
     "Description": "Type system extensions for programs checked with the mypy type checker.",
@@ -298,7 +298,7 @@
     "License": "MIT License",
     "Name": "omnimancer-cli",
     "URL": "https://github.com/nvasion/omnimancer",
-    "Version": "0.2.17"
+    "Version": "0.2.20"
   },
   {
     "Description": "Core utilities for Python packages",

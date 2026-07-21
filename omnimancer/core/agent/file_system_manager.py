@@ -289,7 +289,7 @@ class FileSystemManager:
             return False
 
         try:
-            exists = await aiofiles.os.path.exists(resolved)
+            exists = bool(await aiofiles.os.path.exists(resolved))
             logger.debug("file_exists: %s → %s", resolved, exists)
             return exists
         except OSError as e:
