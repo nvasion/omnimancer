@@ -5,6 +5,8 @@ results to stdout. No Rich console, no readline, no interactive UI.
 """
 
 import json
+import logging
+import os
 import sys
 import uuid
 from enum import Enum
@@ -23,6 +25,54 @@ from .tool_handler import (
     RepeatedCallTracker,
     ToolHandler,
 )
+
+
+logger = logging.getLogger(__name__)
+
+# A turn with no tool calls used to end the run immediately. Models that
+# narrate their plan ("Let me look into X...") without attaching a tool call
+# made headless runs "complete" with zero work done, so the runner now nudges
+# the model to either keep working or explicitly declare completion.
+NO_TOOL_CALL_NUDGE = (
+    "You did not call any tools. If the task is fully complete, reply with "
+    "exactly DONE. Otherwise continue working now by calling tools — do not "
+    "describe what you plan to do without doing it."
+)
+
+# Consecutive tool-less turns tolerated before the run is ended anyway.
+MAX_NO_TOOL_NUDGES = 2
+
+
+def _is_done_reply(content: Optional[str]) -> bool:
+    """True when the model explicitly declares completion per the nudge."""
+    if not content:
+        return False
+    lines = content.strip().splitlines()
+    if not lines:
+        return False
+    return lines[-1].strip().rstrip(".!").upper() == "DONE"
+
+
+def _resolve_max_iterations(explicit: Optional[int]) -> int:
+    """Resolve the tool-iteration cap: explicit value wins, then the
+    OMNIMANCER_MAX_ITERATIONS environment variable, then the default.
+
+    The default (25) suits interactive use; orchestrators running real
+    coding tasks inject a higher cap — exhausting it mid-task previously
+    looked like a clean "completed" run with no changes.
+    """
+    if explicit:
+        return explicit
+    raw = os.environ.get("OMNIMANCER_MAX_ITERATIONS")
+    if raw:
+        try:
+            value = int(raw)
+            if value > 0:
+                return value
+            logger.warning("Ignoring non-positive OMNIMANCER_MAX_ITERATIONS %r", raw)
+        except ValueError:
+            logger.warning("Ignoring invalid OMNIMANCER_MAX_ITERATIONS %r", raw)
+    return MAX_TOOL_ITERATIONS
 
 
 class OutputFormat(Enum):
@@ -229,7 +279,7 @@ class HeadlessRunner:
         self._verbose = verbose
         # Headless runs are unattended, so a cap (not a check-in prompt) is
         # the safety net; --max-iterations sizes it to the job.
-        self._max_iterations = max_iterations or MAX_TOOL_ITERATIONS
+        self._max_iterations = _resolve_max_iterations(max_iterations)
         session_id = str(uuid.uuid4())
         self._emitter = HeadlessOutputEmitter(output_format, session_id, verbose)
         self._tokens = TokenAccumulator()
@@ -296,6 +346,7 @@ class HeadlessRunner:
 
         current_message = f"{agent_prompt}\n\nUser: {prompt}"
         last_content = ""
+        prev_content = ""
         last_model = model
         last_stop_reason = "end_turn"
         # Record of the actions the agent took, surfaced in the JSON result.
@@ -304,6 +355,7 @@ class HeadlessRunner:
         # Identical repeated calls get skipped with a corrective nudge; the
         # run is aborted only if the model keeps repeating despite nudges.
         repeat_tracker = RepeatedCallTracker()
+        no_tool_nudges = 0
 
         for iteration in range(self._max_iterations):
             turns = iteration + 1
@@ -322,6 +374,7 @@ class HeadlessRunner:
             last_stop_reason = response.stop_reason or "end_turn"
 
             if response.content:
+                prev_content = last_content
                 last_content = response.content
                 self._emitter.emit_assistant(
                     response.content,
@@ -334,9 +387,31 @@ class HeadlessRunner:
             # those so the run doesn't end with the work undone.
             if not response.tool_calls:
                 recovered = parse_described_tool_calls(response.content)
-                if not recovered:
-                    break
-                response.tool_calls = recovered
+                if recovered:
+                    response.tool_calls = recovered
+                else:
+                    # No tool call: either the final answer or narration from
+                    # a model that stopped without acting. End the run only on
+                    # an explicit DONE or after repeated nudges — breaking
+                    # immediately made agents "complete" with zero changes.
+                    if (
+                        _is_done_reply(response.content)
+                        or no_tool_nudges >= MAX_NO_TOOL_NUDGES
+                    ):
+                        # A bare "DONE" acknowledgment must not replace the
+                        # model's actual final summary in the result payload.
+                        if (
+                            response.content
+                            and response.content.strip().rstrip(".!").upper()
+                            == "DONE"
+                            and prev_content
+                        ):
+                            last_content = prev_content
+                        break
+                    no_tool_nudges += 1
+                    current_message = NO_TOOL_CALL_NUDGE
+                    continue
+            no_tool_nudges = 0
 
             repeat_tracker.record(response.tool_calls)
             offender = repeat_tracker.abort_offender(response.tool_calls)
