@@ -426,11 +426,18 @@ class TestHeadlessRunner:
             stop_reason="end_turn",
             tool_calls=None,
         )
+        done_response = ChatResponse(
+            content="DONE",
+            model_used="test-model",
+            tokens_used=2,
+            stop_reason="end_turn",
+            tool_calls=None,
+        )
 
         mock_engine = MagicMock()
         mock_engine.provider_supports_tools = MagicMock(return_value=True)
         mock_engine.send_message_with_tools = AsyncMock(
-            side_effect=[first_response, second_response]
+            side_effect=[first_response, second_response, done_response]
         )
 
         mock_agent_engine = MagicMock()
@@ -725,6 +732,13 @@ class TestHeadlessRunner:
                 stop_reason="end_turn",
                 tool_calls=None,
             ),
+            ChatResponse(
+                content="DONE",
+                model_used="claude",
+                tokens_used=2,
+                stop_reason="end_turn",
+                tool_calls=None,
+            ),
         ]
 
         mock_engine = MagicMock()
@@ -749,8 +763,9 @@ class TestHeadlessRunner:
         exit_code = await runner.run("explain this repo")
         assert exit_code == 0
         payload = json.loads(stdout_buf.getvalue())
+        # The bare DONE acknowledgment must not replace the real summary.
         assert payload["result"] == "Here is the explanation."
-        assert payload["num_turns"] == 2
+        assert payload["num_turns"] == 3
         assert len(payload["tool_calls"]) == 1
         assert payload["tool_calls"][0]["name"] == "find_files"
 
@@ -965,3 +980,153 @@ class TestHeadlessRunner:
         assert mock_engine.send_message_with_tools.call_count == 5
         # Only the first two occurrences actually executed.
         assert mock_agent_engine.execute_with_approval.call_count == 2
+
+
+class TestNoToolCallNudge:
+    """A tool-less narration turn must nudge the model, not end the run."""
+
+    @staticmethod
+    def _mock_engine(responses):
+        mock_engine = MagicMock()
+        mock_engine.provider_supports_tools = MagicMock(return_value=True)
+        mock_engine.send_message_with_tools = AsyncMock(side_effect=responses)
+        mock_agent_engine = MagicMock()
+        mock_agent_engine.execute_with_approval = AsyncMock(
+            return_value=MagicMock(
+                success=True, data="ok", error=None, was_cancelled=False
+            )
+        )
+        mock_engine.agent_engine = mock_agent_engine
+        return mock_engine, mock_agent_engine
+
+    @pytest.mark.asyncio
+    async def test_narration_turn_is_nudged_then_work_continues(self):
+        from omnimancer.cli.headless import (
+            NO_TOOL_CALL_NUDGE,
+            HeadlessRunner,
+            OutputFormat,
+        )
+
+        responses = [
+            ChatResponse(
+                content="Let me look into the existing routes first.",
+                model_used="m",
+                tokens_used=5,
+                stop_reason="end_turn",
+                tool_calls=None,
+            ),
+            ChatResponse(
+                content="Reading now.",
+                model_used="m",
+                tokens_used=5,
+                stop_reason="tool_use",
+                tool_calls=[ToolCall(name="file_read", arguments={"path": "/a.py"})],
+            ),
+            ChatResponse(
+                content="All changes are in place.\nDONE",
+                model_used="m",
+                tokens_used=5,
+                stop_reason="end_turn",
+                tool_calls=None,
+            ),
+        ]
+        mock_engine, mock_agent_engine = self._mock_engine(responses)
+
+        runner = HeadlessRunner(
+            engine=mock_engine, output_format=OutputFormat.TEXT, no_approval=True
+        )
+        runner._emitter._stdout = StringIO()
+
+        exit_code = await runner.run("add a route")
+        assert exit_code == 0
+        # Narration did not end the run: the tool call after the nudge ran.
+        assert mock_agent_engine.execute_with_approval.call_count == 1
+        # The second request carried the nudge.
+        nudge_message = mock_engine.send_message_with_tools.call_args_list[1][0][0]
+        assert nudge_message == NO_TOOL_CALL_NUDGE
+
+    @pytest.mark.asyncio
+    async def test_persistent_narration_ends_after_max_nudges(self):
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        narration = ChatResponse(
+            content="I will now plan my approach.",
+            model_used="m",
+            tokens_used=5,
+            stop_reason="end_turn",
+            tool_calls=None,
+        )
+        mock_engine, mock_agent_engine = self._mock_engine(
+            [narration, narration, narration, narration]
+        )
+
+        runner = HeadlessRunner(
+            engine=mock_engine, output_format=OutputFormat.TEXT, no_approval=True
+        )
+        runner._emitter._stdout = StringIO()
+
+        exit_code = await runner.run("do the thing")
+        assert exit_code == 0
+        # Initial turn + 2 nudged retries, then the run ends.
+        assert mock_engine.send_message_with_tools.call_count == 3
+        assert mock_agent_engine.execute_with_approval.call_count == 0
+
+    @pytest.mark.asyncio
+    async def test_done_reply_ends_run_without_nudge(self):
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        responses = [
+            ChatResponse(
+                content="Nothing to do here.\nDONE",
+                model_used="m",
+                tokens_used=5,
+                stop_reason="end_turn",
+                tool_calls=None,
+            ),
+        ]
+        mock_engine, _ = self._mock_engine(responses)
+
+        runner = HeadlessRunner(
+            engine=mock_engine, output_format=OutputFormat.TEXT, no_approval=True
+        )
+        runner._emitter._stdout = StringIO()
+
+        exit_code = await runner.run("check something")
+        assert exit_code == 0
+        assert mock_engine.send_message_with_tools.call_count == 1
+
+
+class TestMaxIterationsEnv:
+    """OMNIMANCER_MAX_ITERATIONS resolves the iteration cap."""
+
+    def test_env_var_respected(self, monkeypatch):
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        monkeypatch.setenv("OMNIMANCER_MAX_ITERATIONS", "150")
+        runner = HeadlessRunner(
+            engine=MagicMock(), output_format=OutputFormat.TEXT, no_approval=True
+        )
+        assert runner._max_iterations == 150
+
+    def test_explicit_argument_wins_over_env(self, monkeypatch):
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+
+        monkeypatch.setenv("OMNIMANCER_MAX_ITERATIONS", "150")
+        runner = HeadlessRunner(
+            engine=MagicMock(),
+            output_format=OutputFormat.TEXT,
+            no_approval=True,
+            max_iterations=7,
+        )
+        assert runner._max_iterations == 7
+
+    def test_invalid_env_falls_back_to_default(self, monkeypatch):
+        from omnimancer.cli.headless import HeadlessRunner, OutputFormat
+        from omnimancer.cli.tool_handler import MAX_TOOL_ITERATIONS
+
+        for bad in ("abc", "0", "-5"):
+            monkeypatch.setenv("OMNIMANCER_MAX_ITERATIONS", bad)
+            runner = HeadlessRunner(
+                engine=MagicMock(), output_format=OutputFormat.TEXT, no_approval=True
+            )
+            assert runner._max_iterations == MAX_TOOL_ITERATIONS
