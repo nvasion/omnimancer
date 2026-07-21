@@ -26,7 +26,6 @@ from .tool_handler import (
     ToolHandler,
 )
 
-
 logger = logging.getLogger(__name__)
 
 # A turn with no tool calls used to end the run immediately. Models that
@@ -402,8 +401,7 @@ class HeadlessRunner:
                         # model's actual final summary in the result payload.
                         if (
                             response.content
-                            and response.content.strip().rstrip(".!").upper()
-                            == "DONE"
+                            and response.content.strip().rstrip(".!").upper() == "DONE"
                             and prev_content
                         ):
                             last_content = prev_content
