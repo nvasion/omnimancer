@@ -1,6 +1,8 @@
-# Omnimancer
+<p align="center">
+  <img src="assets/omnimancer.png" alt="Omnimancer" width="600">
+</p>
 
-A multi-model coding agent for the terminal. One tool, any LLM.
+<p align="center"><strong>A multi-model coding agent for the terminal. One tool, any LLM.</strong></p>
 
 Omnimancer works like `claude -p` but isn't locked to a single provider. Point it at Claude, OpenAI, Gemini, Bedrock, Ollama, or any of 13+ supported backends and get a coding agent that reads files, writes code, runs commands, and iterates autonomously — with streaming responses, token/cost tracking, and structured JSON output for pipeline integration.
 
