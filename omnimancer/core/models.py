@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from ..utils.errors import MCPError
 
@@ -1333,6 +1333,9 @@ class EnhancementConfig(BaseModel):
     model: str = "qwen3-8b"
     temperature: float = 0.4
     default_profile: str = "code"
+    # Feature switch within an existing block; absence of the whole
+    # `enhancement` block on Config also disables the feature (opt-in).
+    enabled: bool = True
 
 
 class Config(BaseModel):
@@ -1383,8 +1386,10 @@ class Config(BaseModel):
     # Custom models - user-defined models that extend available options
     custom_models: List[EnhancedModelInfo] = []
 
-    # Prompt enhancement (/enhance and the e: prefix)
-    enhancement: EnhancementConfig = Field(default_factory=EnhancementConfig)
+    # Prompt enhancement (/enhance and the e: prefix). Opt-in: None means
+    # the feature is off — a default block would silently assume a
+    # "gateway" provider most installs don't have.
+    enhancement: Optional[EnhancementConfig] = None
 
     @field_validator("default_provider")
     @classmethod

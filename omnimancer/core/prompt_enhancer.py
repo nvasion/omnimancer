@@ -1,23 +1,27 @@
 """Prompt enhancement: the PromptFoundry meta-prompts, ported as data.
 
-Source: the user's PromptFoundry browser extension (background.js,
-gitshipdone/promptfoundry) — four single-pass rewrite system prompts,
-copied VERBATIM. tests/cli/test_enhance.py pins their sha256 hashes; do
-not edit the texts here without updating the fixture (and ideally the
-upstream extension).
+Provenance: the four single-pass rewrite system prompts are copied
+VERBATIM from PromptFoundry — https://github.com/gitshipdone/promptfoundry
+(same author; the repo is being prepared for public release) — which is
+the canonical source for the prompt texts. tests/cli/test_enhance.py pins
+their sha256 hashes; do not edit the texts here without updating the
+fixture (and ideally upstream PromptFoundry).
 
-The enhancement call is one non-streaming completion against the
-configured (provider, model) — by default the homelab gateway's small
-model — with the meta-prompt as the system message and the draft as
-"Draft prompt:\n\n<draft>" (pf CLI convention). Enhancement must never
-block a prompt: any failure returns the original draft unchanged.
+The feature is opt-in: it activates only when the config carries an
+``enhancement`` block (see ``enhancement_enabled``). The enhancement call
+is one non-streaming completion against the configured (provider, model),
+with the meta-prompt as the system message and the draft as
+"Draft prompt:\n\n<draft>" (pf CLI convention). Failsafe: if the
+configured model is unreachable, the current session's model is tried
+next; when everything fails the original draft goes through unchanged —
+enhancement must never block a prompt.
 """
 
 import logging
 import re
 import uuid
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from .config_manager import ConfigManager
 from .models import ChatContext, ChatMessage, MessageRole
@@ -195,6 +199,17 @@ def _strip_reasoning(text: str) -> str:
     return stripped.strip()
 
 
+def enhancement_enabled(config: Any) -> bool:
+    """Whether prompt enhancement is active for this config.
+
+    Opt-in semantics: no ``enhancement`` block means off (a default block
+    would silently assume a "gateway" provider most installs don't have);
+    a present block is on unless it says ``enabled: false``.
+    """
+    settings = getattr(config, "enhancement", None)
+    return settings is not None and bool(getattr(settings, "enabled", True))
+
+
 def split_enhance_prefix(text: str) -> Optional[str]:
     """Return the draft when *text* uses the e: trigger, else None.
 
@@ -212,13 +227,20 @@ async def enhance(
     draft: str,
     profile: str,
     config_manager: ConfigManager,
+    fallback_model: Optional[Tuple[str, str]] = None,
 ) -> Tuple[str, bool]:
     """Rewrite *draft* with the configured enhancement model.
 
+    Failsafe chain: the configured ``enhancement`` (provider, model) is
+    tried first; if it is unreachable or returns nothing usable, the
+    caller-supplied *fallback_model* — by convention the current session's
+    (provider, model), which is reachable by definition — is tried next.
+
     Returns:
         (text, enhanced): the rewritten prompt and True on success, or
-        the ORIGINAL draft and False on any failure — enhancement never
-        blocks the user's message (the pf hook's fail-open philosophy).
+        the ORIGINAL draft and False when every candidate fails —
+        enhancement never blocks the user's message (the pf hook's
+        fail-open philosophy).
     """
     meta_prompt = META_PROMPTS.get(profile)
     if meta_prompt is None:
@@ -228,45 +250,76 @@ async def enhance(
     try:
         config = config_manager.get_config()
         settings = getattr(config, "enhancement", None)
-        provider_name = getattr(settings, "provider", "gateway")
-        model = getattr(settings, "model", "qwen3-8b")
+        if settings is None:
+            logger.info("Enhancement not configured; sending draft unchanged")
+            return draft, False
         temperature = getattr(settings, "temperature", 0.4)
 
-        provider_config = config.providers.get(provider_name)
-        if provider_config is None:
-            logger.warning("Enhancement provider %r is not configured", provider_name)
-            return draft, False
-
-        effective = provider_config.model_copy(
-            update={"model": model, "temperature": temperature}
-        )
+        candidates: List[Tuple[str, str]] = [
+            (
+                getattr(settings, "provider", "gateway"),
+                getattr(settings, "model", "qwen3-8b"),
+            )
+        ]
+        if fallback_model is not None and fallback_model not in candidates:
+            candidates.append(fallback_model)
 
         from ..providers.factory import ProviderFactory
 
-        provider = ProviderFactory.create_provider(
-            provider_name, effective, config_manager
-        )
-
-        # Isolated context: the session conversation never leaks into the
-        # rewrite, and the rewrite never lands in session history.
-        context = ChatContext(
-            messages=[
-                ChatMessage(
-                    role=MessageRole.SYSTEM,
-                    content=meta_prompt,
-                    timestamp=datetime.now(),
-                    model_used=model,
+        for provider_name, model in candidates:
+            provider_config = config.providers.get(provider_name)
+            if provider_config is None:
+                logger.warning(
+                    "Enhancement provider %r is not configured", provider_name
                 )
-            ],
-            current_model=model,
-            session_id=f"enhance-{uuid.uuid4()}",
-        )
+                continue
+            try:
+                effective = provider_config.model_copy(
+                    update={"model": model, "temperature": temperature}
+                )
+                provider = ProviderFactory.create_provider(
+                    provider_name, effective, config_manager
+                )
 
-        response = await provider.send_message(f"Draft prompt:\n\n{draft}", context)
-        rewritten = _strip_reasoning((response.content or "").strip())
-        if not rewritten:
-            return draft, False
-        return rewritten, True
+                # Isolated context: the session conversation never leaks
+                # into the rewrite, and the rewrite never lands in session
+                # history.
+                context = ChatContext(
+                    messages=[
+                        ChatMessage(
+                            role=MessageRole.SYSTEM,
+                            content=meta_prompt,
+                            timestamp=datetime.now(),
+                            model_used=model,
+                        )
+                    ],
+                    current_model=model,
+                    session_id=f"enhance-{uuid.uuid4()}",
+                )
+
+                response = await provider.send_message(
+                    f"Draft prompt:\n\n{draft}", context
+                )
+                rewritten = _strip_reasoning((response.content or "").strip())
+                if rewritten:
+                    if (provider_name, model) != candidates[0]:
+                        logger.info(
+                            "Enhancement fell back to session model %s/%s",
+                            provider_name,
+                            model,
+                        )
+                    return rewritten, True
+                logger.warning(
+                    "Enhancement via %s/%s produced no usable output",
+                    provider_name,
+                    model,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Enhancement via %s/%s failed (%s)", provider_name, model, e
+                )
+
+        return draft, False
 
     except Exception as e:
         logger.warning("Prompt enhancement failed (%s); using original draft", e)

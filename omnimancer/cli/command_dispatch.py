@@ -11,7 +11,7 @@ import inspect
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Tuple
 
 # Third-party imports
 from rich.panel import Panel
@@ -22,6 +22,7 @@ from rich.table import Table
 from ..core.models import EnhancedModelInfo, FallbackConfig
 from ..core.prompt_enhancer import PROFILES as ENHANCE_PROFILES
 from ..core.prompt_enhancer import enhance as enhance_prompt
+from ..core.prompt_enhancer import enhancement_enabled
 from ..providers.factory import ProviderFactory
 
 # Internal imports - CLI
@@ -582,6 +583,19 @@ class CommandDispatchMixin:
         await self.engine.switch_model(provider_name, model)
         self._show_success(f"Model set to {model} ({provider_name}).")
 
+    def _enhance_fallback_model(self) -> Optional[Tuple[str, str]]:
+        """The current session's (provider key, model) as the enhancement
+        failsafe — reachable by definition, since the user is chatting
+        with it right now."""
+        try:
+            provider_key = self._current_provider_key()
+            model = getattr(self.engine.current_provider, "model", None)
+            if provider_key and isinstance(model, str) and model:
+                return provider_key, model
+        except Exception:
+            pass
+        return None
+
     def _default_enhance_profile(self) -> str:
         """Configured default enhancement profile, falling back to 'code'."""
         try:
@@ -614,6 +628,14 @@ class CommandDispatchMixin:
             self._show_error("Usage: /enhance [chat|code|image|research] <draft>")
             return
 
+        if not enhancement_enabled(self.engine.config_manager.get_config()):
+            self._show_info(
+                'Prompt enhancement is not configured. Add an "enhancement" '
+                "block to ~/.omnimancer/config.json, e.g. "
+                '{"provider": "gateway", "model": "qwen3-8b"} — see the README.'
+            )
+            return
+
         if args[0].lower() in ENHANCE_PROFILES:
             profile = args[0].lower()
             draft = " ".join(args[1:]).strip()
@@ -624,7 +646,12 @@ class CommandDispatchMixin:
             self._show_error("Provide a draft to enhance.")
             return
 
-        enhanced, ok = await enhance_prompt(draft, profile, self.engine.config_manager)
+        enhanced, ok = await enhance_prompt(
+            draft,
+            profile,
+            self.engine.config_manager,
+            fallback_model=self._enhance_fallback_model(),
+        )
         if not ok:
             self._show_error(
                 "Enhancement failed (is the enhancement provider reachable?). "

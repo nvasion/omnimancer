@@ -308,6 +308,20 @@ class ConfigMigration:
                 }
             )
 
+        # Pass newer optional blocks through unchanged — rebuilding from the
+        # fixed dict above silently dropped them (2026-07-31: a migration ate
+        # an `enhancement` block; masked while Config defaulted one).
+        for passthrough_key in (
+            "enhancement",
+            "custom_models",
+            "fallback",
+            "permissions",
+            "hooks",
+            "subagents",
+        ):
+            if passthrough_key in old_config:
+                new_config[passthrough_key] = old_config[passthrough_key]
+
         return new_config
 
     def _migrate_provider_config_v1(
@@ -350,13 +364,24 @@ class ConfigMigration:
             "health_check_interval": old_config.get("health_check_interval", 300),
             "health_check_timeout": old_config.get("health_check_timeout", 10.0),
             "auth_type": old_config.get("auth_type", "api_key"),
+            "provider_type": old_config.get("provider_type"),
             "custom_headers": old_config.get("custom_headers"),
             "oauth_config": old_config.get("oauth_config"),
             "extra_settings": old_config.get("extra_settings"),
         }
 
-        # Add provider-specific defaults
-        new_config.update(provider_defaults)
+        # Provider defaults fill gaps only — update() clobbered explicit
+        # user values (2026-07-31: auth_type "none" became "api_key" and an
+        # alias's provider_type "openai-compatible" became the entry name).
+        # auth_type has a non-None placeholder above, so treat the default
+        # "api_key" as a gap unless the old config set it explicitly.
+        if "auth_type" not in old_config:
+            new_config["auth_type"] = None
+        for key, value in provider_defaults.items():
+            if new_config.get(key) is None:
+                new_config[key] = value
+        if new_config.get("auth_type") is None:
+            new_config["auth_type"] = "api_key"
 
         # Remove None values
         return {k: v for k, v in new_config.items() if v is not None}
