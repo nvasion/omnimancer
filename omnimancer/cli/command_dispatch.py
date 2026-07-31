@@ -453,6 +453,19 @@ class CommandDispatchMixin:
             f"(/remove-model {model_name} {provider_name} to undo)"
         )
 
+    def _resolve_provider_key(self, name: str) -> str:
+        """Resolve a user-typed provider name to its configured key.
+
+        Config keys are matched case-insensitively so an entry like
+        'MyGateway' stays reachable; unknown names fall back to lowercase
+        (the historical behavior for registered provider names).
+        """
+        providers: dict = getattr(self.engine, "providers", None) or {}
+        for key in providers:
+            if str(key).lower() == name.lower():
+                return str(key)
+        return name.lower()
+
     async def _handle_switch_command(self, command: Command) -> None:
         """Handle switch command with enhanced provider type support."""
         args = command.args
@@ -467,7 +480,7 @@ class CommandDispatchMixin:
             await self._show_providers(providers_command)
             return
 
-        provider_name = args[0].lower()
+        provider_name = self._resolve_provider_key(args[0])
         model_name = args[1] if len(args) > 1 else None
 
         try:
@@ -794,17 +807,22 @@ class CommandDispatchMixin:
         self._show_success(f"{field} set to '{value}' for provider '{provider_name}'")
 
     async def _handle_config_set_provider(self, args: List[str]) -> None:
-        """Handle '/config set-provider <name> [--api-key K] [--base-url U]
-        [--model M]'."""
+        """Handle '/config set-provider <name> [--type T] [--api-key K]
+        [--base-url U] [--model M]'."""
         if not args:
             self._show_error(
-                "Usage: /config set-provider <name> "
+                "Usage: /config set-provider <name> [--type TYPE] "
                 "[--api-key KEY] [--base-url URL] [--model MODEL]"
             )
             return
 
         provider_name = args[0]
-        flags = {"--api-key": "api_key", "--base-url": "base_url", "--model": "model"}
+        flags = {
+            "--api-key": "api_key",
+            "--base-url": "base_url",
+            "--model": "model",
+            "--type": "provider_type",
+        }
         values: dict = {}
         i = 1
         while i < len(args):
@@ -818,7 +836,7 @@ class CommandDispatchMixin:
 
         if not values:
             self._show_error(
-                "Provide at least one of --api-key, --base-url, or --model."
+                "Provide at least one of --type, --api-key, --base-url, " "or --model."
             )
             return
 
@@ -826,6 +844,38 @@ class CommandDispatchMixin:
             from ..core.models import ProviderConfig
 
             config_manager = self.engine.config_manager
+            registered = sorted(ProviderFactory.get_available_providers())
+            existing = config_manager.get_provider_config(provider_name)
+
+            # Validate everything BEFORE any write so a bad invocation
+            # persists nothing (set_api_key would create a partial entry).
+            provider_type = values.get("provider_type") or (
+                existing.provider_type if existing else None
+            )
+            if provider_type and provider_type not in registered:
+                self._show_error(
+                    f"Unknown provider type '{provider_type}'. "
+                    f"Registered types: {', '.join(registered)}"
+                )
+                return
+            if (
+                existing is None
+                and provider_name not in registered
+                and not provider_type
+            ):
+                self._show_error(
+                    f"'{provider_name}' is not a registered provider. To "
+                    "configure a custom endpoint under this name, add "
+                    "--type <provider_type> (e.g. --type openai-compatible). "
+                    f"Registered types: {', '.join(registered)}"
+                )
+                return
+            if existing is None and not values.get("model"):
+                self._show_error(
+                    "New provider entries need --model <name> — an empty "
+                    "model is never valid."
+                )
+                return
 
             # API key first (encrypts; creates a minimal entry if needed).
             if "api_key" in values:
@@ -833,10 +883,9 @@ class CommandDispatchMixin:
 
             existing = config_manager.get_provider_config(provider_name)
             data = existing.model_dump() if existing else {"model": ""}
-            if "base_url" in values:
-                data["base_url"] = values["base_url"]
-            if "model" in values:
-                data["model"] = values["model"]
+            for field in ("base_url", "model", "provider_type"):
+                if field in values:
+                    data[field] = values[field]
             config_manager.set_provider_config(provider_name, ProviderConfig(**data))
 
             fields = ", ".join(sorted(values))

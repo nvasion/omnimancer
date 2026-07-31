@@ -1454,10 +1454,18 @@ class ConfigManager:
             raw_config["config_sources"] = {}
             migrated = True
 
-        # Migrate provider configurations
+        # Migrate provider configurations. Back-fill provider_type only for
+        # factory-registered names: alias entries (e.g. "gateway") must not
+        # get a useless self-referential type that can never resolve.
         if "providers" in raw_config:
+            from ..providers.factory import ProviderFactory
+
+            registered_names = set(ProviderFactory.get_available_providers())
             for provider_name, provider_config in raw_config["providers"].items():
-                if "provider_type" not in provider_config:
+                if (
+                    "provider_type" not in provider_config
+                    and provider_name in registered_names
+                ):
                     provider_config["provider_type"] = provider_name
                     migrated = True
 
