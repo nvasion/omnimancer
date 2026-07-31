@@ -10,10 +10,18 @@ try:
 
     __version__ = _get_version("omnimancer-cli")
 except Exception:
-    with open("pyproject.toml", "r") as f:
-        project = f.readlines()
-    version = [i for i in project if "version" in i].pop(0).strip()
-    __version__ = version.split().pop().strip("\"'")
+    # Uninstalled checkout (PYTHONPATH usage): read pyproject.toml next to
+    # the package, never relative to cwd — the CLI can be invoked from any
+    # working directory.
+    try:
+        from pathlib import Path
+
+        _pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        project = _pyproject.read_text().splitlines()
+        version = [i for i in project if "version" in i].pop(0).strip()
+        __version__ = version.split().pop().strip("\"'")
+    except Exception:
+        __version__ = "unknown"
 __author__ = "Omnimancer Team"
 __description__ = "Unified CLI for multiple AI language models"
 

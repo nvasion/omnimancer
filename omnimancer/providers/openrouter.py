@@ -67,8 +67,9 @@ class OpenRouterProvider(BaseProvider):
         self.top_p = kwargs.get("top_p", 1.0)
         self.frequency_penalty = kwargs.get("frequency_penalty", 0.0)
         self.presence_penalty = kwargs.get("presence_penalty", 0.0)
+        # ProviderConfig's field is `timeout`; `request_timeout` wins if both.
         self.request_timeout = self._resolve_request_timeout(
-            kwargs.get("request_timeout")
+            kwargs.get("request_timeout") or kwargs.get("timeout")
         )
 
         # Cost optimization settings

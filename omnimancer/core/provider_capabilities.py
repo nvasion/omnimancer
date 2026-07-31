@@ -27,6 +27,7 @@ class ProviderType(str, Enum):
     BEDROCK = "bedrock"
     OPENROUTER = "openrouter"
     DIGITALOCEAN = "digitalocean"
+    OPENAI_COMPATIBLE = "openai-compatible"
 
 
 @dataclass
@@ -104,16 +105,33 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
     ProviderType.OPENAI: ProviderCapabilities(
         supports_tools=True,
         supports_multimodal=True,
-        # NOTE: OpenAIProvider does not override send_message_stream(); only
-        # ClaudeProvider implements real streaming. Keep False so the registry
-        # matches the actual implementation.
-        supports_streaming=False,
+        # Real SSE streaming over /chat/completions (implemented in
+        # OpenAIProvider.send_message_stream; inherited by DigitalOcean and
+        # openai-compatible, whose entries flip together with this one).
+        supports_streaming=True,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=True,
         supports_json_mode=True,
         default_max_tokens=4096,
         default_temperature=0.7,
+    ),
+    ProviderType.OPENAI_COMPATIBLE: ProviderCapabilities(
+        # Generic self-hosted OpenAI-dialect endpoints (vLLM, llama.cpp,
+        # LM Studio). Tool support is inherited from OpenAIProvider; whether
+        # a given model actually handles tools is the endpoint's business.
+        supports_tools=True,
+        supports_multimodal=False,
+        # Inherits OpenAIProvider's SSE streaming implementation.
+        supports_streaming=True,
+        supports_system_messages=True,
+        supports_function_calling=True,
+        supports_vision=False,
+        supports_json_mode=True,
+        default_max_tokens=8192,
+        default_temperature=0.7,
+        requires_api_key=False,
+        auth_type="none",
     ),
     ProviderType.GEMINI: ProviderCapabilities(
         supports_tools=True,
@@ -298,10 +316,8 @@ PROVIDER_CAPABILITIES: Dict[ProviderType, ProviderCapabilities] = {
         # models are text-only; actual support is model-dependent at runtime.
         supports_tools=True,
         supports_multimodal=False,
-        # NOTE: DigitalOceanProvider inherits from OpenAIProvider which does not
-        # override send_message_stream(); only ClaudeProvider implements real
-        # streaming. Keep False so the registry matches the actual implementation.
-        supports_streaming=False,
+        # Inherits OpenAIProvider's SSE streaming implementation.
+        supports_streaming=True,
         supports_system_messages=True,
         supports_function_calling=True,
         supports_vision=False,

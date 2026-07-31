@@ -253,7 +253,10 @@ class ConfigValidator:
             if hasattr(self, "provider_factory") and self.provider_factory:
                 # In test mode, don't require API key if provider factory is available
                 pass
-            elif not provider_config.api_key:
+            elif (
+                not provider_config.api_key
+                and getattr(provider_config, "auth_type", "api_key") != "none"
+            ):
                 errors.append(f"Provider '{provider_name}' has no API key")
 
         return errors

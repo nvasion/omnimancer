@@ -18,6 +18,7 @@ from .gemini import GeminiProvider
 from .mistral import MistralProvider
 from .ollama import OllamaProvider
 from .openai import OpenAIProvider
+from .openai_compatible import OpenAICompatibleProvider
 from .openrouter import OpenRouterProvider
 from .perplexity import PerplexityProvider
 from .vertex import VertexAIProvider
@@ -29,6 +30,7 @@ __all__ = [
     "ClaudeProvider",
     "ClaudeCodeProvider",
     "OpenAIProvider",
+    "OpenAICompatibleProvider",
     "GeminiProvider",
     "CohereProvider",
     "OllamaProvider",

@@ -23,6 +23,7 @@ from .gemini import GeminiProvider
 from .mistral import MistralProvider
 from .ollama import OllamaProvider
 from .openai import OpenAIProvider
+from .openai_compatible import OpenAICompatibleProvider
 from .openrouter import OpenRouterProvider
 from .perplexity import PerplexityProvider
 from .vertex import VertexAIProvider
@@ -207,15 +208,35 @@ class ProviderFactory:
             Provider instance
 
         Raises:
-            ConfigurationError: If provider is not registered
+            ConfigurationError: If neither the name nor the config's
+                provider_type is a registered provider
         """
-        if name not in cls._providers:
-            raise ConfigurationError(f"Unknown provider: {name}")
+        # Resolve the provider class identity. A factory-registered name is
+        # authoritative; otherwise the config entry is an alias (e.g.
+        # "gateway", "local") whose class comes from config.provider_type.
+        type_key: Optional[str]
+        if name in cls._providers:
+            type_key = name
+        else:
+            type_key = getattr(config, "provider_type", None)
+            if not type_key or type_key not in cls._providers:
+                registered = ", ".join(sorted(cls._providers))
+                detail = (
+                    f" (provider_type={type_key!r} is not registered)"
+                    if type_key
+                    else " (no provider_type set)"
+                )
+                raise ConfigurationError(
+                    f"Unknown provider: {name}{detail}. "
+                    f"Registered types: {registered}"
+                )
 
         # Use the optimized provider initializer for lazy loading and caching
         from ..core.provider_initializer import ProviderInitializer
 
-        return ProviderInitializer.get_provider_instance(name, config, config_manager)
+        return ProviderInitializer.get_provider_instance(
+            name, config, config_manager, provider_type=type_key
+        )
 
     @classmethod
     def get_available_providers(cls) -> list[str]:
@@ -1002,3 +1023,4 @@ ProviderFactory.register_provider("bedrock", BedrockProvider)
 ProviderFactory.register_provider("openrouter", OpenRouterProvider)
 ProviderFactory.register_provider("digitalocean", DigitalOceanProvider)
 ProviderFactory.register_provider("claude-code", ClaudeCodeProvider)
+ProviderFactory.register_provider("openai-compatible", OpenAICompatibleProvider)

@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Any, Dict, Optional
 
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 
@@ -111,11 +112,20 @@ Core Commands:
 
 Provider & Model Management:
 /providers - List all AI providers with status
-/models    - List available models
+/models    - List available models (/models refresh pulls live catalogs)
+/model     - Interactive model picker for the current provider
 /switch    - Switch provider/model: /switch <provider> [model]
 
 Agent Management:
 /agent     - Manage agent mode (on/off/status)
+/accept    - Session approval mode: /accept [edits|all|off]
+             (Shift+Tab at the prompt cycles it)
+
+Input:
+- Enter sends; Esc+Enter or trailing \\ adds a newline
+- @path/to/file injects file content into your message
+- Tab completes commands, providers, models, and @-file paths
+- Ctrl+R searches input history
 
 MCP Tool Integration:
 /tools     - List available MCP tools
@@ -325,6 +335,19 @@ Current model: {summary.get('current_model') or 'None'}
 Session ID: {summary.get('session_id')}
 Model available: {'Yes' if model_info else 'No'}"""
 
+        usage = getattr(self, "usage", None)
+        if usage is not None:
+            totals = usage.total
+            status_text += (
+                f"\nSession tokens: {totals['input_tokens']} in"
+                f" / {totals['output_tokens']} out"
+                f" | ~${totals['total_cost_usd']:.4f}"
+            )
+
+        mode_provider = getattr(self, "_session_approval_mode_name", None)
+        if mode_provider is not None:
+            status_text += f"\nApproval mode: {mode_provider()}"
+
         status_panel = Panel(status_text, title="Status", border_style="cyan")
         self.console.print(status_panel)
 
@@ -333,10 +356,31 @@ Model available: {'Yes' if model_info else 'No'}"""
         self.console.print(user_panel)
 
     def _show_assistant_message(self, message: str, model: str) -> None:
-        escaped_message = re.sub(
+        cleaned_message = re.sub(
             r"<!--(?:read-only|modifies-system)-->\s*", "", message
         )
 
+        # Markdown rendering: headings, lists, and syntax-highlighted code
+        # blocks. Markdown never interprets Rich markup, so operation
+        # markers like [FILE_WRITE:...] render literally without the old
+        # escaping pass (which is kept only for the plain-text fallback).
+        renderable: Any
+        try:
+            renderable = Markdown(cleaned_message, code_theme="monokai")
+        except Exception:
+            renderable = self._escape_operation_markers(cleaned_message)
+
+        assistant_panel = Panel(
+            renderable,
+            title=f"Assistant ({model})",
+            border_style="blue",
+        )
+        self.console.print(assistant_panel)
+
+    @staticmethod
+    def _escape_operation_markers(message: str) -> str:
+        """Escape agent markers so a plain-text Panel doesn't eat them
+        as Rich markup (fallback path only)."""
         operation_patterns = [
             r"\[FILE_WRITE:[^\]]+\]",
             r"\[FILE_READ:[^\]]+\]",
@@ -347,20 +391,13 @@ Model available: {'Yes' if model_info else 'No'}"""
             r"\[SAFE_EXEC\]",
             r"\[/SAFE_EXEC\]",
         ]
-
         for pattern in operation_patterns:
-            escaped_message = re.sub(
+            message = re.sub(
                 pattern,
                 lambda m: m.group(0).replace("[", "\\[").replace("]", "\\]"),
-                escaped_message,
+                message,
             )
-
-        assistant_panel = Panel(
-            escaped_message,
-            title=f"Assistant ({model})",
-            border_style="blue",
-        )
-        self.console.print(assistant_panel)
+        return message
 
     def _show_info(self, message: str) -> None:
         self.display_manager.show_message(message, MessageType.INFO)
@@ -375,6 +412,9 @@ Model available: {'Yes' if model_info else 'No'}"""
         self.display_manager.show_message(message, MessageType.WARNING)
 
     def _show_token_status(self, response: Any) -> None:
+        usage = getattr(self, "usage", None)
+        if usage is not None:
+            usage.add(response)
         input_t = response.input_tokens or 0
         output_t = response.output_tokens or 0
         cost = response.cost_estimate or 0.0
