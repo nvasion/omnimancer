@@ -100,7 +100,7 @@ class OpenAIProvider(BaseProvider):
             return self._handle_response(response)
 
         except httpx.TimeoutException:
-            raise NetworkError("Request to OpenAI API timed out")
+            raise self._timeout_network_error()
         except httpx.RequestError as e:
             raise NetworkError(f"Network error: {e}")
         except (
@@ -124,10 +124,7 @@ class OpenAIProvider(BaseProvider):
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{self.base_url}/chat/completions",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.api_key}",
-                    },
+                    headers=self._build_headers(),
                     json={
                         "model": self.model,
                         "messages": [{"role": "user", "content": "Hi"}],
@@ -230,6 +227,21 @@ class OpenAIProvider(BaseProvider):
         input_tokens = int(input_match.group(1))
         return max(context_limit - input_tokens - self._CONTEXT_FIT_BUFFER, 0)
 
+    def _build_headers(self) -> Dict[str, str]:
+        """Request headers; Authorization only when a key is configured.
+
+        Keyless endpoints (self-hosted vLLM, local proxies) reject or ignore
+        an empty ``Bearer `` header, so it is omitted entirely.
+        """
+        headers = {"Content-Type": "application/json"}
+        if self.api_key and self.api_key.strip():
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
+
+    def _timeout_network_error(self) -> NetworkError:
+        """The NetworkError raised when a chat completion times out."""
+        return NetworkError(f"Request to {self.PROVIDER_LABEL} API timed out")
+
     def _require_api_key(self) -> None:
         """Fail fast with an actionable error when no API key is configured.
 
@@ -237,7 +249,12 @@ class OpenAIProvider(BaseProvider):
         httpx raises a cryptic ``Illegal header value`` error that gives the user
         no idea the real problem is a missing key (common for OpenAI-compatible
         providers like DigitalOcean whose key lives only in an env var).
+
+        Configs may opt out explicitly with ``auth_type: "none"`` (keyless
+        self-hosted endpoints).
         """
+        if self.config.get("auth_type") == "none":
+            return
         if self.api_key and self.api_key.strip():
             return
 
@@ -259,10 +276,7 @@ class OpenAIProvider(BaseProvider):
         async with httpx.AsyncClient() as client:
             return await client.post(
                 f"{self.base_url}/chat/completions",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.api_key}",
-                },
+                headers=self._build_headers(),
                 json=body,
                 timeout=timeout,
             )
@@ -439,7 +453,7 @@ class OpenAIProvider(BaseProvider):
             return self._handle_response_with_tools(response)
 
         except httpx.TimeoutException:
-            raise NetworkError("Request to OpenAI API timed out")
+            raise self._timeout_network_error()
         except httpx.RequestError as e:
             raise NetworkError(f"Network error: {e}")
         except (
@@ -635,10 +649,7 @@ class OpenAIProvider(BaseProvider):
             List of ModelInfo objects from OpenAI API
         """
         try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            }
+            headers = self._build_headers()
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(

@@ -116,9 +116,11 @@ class ProviderInitializer:
         Returns:
             Module path
         """
-        # Special case for claude-code provider
+        # Special cases: hyphenated provider names map to underscored modules
         if provider_name == "claude-code":
             return "omnimancer.providers.claude_code"
+        if provider_name == "openai-compatible":
+            return "omnimancer.providers.openai_compatible"
 
         # Standard mapping
         return f"omnimancer.providers.{provider_name}"

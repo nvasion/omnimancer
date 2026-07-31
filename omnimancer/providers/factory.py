@@ -23,6 +23,7 @@ from .gemini import GeminiProvider
 from .mistral import MistralProvider
 from .ollama import OllamaProvider
 from .openai import OpenAIProvider
+from .openai_compatible import OpenAICompatibleProvider
 from .openrouter import OpenRouterProvider
 from .perplexity import PerplexityProvider
 from .vertex import VertexAIProvider
@@ -1022,3 +1023,4 @@ ProviderFactory.register_provider("bedrock", BedrockProvider)
 ProviderFactory.register_provider("openrouter", OpenRouterProvider)
 ProviderFactory.register_provider("digitalocean", DigitalOceanProvider)
 ProviderFactory.register_provider("claude-code", ClaudeCodeProvider)
+ProviderFactory.register_provider("openai-compatible", OpenAICompatibleProvider)

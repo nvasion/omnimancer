@@ -26,6 +26,7 @@ EXPECTED_PROVIDER_CLASSES = {
     "BedrockProvider",
     "OpenRouterProvider",
     "DigitalOceanProvider",
+    "OpenAICompatibleProvider",
 }
 
 
