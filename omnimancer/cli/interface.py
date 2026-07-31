@@ -12,7 +12,6 @@ import logging
 import os
 import re
 import readline  # noqa: F401
-import select
 import sys
 from typing import Any, Optional
 
@@ -153,8 +152,29 @@ class CommandLineInterface(
         # Initialize command history
         self.history_manager = HistoryManager()
 
-        # Setup readline for arrow key history navigation
-        self._setup_readline_history()
+        # Input layer: prompt_toolkit on interactive terminals (multiline
+        # editing, bracketed paste, Ctrl-R search — and it un-blocks the
+        # event loop that builtin input() silently blocked). Non-TTY
+        # sessions (pipes, tests) keep the historical input()+readline
+        # path. Only the fallback registers readline's atexit history
+        # writer, so prompt_toolkit mode never touches readline_history.
+        self.prompt_input = None
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            try:
+                from .prompt_input import PromptInput
+
+                self.prompt_input = PromptInput(
+                    history_dir=self.history_manager.storage_path
+                )
+            except Exception as e:
+                logger.warning(
+                    "prompt_toolkit input unavailable (%s); "
+                    "falling back to readline",
+                    e,
+                )
+        if self.prompt_input is None:
+            # Setup readline for arrow key history navigation
+            self._setup_readline_history()
 
         # Completion is handled by existing _complete_command method
 
@@ -283,7 +303,7 @@ class CommandLineInterface(
 
     async def _handle_user_input(self) -> None:
         """Handle a single user input cycle."""
-        user_input = self._get_user_input()
+        user_input = await self._get_user_input_async()
         if user_input is None:  # EOF
             self.running = False
             return
@@ -647,51 +667,38 @@ class CommandLineInterface(
         """Get system prompt for agent capabilities."""
         return get_agent_capabilities_prompt()
 
+    async def _get_user_input_async(self) -> Optional[str]:
+        """
+        Get one user submission without blocking the event loop.
+
+        prompt_toolkit path on interactive terminals; plain-input fallback
+        otherwise.
+
+        Returns:
+            User input string, or None to end the session (EOF / exit).
+        """
+        if self.prompt_input is not None:
+            try:
+                user_input = await self.prompt_input.prompt_async()
+            except (EOFError, KeyboardInterrupt):
+                return None
+            if user_input and user_input.strip():
+                self.history_manager.add_command(user_input.strip())
+            return user_input
+        return self._get_user_input()
+
     def _get_user_input(self) -> Optional[str]:
         """
-        Get input from the user with multi-line paste support.
+        Plain-input fallback for non-TTY sessions (pipes, tests).
+
+        Multi-line paste handling lives in the prompt_toolkit path
+        (bracketed paste); this fallback reads single lines.
 
         Returns:
             User input string or None if EOF
         """
         try:
-            # Check if there's immediate input available (paste detection)
-            # This detects if user is pasting multiple lines
-            lines = []
-
-            # Get first line
-            first_line = input(">>> ")
-            lines.append(first_line)
-
-            # Check for additional pasted lines (non-blocking)
-            # On Unix-like systems, check if more input is immediately available
-            if sys.stdin.isatty():
-                # For interactive terminals, check if more lines are waiting
-                import termios
-                import tty
-
-                # Save terminal settings
-                old_settings = termios.tcgetattr(sys.stdin)
-                try:
-                    # Set non-blocking mode briefly to check for paste
-                    tty.setcbreak(sys.stdin.fileno())
-
-                    # Check if data is available (indicates paste)
-                    while select.select([sys.stdin], [], [], 0.05)[0]:
-                        try:
-                            line = sys.stdin.readline()
-                            if line:
-                                lines.append(line.rstrip("\n"))
-                            else:
-                                break
-                        except Exception:
-                            break
-                finally:
-                    # Restore terminal settings
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-
-            # Join all lines
-            user_input = "\n".join(lines) if len(lines) > 1 else first_line
+            user_input = input(">>> ")
 
             # Add to history if we got valid input
             if user_input and user_input.strip():
@@ -701,9 +708,6 @@ class CommandLineInterface(
 
         except (EOFError, KeyboardInterrupt):
             return None
-        except Exception:
-            # Fallback to simple input on any error
-            return first_line if "first_line" in locals() else None
 
     async def _process_command(self, command: Command) -> None:
         """
