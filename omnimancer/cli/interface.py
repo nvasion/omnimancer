@@ -769,16 +769,25 @@ class CommandLineInterface(
         # automatically; on failure the original draft goes through.
         effective_content = command.content
         from ..core.prompt_enhancer import enhance as enhance_prompt
-        from ..core.prompt_enhancer import split_enhance_prefix
+        from ..core.prompt_enhancer import enhancement_enabled, split_enhance_prefix
 
         draft = split_enhance_prefix(command.content)
+        if draft is not None and not enhancement_enabled(
+            self.engine.config_manager.get_config()
+        ):
+            # Feature off: "e:" is not intercepted — the message goes
+            # through verbatim as ordinary chat.
+            draft = None
         if draft is not None:
             profile = self._default_enhance_profile()
             with self.console.status(
                 f"[dim]Enhancing prompt ({profile})...[/dim]", spinner="dots"
             ):
                 enhanced, enhance_ok = await enhance_prompt(
-                    draft, profile, self.engine.config_manager
+                    draft,
+                    profile,
+                    self.engine.config_manager,
+                    fallback_model=self._enhance_fallback_model(),
                 )
             if enhance_ok:
                 from rich.panel import Panel
