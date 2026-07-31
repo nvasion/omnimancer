@@ -333,3 +333,42 @@ class TestOpenAINativeToolHistory:
 
         # The flattened legacy text must not leak into the native request.
         assert not any("[Called tools" in (m.get("content") or "") for m in messages)
+
+
+class TestUsageTokensOnResponses:
+    """input/output token counts must reach ChatResponse — the session
+    accumulator and headless usage reporting read them (they were 0 for
+    every OpenAI-family response before the fix)."""
+
+    def _response_with_usage(self, payload_extra):
+        resp = MagicMock()
+        resp.status_code = 200
+        body = {
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "hi"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 111,
+                "completion_tokens": 22,
+                "total_tokens": 133,
+            },
+        }
+        body.update(payload_extra)
+        resp.json = MagicMock(return_value=body)
+        return resp
+
+    def test_handle_response_sets_token_split(self, openai_provider):
+        response = openai_provider._handle_response(self._response_with_usage({}))
+        assert response.input_tokens == 111
+        assert response.output_tokens == 22
+
+    def test_handle_response_with_tools_sets_token_split(self, openai_provider):
+        response = openai_provider._handle_response_with_tools(
+            self._response_with_usage({})
+        )
+        assert response.input_tokens == 111
+        assert response.output_tokens == 22

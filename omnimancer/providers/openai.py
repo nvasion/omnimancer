@@ -386,6 +386,8 @@ class OpenAIProvider(BaseProvider):
                     model_used=self.model,
                     tokens_used=usage.get("total_tokens", 0),
                     timestamp=datetime.now(),
+                    input_tokens=usage.get("prompt_tokens", 0),
+                    output_tokens=usage.get("completion_tokens", 0),
                 )
             else:
                 raise ProviderError("Empty response from OpenAI API")
@@ -529,6 +531,8 @@ class OpenAIProvider(BaseProvider):
                     model_used=self.model,
                     tokens_used=usage.get("total_tokens", 0),
                     timestamp=datetime.now(),
+                    input_tokens=usage.get("prompt_tokens", 0),
+                    output_tokens=usage.get("completion_tokens", 0),
                     tool_calls=tool_calls if tool_calls else None,
                 )
             else:
