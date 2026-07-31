@@ -14,6 +14,7 @@ block a prompt: any failure returns the original draft unchanged.
 """
 
 import logging
+import re
 import uuid
 from datetime import datetime
 from typing import Optional, Tuple
@@ -177,6 +178,23 @@ META_PROMPTS = {
 PROFILES = tuple(META_PROMPTS)
 
 
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _strip_reasoning(text: str) -> str:
+    """Drop <think>…</think> reasoning emitted by reasoning models.
+
+    qwen3-8b (the default enhancement model) prefixes every completion
+    with its chain of thought; only what follows the block is the
+    rewrite. An unclosed <think> means the response was truncated
+    mid-reasoning — nothing after it is usable either.
+    """
+    stripped = _THINK_BLOCK_RE.sub("", text)
+    if "<think>" in stripped:
+        stripped = stripped.split("<think>", 1)[0]
+    return stripped.strip()
+
+
 def split_enhance_prefix(text: str) -> Optional[str]:
     """Return the draft when *text* uses the e: trigger, else None.
 
@@ -245,7 +263,7 @@ async def enhance(
         )
 
         response = await provider.send_message(f"Draft prompt:\n\n{draft}", context)
-        rewritten = (response.content or "").strip()
+        rewritten = _strip_reasoning((response.content or "").strip())
         if not rewritten:
             return draft, False
         return rewritten, True

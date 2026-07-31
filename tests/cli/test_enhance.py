@@ -70,14 +70,19 @@ class TestPrefixSplit:
 def _config_manager(providers=None, enhancement=None):
     from omnimancer.core.models import ProviderConfig
 
-    providers = providers or {
-        "gateway": ProviderConfig(
-            model="qwen3-coder-30b",
-            provider_type="openai-compatible",
-            base_url="http://alpha:8888/v1",
-            auth_type="none",
-        )
-    }
+    # `is None` (not falsy-or): passing an explicit empty dict must yield a
+    # config with NO providers. `{} or default` silently substituted the real
+    # gateway entry, and the missing-provider test then hit the live network —
+    # green only while the gateway was broken.
+    if providers is None:
+        providers = {
+            "gateway": ProviderConfig(
+                model="qwen3-coder-30b",
+                provider_type="openai-compatible",
+                base_url="http://alpha:8888/v1",
+                auth_type="none",
+            )
+        }
     config = SimpleNamespace(providers=providers, enhancement=enhancement)
     manager = MagicMock()
     manager.get_config.return_value = config
@@ -106,6 +111,66 @@ class TestEnhance:
         assert message == "Draft prompt:\n\ndraft"
         context = provider.send_message.call_args.args[1]
         assert context.messages[0].content == prompt_enhancer.CODE_META_PROMPT
+
+    @pytest.mark.asyncio
+    async def test_reasoning_think_block_is_stripped(self):
+        """qwen3-8b wraps output in <think>…</think>; only the rewrite
+        after the block may reach the user (observed live 2026-07-31)."""
+        provider = MagicMock()
+        provider.send_message = AsyncMock(
+            return_value=ChatResponse(
+                content="<think>\nchain of thought here\n</think>\n\nGoal: fix it.",
+                model_used="qwen3-8b",
+                tokens_used=1,
+                timestamp=datetime.now(),
+            )
+        )
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            return_value=provider,
+        ):
+            text, ok = await enhance("draft", "code", _config_manager())
+        assert (text, ok) == ("Goal: fix it.", True)
+
+    @pytest.mark.asyncio
+    async def test_only_think_block_fails_open(self):
+        """All-reasoning output (nothing after </think>) is a failed
+        enhancement — fall back to the original draft."""
+        provider = MagicMock()
+        provider.send_message = AsyncMock(
+            return_value=ChatResponse(
+                content="<think>reasoning but no rewrite</think>",
+                model_used="qwen3-8b",
+                tokens_used=1,
+                timestamp=datetime.now(),
+            )
+        )
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            return_value=provider,
+        ):
+            text, ok = await enhance("my draft", "code", _config_manager())
+        assert (text, ok) == ("my draft", False)
+
+    @pytest.mark.asyncio
+    async def test_unclosed_think_block_fails_open(self):
+        """A truncated response can end mid-reasoning with no closing tag;
+        everything from <think> on is reasoning, so nothing usable remains."""
+        provider = MagicMock()
+        provider.send_message = AsyncMock(
+            return_value=ChatResponse(
+                content="<think>ran out of tokens mid-thought",
+                model_used="qwen3-8b",
+                tokens_used=1,
+                timestamp=datetime.now(),
+            )
+        )
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            return_value=provider,
+        ):
+            text, ok = await enhance("my draft", "code", _config_manager())
+        assert (text, ok) == ("my draft", False)
 
     @pytest.mark.asyncio
     async def test_provider_error_fails_open(self):
