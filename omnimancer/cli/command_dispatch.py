@@ -226,12 +226,50 @@ class CommandDispatchMixin:
 
     # Display methods are in cli/display.py (DisplayMixin)
 
+    async def _refresh_model_catalogs(self, provider_name: Optional[str]) -> None:
+        """'/models refresh [provider]' — pull live catalogs from endpoints.
+
+        Assigns each provider's fetch_enhanced_models() result to its
+        _catalog_models (preferred by get_available_models), so served
+        context sizes (e.g. vLLM max_model_len) replace static guesses.
+        """
+        providers = self.engine.providers or {}
+        if provider_name is not None:
+            key = self._resolve_provider_key(provider_name)
+            if key not in providers:
+                self._show_error(
+                    f"Provider '{provider_name}' is not configured. "
+                    f"Configured: {', '.join(sorted(providers)) or '(none)'}"
+                )
+                return
+            targets = {key: providers[key]}
+        else:
+            targets = dict(providers)
+
+        for name, provider in targets.items():
+            try:
+                enhanced = await provider.fetch_enhanced_models()
+            except Exception as e:
+                self._show_error(f"{name}: refresh failed ({e})")
+                continue
+            if enhanced:
+                provider._catalog_models = enhanced
+                self._show_success(f"{name}: {len(enhanced)} models")
+            else:
+                # An empty fetch (endpoint down, no /models) must not
+                # clobber a previously good catalog.
+                self._show_info(f"{name}: no models returned; catalog kept")
+
     async def _show_models(self, command: Command) -> None:
         """Show available models with enhanced provider grouping and capabilities."""
         try:
             args = command.args
             filter_type = args[0].lower() if len(args) > 0 else None
             filter_value = args[1] if len(args) > 1 else None
+
+            if filter_type == "refresh":
+                await self._refresh_model_catalogs(filter_value)
+                return
 
             # First check if there are any models available at all
             all_models = self.engine.get_available_models()
