@@ -17,7 +17,7 @@ Use it in config via a named alias entry::
 
     "gateway": {
         "provider_type": "openai-compatible",
-        "base_url": "http://alpha.lab.pendlerosa:8888/v1",
+        "base_url": "http://vllm-gateway.internal:8888/v1",
         "model": "qwen3-coder-30b",
         "auth_type": "none",
         "timeout": 360

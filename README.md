@@ -392,7 +392,7 @@ Any number of OpenAI-compatible endpoints (vLLM, llama.cpp server, LM Studio, pr
 
 ```bash
 >>> /config set-provider gateway --type openai-compatible \
-        --base-url http://alpha.lab.pendlerosa:8888/v1 --model qwen3-coder-30b
+        --base-url http://vllm-gateway.internal:8888/v1 --model qwen3-coder-30b
 >>> /config set-provider local --type openai-compatible \
         --base-url http://localhost:8000/v1 --model qwen3-coder-30b
 >>> /switch local
