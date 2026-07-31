@@ -121,6 +121,8 @@ stages:
         type: test
         test_language: python
         test_command: |
+          # slim images ship without git; the suite exercises git-backed @-file completion
+          apt-get update -qq && apt-get install -y -qq --no-install-recommends git
           pip install --upgrade pip && pip install -e ".[dev]"
           pytest tests/ \
             --cov=omnimancer \
@@ -133,6 +135,8 @@ stages:
         type: test
         test_language: python
         test_command: |
+          # slim images ship without git; the suite exercises git-backed @-file completion
+          apt-get update -qq && apt-get install -y -qq --no-install-recommends git
           pip install --upgrade pip && pip install -e ".[dev]"
           pytest tests/ \
             --cov=omnimancer \
@@ -145,6 +149,8 @@ stages:
         type: test
         test_language: python
         test_command: |
+          # slim images ship without git; the suite exercises git-backed @-file completion
+          apt-get update -qq && apt-get install -y -qq --no-install-recommends git
           pip install --upgrade pip && pip install -e ".[dev]"
           pytest tests/ \
             --cov=omnimancer \
@@ -162,6 +168,8 @@ stages:
         type: test
         test_language: python
         test_command: |
+          # slim images ship without git; the suite exercises git-backed @-file completion
+          apt-get update -qq && apt-get install -y -qq --no-install-recommends git
           pip install --upgrade pip && pip install -e ".[dev]"
           pytest tests/integration/ \
             --tb=short \
