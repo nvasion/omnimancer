@@ -1,10 +1,11 @@
 """Streaming response display for Omnimancer interactive mode."""
 
 import json
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from rich.console import Console
 from rich.live import Live
+from rich.markdown import Markdown
 from rich.panel import Panel
 
 from ..core.models import StreamEvent, StreamEventType, ToolCall
@@ -71,5 +72,14 @@ class StreamingDisplay:
             self._live.update(self._render())
 
     def _render(self) -> Panel:
-        content = self.accumulated_text or "..."
+        # Progressive markdown: re-parsing a few KB at 15fps is cheap, and
+        # an unclosed fence mid-stream just renders as code-so-far.
+        content: Union[str, Markdown]
+        if not self.accumulated_text:
+            content = "..."
+        else:
+            try:
+                content = Markdown(self.accumulated_text, code_theme="monokai")
+            except Exception:
+                content = self.accumulated_text
         return Panel(content, title=f"Assistant ({self.model})", border_style="blue")

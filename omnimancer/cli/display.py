@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Any, Dict, Optional
 
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 
@@ -333,10 +334,31 @@ Model available: {'Yes' if model_info else 'No'}"""
         self.console.print(user_panel)
 
     def _show_assistant_message(self, message: str, model: str) -> None:
-        escaped_message = re.sub(
+        cleaned_message = re.sub(
             r"<!--(?:read-only|modifies-system)-->\s*", "", message
         )
 
+        # Markdown rendering: headings, lists, and syntax-highlighted code
+        # blocks. Markdown never interprets Rich markup, so operation
+        # markers like [FILE_WRITE:...] render literally without the old
+        # escaping pass (which is kept only for the plain-text fallback).
+        renderable: Any
+        try:
+            renderable = Markdown(cleaned_message, code_theme="monokai")
+        except Exception:
+            renderable = self._escape_operation_markers(cleaned_message)
+
+        assistant_panel = Panel(
+            renderable,
+            title=f"Assistant ({model})",
+            border_style="blue",
+        )
+        self.console.print(assistant_panel)
+
+    @staticmethod
+    def _escape_operation_markers(message: str) -> str:
+        """Escape agent markers so a plain-text Panel doesn't eat them
+        as Rich markup (fallback path only)."""
         operation_patterns = [
             r"\[FILE_WRITE:[^\]]+\]",
             r"\[FILE_READ:[^\]]+\]",
@@ -347,20 +369,13 @@ Model available: {'Yes' if model_info else 'No'}"""
             r"\[SAFE_EXEC\]",
             r"\[/SAFE_EXEC\]",
         ]
-
         for pattern in operation_patterns:
-            escaped_message = re.sub(
+            message = re.sub(
                 pattern,
                 lambda m: m.group(0).replace("[", "\\[").replace("]", "\\]"),
-                escaped_message,
+                message,
             )
-
-        assistant_panel = Panel(
-            escaped_message,
-            title=f"Assistant ({model})",
-            border_style="blue",
-        )
-        self.console.print(assistant_panel)
+        return message
 
     def _show_info(self, message: str) -> None:
         self.display_manager.show_message(message, MessageType.INFO)
