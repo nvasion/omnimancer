@@ -14,16 +14,87 @@ logger = logging.getLogger(__name__)
 
 
 class CompletionManager:
-    """Unified completion manager for command completion."""
+    """Unified completion manager for command completion.
 
-    def __init__(self) -> None:
-        pass
+    With an engine reference it also serves live provider/model names, so
+    ``/switch <tab>`` completes real configured providers and their models
+    (shared by both the readline fallback and the prompt_toolkit completer).
+    """
+
+    def __init__(self, engine: Optional["CoreEngine"] = None) -> None:
+        self.engine = engine
+
+    def provider_names(self, prefix: str) -> List[str]:
+        """Configured provider names (aliases included) matching prefix."""
+        try:
+            if self.engine is None or not getattr(self.engine, "providers", None):
+                return []
+            return sorted(
+                name for name in self.engine.providers if name.startswith(prefix)
+            )
+        except Exception:
+            return []
+
+    def model_names(self, provider_name: str, prefix: str) -> List[str]:
+        """Model names for a provider: its catalog plus custom models."""
+        try:
+            if self.engine is None:
+                return []
+            names: List[str] = []
+            providers = getattr(self.engine, "providers", None) or {}
+            provider = providers.get(provider_name)
+            if provider is not None and hasattr(provider, "get_available_models"):
+                models = provider.get_available_models()
+                if isinstance(models, dict):
+                    names.extend(models.keys())
+                elif isinstance(models, list):
+                    for model in models:
+                        names.append(getattr(model, "name", str(model)))
+            config_manager = getattr(self.engine, "config_manager", None)
+            if config_manager is not None:
+                for model in config_manager.get_custom_models():
+                    if getattr(model, "provider", None) == provider_name:
+                        names.append(model.name)
+            seen = set()
+            unique = []
+            for name in names:
+                if name not in seen:
+                    seen.add(name)
+                    unique.append(name)
+            return [name for name in unique if name.startswith(prefix)]
+        except Exception:
+            return []
+
+    def custom_model_names(self, prefix: str) -> List[str]:
+        """Names of user-registered custom models."""
+        try:
+            if self.engine is None:
+                return []
+            config_manager = getattr(self.engine, "config_manager", None)
+            if config_manager is None:
+                return []
+            return [
+                model.name
+                for model in config_manager.get_custom_models()
+                if model.name.startswith(prefix)
+            ]
+        except Exception:
+            return []
 
     def get_completions(
         self, command: str, arg_index: int, text: str, args: List[str]
     ) -> List[str]:
         if command.startswith("/"):
             command = command[1:]
+
+        # Dynamic, engine-backed argument completion.
+        if command == "switch":
+            if arg_index == 0:
+                return self.provider_names(text)
+            if arg_index == 1 and args:
+                return self.model_names(args[0], text)
+        if command == "remove-model" and arg_index == 0:
+            return self.custom_model_names(text)
 
         static_completions = {
             "mcp": {
@@ -66,6 +137,7 @@ class CompletionManager:
             "permissions": {
                 0: ["list", "allow", "deny", "ask", "remove", "on", "off"],
             },
+            "models": {0: ["refresh"]},
             "prompts": {0: ["list"]},
             "subagents": {0: ["list", "run"]},
             "validate": {0: ["--fix", "--auto-fix"]},
@@ -185,72 +257,14 @@ class CompletionMixin:
         except Exception:
             return []
 
+    # Thin shims: the shared CompletionManager owns the engine-backed
+    # sources so the prompt_toolkit completer and this readline path
+    # serve identical candidates.
     def _get_provider_names(self, text: str) -> List[str]:
-        try:
-            if hasattr(self.engine, "providers") and self.engine.providers:
-                provider_names = list(self.engine.providers.keys())
-            else:
-                provider_names = [
-                    "openai",
-                    "claude",
-                    "gemini",
-                    "openrouter",
-                    "digitalocean",
-                    "azure",
-                    "bedrock",
-                    "mistral",
-                    "perplexity",
-                    "cohere",
-                    "xai",
-                    "ollama",
-                    "vertex",
-                ]
-
-            return [name for name in provider_names if name.startswith(text)]
-        except Exception:
-            return []
+        return self.completion_manager.provider_names(text)
 
     def _get_model_names(self, provider_name: str, text: str) -> List[str]:
-        try:
-            model_names: List[str] = []
-
-            if (
-                hasattr(self.engine, "providers")
-                and provider_name in self.engine.providers
-            ):
-                provider = self.engine.providers[provider_name]
-                if hasattr(provider, "get_available_models"):
-                    models = provider.get_available_models()
-                    if isinstance(models, dict):
-                        model_names.extend(list(models.keys()))
-                    elif isinstance(models, list):
-                        if models and hasattr(models[0], "name"):
-                            model_names.extend([m.name for m in models])
-                        else:
-                            model_names.extend(models)  # type: ignore[arg-type]
-
-            if hasattr(self.engine, "config_manager"):
-                custom_models = self.engine.config_manager.get_custom_models()
-                custom_model_names = [
-                    m.name for m in custom_models if m.provider == provider_name
-                ]
-                model_names.extend(custom_model_names)
-
-            return [name for name in model_names if name.startswith(text)]
-
-        except Exception:
-            return []
+        return self.completion_manager.model_names(provider_name, text)
 
     def _get_custom_model_names(self, text: str) -> List[str]:
-        try:
-            if hasattr(self.engine, "config_manager"):
-                custom_models = self.engine.config_manager.get_custom_models()
-                if isinstance(custom_models, dict):
-                    model_names = []
-                    for provider_models in custom_models.values():
-                        if isinstance(provider_models, dict):
-                            model_names.extend(provider_models.keys())
-                    return [name for name in model_names if name.startswith(text)]
-            return []
-        except Exception:
-            return []
+        return self.completion_manager.custom_model_names(text)

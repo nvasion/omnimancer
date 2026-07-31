@@ -125,7 +125,7 @@ class CommandLineInterface(
 
         # Initialize new unified managers
         self.display_manager = DisplayManager(self.console)
-        self.completion_manager = CompletionManager()
+        self.completion_manager = CompletionManager(engine=engine)
 
         # Initialize signal handler for graceful shutdown
         self.signal_handler = SignalHandler(getattr(engine, "agent_engine", None))
@@ -161,10 +161,17 @@ class CommandLineInterface(
         self.prompt_input = None
         if sys.stdin.isatty() and sys.stdout.isatty():
             try:
+                from prompt_toolkit.completion import ThreadedCompleter
+
                 from .prompt_input import PromptInput
+                from .pt_completion import OmnimancerCompleter
 
                 self.prompt_input = PromptInput(
-                    history_dir=self.history_manager.storage_path
+                    history_dir=self.history_manager.storage_path,
+                    # Threaded: the @-file source may shell out to git.
+                    completer=ThreadedCompleter(
+                        OmnimancerCompleter(self.completion_manager)
+                    ),
                 )
             except Exception as e:
                 logger.warning(
