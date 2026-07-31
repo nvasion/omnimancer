@@ -66,8 +66,10 @@ class OpenAIProvider(BaseProvider):
         self.base_url = (kwargs.get("base_url") or self.BASE_URL).rstrip("/")
         self.max_tokens = kwargs.get("max_tokens", 4096)
         self.temperature = kwargs.get("temperature", 0.7)
+        # ProviderConfig's field is `timeout`; `request_timeout` is kept as
+        # the historical kwarg and wins when both are given.
         self.request_timeout = self._resolve_request_timeout(
-            kwargs.get("request_timeout")
+            kwargs.get("request_timeout") or kwargs.get("timeout")
         )
 
     async def send_message(self, message: str, context: ChatContext) -> ChatResponse:
