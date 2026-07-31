@@ -43,7 +43,9 @@ dependencies = [
     "readability-lxml>=0.8.1",
     "PyYAML>=6.0.0",
     "toml>=0.10.2",
-    "mcp>=1.0.0",
+    # <2: mcp 2.0 dropped mcp.server.fastmcp (breaks the MCP test server)
+    # and its client surface is unvalidated against omnimancer/mcp/client.py.
+    "mcp>=1.0.0,<2",
     "prompt-toolkit>=3.0.43,<4.0",
 ]
 
