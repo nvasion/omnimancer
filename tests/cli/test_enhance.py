@@ -67,8 +67,11 @@ class TestPrefixSplit:
         assert split_enhance_prefix("everyone likes tests") is None
 
 
-def _config_manager(providers=None, enhancement=None):
-    from omnimancer.core.models import ProviderConfig
+_NO_BLOCK = object()  # sentinel: distinguish "default block" from explicit None
+
+
+def _config_manager(providers=None, enhancement=_NO_BLOCK):
+    from omnimancer.core.models import EnhancementConfig, ProviderConfig
 
     # `is None` (not falsy-or): passing an explicit empty dict must yield a
     # config with NO providers. `{} or default` silently substituted the real
@@ -83,6 +86,10 @@ def _config_manager(providers=None, enhancement=None):
                 auth_type="none",
             )
         }
+    # Default = a real enhancement block (the configured state most tests
+    # exercise); pass enhancement=None to model an unconfigured install.
+    if enhancement is _NO_BLOCK:
+        enhancement = EnhancementConfig()
     config = SimpleNamespace(providers=providers, enhancement=enhancement)
     manager = MagicMock()
     manager.get_config.return_value = config
@@ -204,8 +211,12 @@ class TestEnhancementConfig:
         assert settings.model == "qwen3-8b"
         assert settings.temperature == 0.4
         assert settings.default_profile == "code"
+        assert settings.enabled is True
 
-    def test_config_carries_enhancement_block(self):
+    def test_config_without_block_means_feature_off(self):
+        """Enhancement is opt-in: a config with no `enhancement` block has
+        the feature disabled instead of silently assuming a 'gateway'
+        provider that most installs won't have."""
         from omnimancer.core.models import Config
 
         config = Config(
@@ -213,7 +224,222 @@ class TestEnhancementConfig:
             storage_path="/tmp/omni-test",
             providers={},
         )
-        assert config.enhancement.provider == "gateway"
+        assert config.enhancement is None
+
+    def test_config_parses_enhancement_block(self):
+        from omnimancer.core.models import Config
+
+        config = Config(
+            default_provider="local",
+            storage_path="/tmp/omni-test",
+            providers={},
+            enhancement={"provider": "local", "model": "qwen3-coder-30b"},
+        )
+        assert config.enhancement.provider == "local"
+        assert config.enhancement.enabled is True
+
+
+class TestEnhancementEnabled:
+    def _config(self, enhancement):
+        return SimpleNamespace(enhancement=enhancement)
+
+    def test_no_block_is_disabled(self):
+        from omnimancer.core.prompt_enhancer import enhancement_enabled
+
+        assert enhancement_enabled(self._config(None)) is False
+
+    def test_block_present_is_enabled(self):
+        from omnimancer.core.models import EnhancementConfig
+        from omnimancer.core.prompt_enhancer import enhancement_enabled
+
+        assert enhancement_enabled(self._config(EnhancementConfig())) is True
+
+    def test_explicit_disable_wins(self):
+        from omnimancer.core.models import EnhancementConfig
+        from omnimancer.core.prompt_enhancer import enhancement_enabled
+
+        settings = EnhancementConfig(enabled=False)
+        assert enhancement_enabled(self._config(settings)) is False
+
+    @pytest.mark.asyncio
+    async def test_enhance_without_block_fails_open(self):
+        manager = _config_manager(enhancement=None)
+        text, ok = await enhance("draft", "code", manager)
+        assert (text, ok) == ("draft", False)
+
+
+def _provider_returning(content):
+    provider = MagicMock()
+    provider.send_message = AsyncMock(
+        return_value=ChatResponse(
+            content=content,
+            model_used="m",
+            tokens_used=1,
+            timestamp=datetime.now(),
+        )
+    )
+    return provider
+
+
+def _provider_raising():
+    provider = MagicMock()
+    provider.send_message = AsyncMock(side_effect=RuntimeError("down"))
+    return provider
+
+
+def _two_provider_manager():
+    from omnimancer.core.models import ProviderConfig
+
+    return _config_manager(
+        providers={
+            "gateway": ProviderConfig(
+                model="qwen3-coder-30b",
+                provider_type="openai-compatible",
+                base_url="http://alpha:8888/v1",
+                auth_type="none",
+            ),
+            "local": ProviderConfig(
+                model="qwen3-coder-30b",
+                provider_type="openai-compatible",
+                base_url="http://localhost:8000/v1",
+                auth_type="none",
+            ),
+        }
+    )
+
+
+class TestEnhanceFallback:
+    """Failsafe: configured enhancement model first, then the caller's
+    current session model, then fail-open — never block the prompt."""
+
+    @pytest.mark.asyncio
+    async def test_primary_success_skips_fallback(self):
+        factory = MagicMock(return_value=_provider_returning("PRIMARY"))
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            new=factory,
+        ):
+            text, ok = await enhance(
+                "draft",
+                "code",
+                _two_provider_manager(),
+                fallback_model=("local", "qwen3-coder-30b"),
+            )
+        assert (text, ok) == ("PRIMARY", True)
+        assert factory.call_count == 1
+        assert factory.call_args.args[0] == "gateway"
+
+    @pytest.mark.asyncio
+    async def test_primary_failure_uses_session_model(self):
+        factory = MagicMock(
+            side_effect=[_provider_raising(), _provider_returning("FROM FALLBACK")]
+        )
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            new=factory,
+        ):
+            text, ok = await enhance(
+                "draft",
+                "code",
+                _two_provider_manager(),
+                fallback_model=("local", "qwen3-coder-30b"),
+            )
+        assert (text, ok) == ("FROM FALLBACK", True)
+        assert factory.call_count == 2
+        assert factory.call_args.args[0] == "local"
+        # The fallback call must target the session model, not the
+        # enhancement model.
+        assert factory.call_args.args[1].model == "qwen3-coder-30b"
+
+    @pytest.mark.asyncio
+    async def test_all_candidates_fail_opens_with_draft(self):
+        factory = MagicMock(side_effect=[_provider_raising(), _provider_raising()])
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            new=factory,
+        ):
+            text, ok = await enhance(
+                "my draft",
+                "code",
+                _two_provider_manager(),
+                fallback_model=("local", "qwen3-coder-30b"),
+            )
+        assert (text, ok) == ("my draft", False)
+        assert factory.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_identical_fallback_attempted_once(self):
+        factory = MagicMock(return_value=_provider_raising())
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            new=factory,
+        ):
+            text, ok = await enhance(
+                "my draft",
+                "code",
+                _two_provider_manager(),
+                fallback_model=("gateway", "qwen3-8b"),
+            )
+        assert (text, ok) == ("my draft", False)
+        assert factory.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_fallback_provider_missing_is_skipped(self):
+        factory = MagicMock(return_value=_provider_raising())
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            new=factory,
+        ):
+            text, ok = await enhance(
+                "my draft",
+                "code",
+                _two_provider_manager(),
+                fallback_model=("nonexistent", "m"),
+            )
+        assert (text, ok) == ("my draft", False)
+        assert factory.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_think_stripped_on_fallback_path(self):
+        factory = MagicMock(
+            side_effect=[
+                _provider_raising(),
+                _provider_returning("<think>reasoning</think>\n\nGoal: x."),
+            ]
+        )
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            new=factory,
+        ):
+            text, ok = await enhance(
+                "draft",
+                "code",
+                _two_provider_manager(),
+                fallback_model=("local", "qwen3-coder-30b"),
+            )
+        assert (text, ok) == ("Goal: x.", True)
+
+    @pytest.mark.asyncio
+    async def test_think_only_primary_tries_fallback(self):
+        """All-reasoning output from the primary counts as a failure and
+        falls through to the session model."""
+        factory = MagicMock(
+            side_effect=[
+                _provider_returning("<think>only reasoning</think>"),
+                _provider_returning("REAL REWRITE"),
+            ]
+        )
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            new=factory,
+        ):
+            text, ok = await enhance(
+                "draft",
+                "code",
+                _two_provider_manager(),
+                fallback_model=("local", "qwen3-coder-30b"),
+            )
+        assert (text, ok) == ("REAL REWRITE", True)
 
 
 class TestEnhanceCommand:
@@ -277,3 +503,15 @@ class TestEnhanceCommand:
     async def test_no_args_errors(self, harness):
         await harness._handle_enhance_command([])
         assert any(kind == "error" for kind, _ in harness.messages)
+
+    @pytest.mark.asyncio
+    async def test_disabled_hints_and_sends_nothing(self, harness):
+        harness.engine.config_manager.get_config.return_value = SimpleNamespace(
+            enhancement=None
+        )
+        mock = AsyncMock(return_value=("BETTER", True))
+        with patch("omnimancer.cli.command_dispatch.enhance_prompt", new=mock):
+            await harness._handle_enhance_command(["fix", "it"])
+        mock.assert_not_awaited()
+        assert harness.sent == []
+        assert any("enhancement" in m.lower() for _, m in harness.messages)

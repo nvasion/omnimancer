@@ -400,6 +400,24 @@ Any number of OpenAI-compatible endpoints (vLLM, llama.cpp server, LM Studio, pr
 
 The `openai-compatible` type is keyless by default (`auth_type: "none"`), takes its model catalog from the endpoint's `/v1/models` (including each model's served context size — see `/models refresh`), and raises timeout errors with a cold-start hint since self-hosted gateways may load a model on first request. Set `providers.<name>.timeout` generously for such endpoints (e.g. `360`).
 
+### Prompt enhancement (optional)
+
+`/enhance` and the `e:` message prefix rewrite a draft prompt with a dedicated model before sending, using the [PromptFoundry](https://github.com/gitshipdone/promptfoundry) meta-prompts (same author; that repo is the canonical source for the prompt texts and is being prepared for public release).
+
+The feature is **opt-in**: it activates only when your config carries an `enhancement` block. Without one, `e:` is not intercepted and `/enhance` points you here.
+
+```json
+"enhancement": {
+  "provider": "gateway",
+  "model": "qwen3-8b",
+  "temperature": 0.4,
+  "default_profile": "code",
+  "enabled": true
+}
+```
+
+`provider` must name an entry in `providers`; `default_profile` is one of `chat`, `code`, `image`, `research`. Failsafe chain: the configured model is tried first; if it is unreachable, the model you are currently chatting with rewrites the draft instead; if everything fails, the original draft is sent unchanged — enhancement never blocks a message.
+
 ### Environment variable overrides
 
 Environment variables take precedence over the saved config and are applied at
