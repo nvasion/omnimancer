@@ -152,6 +152,11 @@ class CommandLineInterface(
         # Initialize command history
         self.history_manager = HistoryManager()
 
+        # Session token/cost totals (shown by /status)
+        from .usage import TokenAccumulator
+
+        self.usage = TokenAccumulator()
+
         # Input layer: prompt_toolkit on interactive terminals (multiline
         # editing, bracketed paste, Ctrl-R search — and it un-blocks the
         # event loop that builtin input() silently blocked). Non-TTY

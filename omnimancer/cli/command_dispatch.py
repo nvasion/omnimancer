@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from ..core.agent_mode_manager import AgentModeManager
     from ..core.history_manager import HistoryManager
     from .approval_integration import CLIApprovalIntegration
+    from .completion import CompletionManager
     from .display import DisplayManager
 
 
@@ -55,6 +56,7 @@ class CommandDispatchMixin:
     history_manager: "HistoryManager"
     approval_integration: Optional["CLIApprovalIntegration"]
     display_manager: "DisplayManager"
+    completion_manager: "CompletionManager"
 
     # Methods provided by DisplayMixin (or the host class)
     def _show_error(self, message: str) -> None: ...
@@ -88,6 +90,8 @@ class CommandDispatchMixin:
             self._clear_screen()
         elif slash_cmd == SlashCommand.STATUS:
             self._show_status()
+        elif slash_cmd == SlashCommand.MODEL and not command.args:
+            await self._handle_model_picker()
         elif slash_cmd == SlashCommand.MODELS or slash_cmd == SlashCommand.MODEL:
             await self._show_models(command)
         elif slash_cmd == SlashCommand.SWITCH:
@@ -492,6 +496,62 @@ class CommandDispatchMixin:
             "registered it as a custom model and switching anyway. "
             f"(/remove-model {model_name} {provider_name} to undo)"
         )
+
+    async def _prompt_model_selection(self) -> str:
+        """One-line selection prompt; empty string cancels."""
+        message = "Select model (number or name, Enter to cancel): "
+        prompt_input = getattr(self, "prompt_input", None)
+        if prompt_input is not None:
+            try:
+                return str(await prompt_input.prompt_async(message)).strip()
+            except (EOFError, KeyboardInterrupt):
+                return ""
+        try:
+            return (await asyncio.to_thread(input, message)).strip()
+        except (EOFError, KeyboardInterrupt):
+            return ""
+
+    async def _handle_model_picker(self) -> None:
+        """Bare '/model' — numbered picker over the current provider's
+        models (same candidate source as tab completion)."""
+        try:
+            summary = self.engine.get_conversation_summary()
+            provider_name = summary.get("current_provider")
+        except Exception:
+            provider_name = None
+        if not provider_name:
+            self._show_error("No active provider — use /switch first.")
+            return
+
+        choices = self.completion_manager.model_names(provider_name, "")
+        if not choices:
+            self._show_info(
+                f"No models known for '{provider_name}'. "
+                f"Try '/models refresh {provider_name}'."
+            )
+            return
+
+        table = Table(title=f"Models — {provider_name}")
+        table.add_column("#", style="bold", justify="right")
+        table.add_column("Model", style="cyan")
+        for i, name in enumerate(choices, 1):
+            table.add_row(str(i), name)
+        self.console.print(table)
+
+        selection = await self._prompt_model_selection()
+        if not selection:
+            return
+
+        if selection.isdigit() and 1 <= int(selection) <= len(choices):
+            model = choices[int(selection) - 1]
+        elif selection in choices:
+            model = selection
+        else:
+            self._show_error(f"'{selection}' is not in the list.")
+            return
+
+        await self.engine.switch_model(provider_name, model)
+        self._show_success(f"Model set to {model} ({provider_name}).")
 
     async def _handle_accept_command(self, args: List[str]) -> None:
         """'/accept [edits|all|off]' — session approval mode.
