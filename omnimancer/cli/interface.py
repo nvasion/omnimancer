@@ -12,7 +12,6 @@ import logging
 import os
 import re
 import readline  # noqa: F401
-import select
 import sys
 from typing import Any, Optional
 
@@ -126,7 +125,7 @@ class CommandLineInterface(
 
         # Initialize new unified managers
         self.display_manager = DisplayManager(self.console)
-        self.completion_manager = CompletionManager()
+        self.completion_manager = CompletionManager(engine=engine)
 
         # Initialize signal handler for graceful shutdown
         self.signal_handler = SignalHandler(getattr(engine, "agent_engine", None))
@@ -153,8 +152,43 @@ class CommandLineInterface(
         # Initialize command history
         self.history_manager = HistoryManager()
 
-        # Setup readline for arrow key history navigation
-        self._setup_readline_history()
+        # Session token/cost totals (shown by /status)
+        from .usage import TokenAccumulator
+
+        self.usage = TokenAccumulator()
+
+        # Input layer: prompt_toolkit on interactive terminals (multiline
+        # editing, bracketed paste, Ctrl-R search — and it un-blocks the
+        # event loop that builtin input() silently blocked). Non-TTY
+        # sessions (pipes, tests) keep the historical input()+readline
+        # path. Only the fallback registers readline's atexit history
+        # writer, so prompt_toolkit mode never touches readline_history.
+        self.prompt_input = None
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            try:
+                from prompt_toolkit.completion import ThreadedCompleter
+
+                from .prompt_input import PromptInput
+                from .pt_completion import OmnimancerCompleter
+
+                self.prompt_input = PromptInput(
+                    history_dir=self.history_manager.storage_path,
+                    # Threaded: the @-file source may shell out to git.
+                    completer=ThreadedCompleter(
+                        OmnimancerCompleter(self.completion_manager)
+                    ),
+                    mode_toggle=self._cycle_session_approval_mode,
+                    mode_provider=self._session_approval_mode_name,
+                )
+            except Exception as e:
+                logger.warning(
+                    "prompt_toolkit input unavailable (%s); "
+                    "falling back to readline",
+                    e,
+                )
+        if self.prompt_input is None:
+            # Setup readline for arrow key history navigation
+            self._setup_readline_history()
 
         # Completion is handled by existing _complete_command method
 
@@ -283,7 +317,7 @@ class CommandLineInterface(
 
     async def _handle_user_input(self) -> None:
         """Handle a single user input cycle."""
-        user_input = self._get_user_input()
+        user_input = await self._get_user_input_async()
         if user_input is None:  # EOF
             self.running = False
             return
@@ -647,51 +681,50 @@ class CommandLineInterface(
         """Get system prompt for agent capabilities."""
         return get_agent_capabilities_prompt()
 
+    def _cycle_session_approval_mode(self) -> None:
+        """Shift+Tab handler: advance the /accept session approval mode."""
+        integration = getattr(self, "approval_integration", None)
+        if integration is not None and hasattr(integration, "cycle_approval_mode"):
+            integration.cycle_approval_mode()
+
+    def _session_approval_mode_name(self) -> str:
+        """Current approval mode name for the prompt toolbar indicator."""
+        integration = getattr(self, "approval_integration", None)
+        mode = getattr(integration, "session_approval_mode", None)
+        return getattr(mode, "value", "normal")
+
+    async def _get_user_input_async(self) -> Optional[str]:
+        """
+        Get one user submission without blocking the event loop.
+
+        prompt_toolkit path on interactive terminals; plain-input fallback
+        otherwise.
+
+        Returns:
+            User input string, or None to end the session (EOF / exit).
+        """
+        if self.prompt_input is not None:
+            try:
+                user_input = await self.prompt_input.prompt_async()
+            except (EOFError, KeyboardInterrupt):
+                return None
+            if user_input and user_input.strip():
+                self.history_manager.add_command(user_input.strip())
+            return user_input
+        return self._get_user_input()
+
     def _get_user_input(self) -> Optional[str]:
         """
-        Get input from the user with multi-line paste support.
+        Plain-input fallback for non-TTY sessions (pipes, tests).
+
+        Multi-line paste handling lives in the prompt_toolkit path
+        (bracketed paste); this fallback reads single lines.
 
         Returns:
             User input string or None if EOF
         """
         try:
-            # Check if there's immediate input available (paste detection)
-            # This detects if user is pasting multiple lines
-            lines = []
-
-            # Get first line
-            first_line = input(">>> ")
-            lines.append(first_line)
-
-            # Check for additional pasted lines (non-blocking)
-            # On Unix-like systems, check if more input is immediately available
-            if sys.stdin.isatty():
-                # For interactive terminals, check if more lines are waiting
-                import termios
-                import tty
-
-                # Save terminal settings
-                old_settings = termios.tcgetattr(sys.stdin)
-                try:
-                    # Set non-blocking mode briefly to check for paste
-                    tty.setcbreak(sys.stdin.fileno())
-
-                    # Check if data is available (indicates paste)
-                    while select.select([sys.stdin], [], [], 0.05)[0]:
-                        try:
-                            line = sys.stdin.readline()
-                            if line:
-                                lines.append(line.rstrip("\n"))
-                            else:
-                                break
-                        except Exception:
-                            break
-                finally:
-                    # Restore terminal settings
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-
-            # Join all lines
-            user_input = "\n".join(lines) if len(lines) > 1 else first_line
+            user_input = input(">>> ")
 
             # Add to history if we got valid input
             if user_input and user_input.strip():
@@ -701,9 +734,6 @@ class CommandLineInterface(
 
         except (EOFError, KeyboardInterrupt):
             return None
-        except Exception:
-            # Fallback to simple input on any error
-            return first_line if "first_line" in locals() else None
 
     async def _process_command(self, command: Command) -> None:
         """
@@ -734,6 +764,55 @@ class CommandLineInterface(
         # Show user message
         self._show_user_message(command.content)
 
+        # e: prefix — enhance the draft first (PromptFoundry port). Parity
+        # with the user's Claude Code hook: the enhanced prompt is sent
+        # automatically; on failure the original draft goes through.
+        effective_content = command.content
+        from ..core.prompt_enhancer import enhance as enhance_prompt
+        from ..core.prompt_enhancer import split_enhance_prefix
+
+        draft = split_enhance_prefix(command.content)
+        if draft is not None:
+            profile = self._default_enhance_profile()
+            with self.console.status(
+                f"[dim]Enhancing prompt ({profile})...[/dim]", spinner="dots"
+            ):
+                enhanced, enhance_ok = await enhance_prompt(
+                    draft, profile, self.engine.config_manager
+                )
+            if enhance_ok:
+                from rich.panel import Panel
+
+                self.console.print(
+                    Panel(
+                        enhanced,
+                        title=f"Enhanced prompt ({profile})",
+                        border_style="magenta",
+                    )
+                )
+                effective_content = enhanced
+            else:
+                self._show_warning(
+                    "Enhancement unavailable — sending the original draft."
+                )
+                effective_content = draft
+
+        # Expand @file mentions into injected content before sending, so
+        # both the native-tool and marker paths receive the same expanded
+        # message. The panel above shows the original text.
+        from pathlib import Path
+
+        from .file_mentions import expand_file_mentions
+
+        message_content, mentions = expand_file_mentions(effective_content, Path.cwd())
+        for mention in mentions:
+            if mention.injected:
+                self.console.print(f"[dim]  @{mention.path} injected[/dim]")
+            else:
+                self.console.print(
+                    f"[yellow]  @{mention.path} skipped: " f"{mention.reason}[/yellow]"
+                )
+
         # Create AI processing task that can be cancelled
         async def ai_processing_task() -> None:
             self.progress_indicator.disable()
@@ -748,12 +827,12 @@ class CommandLineInterface(
                     await self._complete_approval_integration_setup()
 
                 if use_native_tools:
-                    await self._handle_tool_calling_flow(command.content)
+                    await self._handle_tool_calling_flow(message_content)
                 else:
-                    final_message = command.content
+                    final_message = message_content
                     if agent_mode:
                         agent_prompt = self._get_agent_capabilities_prompt()
-                        final_message = f"{agent_prompt}\n\nUser: {command.content}"
+                        final_message = f"{agent_prompt}\n\nUser: {message_content}"
 
                     provider = getattr(self.engine, "current_provider", None)
                     can_stream = (
@@ -768,7 +847,7 @@ class CommandLineInterface(
                     if response.is_success:
                         if agent_mode:
                             await self._execute_continuous_workflow(
-                                command.content, response
+                                message_content, response
                             )
                         elif not can_stream:
                             self._show_assistant_message(

@@ -60,6 +60,8 @@ class SlashCommand(Enum):
     CONFIG = "/config"
     HOOKS = "/hooks"
     PERMISSIONS = "/permissions"
+    ACCEPT = "/accept"
+    ENHANCE = "/enhance"
     PROMPTS = "/prompts"
     SUBAGENTS = "/subagents"
     FALLBACK = "/fallback"
@@ -271,21 +273,22 @@ def _validate_command_args(command: SlashCommand, args: List[str]) -> List[str]:
         ValueError: If arguments are invalid
     """
     if command == SlashCommand.SWITCH:
-        if len(args) < 1:
-            raise ValueError(
-                "Switch command requires at least one argument: provider name"
-            )
+        # Bare '/switch' is valid — the handler shows usage plus the
+        # provider list, which beats a parse-time error.
         if len(args) > 2:
             raise ValueError(
                 "Switch command accepts at most two" " arguments: provider and model"
             )
 
-        # Validate provider name (alphanumeric and underscores only)
-        provider = args[0]
-        if not provider.replace("_", "").isalnum():
-            raise ValueError(
-                "Provider name must contain only" " letters, numbers, and underscores"
-            )
+        # Validate provider name. Hyphens are legal — registered types
+        # include 'openai-compatible' and 'claude-code'.
+        if args:
+            provider = args[0]
+            if not provider.replace("_", "").replace("-", "").isalnum():
+                raise ValueError(
+                    "Provider name must contain only letters, numbers, "
+                    "hyphens, and underscores"
+                )
 
         # Validate model name if provided
         if len(args) == 2:

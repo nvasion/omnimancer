@@ -318,3 +318,26 @@ class TestErrorModuleSpecific:
 
         except Exception as e:
             pytest.fail(f"Program executor error usage test failed: {e}")
+
+
+class TestImportFromAnyCwd:
+    def test_package_imports_outside_repo_cwd(self, tmp_path):
+        """The version fallback must not read pyproject.toml relative to
+        cwd — importing from a PYTHONPATH checkout in any directory
+        (e.g. an agent working in another repo) crashed on
+        FileNotFoundError before the fix."""
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parent.parent
+        result = subprocess.run(
+            [sys.executable, "-c", "import omnimancer; print('ok')"],
+            cwd=tmp_path,
+            env={"PYTHONPATH": str(repo_root), "PATH": "/usr/bin:/bin"},
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "ok" in result.stdout

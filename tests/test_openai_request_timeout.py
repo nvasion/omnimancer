@@ -63,6 +63,30 @@ class TestTimeoutResolution:
         provider = OpenRouterProvider(api_key="k")
         assert provider.request_timeout == 300.0
 
+    def test_config_timeout_field_reaches_provider(self, monkeypatch):
+        """ProviderConfig.timeout arrives as the `timeout` kwarg via the
+        initializer's splat — it must configure the request timeout.
+        (It used to be silently dropped: only `request_timeout`, which is
+        not a ProviderConfig field, was read.)"""
+        monkeypatch.delenv("OMNIMANCER_REQUEST_TIMEOUT", raising=False)
+        provider = OpenAIProvider(api_key="k", timeout=360)
+        assert provider.request_timeout == 360.0
+
+    def test_request_timeout_kwarg_wins_over_timeout(self, monkeypatch):
+        monkeypatch.delenv("OMNIMANCER_REQUEST_TIMEOUT", raising=False)
+        provider = OpenAIProvider(api_key="k", timeout=360, request_timeout=45)
+        assert provider.request_timeout == 45.0
+
+    def test_config_timeout_wins_over_env(self, monkeypatch):
+        monkeypatch.setenv("OMNIMANCER_REQUEST_TIMEOUT", "300")
+        provider = OpenAIProvider(api_key="k", timeout=360)
+        assert provider.request_timeout == 360.0
+
+    def test_openrouter_config_timeout_field(self, monkeypatch):
+        monkeypatch.delenv("OMNIMANCER_REQUEST_TIMEOUT", raising=False)
+        provider = OpenRouterProvider(api_key="k", timeout=360)
+        assert provider.request_timeout == 360.0
+
 
 class TestOpenRouterTimeoutUsed:
     async def test_send_message_uses_configured_timeout(self, context):

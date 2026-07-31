@@ -13,6 +13,10 @@ Beyond the basics, it ships with:
 - **Permission rules** — declarative allow/deny/ask rules per tool with regex matchers
 - **Subagents** — scoped child agents with their own prompt, tool whitelist, and model
 - **Layered security** — approval workflow, sensitive-path protection, and project-boundary enforcement
+- **Named endpoint aliases** — run several OpenAI-compatible endpoints (vLLM, llama.cpp, LM Studio) side by side as first-class providers, keyless if the endpoint is
+- **Modern input layer** — prompt_toolkit prompt with multiline editing, fuzzy `@file` mentions with content injection, live completion for providers/models, Ctrl-R history search
+- **Prompt enhancement** — `e:` prefix or `/enhance` rewrites your draft with a configurable small model before sending (PromptFoundry meta-prompts)
+- **Session approval modes** — `/accept edits|all` (or Shift+Tab) for claude-code-style auto-accept, always below your permission rules
 
 ## Install
 
@@ -117,6 +121,7 @@ Streaming is automatic for providers that support it. Other providers fall back 
 | Provider | Streaming |
 |----------|:---------:|
 | Claude (Anthropic) | Yes |
+| OpenAI / openai-compatible / DigitalOcean | Yes (SSE, incl. tool-call deltas) |
 | All others | Fallback (full response) |
 
 Streaming works in both regular chat and agent mode (tool calling flow). The display uses a live-updating terminal panel that refreshes at 15fps.
@@ -195,7 +200,8 @@ Tool names match the agent's toolset (`Read`, `Write`, `Edit`, `Bash`, `Glob`, `
 | `/quit` | Exit (also: `/exit`, Ctrl+D) |
 | `/clear` | Clear terminal screen |
 | `/switch <provider> [model]` | Switch provider or model (uncataloged models are registered on the fly) |
-| `/models [filter]` | List available models (alias: `/model`) |
+| `/models [filter]` | List available models; `/models refresh [provider]` pulls live catalogs |
+| `/model` | Interactive model picker for the current provider |
 | `/providers` | List all providers with status |
 | `/agent on\|off\|status` | Toggle agent mode |
 | `/subagents [run <name> <task>]` | List or run scoped child agents |
@@ -204,6 +210,8 @@ Tool names match the agent's toolset (`Read`, `Write`, `Edit`, `Bash`, `Glob`, `
 | `/config remove-provider <name>` | Remove a provider |
 | `/hooks [list\|on\|off\|add\|remove]` | Manage lifecycle hooks |
 | `/permissions [list\|on\|off\|allow\|deny\|ask\|remove]` | Manage permission rules |
+| `/accept [edits\|all\|off]` | Session approval mode (Shift+Tab cycles it at the prompt) |
+| `/enhance [chat\|code\|image\|research] <draft>` | Rewrite a draft prompt with the enhancement model, confirm, send (the `e:` message prefix does it inline) |
 | `/save [name]` | Save conversation |
 | `/load [name]` | Load conversation |
 | `/list` | List saved conversations |
@@ -377,6 +385,21 @@ several endpoints side by side and switch between them with `/switch <provider>`
 Any OpenAI-compatible service (local proxy, gateway, self-hosted model) works by
 overriding `base_url` on the `openai` provider.
 
+
+### Self-hosted endpoints as named providers
+
+Any number of OpenAI-compatible endpoints (vLLM, llama.cpp server, LM Studio, proxies) can be configured side by side under names you choose. `provider_type` picks the implementation; the entry name is yours:
+
+```bash
+>>> /config set-provider gateway --type openai-compatible \
+        --base-url http://vllm-gateway.internal:8888/v1 --model qwen3-coder-30b
+>>> /config set-provider local --type openai-compatible \
+        --base-url http://localhost:8000/v1 --model qwen3-coder-30b
+>>> /switch local
+```
+
+The `openai-compatible` type is keyless by default (`auth_type: "none"`), takes its model catalog from the endpoint's `/v1/models` (including each model's served context size — see `/models refresh`), and raises timeout errors with a cold-start hint since self-hosted gateways may load a model on first request. Set `providers.<name>.timeout` generously for such endpoints (e.g. `360`).
+
 ### Environment variable overrides
 
 Environment variables take precedence over the saved config and are applied at
@@ -522,3 +545,7 @@ Tests follow TDD. 1,460 tests across providers, CLI, streaming, agent operations
 ## License
 
 MIT
+
+---
+
+*This documentation was reviewed by a local Qwen model as part of OMN testing harness.*

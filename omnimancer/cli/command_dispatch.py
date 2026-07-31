@@ -20,6 +20,8 @@ from rich.table import Table
 
 # Internal imports - Core
 from ..core.models import EnhancedModelInfo, FallbackConfig
+from ..core.prompt_enhancer import PROFILES as ENHANCE_PROFILES
+from ..core.prompt_enhancer import enhance as enhance_prompt
 from ..providers.factory import ProviderFactory
 
 # Internal imports - CLI
@@ -33,6 +35,7 @@ if TYPE_CHECKING:
     from ..core.agent_mode_manager import AgentModeManager
     from ..core.history_manager import HistoryManager
     from .approval_integration import CLIApprovalIntegration
+    from .completion import CompletionManager
     from .display import DisplayManager
 
 
@@ -55,6 +58,7 @@ class CommandDispatchMixin:
     history_manager: "HistoryManager"
     approval_integration: Optional["CLIApprovalIntegration"]
     display_manager: "DisplayManager"
+    completion_manager: "CompletionManager"
 
     # Methods provided by DisplayMixin (or the host class)
     def _show_error(self, message: str) -> None: ...
@@ -65,6 +69,7 @@ class CommandDispatchMixin:
     def _show_command_help(self, command_name: str) -> None: ...
     def _show_status(self) -> None: ...
     def _clear_screen(self) -> None: ...
+    async def _handle_chat_message(self, command: "Command") -> None: ...
     def stop(self) -> None: ...
 
     async def _handle_slash_command(self, command: Command) -> None:
@@ -88,7 +93,9 @@ class CommandDispatchMixin:
             self._clear_screen()
         elif slash_cmd == SlashCommand.STATUS:
             self._show_status()
-        elif slash_cmd == SlashCommand.MODELS or slash_cmd == SlashCommand.MODEL:
+        elif slash_cmd == SlashCommand.MODEL:
+            await self._handle_model_command(command.args)
+        elif slash_cmd == SlashCommand.MODELS:
             await self._show_models(command)
         elif slash_cmd == SlashCommand.SWITCH:
             await self._handle_switch_command(command)
@@ -120,6 +127,10 @@ class CommandDispatchMixin:
             await self._handle_hooks_command(command)
         elif slash_cmd == SlashCommand.PERMISSIONS:
             await self._handle_permissions_command(command)
+        elif slash_cmd == SlashCommand.ACCEPT:
+            await self._handle_accept_command(command.args)
+        elif slash_cmd == SlashCommand.ENHANCE:
+            await self._handle_enhance_command(command.args)
         elif slash_cmd == SlashCommand.PROMPTS:
             await self._handle_prompts_command(command)
         elif slash_cmd == SlashCommand.SUBAGENTS:
@@ -226,12 +237,50 @@ class CommandDispatchMixin:
 
     # Display methods are in cli/display.py (DisplayMixin)
 
+    async def _refresh_model_catalogs(self, provider_name: Optional[str]) -> None:
+        """'/models refresh [provider]' — pull live catalogs from endpoints.
+
+        Assigns each provider's fetch_enhanced_models() result to its
+        _catalog_models (preferred by get_available_models), so served
+        context sizes (e.g. vLLM max_model_len) replace static guesses.
+        """
+        providers = self.engine.providers or {}
+        if provider_name is not None:
+            key = self._resolve_provider_key(provider_name)
+            if key not in providers:
+                self._show_error(
+                    f"Provider '{provider_name}' is not configured. "
+                    f"Configured: {', '.join(sorted(providers)) or '(none)'}"
+                )
+                return
+            targets = {key: providers[key]}
+        else:
+            targets = dict(providers)
+
+        for name, provider in targets.items():
+            try:
+                enhanced = await provider.fetch_enhanced_models()
+            except Exception as e:
+                self._show_error(f"{name}: refresh failed ({e})")
+                continue
+            if enhanced:
+                provider._catalog_models = enhanced
+                self._show_success(f"{name}: {len(enhanced)} models")
+            else:
+                # An empty fetch (endpoint down, no /models) must not
+                # clobber a previously good catalog.
+                self._show_info(f"{name}: no models returned; catalog kept")
+
     async def _show_models(self, command: Command) -> None:
         """Show available models with enhanced provider grouping and capabilities."""
         try:
             args = command.args
             filter_type = args[0].lower() if len(args) > 0 else None
             filter_value = args[1] if len(args) > 1 else None
+
+            if filter_type == "refresh":
+                await self._refresh_model_catalogs(filter_value)
+                return
 
             # First check if there are any models available at all
             all_models = self.engine.get_available_models()
@@ -453,6 +502,208 @@ class CommandDispatchMixin:
             f"(/remove-model {model_name} {provider_name} to undo)"
         )
 
+    async def _prompt_model_selection(self) -> str:
+        """One-line selection prompt; empty string cancels."""
+        message = "Select model (number or name, Enter to cancel): "
+        prompt_input = getattr(self, "prompt_input", None)
+        if prompt_input is not None:
+            try:
+                return str(await prompt_input.prompt_async(message)).strip()
+            except (EOFError, KeyboardInterrupt):
+                return ""
+        try:
+            return (await asyncio.to_thread(input, message)).strip()
+        except (EOFError, KeyboardInterrupt):
+            return ""
+
+    def _current_provider_key(self) -> Optional[str]:
+        """Alias/config name of the active provider, by IDENTITY against
+        engine.providers. (get_conversation_summary carries no provider
+        key — reading one there silently yielded None.)"""
+        current = getattr(self.engine, "current_provider", None)
+        if current is None:
+            return None
+        providers = getattr(self.engine, "providers", None) or {}
+        for name, provider in providers.items():
+            if provider is current:
+                return str(name)
+        return None
+
+    async def _handle_model_command(self, args: List[str]) -> None:
+        """'/model' — picker; '/model <name>' — set it on the current
+        provider. (Filters live on /models.)"""
+        provider_name = self._current_provider_key()
+        if not provider_name:
+            self._show_error("No active provider — use /switch first.")
+            return
+
+        choices = self.completion_manager.model_names(provider_name, "")
+
+        if args:
+            model = args[0]
+            if model not in choices:
+                self._show_error(
+                    f"'{model}' is not in '{provider_name}''s catalog. "
+                    f"Use '/switch {provider_name} {model}' to register "
+                    "it on the fly, or '/models refresh "
+                    f"{provider_name}' to pull the live list."
+                )
+                return
+            await self.engine.switch_model(provider_name, model)
+            self._show_success(f"Model set to {model} ({provider_name}).")
+            return
+
+        if not choices:
+            self._show_info(
+                f"No models known for '{provider_name}'. "
+                f"Try '/models refresh {provider_name}'."
+            )
+            return
+
+        table = Table(title=f"Models — {provider_name}")
+        table.add_column("#", style="bold", justify="right")
+        table.add_column("Model", style="cyan")
+        for i, name in enumerate(choices, 1):
+            table.add_row(str(i), name)
+        self.console.print(table)
+
+        selection = await self._prompt_model_selection()
+        if not selection:
+            return
+
+        if selection.isdigit() and 1 <= int(selection) <= len(choices):
+            model = choices[int(selection) - 1]
+        elif selection in choices:
+            model = selection
+        else:
+            self._show_error(f"'{selection}' is not in the list.")
+            return
+
+        await self.engine.switch_model(provider_name, model)
+        self._show_success(f"Model set to {model} ({provider_name}).")
+
+    def _default_enhance_profile(self) -> str:
+        """Configured default enhancement profile, falling back to 'code'."""
+        try:
+            settings = getattr(
+                self.engine.config_manager.get_config(), "enhancement", None
+            )
+            profile = getattr(settings, "default_profile", "code")
+            return profile if profile in ENHANCE_PROFILES else "code"
+        except Exception:
+            return "code"
+
+    async def _prompt_enhance_confirm(self) -> str:
+        """y/n confirmation for /enhance (the e: prefix skips this)."""
+        message = "Send enhanced prompt? [y/n]: "
+        prompt_input = getattr(self, "prompt_input", None)
+        if prompt_input is not None:
+            try:
+                return str(await prompt_input.prompt_async(message)).strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                return "n"
+        try:
+            return (await asyncio.to_thread(input, message)).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return "n"
+
+    async def _handle_enhance_command(self, args: List[str]) -> None:
+        """'/enhance [chat|code|image|research] <draft>' — rewrite the draft
+        with the configured enhancement model, show it, confirm, send."""
+        if not args:
+            self._show_error("Usage: /enhance [chat|code|image|research] <draft>")
+            return
+
+        if args[0].lower() in ENHANCE_PROFILES:
+            profile = args[0].lower()
+            draft = " ".join(args[1:]).strip()
+        else:
+            profile = self._default_enhance_profile()
+            draft = " ".join(args).strip()
+        if not draft:
+            self._show_error("Provide a draft to enhance.")
+            return
+
+        enhanced, ok = await enhance_prompt(draft, profile, self.engine.config_manager)
+        if not ok:
+            self._show_error(
+                "Enhancement failed (is the enhancement provider reachable?). "
+                "Draft not sent."
+            )
+            return
+
+        self.console.print(
+            Panel(
+                enhanced,
+                title=f"Enhanced prompt ({profile})",
+                border_style="magenta",
+            )
+        )
+        confirm = await self._prompt_enhance_confirm()
+        if confirm not in ("y", "yes"):
+            self._show_info("Not sent.")
+            return
+
+        await self._handle_chat_message(Command.create_chat_message(enhanced))
+
+    async def _handle_accept_command(self, args: List[str]) -> None:
+        """'/accept [edits|all|off]' — session approval mode.
+
+        Bare '/accept' cycles normal → accept-edits → accept-all.
+        """
+        from .approval_integration import ApprovalMode
+
+        integration = getattr(self, "approval_integration", None)
+        if integration is None:
+            self._show_error(
+                "Approval integration is not initialized; "
+                "/accept has nothing to configure."
+            )
+            return
+
+        if not args:
+            mode = integration.cycle_approval_mode()
+        else:
+            arg_to_mode = {
+                "edits": ApprovalMode.ACCEPT_EDITS,
+                "all": ApprovalMode.ACCEPT_ALL,
+                "off": ApprovalMode.NORMAL,
+                "normal": ApprovalMode.NORMAL,
+            }
+            mode = arg_to_mode.get(args[0].lower())
+            if mode is None:
+                self._show_error(
+                    f"Unknown mode '{args[0]}'. Use /accept [edits|all|off]."
+                )
+                return
+            integration.session_approval_mode = mode
+
+        descriptions = {
+            ApprovalMode.NORMAL: "normal — every operation prompts as usual",
+            ApprovalMode.ACCEPT_EDITS: (
+                "accept-edits — file writes auto-approve; deletes and "
+                "commands still prompt"
+            ),
+            ApprovalMode.ACCEPT_ALL: (
+                "accept-all — everything auto-approves (deny/ask permission "
+                "rules and hard security limits still apply)"
+            ),
+        }
+        self._show_success(f"Approval mode: {descriptions[mode]}")
+
+    def _resolve_provider_key(self, name: str) -> str:
+        """Resolve a user-typed provider name to its configured key.
+
+        Config keys are matched case-insensitively so an entry like
+        'MyGateway' stays reachable; unknown names fall back to lowercase
+        (the historical behavior for registered provider names).
+        """
+        providers: dict = getattr(self.engine, "providers", None) or {}
+        for key in providers:
+            if str(key).lower() == name.lower():
+                return str(key)
+        return name.lower()
+
     async def _handle_switch_command(self, command: Command) -> None:
         """Handle switch command with enhanced provider type support."""
         args = command.args
@@ -467,7 +718,7 @@ class CommandDispatchMixin:
             await self._show_providers(providers_command)
             return
 
-        provider_name = args[0].lower()
+        provider_name = self._resolve_provider_key(args[0])
         model_name = args[1] if len(args) > 1 else None
 
         try:
@@ -794,17 +1045,22 @@ class CommandDispatchMixin:
         self._show_success(f"{field} set to '{value}' for provider '{provider_name}'")
 
     async def _handle_config_set_provider(self, args: List[str]) -> None:
-        """Handle '/config set-provider <name> [--api-key K] [--base-url U]
-        [--model M]'."""
+        """Handle '/config set-provider <name> [--type T] [--api-key K]
+        [--base-url U] [--model M]'."""
         if not args:
             self._show_error(
-                "Usage: /config set-provider <name> "
+                "Usage: /config set-provider <name> [--type TYPE] "
                 "[--api-key KEY] [--base-url URL] [--model MODEL]"
             )
             return
 
         provider_name = args[0]
-        flags = {"--api-key": "api_key", "--base-url": "base_url", "--model": "model"}
+        flags = {
+            "--api-key": "api_key",
+            "--base-url": "base_url",
+            "--model": "model",
+            "--type": "provider_type",
+        }
         values: dict = {}
         i = 1
         while i < len(args):
@@ -818,7 +1074,7 @@ class CommandDispatchMixin:
 
         if not values:
             self._show_error(
-                "Provide at least one of --api-key, --base-url, or --model."
+                "Provide at least one of --type, --api-key, --base-url, " "or --model."
             )
             return
 
@@ -826,6 +1082,38 @@ class CommandDispatchMixin:
             from ..core.models import ProviderConfig
 
             config_manager = self.engine.config_manager
+            registered = sorted(ProviderFactory.get_available_providers())
+            existing = config_manager.get_provider_config(provider_name)
+
+            # Validate everything BEFORE any write so a bad invocation
+            # persists nothing (set_api_key would create a partial entry).
+            provider_type = values.get("provider_type") or (
+                existing.provider_type if existing else None
+            )
+            if provider_type and provider_type not in registered:
+                self._show_error(
+                    f"Unknown provider type '{provider_type}'. "
+                    f"Registered types: {', '.join(registered)}"
+                )
+                return
+            if (
+                existing is None
+                and provider_name not in registered
+                and not provider_type
+            ):
+                self._show_error(
+                    f"'{provider_name}' is not a registered provider. To "
+                    "configure a custom endpoint under this name, add "
+                    "--type <provider_type> (e.g. --type openai-compatible). "
+                    f"Registered types: {', '.join(registered)}"
+                )
+                return
+            if existing is None and not values.get("model"):
+                self._show_error(
+                    "New provider entries need --model <name> — an empty "
+                    "model is never valid."
+                )
+                return
 
             # API key first (encrypts; creates a minimal entry if needed).
             if "api_key" in values:
@@ -833,10 +1121,9 @@ class CommandDispatchMixin:
 
             existing = config_manager.get_provider_config(provider_name)
             data = existing.model_dump() if existing else {"model": ""}
-            if "base_url" in values:
-                data["base_url"] = values["base_url"]
-            if "model" in values:
-                data["model"] = values["model"]
+            for field in ("base_url", "model", "provider_type"):
+                if field in values:
+                    data[field] = values[field]
             config_manager.set_provider_config(provider_name, ProviderConfig(**data))
 
             fields = ", ".join(sorted(values))

@@ -113,9 +113,25 @@ class TestStreamingDisplayRender:
     def test_render_with_text(self, display):
         display.accumulated_text = "Hello world"
         panel = display._render()
-        assert "Hello world" in str(panel.renderable)
+        from rich.markdown import Markdown
+
+        assert isinstance(panel.renderable, Markdown)
+        assert "Hello world" in panel.renderable.markup
 
     def test_render_shows_model_in_title(self, display):
         display.model = "claude-sonnet-4-6"
         panel = display._render()
         assert "claude-sonnet-4-6" in panel.title
+
+
+class TestStreamingDisplayMarkdown:
+    def test_render_is_progressive_markdown(self, display):
+        display.accumulated_text = "# Heading\n\nsome *body*"
+        panel = display._render()
+        from rich.markdown import Markdown
+
+        assert isinstance(panel.renderable, Markdown)
+
+    def test_unclosed_fence_mid_stream_does_not_raise(self, display):
+        display.accumulated_text = "```python\npartial code with no closing"
+        display._render()  # must not raise
