@@ -172,6 +172,8 @@ class CommandLineInterface(
                     completer=ThreadedCompleter(
                         OmnimancerCompleter(self.completion_manager)
                     ),
+                    mode_toggle=self._cycle_session_approval_mode,
+                    mode_provider=self._session_approval_mode_name,
                 )
             except Exception as e:
                 logger.warning(
@@ -673,6 +675,18 @@ class CommandLineInterface(
     def _get_agent_capabilities_prompt(self) -> str:
         """Get system prompt for agent capabilities."""
         return get_agent_capabilities_prompt()
+
+    def _cycle_session_approval_mode(self) -> None:
+        """Shift+Tab handler: advance the /accept session approval mode."""
+        integration = getattr(self, "approval_integration", None)
+        if integration is not None and hasattr(integration, "cycle_approval_mode"):
+            integration.cycle_approval_mode()
+
+    def _session_approval_mode_name(self) -> str:
+        """Current approval mode name for the prompt toolbar indicator."""
+        integration = getattr(self, "approval_integration", None)
+        mode = getattr(integration, "session_approval_mode", None)
+        return getattr(mode, "value", "normal")
 
     async def _get_user_input_async(self) -> Optional[str]:
         """

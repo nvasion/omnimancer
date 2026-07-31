@@ -69,6 +69,8 @@ class PromptInput:
         completer: Optional[Any] = None,
         input: Optional[Any] = None,
         output: Optional[Any] = None,
+        mode_toggle: Optional[Any] = None,
+        mode_provider: Optional[Any] = None,
     ) -> None:
         """
         Args:
@@ -76,7 +78,14 @@ class PromptInput:
             completer: Optional prompt_toolkit Completer.
             input/output: Test seams (pipe input / DummyOutput); production
                 omits both and prompt_toolkit binds the real terminal.
+            mode_toggle: Zero-arg callable invoked on Shift+Tab (cycles the
+                session approval mode).
+            mode_provider: Zero-arg callable returning the current approval
+                mode string; a non-"normal" mode shows in the bottom
+                toolbar as a safety indicator.
         """
+        self._mode_toggle = mode_toggle
+        self._mode_provider = mode_provider
         history_dir = Path(history_dir)
         history_dir.mkdir(parents=True, exist_ok=True)
         history_path = _migrate_readline_history(history_dir)
@@ -95,6 +104,8 @@ class PromptInput:
         if completer is not None:
             session_kwargs["completer"] = completer
             session_kwargs["complete_while_typing"] = True
+        if mode_provider is not None:
+            session_kwargs["bottom_toolbar"] = self._render_toolbar
         if input is not None:
             session_kwargs["input"] = input
         if output is not None:
@@ -122,6 +133,12 @@ class PromptInput:
         def _insert_newline(event: Any) -> None:
             event.current_buffer.insert_text("\n")
 
+        @bindings.add("s-tab")
+        def _cycle_mode(event: Any) -> None:
+            if self._mode_toggle is not None:
+                self._mode_toggle()
+                event.app.invalidate()  # refresh the toolbar indicator
+
         @bindings.add("c-c")
         def _ctrl_c(event: Any) -> None:
             buffer = event.current_buffer
@@ -143,6 +160,18 @@ class PromptInput:
     def exit_armed(self) -> bool:
         """True after one Ctrl+C at an empty prompt (exit hint state)."""
         return self._exit_armed
+
+    def _render_toolbar(self) -> Optional[str]:
+        """Approval-mode safety indicator; hidden in normal mode."""
+        if self._mode_provider is None:
+            return None
+        try:
+            mode = self._mode_provider()
+        except Exception:
+            return None
+        if not mode or mode == "normal":
+            return None
+        return f" approval: {mode} (Shift+Tab cycles) "
 
     async def prompt_async(self, message: str = ">>> ") -> str:
         """Read one submission from the user.

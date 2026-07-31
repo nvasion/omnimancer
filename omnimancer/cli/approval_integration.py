@@ -8,6 +8,7 @@ in terminal with clear formatting and captures approval decisions.
 
 import logging
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -25,6 +26,32 @@ from .approval_formatter import CLIApprovalFormatter
 from .approval_prompt import ApprovalDecision, CLIApprovalPrompt
 
 logger = logging.getLogger(__name__)
+
+
+class ApprovalMode(Enum):
+    """Session-wide approval mode (claude-code-style accept toggles).
+
+    Sits BELOW permission rules: DENY rules refuse before the approval
+    workflow is reached, and ASK rules set ``_force_prompt``, which is
+    checked before the mode. The low-level security gate re-validates
+    paths/commands at execute time regardless.
+    """
+
+    NORMAL = "normal"
+    ACCEPT_EDITS = "accept-edits"
+    ACCEPT_ALL = "accept-all"
+
+
+#: /accept cycle order.
+_MODE_CYCLE = [
+    ApprovalMode.NORMAL,
+    ApprovalMode.ACCEPT_EDITS,
+    ApprovalMode.ACCEPT_ALL,
+]
+
+#: Operation types auto-approved by ACCEPT_EDITS. Deliberately excludes
+#: deletes and command execution — those stay interactive.
+_EDIT_OPERATION_TYPES = frozenset({OperationType.FILE_WRITE})
 
 
 class CLIApprovalIntegration:
@@ -60,6 +87,7 @@ class CLIApprovalIntegration:
         self.console = console or Console()
         self.enable_auto_approval = enable_auto_approval
         self.approval_timeout_seconds = approval_timeout_seconds
+        self.session_approval_mode = ApprovalMode.NORMAL
 
         # Initialize UI components
         self.formatter = CLIApprovalFormatter(self.console)
@@ -337,6 +365,18 @@ class CLIApprovalIntegration:
         if operation.data.get("_force_prompt"):
             return None
 
+        # Session approval mode (/accept): accept-edits auto-approves file
+        # writes only; accept-all approves everything that reaches the
+        # approval workflow (deny rules and hard security limits never do).
+        if self._mode_auto_approves(operation):
+            self.console.print(
+                "[dim]✅ Auto-approved:"
+                f" {operation.description}"
+                f" (session mode: {self.session_approval_mode.value})"
+                "[/dim]"
+            )
+            return True
+
         try:
             # Generate operation signature for matching
             operation_signature = self._generate_operation_signature(operation)
@@ -365,6 +405,20 @@ class CLIApprovalIntegration:
         except Exception as e:
             logger.error(f"Error checking auto-approval: {e}")
             return None
+
+    def _mode_auto_approves(self, operation: Operation) -> bool:
+        """Whether the session approval mode auto-approves this operation."""
+        if self.session_approval_mode is ApprovalMode.ACCEPT_ALL:
+            return True
+        if self.session_approval_mode is ApprovalMode.ACCEPT_EDITS:
+            return operation.type in _EDIT_OPERATION_TYPES
+        return False
+
+    def cycle_approval_mode(self) -> ApprovalMode:
+        """Advance normal → accept-edits → accept-all → normal."""
+        index = _MODE_CYCLE.index(self.session_approval_mode)
+        self.session_approval_mode = _MODE_CYCLE[(index + 1) % len(_MODE_CYCLE)]
+        return self.session_approval_mode
 
     async def _store_approval_pattern(
         self,

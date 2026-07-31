@@ -120,6 +120,8 @@ class CommandDispatchMixin:
             await self._handle_hooks_command(command)
         elif slash_cmd == SlashCommand.PERMISSIONS:
             await self._handle_permissions_command(command)
+        elif slash_cmd == SlashCommand.ACCEPT:
+            await self._handle_accept_command(command.args)
         elif slash_cmd == SlashCommand.PROMPTS:
             await self._handle_prompts_command(command)
         elif slash_cmd == SlashCommand.SUBAGENTS:
@@ -490,6 +492,51 @@ class CommandDispatchMixin:
             "registered it as a custom model and switching anyway. "
             f"(/remove-model {model_name} {provider_name} to undo)"
         )
+
+    async def _handle_accept_command(self, args: List[str]) -> None:
+        """'/accept [edits|all|off]' — session approval mode.
+
+        Bare '/accept' cycles normal → accept-edits → accept-all.
+        """
+        from .approval_integration import ApprovalMode
+
+        integration = getattr(self, "approval_integration", None)
+        if integration is None:
+            self._show_error(
+                "Approval integration is not initialized; "
+                "/accept has nothing to configure."
+            )
+            return
+
+        if not args:
+            mode = integration.cycle_approval_mode()
+        else:
+            arg_to_mode = {
+                "edits": ApprovalMode.ACCEPT_EDITS,
+                "all": ApprovalMode.ACCEPT_ALL,
+                "off": ApprovalMode.NORMAL,
+                "normal": ApprovalMode.NORMAL,
+            }
+            mode = arg_to_mode.get(args[0].lower())
+            if mode is None:
+                self._show_error(
+                    f"Unknown mode '{args[0]}'. Use /accept [edits|all|off]."
+                )
+                return
+            integration.session_approval_mode = mode
+
+        descriptions = {
+            ApprovalMode.NORMAL: "normal — every operation prompts as usual",
+            ApprovalMode.ACCEPT_EDITS: (
+                "accept-edits — file writes auto-approve; deletes and "
+                "commands still prompt"
+            ),
+            ApprovalMode.ACCEPT_ALL: (
+                "accept-all — everything auto-approves (deny/ask permission "
+                "rules and hard security limits still apply)"
+            ),
+        }
+        self._show_success(f"Approval mode: {descriptions[mode]}")
 
     def _resolve_provider_key(self, name: str) -> str:
         """Resolve a user-typed provider name to its configured key.
