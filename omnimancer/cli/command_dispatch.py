@@ -20,6 +20,8 @@ from rich.table import Table
 
 # Internal imports - Core
 from ..core.models import EnhancedModelInfo, FallbackConfig
+from ..core.prompt_enhancer import PROFILES as ENHANCE_PROFILES
+from ..core.prompt_enhancer import enhance as enhance_prompt
 from ..providers.factory import ProviderFactory
 
 # Internal imports - CLI
@@ -67,6 +69,7 @@ class CommandDispatchMixin:
     def _show_command_help(self, command_name: str) -> None: ...
     def _show_status(self) -> None: ...
     def _clear_screen(self) -> None: ...
+    async def _handle_chat_message(self, command: "Command") -> None: ...
     def stop(self) -> None: ...
 
     async def _handle_slash_command(self, command: Command) -> None:
@@ -126,6 +129,8 @@ class CommandDispatchMixin:
             await self._handle_permissions_command(command)
         elif slash_cmd == SlashCommand.ACCEPT:
             await self._handle_accept_command(command.args)
+        elif slash_cmd == SlashCommand.ENHANCE:
+            await self._handle_enhance_command(command.args)
         elif slash_cmd == SlashCommand.PROMPTS:
             await self._handle_prompts_command(command)
         elif slash_cmd == SlashCommand.SUBAGENTS:
@@ -552,6 +557,70 @@ class CommandDispatchMixin:
 
         await self.engine.switch_model(provider_name, model)
         self._show_success(f"Model set to {model} ({provider_name}).")
+
+    def _default_enhance_profile(self) -> str:
+        """Configured default enhancement profile, falling back to 'code'."""
+        try:
+            settings = getattr(
+                self.engine.config_manager.get_config(), "enhancement", None
+            )
+            profile = getattr(settings, "default_profile", "code")
+            return profile if profile in ENHANCE_PROFILES else "code"
+        except Exception:
+            return "code"
+
+    async def _prompt_enhance_confirm(self) -> str:
+        """y/n confirmation for /enhance (the e: prefix skips this)."""
+        message = "Send enhanced prompt? [y/n]: "
+        prompt_input = getattr(self, "prompt_input", None)
+        if prompt_input is not None:
+            try:
+                return str(await prompt_input.prompt_async(message)).strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                return "n"
+        try:
+            return (await asyncio.to_thread(input, message)).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return "n"
+
+    async def _handle_enhance_command(self, args: List[str]) -> None:
+        """'/enhance [chat|code|image|research] <draft>' — rewrite the draft
+        with the configured enhancement model, show it, confirm, send."""
+        if not args:
+            self._show_error("Usage: /enhance [chat|code|image|research] <draft>")
+            return
+
+        if args[0].lower() in ENHANCE_PROFILES:
+            profile = args[0].lower()
+            draft = " ".join(args[1:]).strip()
+        else:
+            profile = self._default_enhance_profile()
+            draft = " ".join(args).strip()
+        if not draft:
+            self._show_error("Provide a draft to enhance.")
+            return
+
+        enhanced, ok = await enhance_prompt(draft, profile, self.engine.config_manager)
+        if not ok:
+            self._show_error(
+                "Enhancement failed (is the enhancement provider reachable?). "
+                "Draft not sent."
+            )
+            return
+
+        self.console.print(
+            Panel(
+                enhanced,
+                title=f"Enhanced prompt ({profile})",
+                border_style="magenta",
+            )
+        )
+        confirm = await self._prompt_enhance_confirm()
+        if confirm not in ("y", "yes"):
+            self._show_info("Not sent.")
+            return
+
+        await self._handle_chat_message(Command.create_chat_message(enhanced))
 
     async def _handle_accept_command(self, args: List[str]) -> None:
         """'/accept [edits|all|off]' — session approval mode.

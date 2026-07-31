@@ -61,6 +61,7 @@ class SlashCommand(Enum):
     HOOKS = "/hooks"
     PERMISSIONS = "/permissions"
     ACCEPT = "/accept"
+    ENHANCE = "/enhance"
     PROMPTS = "/prompts"
     SUBAGENTS = "/subagents"
     FALLBACK = "/fallback"

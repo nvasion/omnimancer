@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ..utils.errors import MCPError
 
@@ -1322,6 +1322,19 @@ class FallbackConfig(BaseModel):
         return [str(p).strip() for p in v if str(p).strip()]
 
 
+class EnhancementConfig(BaseModel):
+    """Prompt-enhancement settings (the PromptFoundry port).
+
+    Defaults target the homelab gateway's small model: cheap, always
+    reachable, and no VRAM contention with the local coding model.
+    """
+
+    provider: str = "gateway"
+    model: str = "qwen3-8b"
+    temperature: float = 0.4
+    default_profile: str = "code"
+
+
 class Config(BaseModel):
     """Main configuration model."""
 
@@ -1369,6 +1382,9 @@ class Config(BaseModel):
 
     # Custom models - user-defined models that extend available options
     custom_models: List[EnhancedModelInfo] = []
+
+    # Prompt enhancement (/enhance and the e: prefix)
+    enhancement: EnhancementConfig = Field(default_factory=EnhancementConfig)
 
     @field_validator("default_provider")
     @classmethod

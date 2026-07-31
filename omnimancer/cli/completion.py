@@ -138,6 +138,7 @@ class CompletionManager:
                 0: ["list", "allow", "deny", "ask", "remove", "on", "off"],
             },
             "accept": {0: ["edits", "all", "off"]},
+            "enhance": {0: ["chat", "code", "image", "research"]},
             "models": {0: ["refresh"]},
             "prompts": {0: ["list"]},
             "subagents": {0: ["list", "run"]},

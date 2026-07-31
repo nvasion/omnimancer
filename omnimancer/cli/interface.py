@@ -764,6 +764,39 @@ class CommandLineInterface(
         # Show user message
         self._show_user_message(command.content)
 
+        # e: prefix — enhance the draft first (PromptFoundry port). Parity
+        # with the user's Claude Code hook: the enhanced prompt is sent
+        # automatically; on failure the original draft goes through.
+        effective_content = command.content
+        from ..core.prompt_enhancer import enhance as enhance_prompt
+        from ..core.prompt_enhancer import split_enhance_prefix
+
+        draft = split_enhance_prefix(command.content)
+        if draft is not None:
+            profile = self._default_enhance_profile()
+            with self.console.status(
+                f"[dim]Enhancing prompt ({profile})...[/dim]", spinner="dots"
+            ):
+                enhanced, enhance_ok = await enhance_prompt(
+                    draft, profile, self.engine.config_manager
+                )
+            if enhance_ok:
+                from rich.panel import Panel
+
+                self.console.print(
+                    Panel(
+                        enhanced,
+                        title=f"Enhanced prompt ({profile})",
+                        border_style="magenta",
+                    )
+                )
+                effective_content = enhanced
+            else:
+                self._show_warning(
+                    "Enhancement unavailable — sending the original draft."
+                )
+                effective_content = draft
+
         # Expand @file mentions into injected content before sending, so
         # both the native-tool and marker paths receive the same expanded
         # message. The panel above shows the original text.
@@ -771,7 +804,7 @@ class CommandLineInterface(
 
         from .file_mentions import expand_file_mentions
 
-        message_content, mentions = expand_file_mentions(command.content, Path.cwd())
+        message_content, mentions = expand_file_mentions(effective_content, Path.cwd())
         for mention in mentions:
             if mention.injected:
                 self.console.print(f"[dim]  @{mention.path} injected[/dim]")
