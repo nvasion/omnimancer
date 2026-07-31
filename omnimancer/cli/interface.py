@@ -745,6 +745,22 @@ class CommandLineInterface(
         # Show user message
         self._show_user_message(command.content)
 
+        # Expand @file mentions into injected content before sending, so
+        # both the native-tool and marker paths receive the same expanded
+        # message. The panel above shows the original text.
+        from pathlib import Path
+
+        from .file_mentions import expand_file_mentions
+
+        message_content, mentions = expand_file_mentions(command.content, Path.cwd())
+        for mention in mentions:
+            if mention.injected:
+                self.console.print(f"[dim]  @{mention.path} injected[/dim]")
+            else:
+                self.console.print(
+                    f"[yellow]  @{mention.path} skipped: " f"{mention.reason}[/yellow]"
+                )
+
         # Create AI processing task that can be cancelled
         async def ai_processing_task() -> None:
             self.progress_indicator.disable()
@@ -759,12 +775,12 @@ class CommandLineInterface(
                     await self._complete_approval_integration_setup()
 
                 if use_native_tools:
-                    await self._handle_tool_calling_flow(command.content)
+                    await self._handle_tool_calling_flow(message_content)
                 else:
-                    final_message = command.content
+                    final_message = message_content
                     if agent_mode:
                         agent_prompt = self._get_agent_capabilities_prompt()
-                        final_message = f"{agent_prompt}\n\nUser: {command.content}"
+                        final_message = f"{agent_prompt}\n\nUser: {message_content}"
 
                     provider = getattr(self.engine, "current_provider", None)
                     can_stream = (
@@ -779,7 +795,7 @@ class CommandLineInterface(
                     if response.is_success:
                         if agent_mode:
                             await self._execute_continuous_workflow(
-                                command.content, response
+                                message_content, response
                             )
                         elif not can_stream:
                             self._show_assistant_message(
