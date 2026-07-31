@@ -93,9 +93,9 @@ class CommandDispatchMixin:
             self._clear_screen()
         elif slash_cmd == SlashCommand.STATUS:
             self._show_status()
-        elif slash_cmd == SlashCommand.MODEL and not command.args:
-            await self._handle_model_picker()
-        elif slash_cmd == SlashCommand.MODELS or slash_cmd == SlashCommand.MODEL:
+        elif slash_cmd == SlashCommand.MODEL:
+            await self._handle_model_command(command.args)
+        elif slash_cmd == SlashCommand.MODELS:
             await self._show_models(command)
         elif slash_cmd == SlashCommand.SWITCH:
             await self._handle_switch_command(command)
@@ -516,19 +516,43 @@ class CommandDispatchMixin:
         except (EOFError, KeyboardInterrupt):
             return ""
 
-    async def _handle_model_picker(self) -> None:
-        """Bare '/model' — numbered picker over the current provider's
-        models (same candidate source as tab completion)."""
-        try:
-            summary = self.engine.get_conversation_summary()
-            provider_name = summary.get("current_provider")
-        except Exception:
-            provider_name = None
+    def _current_provider_key(self) -> Optional[str]:
+        """Alias/config name of the active provider, by IDENTITY against
+        engine.providers. (get_conversation_summary carries no provider
+        key — reading one there silently yielded None.)"""
+        current = getattr(self.engine, "current_provider", None)
+        if current is None:
+            return None
+        providers = getattr(self.engine, "providers", None) or {}
+        for name, provider in providers.items():
+            if provider is current:
+                return str(name)
+        return None
+
+    async def _handle_model_command(self, args: List[str]) -> None:
+        """'/model' — picker; '/model <name>' — set it on the current
+        provider. (Filters live on /models.)"""
+        provider_name = self._current_provider_key()
         if not provider_name:
             self._show_error("No active provider — use /switch first.")
             return
 
         choices = self.completion_manager.model_names(provider_name, "")
+
+        if args:
+            model = args[0]
+            if model not in choices:
+                self._show_error(
+                    f"'{model}' is not in '{provider_name}''s catalog. "
+                    f"Use '/switch {provider_name} {model}' to register "
+                    "it on the fly, or '/models refresh "
+                    f"{provider_name}' to pull the live list."
+                )
+                return
+            await self.engine.switch_model(provider_name, model)
+            self._show_success(f"Model set to {model} ({provider_name}).")
+            return
+
         if not choices:
             self._show_info(
                 f"No models known for '{provider_name}'. "

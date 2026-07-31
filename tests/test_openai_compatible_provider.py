@@ -180,6 +180,18 @@ class TestColdStartTimeout:
         assert "providers.<name>.timeout" in message
 
 
+class TestModelInfo:
+    def test_model_info_reflects_served_model_not_gpt_catalog(self, keyless_provider):
+        """get_model_info must describe the configured model, not fall back
+        to OpenAI's GPT catalog defaults (which showed 'Max tokens: 4,096 |
+        Cost: $0.000020/token' for free self-hosted models)."""
+        info = keyless_provider.get_model_info()
+        assert info.name == "qwen3-coder-30b"
+        assert info.cost_per_token == 0.0
+        assert info.supports_tools is True
+        assert info.max_tokens == keyless_provider.max_tokens
+
+
 class TestCredentialValidation:
     @pytest.mark.asyncio
     async def test_validate_credentials_uses_models_endpoint(self, keyless_provider):

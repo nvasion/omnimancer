@@ -121,6 +121,25 @@ class TestSetProviderAlias:
         assert stored.provider_type == "openai-compatible"
 
 
+class TestSwitchParsing:
+    """Parse-layer rules for /switch: bare invocation reaches the handler
+    (which shows usage + providers) instead of raising, and hyphenated
+    provider names (openai-compatible, claude-code) are valid."""
+
+    def test_bare_switch_parses_with_empty_args(self):
+        from omnimancer.cli.commands import CommandType, parse_command
+
+        command = parse_command("/switch")
+        assert command.type == CommandType.SLASH_COMMAND
+        assert command.args == []
+
+    def test_hyphenated_provider_names_accepted(self):
+        from omnimancer.cli.commands import parse_command
+
+        assert parse_command("/switch openai-compatible").args == ["openai-compatible"]
+        assert parse_command("/switch claude-code").args == ["claude-code"]
+
+
 class TestSwitchResolution:
     def test_case_insensitive_match_against_configured_providers(self, harness):
         harness.engine.providers = {"MyGateway": object(), "local": object()}

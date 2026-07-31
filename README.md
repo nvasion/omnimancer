@@ -545,3 +545,7 @@ Tests follow TDD. 1,460 tests across providers, CLI, streaming, agent operations
 ## License
 
 MIT
+
+---
+
+*This documentation was reviewed by a local Qwen model as part of OMN testing harness.*

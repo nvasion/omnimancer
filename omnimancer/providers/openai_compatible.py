@@ -67,6 +67,24 @@ class OpenAICompatibleProvider(_OpenAIBase):
         """No static catalog: the endpoint's /models list is the only truth."""
         return []
 
+    def get_model_info(self) -> ModelInfo:
+        """Describe the configured model, not OpenAI's GPT catalog.
+
+        The base implementation falls back to GPT defaults for unknown
+        names ("Max tokens: 4,096 | $0.00002/token"), which is noise for
+        free self-hosted models.
+        """
+        return ModelInfo(
+            name=self.model,
+            provider="openai-compatible",
+            description=f"{self.model} ({self.base_url})",
+            max_tokens=self.max_tokens,
+            cost_per_token=0.0,
+            available=True,
+            supports_tools=True,
+            supports_multimodal=False,
+        )
+
     async def validate_credentials(self) -> bool:
         """Cheap liveness check via GET /models (keyless-safe).
 
