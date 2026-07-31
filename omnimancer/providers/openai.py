@@ -4,14 +4,23 @@ OpenAI provider implementation for Omnimancer.
 This module provides the OpenAI API provider implementation using OpenAI's API.
 """
 
+import json
 import logging
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
 
-from ..core.models import ChatContext, ChatResponse, ModelInfo, ToolCall, ToolDefinition
+from ..core.models import (
+    ChatContext,
+    ChatResponse,
+    ModelInfo,
+    StreamEvent,
+    StreamEventType,
+    ToolCall,
+    ToolDefinition,
+)
 from ..utils.errors import (
     AuthenticationError,
     ModelNotFoundError,
@@ -526,6 +535,220 @@ class OpenAIProvider(BaseProvider):
                 raise ProviderError("Empty response from OpenAI API")
 
         return self._handle_response(response)
+
+    def supports_streaming(self) -> bool:
+        """Real SSE streaming over /chat/completions (OpenAI dialect).
+
+        Also inherited by DigitalOcean and openai-compatible providers;
+        their PROVIDER_CAPABILITIES entries flip together with this one
+        (enforced by tests/test_provider_capability_consistency.py).
+        """
+        return True
+
+    async def send_message_stream(
+        self, message: str, context: ChatContext
+    ) -> AsyncIterator[StreamEvent]:
+        messages = self._prepare_messages(message, context)
+        request_body = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+        async for event in self._stream_request(request_body):
+            yield event
+
+    async def send_message_with_tools_stream(
+        self,
+        message: str,
+        context: ChatContext,
+        available_tools: List[ToolDefinition],
+    ) -> AsyncIterator[StreamEvent]:
+        if not self.supports_tools():
+            async for event in self.send_message_stream(message, context):
+                yield event
+            return
+
+        messages = self._prepare_messages(message, context)
+        tools = self._convert_tools_to_openai_format(available_tools)
+        request_body: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+        if tools:
+            request_body["tools"] = tools
+        async for event in self._stream_request(request_body):
+            yield event
+
+    async def _stream_request(
+        self, request_body: Dict[str, Any]
+    ) -> AsyncIterator[StreamEvent]:
+        """POST with stream=true and yield parsed StreamEvents.
+
+        ``stream_options.include_usage`` asks for a final usage chunk
+        (supported by OpenAI and vLLM); servers that reject the field with
+        a 400 get one retry without it.
+        """
+        self._require_api_key()
+
+        body = dict(request_body)
+        body["stream"] = True
+        body["stream_options"] = {"include_usage": True}
+
+        tried_without_usage = False
+        try:
+            while True:
+                async with httpx.AsyncClient() as client:
+                    async with client.stream(
+                        "POST",
+                        f"{self.base_url}/chat/completions",
+                        headers=self._build_headers(),
+                        json=body,
+                        timeout=self.request_timeout,
+                    ) as response:
+                        if response.status_code != 200:
+                            await response.aread()
+                            error_msg = self._extract_error_message(response) or ""
+                            if (
+                                not tried_without_usage
+                                and response.status_code == 400
+                                and "stream_options" in error_msg
+                            ):
+                                tried_without_usage = True
+                                body.pop("stream_options", None)
+                                continue
+                            # Raises the appropriate typed error.
+                            self._handle_response(response)
+                            return
+                        async for event in self._parse_openai_sse(response):
+                            yield event
+                        return
+        except httpx.TimeoutException:
+            raise self._timeout_network_error()
+        except httpx.RequestError as e:
+            raise NetworkError(f"Network error: {e}")
+
+    async def _parse_openai_sse(
+        self, response: httpx.Response
+    ) -> AsyncIterator[StreamEvent]:
+        """Parse chat.completion.chunk SSE lines into StreamEvents.
+
+        Tool-call fragments are accumulated by their ``index`` field: the
+        first fragment of an index carries the name (and usually the id),
+        later fragments append to ``function.arguments``.
+        """
+        accumulated_text = ""
+        model = self.model
+        stop_reason: Optional[str] = None
+        input_tokens = 0
+        output_tokens = 0
+        started = False
+
+        tool_order: List[int] = []
+        tool_names: Dict[int, str] = {}
+        tool_ids: Dict[int, str] = {}
+        tool_args: Dict[int, str] = {}
+        open_index: Optional[int] = None
+
+        async for line in response.aiter_lines():
+            if not line.startswith("data: "):
+                continue
+            data_str = line[6:].strip()
+            if data_str == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data_str)
+            except json.JSONDecodeError:
+                continue
+
+            if not started:
+                model = chunk.get("model") or self.model
+                started = True
+                yield StreamEvent(type=StreamEventType.MESSAGE_START, model=model)
+
+            usage = chunk.get("usage")
+            if usage:
+                input_tokens = usage.get("prompt_tokens", input_tokens)
+                output_tokens = usage.get("completion_tokens", output_tokens)
+
+            choices = chunk.get("choices") or []
+            if not choices:
+                continue
+            choice = choices[0]
+            if choice.get("finish_reason"):
+                stop_reason = choice["finish_reason"]
+
+            delta = choice.get("delta") or {}
+            text = delta.get("content")
+            if text:
+                accumulated_text += text
+                yield StreamEvent(type=StreamEventType.TEXT_DELTA, text=text)
+
+            for fragment in delta.get("tool_calls") or []:
+                index = fragment.get("index", 0)
+                func = fragment.get("function") or {}
+                if index not in tool_names:
+                    if open_index is not None:
+                        yield StreamEvent(type=StreamEventType.TOOL_USE_END)
+                    tool_order.append(index)
+                    tool_names[index] = func.get("name", "")
+                    # Some OpenAI-compatible servers omit ids; synthesize
+                    # one so results can pair to calls (matches the
+                    # non-stream handler's convention).
+                    tool_ids[index] = fragment.get("id") or f"call_{index}"
+                    tool_args[index] = ""
+                    open_index = index
+                    yield StreamEvent(
+                        type=StreamEventType.TOOL_USE_START,
+                        tool_name=tool_names[index],
+                        tool_id=tool_ids[index],
+                    )
+                else:
+                    if func.get("name") and not tool_names[index]:
+                        tool_names[index] = func["name"]
+                    if fragment.get("id"):
+                        tool_ids[index] = fragment["id"]
+                partial = func.get("arguments") or ""
+                if partial:
+                    tool_args[index] += partial
+                    yield StreamEvent(
+                        type=StreamEventType.TOOL_USE_DELTA,
+                        partial_json=partial,
+                    )
+
+        if open_index is not None:
+            yield StreamEvent(type=StreamEventType.TOOL_USE_END)
+
+        tool_calls = []
+        for index in tool_order:
+            try:
+                arguments = json.loads(tool_args[index]) if tool_args[index] else {}
+            except json.JSONDecodeError:
+                arguments = {}
+            tool_calls.append(
+                ToolCall(
+                    name=tool_names[index],
+                    arguments=arguments,
+                    id=tool_ids[index],
+                )
+            )
+
+        final_response = ChatResponse(
+            content=accumulated_text,
+            model_used=model,
+            tokens_used=input_tokens + output_tokens,
+            timestamp=datetime.now(),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            stop_reason=stop_reason or "end_turn",
+            tool_calls=tool_calls if tool_calls else None,
+        )
+        yield StreamEvent(
+            type=StreamEventType.MESSAGE_COMPLETE,
+            response=final_response,
+        )
 
     def get_model_info(self) -> ModelInfo:
         """
