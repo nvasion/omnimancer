@@ -224,6 +224,12 @@ class ConfigManager:
         config.providers[provider_name] = provider_config
         self.save_config()
 
+        # Cached provider instances ignore api_key/timeout edits (they are
+        # not all part of the cache key), so a config write must invalidate.
+        from .provider_initializer import ProviderInitializer
+
+        ProviderInitializer.clear_caches()
+
     def set_default_provider(self, provider_name: str) -> None:
         """
         Set the default provider.

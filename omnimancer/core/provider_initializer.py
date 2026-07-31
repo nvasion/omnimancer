@@ -129,21 +129,27 @@ class ProviderInitializer:
         provider_name: str,
         config: ProviderConfig,
         config_manager: Optional["ConfigManager"] = None,
+        provider_type: Optional[str] = None,
     ) -> BaseProvider:
         """
         Get or create cached provider instance.
 
         Args:
-            provider_name: Name of the provider
+            provider_name: Config-entry name (may be an alias like "gateway")
             config: Provider configuration
             config_manager: Optional config manager for API key decryption
+            provider_type: Registered provider type for class lookup; defaults
+                to provider_name. API keys and caching stay keyed on
+                provider_name so each alias keeps its own identity.
 
         Returns:
             Provider instance
         """
         if not cls._cache_enabled:
             # If caching is disabled, create new instance every time
-            return cls._create_provider_instance(provider_name, config, config_manager)
+            return cls._create_provider_instance(
+                provider_name, config, config_manager, provider_type
+            )
 
         # Generate cache key based on provider name and config
         cache_key = cls._generate_cache_key(provider_name, config)
@@ -156,7 +162,7 @@ class ProviderInitializer:
 
             # Create new instance
             instance = cls._create_provider_instance(
-                provider_name, config, config_manager
+                provider_name, config, config_manager, provider_type
             )
 
             # Cache instance
@@ -171,20 +177,27 @@ class ProviderInitializer:
         provider_name: str,
         config: ProviderConfig,
         config_manager: Optional["ConfigManager"] = None,
+        provider_type: Optional[str] = None,
     ) -> BaseProvider:
         """
         Create a new provider instance.
 
         Args:
-            provider_name: Name of the provider
+            provider_name: Config-entry name (may be an alias)
             config: Provider configuration
             config_manager: Optional config manager for API key decryption
+            provider_type: Registered type for class lookup (defaults to
+                provider_name)
 
         Returns:
             Provider instance
         """
+        # Class lookup follows the provider *type*; everything keyed on
+        # identity (API-key decryption, env overrides) stays on the name.
+        type_key = provider_type or provider_name
+
         # Get provider class
-        provider_class = cls.get_provider_class(provider_name)
+        provider_class = cls.get_provider_class(type_key)
 
         # Get decrypted API key
         api_key = config.api_key
@@ -210,7 +223,7 @@ class ProviderInitializer:
 
         # For Claude, prefer subscription OAuth token when available
         auth_type_override = None
-        if provider_name == "claude":
+        if type_key == "claude":
             from .env_loader import load_claude_subscription_token
 
             sub_token = load_claude_subscription_token()
@@ -252,6 +265,10 @@ class ProviderInitializer:
             "project_id": getattr(config, "project_id", None),
             "azure_endpoint": getattr(config, "azure_endpoint", None),
             "azure_deployment": getattr(config, "azure_deployment", None),
+            # Aliases: same type/model/base_url must still be distinct per
+            # entry, and a timeout edit must not serve a stale instance.
+            "provider_type": getattr(config, "provider_type", None),
+            "timeout": getattr(config, "timeout", None),
         }
 
         # Filter out None values
