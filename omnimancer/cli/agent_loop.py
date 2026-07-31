@@ -10,13 +10,12 @@ import ipaddress
 import logging
 import re
 import shlex
-import subprocess
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from urllib.parse import urlparse, urlunparse
 
-from ..core.agent.types import Operation, OperationType
+from ..core.agent.types import Operation, OperationResult, OperationType
 
 # ---------------------------------------------------------------------------
 # Web request constants and helpers
@@ -238,6 +237,7 @@ class AgentLoopMixin:
         until complete.
         """
         current_response = initial_response
+        self._turn_final_response = initial_response
 
         while True:
             self._show_assistant_message(
@@ -306,6 +306,8 @@ class AgentLoopMixin:
                     "Workflow continuation failed:" f" {next_response.error}"
                 )
                 break
+
+            self._turn_final_response = next_response
 
             done_indicators = [
                 "task is complete",
@@ -446,6 +448,44 @@ class AgentLoopMixin:
                 best_match = str(item)
 
         return best_match
+
+    async def _execute_marker_command(
+        self,
+        command: str,
+        args: list[str],
+        description: str,
+    ) -> OperationResult:
+        """Execute a marker command through the shared permission gate.
+
+        Args:
+            command: Executable name.
+            args: Command arguments without shell interpolation.
+            description: Human-readable operation description.
+
+        Returns:
+            The gated command result, or a failure if no agent engine exists.
+        """
+        agent_engine = getattr(self.engine, "agent_engine", None)
+        if agent_engine is None:
+            return OperationResult(
+                success=False,
+                error="Agent engine not available - command execution disabled",
+            )
+        operation = Operation(
+            type=OperationType.COMMAND_EXECUTE,
+            description=description,
+            data={"command": command, "args": args},
+            requires_approval=False,
+        )
+        result = await agent_engine.execute_with_approval(operation)
+        return cast(OperationResult, result)
+
+    @staticmethod
+    def _marker_command_output(result: OperationResult) -> str:
+        """Extract displayable stdout from an operation result."""
+        if isinstance(result.data, dict):
+            return str(result.data.get("stdout", ""))
+        return str(result.data or "")
 
     async def _parse_and_execute_operations(self, response_content: str) -> str:
         """Parse model response for operation markers and execute them."""
@@ -608,23 +648,28 @@ class AgentLoopMixin:
                 pattern = match.group(1).strip()
 
                 try:
-                    result = subprocess.run(
-                        f"find . -name '{pattern}' -type f 2>/dev/null | head -20",
-                        shell=True,
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
+                    result = await self._execute_marker_command(
+                        "find",
+                        [".", "-name", pattern, "-type", "f"],
+                        f"Find files matching: {pattern}",
                     )
-                    files = result.stdout.strip()
-                    if files:
+                    if not result.success:
                         updated_response = updated_response.replace(
                             match.group(0),
-                            f"🔍 Found files matching '{pattern}':\n{files}",
+                            f"❌ Find failed: {result.error}",
                         )
                     else:
+                        files = "\n".join(
+                            self._marker_command_output(result).splitlines()[:20]
+                        ).strip()
+                        if files:
+                            replacement = (
+                                f"🔍 Found files matching '{pattern}':\n{files}"
+                            )
+                        else:
+                            replacement = f"🔍 No files found matching '{pattern}'"
                         updated_response = updated_response.replace(
-                            match.group(0),
-                            f"🔍 No files found matching '{pattern}'",
+                            match.group(0), replacement
                         )
                 except Exception as e:
                     updated_response = updated_response.replace(
@@ -638,23 +683,26 @@ class AgentLoopMixin:
                 search_text = match.group(1).strip()
 
                 try:
-                    result = subprocess.run(
-                        f"grep -r -n '{search_text}' . 2>/dev/null | head -20",
-                        shell=True,
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
+                    result = await self._execute_marker_command(
+                        "grep",
+                        ["-r", "-n", search_text, "."],
+                        f"Search files for: {search_text}",
                     )
-                    matches = result.stdout.strip()
-                    if matches:
+                    if not result.success:
                         updated_response = updated_response.replace(
                             match.group(0),
-                            f"🔍 Found '{search_text}' in:\n{matches}",
+                            f"❌ Search failed: {result.error}",
                         )
                     else:
+                        matches = "\n".join(
+                            self._marker_command_output(result).splitlines()[:20]
+                        ).strip()
+                        if matches:
+                            replacement = f"🔍 Found '{search_text}' in:\n{matches}"
+                        else:
+                            replacement = f"🔍 No matches found for '{search_text}'"
                         updated_response = updated_response.replace(
-                            match.group(0),
-                            f"🔍 No matches found for '{search_text}'",
+                            match.group(0), replacement
                         )
                 except Exception as e:
                     updated_response = updated_response.replace(
@@ -707,22 +755,19 @@ class AgentLoopMixin:
 
                 if cmd_base in safe_commands:
                     try:
-                        result = subprocess.run(
-                            command,
-                            shell=True,
-                            capture_output=True,
-                            text=True,
-                            timeout=10,
-                            executable="/bin/bash",
+                        parts = shlex.split(command)
+                        result = await self._execute_marker_command(
+                            parts[0],
+                            parts[1:],
+                            f"Execute safe command: {command[:50]}",
                         )
-                        output = (
-                            result.stdout.strip()
-                            if result.returncode == 0
-                            else f"Error: {result.stderr}"
-                        )
+                        if result.success:
+                            output = self._marker_command_output(result).strip()
+                            replacement = f"✅ `{command}`\n{output}"
+                        else:
+                            replacement = f"❌ Failed: {result.error}"
                         updated_response = updated_response.replace(
-                            match.group(0),
-                            f"✅ `{command}`\n{output}",
+                            match.group(0), replacement
                         )
                     except Exception as e:
                         updated_response = updated_response.replace(

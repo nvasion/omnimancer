@@ -412,6 +412,9 @@ Model available: {'Yes' if model_info else 'No'}"""
         self.display_manager.show_message(message, MessageType.WARNING)
 
     def _show_token_status(self, response: Any) -> None:
+        notifier = getattr(self, "turn_notifier", None)
+        if notifier is not None:
+            notifier.record_assistant(getattr(response, "content", None), response)
         usage = getattr(self, "usage", None)
         if usage is not None:
             usage.add(response)
