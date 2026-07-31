@@ -1,6 +1,7 @@
 """OmnimancerCompleter — one completer for slash commands, their arguments
 (including live provider/model names), and @-file mentions."""
 
+import shutil
 import subprocess
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -98,6 +99,7 @@ class TestFileMentions:
         results = _complete(completer, "please read @ma")
         assert any("main.py" in r for r in results)
 
+    @pytest.mark.skipif(shutil.which("git") is None, reason="requires the git binary")
     def test_gitignored_files_excluded_in_repo(self, completer, project):
         subprocess.run(
             ["git", "init", "-q"], cwd=project, check=True, capture_output=True
