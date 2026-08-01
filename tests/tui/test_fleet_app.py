@@ -7,6 +7,8 @@ detail modal.
 """
 
 import json
+import os
+import time
 
 import pytest
 
@@ -84,6 +86,54 @@ def _log_text(app, selector: str) -> str:
 async def _settle(pilot, seconds: float = 0.4) -> None:
     await pilot.pause(seconds)
     await pilot.pause()
+
+
+def _overflow_jobs(tmp_path):
+    """Seed 1 WORKING + 14 COMPLETED codex jobs with mtimes pinned 2h old.
+
+    Fifteen rows overflow the 40%-height agents table at the Pilot
+    default 80x24 size, and the stale mtimes keep the age column stable
+    so the skip-rebuild guard is deterministic between content changes.
+    """
+    jobs = tmp_path / "jobs"
+    events = tmp_path / "events"
+    project = tmp_path / "proj"
+    for directory in (jobs, events, project):
+        directory.mkdir()
+    old = time.time() - 7200
+    working = jobs / "00working.json"
+    working.write_text(
+        json.dumps(
+            {
+                "id": "00working",
+                "backend": "codex",
+                "status": "running",
+                "turnState": "working",
+            }
+        )
+    )
+    os.utime(working, (old, old))
+    for n in range(14):
+        path = jobs / f"c{n:07d}.json"
+        path.write_text(
+            json.dumps({"id": f"c{n:07d}", "backend": "codex", "status": "completed"})
+        )
+        os.utime(path, (old, old))
+    return jobs, events, project
+
+
+async def _wait_for(pilot, condition, timeout_s: float = 5.0) -> None:
+    """Settle until condition() is truthy or the deadline passes.
+
+    Fixed sleeps starve under CI load; polling keeps the stability tests
+    honest without slowing the happy path. The caller asserts afterwards,
+    so a timeout still fails with the caller's own message.
+    """
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        if condition():
+            return
+        await _settle(pilot, 0.1)
 
 
 class TestFleetAppData:
@@ -1053,3 +1103,273 @@ class TestJobSessionDedup:
             # Main row must NOT be stale.
             assert states["gggg9999"] != "stale"
             assert states["gggg9999"] == "working"
+
+
+class TestCursorScrollStability:
+    """The 1s rescan must never move the operator's cursor or viewport."""
+
+    async def test_scroll_and_cursor_survive_rebuild(self, tmp_path):
+        jobs, events, project = _overflow_jobs(tmp_path)
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 15
+            table.move_cursor(row=table.row_count - 1)
+            await _settle(pilot)
+            assert app._cursor_row_key(table) == "c0000013"
+            scroll_before = table.scroll_y
+            assert scroll_before > 0
+
+            # Idle ticks: the skip-guard path must leave everything alone.
+            await _settle(pilot, 0.8)
+            assert app._cursor_row_key(table) == "c0000013"
+            assert table.scroll_y == scroll_before
+
+            # Content change: the full-rebuild path must restore both.
+            state_before = app._last_render_state
+            (jobs / "00working.json").write_text(
+                json.dumps(
+                    {
+                        "id": "00working",
+                        "backend": "codex",
+                        "status": "running",
+                        "turnState": "working",
+                        "turnsCompleted": 5,
+                    }
+                )
+            )
+            await _wait_for(pilot, lambda: app._last_render_state is not state_before)
+            assert app._last_render_state is not state_before
+            assert app._cursor_row_key(table) == "c0000013"
+            assert table.scroll_y == scroll_before
+
+    async def test_skip_rebuild_leaves_table_untouched(self, tmp_path):
+        jobs, events, project = _overflow_jobs(tmp_path)
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 15
+
+            calls = []
+            original_clear = table.clear
+
+            def counting_clear(*args, **kwargs):
+                calls.append(1)
+                return original_clear(*args, **kwargs)
+
+            table.clear = counting_clear  # type: ignore[method-assign]
+
+            # Idle fleet: stable content must skip the rebuild entirely.
+            await _settle(pilot, 0.8)
+            assert not calls
+
+            # A real content change still rebuilds.
+            (jobs / "00working.json").write_text(
+                json.dumps(
+                    {
+                        "id": "00working",
+                        "backend": "codex",
+                        "status": "running",
+                        "turnState": "working",
+                        "turnsCompleted": 9,
+                    }
+                )
+            )
+            await _wait_for(pilot, lambda: bool(calls))
+            assert calls
+            assert "all (15/15)" in str(table.border_title)
+
+    async def test_vanished_row_lands_on_neighbor_with_scroll(self, tmp_path):
+        jobs, events, project = _overflow_jobs(tmp_path)
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            table.move_cursor(row=table.row_count - 1)
+            await _settle(pilot)
+            scroll_before = table.scroll_y
+            assert scroll_before > 0
+
+            (jobs / "c0000013.json").unlink()
+            await _wait_for(pilot, lambda: table.row_count == 14)
+            assert table.row_count == 14
+            # Nearest surviving index, never a hard reset to the top.
+            assert table.cursor_coordinate.row == 13
+            assert app._cursor_row_key(table) == "c0000012"
+            assert table.scroll_y > 0
+            assert table.scroll_y >= scroll_before - 1
+
+            # The row coming back must not steal the cursor either.
+            (jobs / "c0000013.json").write_text(
+                json.dumps(
+                    {"id": "c0000013", "backend": "codex", "status": "completed"}
+                )
+            )
+            await _wait_for(pilot, lambda: table.row_count == 15)
+            assert table.row_count == 15
+            assert app._cursor_row_key(table) == "c0000012"
+            assert table.scroll_y > 0
+
+
+class TestSessionDetail:
+    """Enter on session/subagent rows opens the session detail modal."""
+
+    async def test_enter_on_session_row_opens_session_detail(self, fleet_dirs):
+        app = _app(fleet_dirs)
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            from omnimancer.tui.fleet.app import SessionDetailScreen
+
+            table = app.query_one("#agents", DataTable)
+            table.move_cursor(row=table.get_row_index("session-11112222-3333"))
+            await pilot.press("enter")
+            await _settle(pilot)
+            assert isinstance(app.screen, SessionDetailScreen)
+            assert app.screen.session_id == "11112222-3333"
+            assert app.screen.agent_id == "main"
+            assert any(
+                event.get("event") == "tool_start"
+                and (event.get("data") or {}).get("tool") == "Bash"
+                for event in app.screen.events
+            )
+            await pilot.press("escape")
+            await _settle(pilot)
+            assert not isinstance(app.screen, SessionDetailScreen)
+
+    async def test_enter_on_session_row_canonical_file(self, tmp_path):
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        (events / "omn-11112222-3333.jsonl").write_text(
+            json.dumps(EVENT_SESSION_START) + "\n" + json.dumps(EVENT_TOOL_START) + "\n"
+        )
+        decoy = dict(EVENT_SESSION_START)
+        decoy["session_id"] = "99998888-7777"
+        (events / "omn-99998888-7777.jsonl").write_text(json.dumps(decoy) + "\n")
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            from omnimancer.tui.fleet.app import SessionDetailScreen
+
+            table = app.query_one("#agents", DataTable)
+            table.move_cursor(row=table.get_row_index("session-11112222-3333"))
+            await pilot.press("enter")
+            await _settle(pilot)
+            assert isinstance(app.screen, SessionDetailScreen)
+            assert app.screen.session_id == "11112222-3333"
+            assert app.screen.events
+            assert all(
+                event.get("session_id") == "11112222-3333"
+                for event in app.screen.events
+            )
+            await pilot.press("escape")
+            await _settle(pilot)
+
+    async def test_enter_on_subagent_row_filters_events(self, tmp_path):
+        from datetime import datetime, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        main_start = {
+            "v": 1,
+            "ts": now_ts,
+            "event": "session_start",
+            "session_id": "eeee5555-6666",
+            "agent_id": "main",
+            "mode": "interactive",
+            "cwd": "/tmp/proj",
+            "data": {"provider": "gateway", "model": "qwen3-coder-30b"},
+        }
+        sub_start = {
+            "v": 1,
+            "ts": now_ts,
+            "event": "session_start",
+            "session_id": "eeee5555-6666",
+            "agent_id": "subagent-researcher-ab12cd34",
+            "parent_id": "main",
+            "mode": "interactive",
+            "cwd": "/tmp/proj",
+            "data": {
+                "provider": "gateway",
+                "model": "qwen3-4b",
+                "subagent": "researcher",
+            },
+        }
+        sub_tool = {
+            "v": 1,
+            "ts": now_ts,
+            "event": "tool_start",
+            "session_id": "eeee5555-6666",
+            "agent_id": "subagent-researcher-ab12cd34",
+            "mode": "interactive",
+            "cwd": "/tmp/proj",
+            "data": {"tool": "Read", "target": "notes.md"},
+        }
+        (events / "sess.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in (main_start, sub_start, sub_tool)) + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            from omnimancer.tui.fleet.app import SessionDetailScreen
+
+            table = app.query_one("#agents", DataTable)
+            row_key = "session-eeee5555-6666:subagent-researcher-ab12cd34"
+            table.move_cursor(row=table.get_row_index(row_key))
+            await pilot.press("enter")
+            await _settle(pilot)
+            assert isinstance(app.screen, SessionDetailScreen)
+            assert app.screen.agent_id == "subagent-researcher-ab12cd34"
+            assert app.screen.agent_filtered is True
+            assert app.screen.events
+            assert all(
+                event.get("agent_id") == "subagent-researcher-ab12cd34"
+                for event in app.screen.events
+            )
+            await pilot.press("escape")
+            await _settle(pilot)
+
+    async def test_job_row_enter_still_opens_job_detail(self, fleet_dirs):
+        app = _app(fleet_dirs)
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            table.move_cursor(row=table.get_row_index("aabbccdd"))
+            await pilot.press("enter")
+            await _settle(pilot)
+            assert isinstance(app.screen, JobDetailScreen)
+            assert app.screen.job_id == "aabbccdd"
+            await pilot.press("escape")
+            await _settle(pilot)

@@ -26,9 +26,11 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, VerticalScroll
+from textual.css.query import NoMatches
 from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, RichLog, Static
+from textual.widgets.data_table import CellDoesNotExist, RowDoesNotExist
 
 from omnimancer.tui.fleet.models import (
     DisplayState,
@@ -42,7 +44,7 @@ from omnimancer.tui.fleet.sources import (
     JobsSnapshot,
     JobsSource,
 )
-from omnimancer.tui.fleet.widgets import comms_line, feed_line, job_row
+from omnimancer.tui.fleet.widgets import comms_line, feed_line, format_age, job_row
 
 AGENT_COLUMNS = (
     "id",
@@ -57,6 +59,10 @@ AGENT_COLUMNS = (
 )
 
 FEED_MAX_LINES = 2000
+
+# Session detail modal: bounded tail so a huge JSONL can't stall the UI.
+SESSION_TAIL_BYTES = 64 * 1024
+SESSION_TAIL_EVENTS = 50
 # Events routed to the comms panel; everything else is activity.
 COMMS_EVENTS = {"turn_end", "session_start", "session_end"}
 
@@ -172,6 +178,78 @@ class JobDetailScreen(ModalScreen[None]):
                 yield Static(Text.from_ansi(self.log_tail))
 
 
+class SessionDetailScreen(ModalScreen[None]):
+    """Modal with a session's identity and a tail of its recent events."""
+
+    BINDINGS = [Binding("escape", "dismiss", "Close")]
+
+    def __init__(
+        self,
+        session_id: str,
+        agent_id: str,
+        info: Optional[SessionInfo],
+        events: List[dict],
+        agent_filtered: bool = True,
+    ) -> None:
+        super().__init__()
+        self.session_id = session_id
+        self.agent_id = agent_id
+        self.info = info
+        self.events = events
+        self.agent_filtered = agent_filtered
+
+    def _started_label(self) -> str:
+        """Timestamp of the first session_start in the tail, if any."""
+        for event in self.events:
+            if event.get("event") == "session_start":
+                ts = event.get("ts")
+                if isinstance(ts, str) and ts:
+                    return ts
+        return "-"
+
+    def _identity_text(self) -> Text:
+        """Identity block; Text objects bypass markup parsing (session
+        fields and event payloads can contain brackets)."""
+        if self.info is None:
+            return Text("session not tracked (events replay pending)")
+        info = self.info
+        state = FleetApp._session_state(info, time.time())
+        state_label = state.value if state is not None else "gone"
+        if info.ended and info.exit_status is not None:
+            state_label += f" (exit {info.exit_status})"
+        lines = [
+            f"provider/model: {info.provider or '-'} / {info.model or '-'}",
+            f"cwd: {info.cwd or '-'}",
+            f"mode: {info.mode or '-'}",
+            f"state: {state_label}",
+            f"turns: {info.turns}",
+            f"started: {self._started_label()}",
+            f"last activity: {format_age(time.time() - info.last_seen)} ago",
+        ]
+        return Text("\n".join(lines))
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll(id="detail"):
+            title = f"Session {self.session_id[:8]}"
+            if self.agent_id != "main":
+                title += f" · {self.agent_id}"
+            yield Static(Text(title, style="bold"), id="detail-title")
+            yield Static(self._identity_text())
+            if not self.agent_filtered:
+                yield Static(
+                    Text(
+                        "no events tagged for this agent; "
+                        "showing parent session tail",
+                        style="italic dim",
+                    )
+                )
+            if self.events:
+                yield Static(Text(f"recent events ({len(self.events)})", style="bold"))
+                yield Static(Text("\n").join(feed_line(event) for event in self.events))
+            else:
+                yield Static(Text("no events found", style="dim"))
+
+
 class FleetApp(App[None]):
     """Full-screen dashboard over fleet agents, activity, and comms."""
 
@@ -251,6 +329,10 @@ class FleetApp(App[None]):
         self._once_seen = {"jobs": False, "feeds": False}
         self._once_finishing = False
         self._filter_index = 0
+        # Rendered-table fingerprint: (filter_index, total, rows). When the
+        # next rebuild computes an identical value the rebuild is skipped
+        # entirely, so clear() never churns scroll/cursor on idle ticks.
+        self._last_render_state: Optional[tuple] = None
 
     def compose(self) -> ComposeResult:
         """Build the static widget tree."""
@@ -350,8 +432,14 @@ class FleetApp(App[None]):
 
     def on_feeds_updated(self, message: FeedsUpdated) -> None:
         """Route new events/ledger entries into the feed panels."""
-        activity = self.query_one("#activity", RichLog)
-        comms = self.query_one("#comms", RichLog)
+        try:
+            activity = self.query_one("#activity", RichLog)
+            comms = self.query_one("#comms", RichLog)
+        except NoMatches:
+            # Thread workers can post one final batch while the DOM is
+            # being torn down (observed as a flaky NoMatches under
+            # pytest); dropping it is safe — feeds are append-only UI.
+            return
         for event in message.events:
             self._track_session(event)
             if event.get("event") in COMMS_EVENTS:
@@ -451,6 +539,24 @@ class FleetApp(App[None]):
             if parent_info is not None:
                 parent_info.last_seen = max(parent_info.last_seen, info.last_seen)
 
+    @staticmethod
+    def _session_state(session: SessionInfo, now: float) -> Optional[DisplayState]:
+        """Display state for a session row, or None past ended-retention."""
+        if session.ended:
+            if now - session.last_seen > ENDED_RETENTION_S:
+                return None
+            return (
+                DisplayState.FAILED
+                if session.exit_status not in (None, 0)
+                else DisplayState.COMPLETED
+            )
+        if session.last_event == "turn_end":
+            # Idle at its prompt: answered and waiting for a human.
+            return DisplayState.WAITING
+        if now - session.last_seen > 120.0:
+            return DisplayState.STALE
+        return DisplayState.WORKING
+
     def _collect_rows(self) -> list:
         """Build (key, state, cells) for every job and loose session."""
         now = time.time()
@@ -482,23 +588,9 @@ class FleetApp(App[None]):
                 # Guard against stray tool events from older omn versions.
                 if not (session.subagent or session.model):
                     continue
-                if session.ended:
-                    ended_age = now - session.last_seen
-                    if ended_age > ENDED_RETENTION_S:
-                        continue
-                    state = (
-                        DisplayState.FAILED
-                        if session.exit_status not in (None, 0)
-                        else DisplayState.COMPLETED
-                    )
-                else:
-                    age = now - session.last_seen
-                    if session.last_event == "turn_end":
-                        state = DisplayState.WAITING
-                    elif age > 120.0:
-                        state = DisplayState.STALE
-                    else:
-                        state = DisplayState.WORKING
+                session_state = self._session_state(session, now)
+                if session_state is None:
+                    continue
                 name_label = session.subagent or session.agent_id.removeprefix(
                     "subagent-"
                 )
@@ -512,7 +604,11 @@ class FleetApp(App[None]):
                 )
                 row_key = f"session-{session.session_id}:{session.agent_id}"
                 rows.append(
-                    (row_key, state, job_row(record, state, now - session.last_seen))
+                    (
+                        row_key,
+                        session_state,
+                        job_row(record, session_state, now - session.last_seen),
+                    )
                 )
                 continue
             # Main-agent rows — keep existing behaviour.
@@ -526,23 +622,9 @@ class FleetApp(App[None]):
                     for mtime in terminal_mtimes_by_cwd.get(session.cwd, ())
                 ):
                     continue
-                ended_age = now - session.last_seen
-                if ended_age > ENDED_RETENTION_S:
-                    continue
-                state = (
-                    DisplayState.FAILED
-                    if session.exit_status not in (None, 0)
-                    else DisplayState.COMPLETED
-                )
-            else:
-                age = now - session.last_seen
-                if session.last_event == "turn_end":
-                    # Idle at its prompt: answered and waiting for a human.
-                    state = DisplayState.WAITING
-                elif age > 120.0:
-                    state = DisplayState.STALE
-                else:
-                    state = DisplayState.WORKING
+            session_state = self._session_state(session, now)
+            if session_state is None:
+                continue
             if session.mode == "claude":
                 backend = "claude"
             elif session.mode:
@@ -559,27 +641,34 @@ class FleetApp(App[None]):
             )
             age = now - session.last_seen
             rows.append(
-                (f"session-{session.session_id}", state, job_row(record, state, age))
+                (
+                    f"session-{session.session_id}",
+                    session_state,
+                    job_row(record, session_state, age),
+                )
             )
         return rows
 
-    def _cursor_row_key(self, table: DataTable) -> Optional[str]:
-        """Row key under the cursor, or None."""
+    def _cursor_position(self, table: DataTable) -> tuple[Optional[str], int]:
+        """Row key and row index under the cursor ((None, 0) when empty)."""
         try:
             if table.row_count == 0 or table.cursor_row is None:
-                return None
+                return None, 0
             coordinate = table.cursor_coordinate
             cell_key = table.coordinate_to_cell_key(coordinate)
-            return cell_key.row_key.value
-        except Exception:
-            return None
+            return cell_key.row_key.value, coordinate.row
+        except CellDoesNotExist:
+            return None, 0
+
+    def _cursor_row_key(self, table: DataTable) -> Optional[str]:
+        """Row key under the cursor, or None."""
+        return self._cursor_position(table)[0]
 
     def _rebuild_table(self) -> None:
         """Recompute the agents table: filtered, operator-sorted, and with
-        the cursor kept on the same row across rescans (a 1s refresh must
-        never yank the operator back to the top)."""
+        the cursor AND scroll offset kept stable across rescans (a 1s
+        refresh must never yank the operator back to the top)."""
         table = self.query_one("#agents", DataTable)
-        cursor_key = self._cursor_row_key(table)
 
         rows = self._collect_rows()
         total = len(rows)
@@ -588,17 +677,52 @@ class FleetApp(App[None]):
             rows = [row for row in rows if row[1] in allowed]
         rows.sort(key=lambda row: (STATE_PRIORITY.get(row[1], 99), row[0]))
 
+        # Nothing visible changed (rich.Text has value equality): skip the
+        # rebuild entirely so clear() never resets scroll on idle ticks.
+        render_state = (self._filter_index, total, rows)
+        if render_state == self._last_render_state:
+            return
+        self._last_render_state = render_state
+
+        cursor_key, cursor_index = self._cursor_position(table)
+        saved_x, saved_y = table.scroll_x, table.scroll_y
+        saved_tx = table.scroll_target_x
+        saved_ty = table.scroll_target_y
+
         table.clear()
         for key, _state, cells in rows:
             table.add_row(*cells, key=key)
         table.border_title = f"agents — {filter_name} ({len(rows)}/{total})"
 
-        if cursor_key is not None:
+        if cursor_key is not None and table.row_count:
             try:
-                table.move_cursor(row=table.get_row_index(cursor_key))
-            except Exception:
-                # Row filtered out or gone; leave the cursor clamped.
-                pass
+                new_index = table.get_row_index(cursor_key)
+            except RowDoesNotExist:
+                # Row vanished or was filtered out: land on the nearest
+                # surviving index, never a hard reset to (0, 0).
+                new_index = min(cursor_index, table.row_count - 1)
+            table.move_cursor(row=new_index, scroll=False)
+
+        # clear() zeroed the scroll. Restore synchronously so the next
+        # painted frame sits at the operator's offset (the value clamps
+        # against the pre-rebuild virtual size, exact unless the table
+        # shrank), then re-assert after refresh: by then the table has
+        # recomputed virtual_size (correct clamp for the shrink case) and
+        # the callback runs after the cursor watcher's deferred
+        # scroll-into-view, preserving wheel-scrolled viewports whose
+        # cursor sits off-screen.
+        table.scroll_target_x = saved_tx
+        table.scroll_target_y = saved_ty
+        table.scroll_x = saved_x
+        table.scroll_y = saved_y
+        self.call_after_refresh(self._restore_table_scroll, table, saved_tx, saved_ty)
+
+    def _restore_table_scroll(self, table: DataTable, x: float, y: float) -> None:
+        """Deferred scroll re-assert after a rebuild (see _rebuild_table)."""
+        table.scroll_target_x = x
+        table.scroll_target_y = y
+        table.scroll_x = x
+        table.scroll_y = y
 
     def _job_age_s(self, job_id: str, now: float) -> Optional[float]:
         """Age of the newest on-disk activity for a job, if known."""
@@ -617,9 +741,21 @@ class FleetApp(App[None]):
     # Interactivity ----------------------------------------------------
 
     def on_data_table_row_selected(self, message: DataTable.RowSelected) -> None:
-        """Open the detail modal for a selected job row."""
+        """Open the detail modal for the selected row (job or session)."""
         row_key = message.row_key.value if message.row_key else None
-        if not row_key or row_key.startswith("session-"):
+        if not row_key:
+            return
+        if row_key.startswith("session-"):
+            ident = row_key[len("session-") :]
+            session_id, _, agent_part = ident.partition(":")
+            agent_id = agent_part or "main"
+            info = self._sessions.get(f"{session_id}:{agent_id}")
+            self.run_worker(
+                lambda: self._open_session_detail(session_id, agent_id, info),
+                thread=True,
+                exclusive=True,
+                group="detail",
+            )
             return
         raw = self._snapshot.jobs.get(row_key, {})
         self.run_worker(
@@ -639,3 +775,76 @@ class FleetApp(App[None]):
         except OSError:
             pass
         self.call_from_thread(self.push_screen, JobDetailScreen(job_id, raw, log_tail))
+
+    def _open_session_detail(
+        self, session_id: str, agent_id: str, info: Optional[SessionInfo]
+    ) -> None:
+        """Thread worker: read the event tail, then push the modal."""
+        events, agent_filtered = self._read_session_events(session_id, agent_id)
+        self.call_from_thread(
+            self.push_screen,
+            SessionDetailScreen(session_id, agent_id, info, events, agent_filtered),
+        )
+
+    def _read_session_events(
+        self, session_id: str, agent_id: str
+    ) -> tuple[List[dict], bool]:
+        """Bounded tail of a session's events from the JSONL store.
+
+        Prefers the canonical omn-<session_id>.jsonl file; falls back
+        to scanning every *.jsonl for the session id (hook-fed and
+        legacy files use other names). Reads at most
+        SESSION_TAIL_BYTES per file and returns the last
+        SESSION_TAIL_EVENTS events. The second element is False when
+        a subagent row had no agent-tagged events and the parent
+        session tail is shown instead.
+        """
+        if not self.events_dir.exists():
+            return [], True
+        canonical = self.events_dir / f"omn-{session_id}.jsonl"
+        if canonical.exists():
+            paths = [canonical]
+        else:
+            paths = sorted(self.events_dir.glob("*.jsonl"))
+        events: List[dict] = []
+        contributing = 0
+        for path in paths:
+            found_here = False
+            try:
+                size = path.stat().st_size
+                with path.open("rb") as handle:
+                    handle.seek(max(0, size - SESSION_TAIL_BYTES))
+                    chunk = handle.read(SESSION_TAIL_BYTES)
+            except OSError:
+                continue
+            lines = chunk.split(b"\n")
+            if size > SESSION_TAIL_BYTES and lines:
+                # The first chunk line is almost certainly partial.
+                lines = lines[1:]
+            for line in lines:
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line.decode("utf-8", errors="replace"))
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(event, dict):
+                    continue
+                if str(event.get("session_id") or "") != session_id:
+                    continue
+                events.append(event)
+                found_here = True
+            if found_here:
+                contributing += 1
+        if contributing > 1:
+            events.sort(key=self._event_epoch)
+        if agent_id != "main":
+            filtered = [
+                event
+                for event in events
+                if str(event.get("agent_id") or "main") == agent_id
+            ]
+            if filtered:
+                return filtered[-SESSION_TAIL_EVENTS:], True
+            return events[-SESSION_TAIL_EVENTS:], False
+        return events[-SESSION_TAIL_EVENTS:], True
