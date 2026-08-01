@@ -244,6 +244,75 @@ class TestFleetAppData:
             assert isinstance(app.screen, JobDetailScreen)
             assert app.screen.job_id == "aabbccdd"
 
+    async def test_sort_filter_and_cursor_stability(self, tmp_path):
+        """Operator console behaviors: active work sorts to the top, `f`
+        cycles htop-style state filters, and the 1s rescan never yanks the
+        cursor back to the top (field-reported)."""
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        (jobs / "11111111.json").write_text(
+            json.dumps({"id": "11111111", "backend": "codex", "status": "completed"})
+        )
+        (jobs / "22222222.json").write_text(
+            json.dumps(
+                {
+                    "id": "22222222",
+                    "backend": "codex",
+                    "status": "running",
+                    "turnState": "working",
+                }
+            )
+        )
+        (jobs / "aabbccdd.json").write_text(
+            json.dumps(
+                {
+                    "id": "aabbccdd",
+                    "backend": "codex",
+                    "status": "running",
+                    "turnState": "idle",
+                }
+            )
+        )
+        (jobs / "aabbccdd.turn-complete").write_text("{}")
+
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            order = [table.get_row_at(i)[0].plain for i in range(table.row_count)]
+            # working first, waiting next, completed last
+            assert order == ["22222222", "aabbccdd", "11111111"]
+
+            # Cursor stays put across rescans (several ticks pass here).
+            table.move_cursor(row=2)
+            key_before = app._cursor_row_key(table)
+            assert key_before == "11111111"
+            await _settle(pilot)
+            assert app._cursor_row_key(table) == key_before
+
+            # f cycles: all -> active -> attention -> done -> all
+            await pilot.press("f")
+            await pilot.pause()
+            assert table.row_count == 1  # active: the working job
+            assert "active" in str(table.border_title)
+            await pilot.press("f")
+            await pilot.pause()
+            assert table.row_count == 1  # attention: the waiting job
+            await pilot.press("f")
+            await pilot.pause()
+            assert table.row_count == 1  # done: the completed job
+            await pilot.press("f")
+            await pilot.pause()
+            assert table.row_count == 3
+            assert "all" in str(table.border_title)
+
     async def test_detail_modal_survives_ansi_log_tail(self, fleet_dirs):
         """Field-reported crash: tmux .log files carry raw ANSI escapes and
         bracket junk that exploded Textual's markup parser in the modal."""

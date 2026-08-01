@@ -59,6 +59,38 @@ FEED_MAX_LINES = 2000
 # Events routed to the comms panel; everything else is activity.
 COMMS_EVENTS = {"turn_end", "session_start", "session_end"}
 
+# Operator-first row order: running work at the top, things needing a human
+# next, terminal states last. Ties break on the row key for stability.
+STATE_PRIORITY: Dict[DisplayState, int] = {
+    DisplayState.WORKING: 0,
+    DisplayState.STARTING: 1,
+    DisplayState.PENDING: 2,
+    DisplayState.WAITING: 3,
+    DisplayState.BLOCKED: 4,
+    DisplayState.STALE: 5,
+    DisplayState.FAILED: 6,
+    DisplayState.CANCELLED: 7,
+    DisplayState.COMPLETED: 8,
+}
+
+# htop-style filter groups, cycled with the `f` binding. "attention" is the
+# human-on-the-loop view: answered/blocked/stalled agents that need eyes.
+FILTERS: tuple = (
+    ("all", None),
+    (
+        "active",
+        {DisplayState.WORKING, DisplayState.STARTING, DisplayState.PENDING},
+    ),
+    (
+        "attention",
+        {DisplayState.WAITING, DisplayState.BLOCKED, DisplayState.STALE},
+    ),
+    (
+        "done",
+        {DisplayState.COMPLETED, DisplayState.FAILED, DisplayState.CANCELLED},
+    ),
+)
+
 
 @dataclass
 class SessionInfo:
@@ -149,6 +181,7 @@ class FleetApp(App[None]):
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("p", "toggle_pause", "Pause feeds"),
+        Binding("f", "cycle_filter", "Filter"),
     ]
 
     def __init__(
@@ -190,6 +223,7 @@ class FleetApp(App[None]):
         # from the snapshot instead of correctly aged.
         self._once_seen = {"jobs": False, "feeds": False}
         self._once_finishing = False
+        self._filter_index = 0
 
     def compose(self) -> ComposeResult:
         """Build the static widget tree."""
@@ -218,6 +252,11 @@ class FleetApp(App[None]):
             # source escape hatch, and it reports incompleteness instead
             # of silently shipping a partial snapshot.
             self.set_timer(self.once_fallback_s, self._once_deadline)
+
+    def action_cycle_filter(self) -> None:
+        """Cycle the agents-table filter: all -> active -> attention -> done."""
+        self._filter_index = (self._filter_index + 1) % len(FILTERS)
+        self._rebuild_table()
 
     def action_toggle_pause(self) -> None:
         """Toggle feed auto-scroll / polling."""
@@ -344,24 +383,22 @@ class FleetApp(App[None]):
         elif name == "session_end":
             info.ended = True
 
-    def _rebuild_table(self) -> None:
-        """Recompute every row: codex/omn jobs first, loose sessions after."""
-        table = self.query_one("#agents", DataTable)
-        table.clear()
+    def _collect_rows(self) -> list:
+        """Build (key, state, cells) for every job and loose session."""
         now = time.time()
         snapshot = self._snapshot
+        rows = []
         job_cwds = set()
         for job_id, raw in sorted(snapshot.jobs.items()):
             job = parse_job(raw)
             job_cwds.add(job.cwd)
+            age = self._job_age_s(job_id, now)
             state = derive_state(
                 job,
                 has_turn_complete=job_id in snapshot.turn_complete_ids,
-                activity_age_s=self._job_age_s(job_id, now),
+                activity_age_s=age,
             )
-            table.add_row(
-                *job_row(job, state, self._job_age_s(job_id, now)), key=job_id
-            )
+            rows.append((job_id, state, job_row(job, state, age)))
         for session in sorted(self._sessions.values(), key=lambda s: s.session_id):
             if session.ended or session.cwd in job_cwds:
                 continue
@@ -374,9 +411,47 @@ class FleetApp(App[None]):
             )
             age = now - session.last_seen
             state = DisplayState.STALE if age > 120.0 else DisplayState.WORKING
-            table.add_row(
-                *job_row(record, state, age), key=f"session-{session.session_id}"
+            rows.append(
+                (f"session-{session.session_id}", state, job_row(record, state, age))
             )
+        return rows
+
+    def _cursor_row_key(self, table: DataTable) -> Optional[str]:
+        """Row key under the cursor, or None."""
+        try:
+            if table.row_count == 0 or table.cursor_row is None:
+                return None
+            coordinate = table.cursor_coordinate
+            cell_key = table.coordinate_to_cell_key(coordinate)
+            return cell_key.row_key.value
+        except Exception:
+            return None
+
+    def _rebuild_table(self) -> None:
+        """Recompute the agents table: filtered, operator-sorted, and with
+        the cursor kept on the same row across rescans (a 1s refresh must
+        never yank the operator back to the top)."""
+        table = self.query_one("#agents", DataTable)
+        cursor_key = self._cursor_row_key(table)
+
+        rows = self._collect_rows()
+        total = len(rows)
+        filter_name, allowed = FILTERS[self._filter_index]
+        if allowed is not None:
+            rows = [row for row in rows if row[1] in allowed]
+        rows.sort(key=lambda row: (STATE_PRIORITY.get(row[1], 99), row[0]))
+
+        table.clear()
+        for key, _state, cells in rows:
+            table.add_row(*cells, key=key)
+        table.border_title = f"agents — {filter_name} ({len(rows)}/{total})"
+
+        if cursor_key is not None:
+            try:
+                table.move_cursor(row=table.get_row_index(cursor_key))
+            except Exception:
+                # Row filtered out or gone; leave the cursor clamped.
+                pass
 
     def _job_age_s(self, job_id: str, now: float) -> Optional[float]:
         """Age of the newest on-disk activity for a job, if known."""
