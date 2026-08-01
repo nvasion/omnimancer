@@ -102,6 +102,59 @@ class TestRetentionScope:
         assert bare_uuid.exists()
 
 
+class TestBudgetInputBoundaries:
+    def test_negative_budget_clamped_to_zero(self, tmp_path):
+        """A negative budget behaves like zero: only age-eligible files go,
+        young files always survive (never delete-everything)."""
+        from omnimancer.events.jsonl_writer import enforce_size_budget
+
+        old_epoch = time.time() - 2 * 24 * 3600
+        old = tmp_path / "omn-aaaabbbb-cccc-dddd-eeee-ffff00001111.jsonl"
+        young = tmp_path / "omn-aaaabbbb-cccc-dddd-eeee-ffff00002222.jsonl"
+        old.write_text("x" * 100 + "\n")
+        young.write_text("y" * 100 + "\n")
+        os.utime(old, (old_epoch, old_epoch))
+        freed = enforce_size_budget(tmp_path, -1, name_re=emitter.SESSION_FILE_RE)
+        assert freed == old.stat().st_size if old.exists() else freed > 0
+        assert not old.exists()
+        assert young.exists()
+
+    def test_config_rejects_negative_limits(self):
+        with pytest.raises(Exception):
+            EventsConfig(max_total_gb=-1)
+        with pytest.raises(Exception):
+            EventsConfig(retention_days=-1)
+
+    def test_failed_unlink_does_not_count_as_freed(self, tmp_path, monkeypatch):
+        """Accounting uses live sizes: a failed unlink must not shrink the
+        running total or the freed count."""
+        import pathlib
+
+        from omnimancer.events.jsonl_writer import enforce_size_budget
+
+        old_epoch = time.time() - 2 * 24 * 3600
+        a = tmp_path / "omn-aaaabbbb-cccc-dddd-eeee-ffff00001111.jsonl"
+        b = tmp_path / "omn-aaaabbbb-cccc-dddd-eeee-ffff00002222.jsonl"
+        a.write_text("a" * 100)
+        b.write_text("b" * 100)
+        os.utime(a, (old_epoch - 100, old_epoch - 100))
+        os.utime(b, (old_epoch, old_epoch))
+
+        real_unlink = pathlib.Path.unlink
+
+        def failing_unlink(self, *args, **kwargs):
+            if self.name == a.name:
+                raise OSError("simulated EPERM")
+            return real_unlink(self, *args, **kwargs)
+
+        monkeypatch.setattr(pathlib.Path, "unlink", failing_unlink)
+        freed = enforce_size_budget(tmp_path, 0, name_re=emitter.SESSION_FILE_RE)
+        # a's unlink failed: not freed, still on disk; b was freed.
+        assert a.exists()
+        assert not b.exists()
+        assert freed == 100
+
+
 class TestFilePermissions:
     async def test_event_file_and_dir_are_owner_only(self, tmp_path, event_file):
         await emitter.emit_event(EventType.TURN_START, {"turn": 1})

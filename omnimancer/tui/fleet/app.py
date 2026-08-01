@@ -406,6 +406,9 @@ class FleetApp(App[None]):
         if name == "session_start":
             info.model = str(data.get("model") or "")
             info.provider = str(data.get("provider") or "")
+            # A resumed session (claude --resume) re-uses its session id:
+            # a fresh start must always bring the row back.
+            info.ended = False
         elif name == "turn_end":
             info.turns += 1
         elif name == "session_end":

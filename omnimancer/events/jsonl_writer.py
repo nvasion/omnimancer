@@ -294,6 +294,10 @@ def enforce_size_budget(
     if not directory.exists():
         return 0
 
+    # Destructive-input guard: a negative budget must behave like zero
+    # (prune all age-eligible files), never like "delete everything".
+    max_total_bytes = max(0, max_total_bytes)
+
     pattern = re.compile(name_re) if name_re else None
     now = time.time()
 
@@ -319,20 +323,29 @@ def enforce_size_budget(
     candidates.sort(key=lambda t: t[2])
 
     freed = 0
-    deletable: list[tuple[pathlib.Path, int]] = []
-    for path, sz, mtime in candidates:
-        if now - mtime >= min_age_s:
-            deletable.append((path, sz))
+    deletable: list[pathlib.Path] = [
+        path for path, _sz, mtime in candidates if now - mtime >= min_age_s
+    ]
 
-    for path, sz in deletable:
+    for path in deletable:
+        # Revalidate against the LIVE file, not the scan snapshot: a
+        # concurrent append can rejuvenate a candidate (skip it), and the
+        # accounting must use the size actually freed — a failed unlink
+        # or a vanished file must not shrink the running total.
+        try:
+            st = path.stat()
+        except OSError:
+            continue
+        if time.time() - st.st_mtime < min_age_s:
+            continue
         try:
             path.unlink()
-            freed += sz
-            total_size -= sz
-            if total_size <= max_total_bytes:
-                break
         except Exception:
             logger.debug(f"Error deleting file {path}")
             continue
+        freed += st.st_size
+        total_size -= st.st_size
+        if total_size <= max_total_bytes:
+            break
 
     return freed

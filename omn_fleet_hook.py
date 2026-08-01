@@ -32,7 +32,11 @@ PREVIEW_CHARS = 200
 MESSAGE_PREVIEW_CHARS = 500
 
 MAX_STDIN_BYTES = 1_000_000
-SESSION_ID_RE = re.compile(r"^[0-9a-fA-F-]{8,64}$")
+# Strict uuid shape: anything looser produces filenames that fall outside
+# SESSION_FILE_RE and would escape the retention/budget sweeps entirely.
+SESSION_ID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-" r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 TARGET_KEYS = ("command", "file_path", "path", "url", "pattern")
 
 # Claude hook_event_name -> omn.event.v1 event name.
@@ -89,7 +93,9 @@ def _build_data(payload: Dict[str, Any], event: str) -> Dict[str, Any]:
             "permission_mode": payload.get("permission_mode"),
         }
     if event == "turn_start":
-        prompt = payload.get("prompt_text")
+        # Live payloads carry "prompt"; "prompt_text" kept as a fallback
+        # for older documented shapes (live-verified 2026-08-01).
+        prompt = payload.get("prompt") or payload.get("prompt_text")
         return {
             "prompt_preview": (
                 _truncate(prompt, PREVIEW_CHARS) if isinstance(prompt, str) else None
@@ -109,9 +115,14 @@ def _build_data(payload: Dict[str, Any], event: str) -> Dict[str, Any]:
             "success": hook_event == "PostToolUse",
         }
         if hook_event == "PostToolUseFailure":
-            output = payload.get("tool_output")
-            if isinstance(output, str):
-                data["error"] = _truncate(output, MESSAGE_PREVIEW_CHARS)
+            # Live payloads carry "error" (+ "is_interrupt" for user
+            # cancellation); "tool_output" kept as a fallback for older
+            # documented shapes (live-verified 2026-08-01).
+            error = payload.get("error") or payload.get("tool_output")
+            if isinstance(error, str):
+                data["error"] = _truncate(error, MESSAGE_PREVIEW_CHARS)
+            if payload.get("is_interrupt"):
+                data["was_cancelled"] = True
         return data
     if event == "turn_end":
         message = payload.get("last_assistant_message")

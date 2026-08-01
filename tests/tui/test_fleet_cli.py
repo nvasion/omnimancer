@@ -44,6 +44,11 @@ class TestHooksSnippet:
         assert result.exit_code == 0
         assert "omn-fleet-hook" in result.output
 
+    def test_negative_budget_rejected(self):
+        result = CliRunner().invoke(fleet_main, ["--budget-gb", "-1"])
+        assert result.exit_code != 0
+        assert "not in the range" in result.output or "Invalid" in result.output
+
 
 class TestTextualGuard:
     def test_missing_textual_prints_install_hint(self, monkeypatch):

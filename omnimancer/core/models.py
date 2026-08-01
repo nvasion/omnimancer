@@ -1358,6 +1358,15 @@ class EventsConfig(BaseModel):
     # store); oldest sessions are pruned first, active files protected.
     max_total_gb: float = 50.0
 
+    @field_validator("max_file_mb", "retention_days", "max_total_gb")
+    @classmethod
+    def validate_non_negative(cls, v: Any) -> Any:
+        # A negative limit would turn the retention/budget sweeps into
+        # delete-everything; reject at the config boundary.
+        if v < 0:
+            raise ValueError("events limits must be non-negative")
+        return v
+
 
 class Config(BaseModel):
     """Main configuration model."""

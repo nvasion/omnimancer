@@ -54,7 +54,7 @@ class TestEventMapping:
     def test_full_session_lifecycle(self, tmp_path):
         events = [
             _payload("SessionStart", model="claude-fable-5", source="startup"),
-            _payload("UserPromptSubmit", prompt_text="fix the bug"),
+            _payload("UserPromptSubmit", prompt="fix the bug"),
             _payload(
                 "PreToolUse",
                 tool_name="Bash",
@@ -110,7 +110,8 @@ class TestEventMapping:
             _payload(
                 "PostToolUseFailure",
                 tool_name="Bash",
-                tool_output="x" * 900,
+                error="x" * 900,
+                is_interrupt=False,
                 tool_use_id="toolu_02",
             ),
             tmp_path,
@@ -134,6 +135,36 @@ class TestEventMapping:
         (line,) = _lines(tmp_path)
         assert line["agent_id"] == "subagent-Explore-abc123de"
         assert line["parent_id"] == "main"
+
+    def test_interrupt_marks_cancelled(self, tmp_path):
+        _run(
+            _payload(
+                "PostToolUseFailure",
+                tool_name="Bash",
+                error="interrupted by user",
+                is_interrupt=True,
+                tool_use_id="toolu_04",
+            ),
+            tmp_path,
+        )
+        (line,) = _lines(tmp_path)
+        assert line["data"]["was_cancelled"] is True
+
+    def test_legacy_field_names_still_accepted(self, tmp_path):
+        # Older documented shapes: prompt_text / tool_output.
+        _run(_payload("UserPromptSubmit", prompt_text="legacy prompt"), tmp_path)
+        _run(
+            _payload(
+                "PostToolUseFailure",
+                tool_name="Bash",
+                tool_output="legacy error",
+                tool_use_id="toolu_05",
+            ),
+            tmp_path,
+        )
+        lines = _lines(tmp_path)
+        assert lines[0]["data"]["prompt_preview"] == "legacy prompt"
+        assert lines[1]["data"]["error"] == "legacy error"
 
     def test_long_target_clipped(self, tmp_path):
         _run(
@@ -175,6 +206,17 @@ class TestSafety:
             tmp_path,
         )
         assert result.returncode == 0
+        assert not tmp_path.exists() or not list(tmp_path.iterdir())
+
+    def test_non_uuid_session_id_rejected(self, tmp_path):
+        # Loose hex ids would mint filenames outside SESSION_FILE_RE and
+        # escape the retention/budget sweeps entirely.
+        for bad in ("deadbeef", "a" * 36, "aaaabbbb-cccc-dddd-eeee"):
+            result = _run(
+                _payload("Stop", last_assistant_message="x") | {"session_id": bad},
+                tmp_path,
+            )
+            assert result.returncode == 0
         assert not tmp_path.exists() or not list(tmp_path.iterdir())
 
     def test_file_permissions(self, tmp_path):

@@ -105,7 +105,7 @@ def claude_hooks_block() -> dict:
 )
 @click.option(
     "--budget-gb",
-    type=float,
+    type=click.FloatRange(min=0),
     default=50.0,
     show_default=True,
     help="Total events-dir size budget the dashboard's sweep enforces",

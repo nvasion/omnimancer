@@ -281,6 +281,54 @@ class TestFleetAppData:
             cells = [cell.plain for cell in table.get_row_at(0)]
             assert cells[2] == "waiting"
 
+    async def test_resumed_session_reappears(self, tmp_path):
+        """claude --resume reuses the session id: session_end then a fresh
+        session_start must bring the row back (ended cleared)."""
+        from datetime import datetime, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+        def event(name: str, data: dict) -> str:
+            return json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": name,
+                    "session_id": "dddd4444-5555",
+                    "agent_id": "main",
+                    "mode": "claude",
+                    "cwd": "/tmp/x",
+                    "seq": -1,
+                    "data": data,
+                }
+            )
+
+        (events / "s.jsonl").write_text(
+            event("session_start", {"model": "claude-fable-5"})
+            + "\n"
+            + event("session_end", {"reason": "logout"})
+            + "\n"
+            + event("session_start", {"model": "claude-fable-5"})
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 1
+            cells = [cell.plain for cell in table.get_row_at(0)]
+            assert cells[0] == "dddd4444"
+            assert cells[1] == "claude"
+
     async def test_once_deadline_exits_nonzero_on_wedged_source(self, tmp_path):
         """If an initial poll never lands, --once must exit non-zero with a
         warning — a partial snapshot must never masquerade as complete."""
