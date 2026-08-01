@@ -1271,6 +1271,15 @@ def main() -> None:
     This function initializes the application and starts the interactive CLI.
     """
 
+    # Subcommand pre-dispatch. cli_main stays a single @click.command (not a
+    # group) because converting it would change --help and flag parsing for
+    # `omn -p`, which codex-orchestrator and the fleet wrapper parse.
+    if len(sys.argv) > 1 and sys.argv[1] == "fleet":
+        from omnimancer.tui.fleet.cli import fleet_main
+
+        fleet_main.main(args=sys.argv[2:], prog_name="omn fleet")
+        return
+
     @click.command()
     @click.option(
         "--help",
