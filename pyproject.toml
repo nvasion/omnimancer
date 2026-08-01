@@ -75,11 +75,18 @@ dev = [
 omnimancer = "omnimancer.cli.interface:main"
 omn = "omnimancer.cli.interface:main"
 omniman = "omnimancer.cli.interface:main"
+# Claude Code hook adapter — a top-level stdlib-only module so each hook
+# invocation starts in bare-python time (importing the omnimancer package
+# would pull pydantic on every tool call).
+omn-fleet-hook = "omn_fleet_hook:main"
 
 [project.urls]
 Homepage = "https://github.com/nvasion/omnimancer"
 Repository = "https://github.com/nvasion/omnimancer"
 Issues = "https://github.com/nvasion/omnimancer/issues"
+
+[tool.setuptools]
+py-modules = ["omn_fleet_hook"]
 
 [tool.setuptools.packages.find]
 where = ["."]

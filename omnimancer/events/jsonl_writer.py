@@ -18,6 +18,13 @@ from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
+# Event files are namespaced "omn-<uuid4>.jsonl"; retention and budget
+# sweeps only ever touch names matching this. Owner of the naming scheme;
+# omnimancer/events/emitter.py and the fleet dashboard import it from here.
+SESSION_FILE_RE = (
+    r"^omn-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$"
+)
+
 
 class JsonlWriter:
     """A thread-safe JSONL writer with queue management and file size limits."""
@@ -251,3 +258,81 @@ def cleanup_old_files(
         pass
 
     return deleted_count
+
+
+def enforce_size_budget(
+    directory: pathlib.Path,
+    max_total_bytes: int,
+    name_re: Optional[str] = None,
+    min_age_s: float = 600.0,
+) -> int:
+    """Enforce a total size budget by deleting the oldest eligible .jsonl files.
+
+    Scans *directory* for regular ``.jsonl`` files. When *name_re* is provided,
+    only files whose name matches the compiled pattern are considered.  The
+    function sums their sizes and, if the total exceeds *max_total_bytes*,
+    deletes files one at a time starting from the oldest (by ``st_mtime``)
+    until the remaining considered files fall within the budget.
+
+    The *min_age_s* parameter protects recently-active session files: a file
+    whose age (``time.time() - st_mtime``) is strictly less than *min_age_s*
+    is never deleted, even when over budget.  This prevents the retention
+    sweep from removing files that are still actively written to.
+
+    Args:
+        directory: Directory to scan for eligible .jsonl files.
+        max_total_bytes: Maximum allowed total size of remaining considered
+            files in bytes.
+        name_re: Optional regex string. When set, only files whose name
+            matches ``re.compile(name_re).match(...)`` are considered.
+        min_age_s: Minimum file age in seconds. Files younger than this are
+            protected from deletion. Defaults to 600.0 (10 minutes).
+
+    Returns:
+        Number of bytes freed by deleting files.
+    """
+    if not directory.exists():
+        return 0
+
+    pattern = re.compile(name_re) if name_re else None
+    now = time.time()
+
+    # Gather eligible files with their sizes and mtimes
+    candidates: list[tuple[pathlib.Path, int, float]] = []
+    for item in directory.iterdir():
+        if not (item.is_file() and item.suffix == ".jsonl"):
+            continue
+        if pattern is not None and not pattern.match(item.name):
+            continue
+        try:
+            st = item.stat()
+            candidates.append((item, st.st_size, st.st_mtime))
+        except Exception:
+            logger.debug(f"Error stat-ing file {item}")
+            continue
+
+    total_size = sum(sz for _, sz, _ in candidates)
+    if total_size <= max_total_bytes:
+        return 0
+
+    # Sort by mtime ascending (oldest first)
+    candidates.sort(key=lambda t: t[2])
+
+    freed = 0
+    deletable: list[tuple[pathlib.Path, int]] = []
+    for path, sz, mtime in candidates:
+        if now - mtime >= min_age_s:
+            deletable.append((path, sz))
+
+    for path, sz in deletable:
+        try:
+            path.unlink()
+            freed += sz
+            total_size -= sz
+            if total_size <= max_total_bytes:
+                break
+        except Exception:
+            logger.debug(f"Error deleting file {path}")
+            continue
+
+    return freed

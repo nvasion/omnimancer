@@ -216,6 +216,71 @@ class TestFleetAppData:
         assert rows_at_exit[0][0] == "dead-ses"
         assert rows_at_exit[0][2] == "stale"
 
+    async def test_claude_session_row_and_waiting_semantics(self, tmp_path):
+        """A Claude Code session (from the hook adapter's events) renders
+        with backend 'claude', its model, and flips to WAITING once its
+        latest event is turn_end (idle at prompt)."""
+        from datetime import datetime, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        claude_events = [
+            {
+                "v": 1,
+                "ts": now_ts,
+                "event": "session_start",
+                "session_id": "cccc1111-2222",
+                "agent_id": "main",
+                "mode": "claude",
+                "cwd": "/tmp/claudeproj",
+                "seq": -1,
+                "data": {"harness": "claude", "model": "claude-fable-5"},
+            },
+            {
+                "v": 1,
+                "ts": now_ts,
+                "event": "tool_start",
+                "session_id": "cccc1111-2222",
+                "agent_id": "main",
+                "mode": "claude",
+                "cwd": "/tmp/claudeproj",
+                "seq": -1,
+                "data": {"tool": "Bash", "target": "ls", "invocation": "claude"},
+            },
+        ]
+        (events / "omn-cccc1111-2222.jsonl").write_text(
+            "".join(json.dumps(event) + "\n" for event in claude_events)
+        )
+
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            cells = [cell.plain for cell in table.get_row_at(0)]
+            assert cells[0] == "cccc1111"
+            assert cells[1] == "claude"
+            assert cells[2] == "working"
+            assert cells[3] == "claude-fable-5"
+
+            # Stop event arrives -> idle at prompt -> waiting.
+            stop_event = dict(claude_events[0])
+            stop_event["event"] = "turn_end"
+            stop_event["data"] = {"last_message_preview": "done"}
+            with open(events / "omn-cccc1111-2222.jsonl", "a") as handle:
+                handle.write(json.dumps(stop_event) + "\n")
+            await _settle(pilot)
+            cells = [cell.plain for cell in table.get_row_at(0)]
+            assert cells[2] == "waiting"
+
     async def test_once_deadline_exits_nonzero_on_wedged_source(self, tmp_path):
         """If an initial poll never lands, --once must exit non-zero with a
         warning — a partial snapshot must never masquerade as complete."""

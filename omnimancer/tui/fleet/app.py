@@ -106,6 +106,9 @@ class SessionInfo:
     last_seen: float = 0.0
     turns: int = 0
     ended: bool = False
+    # Last lifecycle event name: a session whose latest event is turn_end
+    # is idle at its prompt — WAITING in operator terms, not stale.
+    last_event: str = ""
 
 
 class JobsUpdated(Message):
@@ -192,6 +195,7 @@ class FleetApp(App[None]):
         refresh: float = 1.0,
         once: bool = False,
         once_fallback_s: float = 10.0,
+        budget_bytes: int = 50 * 1024**3,
     ) -> None:
         """Store data-source locations and refresh cadence.
 
@@ -204,6 +208,8 @@ class FleetApp(App[None]):
             once_fallback_s: --once deadline for the initial polls; hitting
                 it exits with return code 1 and an incompleteness warning
                 instead of silently shipping a partial snapshot.
+            budget_bytes: events-dir size budget the periodic sweep
+                enforces (the audit store's cap while the board is open).
         """
         super().__init__()
         self.jobs_dir = jobs_dir
@@ -212,6 +218,7 @@ class FleetApp(App[None]):
         self.refresh_interval = refresh
         self.once = once
         self.once_fallback_s = once_fallback_s
+        self.budget_bytes = budget_bytes
         self.paused = False
         self._jobs_source = JobsSource(jobs_dir)
         self._events_tailer = EventsTailer(events_dir)
@@ -244,6 +251,10 @@ class FleetApp(App[None]):
         table.add_columns(*AGENT_COLUMNS)
         self.set_interval(self.refresh_interval, self.refresh_jobs)
         self.set_interval(self.refresh_interval / 2, self.refresh_feeds)
+        # Keep the audit store bounded even when no omn session starts
+        # (sessions sweep on their own writer threads; the board covers
+        # the long-running-dashboard case).
+        self.set_interval(600.0, self._budget_sweep)
         self.refresh_jobs()
         self.refresh_feeds()
         if self.once:
@@ -283,6 +294,21 @@ class FleetApp(App[None]):
     def _scan_jobs(self) -> None:
         """Thread worker: scan jobs and post the snapshot."""
         self.post_message(JobsUpdated(self._jobs_source.scan()))
+
+    def _budget_sweep(self) -> None:
+        """Enforce the events-dir size budget off the UI thread."""
+        self.run_worker(
+            self._run_budget_sweep, thread=True, exclusive=True, group="budget"
+        )
+
+    def _run_budget_sweep(self) -> None:
+        """Thread worker: oldest-first pruning down to budget_bytes."""
+        from omnimancer.events.jsonl_writer import (
+            SESSION_FILE_RE,
+            enforce_size_budget,
+        )
+
+        enforce_size_budget(self.events_dir, self.budget_bytes, name_re=SESSION_FILE_RE)
 
     def _tail_feeds(self) -> None:
         """Thread worker: poll both tails and post new entries.
@@ -375,6 +401,8 @@ class FleetApp(App[None]):
         info.cwd = str(event.get("cwd") or info.cwd)
         data = event.get("data") or {}
         name = event.get("event")
+        if isinstance(name, str) and name:
+            info.last_event = name
         if name == "session_start":
             info.model = str(data.get("model") or "")
             info.provider = str(data.get("provider") or "")
@@ -402,15 +430,27 @@ class FleetApp(App[None]):
         for session in sorted(self._sessions.values(), key=lambda s: s.session_id):
             if session.ended or session.cwd in job_cwds:
                 continue
+            if session.mode == "claude":
+                backend = "claude"
+            elif session.mode:
+                backend = f"omn:{session.mode}"
+            else:
+                backend = "omn"
             record = JobRecord(
                 job_id=session.session_id[:8],
-                backend=f"omn:{session.mode}" if session.mode else "omn",
+                backend=backend,
                 status="running",
                 model=session.model,
                 turns_completed=session.turns,
             )
             age = now - session.last_seen
-            state = DisplayState.STALE if age > 120.0 else DisplayState.WORKING
+            if session.last_event == "turn_end":
+                # Idle at its prompt: answered and waiting for a human.
+                state = DisplayState.WAITING
+            elif age > 120.0:
+                state = DisplayState.STALE
+            else:
+                state = DisplayState.WORKING
             rows.append(
                 (f"session-{session.session_id}", state, job_row(record, state, age))
             )

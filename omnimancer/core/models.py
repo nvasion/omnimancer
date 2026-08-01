@@ -1354,6 +1354,9 @@ class EventsConfig(BaseModel):
     directory: Optional[str] = None
     max_file_mb: int = 20
     retention_days: int = 7
+    # Total size budget for the events dir (the machine's agent audit
+    # store); oldest sessions are pruned first, active files protected.
+    max_total_gb: float = 50.0
 
 
 class Config(BaseModel):

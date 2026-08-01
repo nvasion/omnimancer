@@ -37,7 +37,12 @@ from omnimancer.core.agent.status_manager import (
 )
 from omnimancer.core.agent.types import OperationType as AgentOperationType
 from omnimancer.core.models import EventsConfig
-from omnimancer.events.jsonl_writer import JsonlWriter, cleanup_old_files
+from omnimancer.events.jsonl_writer import SESSION_FILE_RE as _SESSION_FILE_RE
+from omnimancer.events.jsonl_writer import (
+    JsonlWriter,
+    cleanup_old_files,
+    enforce_size_budget,
+)
 from omnimancer.events.schema import (
     EVENT_APPROVAL_DENIED,
     EVENT_APPROVAL_GRANTED,
@@ -62,13 +67,12 @@ logger = logging.getLogger(__name__)
 ENV_KILL_SWITCH = "OMNIMANCER_EVENTS"
 
 # Event files are namespaced "omn-<uuid4>.jsonl" so ownership is explicit;
-# retention cleanup deletes ONLY names matching this, and therefore can
+# retention/budget sweeps delete ONLY names matching this, and therefore can
 # never unlink another application's .jsonl data even in a user-configured
 # shared directory. (Un-prefixed uuid files from pre-release builds are
-# deliberately left alone.)
-SESSION_FILE_RE = (
-    r"^omn-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$"
-)
+# deliberately left alone.) Owned by jsonl_writer; re-exported here for the
+# existing import surface.
+SESSION_FILE_RE = _SESSION_FILE_RE
 
 
 def session_file_name(session_id: str) -> str:
@@ -290,6 +294,14 @@ async def init_events(
                 except OSError as exc:
                     logger.debug(f"events dir chmod failed: {exc}")
             cleanup_old_files(directory, cfg.retention_days, name_re=SESSION_FILE_RE)
+            # Age sweep first, then the total-size budget (the audit-store
+            # cap): oldest sessions pruned first, live files age-protected
+            # inside enforce_size_budget.
+            enforce_size_budget(
+                directory,
+                int(cfg.max_total_gb * 1024**3),
+                name_re=SESSION_FILE_RE,
+            )
 
         writer = JsonlWriter(
             directory / session_file_name(session_id),

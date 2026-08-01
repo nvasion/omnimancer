@@ -13,6 +13,38 @@ from click.testing import CliRunner
 from omnimancer.tui.fleet.cli import INSTALL_HINT, fleet_main
 
 
+class TestHooksSnippet:
+    def test_hooks_flag_prints_valid_settings_block(self):
+        import json as json_module
+
+        result = CliRunner().invoke(fleet_main, ["--hooks"])
+        assert result.exit_code == 0
+        block = json_module.loads(result.output)
+        hooks = block["hooks"]
+        assert set(hooks) == {
+            "SessionStart",
+            "UserPromptSubmit",
+            "PreToolUse",
+            "PostToolUse",
+            "PostToolUseFailure",
+            "Stop",
+            "SessionEnd",
+        }
+        for event_name, entries in hooks.items():
+            (entry,) = entries
+            (hook,) = entry["hooks"]
+            assert hook["command"] == "omn-fleet-hook"
+            assert hook["async"] is True
+            if event_name in {"PreToolUse", "PostToolUse", "PostToolUseFailure"}:
+                assert entry["matcher"] == ".*"
+
+    def test_hooks_flag_needs_no_textual(self, monkeypatch):
+        monkeypatch.setitem(sys.modules, "textual", None)
+        result = CliRunner().invoke(fleet_main, ["--hooks"])
+        assert result.exit_code == 0
+        assert "omn-fleet-hook" in result.output
+
+
 class TestTextualGuard:
     def test_missing_textual_prints_install_hint(self, monkeypatch):
         # sys.modules[name] = None makes `import textual` raise ImportError.
