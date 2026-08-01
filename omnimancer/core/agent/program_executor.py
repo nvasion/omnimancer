@@ -6,6 +6,7 @@ real-time output streaming, resource limits, and comprehensive error handling.
 """
 
 import asyncio
+import codecs
 import logging
 import os
 import shlex
@@ -348,18 +349,29 @@ class StreamingExecutor:
         async def read_stream(
             stream: asyncio.StreamReader, stream_type: str, buffer: List[str]
         ) -> None:
+            # Chunk reads, not readline(): a single line longer than the
+            # StreamReader limit (64KB) makes readline() raise ValueError,
+            # which the except below used to swallow — silently discarding
+            # ALL output of the command. The incremental decoder keeps
+            # multibyte characters intact across chunk boundaries.
+            decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
             try:
                 while True:
-                    line = await stream.readline()
-                    if not line:
+                    chunk = await stream.read(65536)
+                    if not chunk:
+                        tail = decoder.decode(b"", final=True)
+                        if tail:
+                            buffer.append(tail)
                         break
 
-                    line_str = line.decode("utf-8", errors="replace")
-                    buffer.append(line_str)
+                    text = decoder.decode(chunk)
+                    if not text:
+                        continue
+                    buffer.append(text)
 
                     if self.callback:
                         try:
-                            self.callback(stream_type, line_str.rstrip())
+                            self.callback(stream_type, text)
                         except Exception as callback_error:
                             logger.debug(f"Stream callback error: {callback_error}")
 

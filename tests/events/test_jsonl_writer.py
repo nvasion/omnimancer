@@ -57,7 +57,7 @@ def test_size_cap_stops_writing(tmp_path: pathlib.Path) -> None:
     w = JsonlWriter(
         tmp_path / "s.jsonl",
         max_file_mb=1,
-        cap_notice_line=cap_line,
+        cap_notice=lambda: cap_line,
     )
 
     # Write 12 lines of 100000 "x" characters each

@@ -87,3 +87,17 @@ class TestCommandProgressEndToEnd:
         result = await executor._execute_command("echo plain-path")
         assert result.success
         assert "plain-path" in result.data["stdout"]
+
+    async def test_large_single_line_output_not_lost(self, event_file):
+        """Regression: a 200KB single-line output exceeded the StreamReader
+        readline() limit, and the swallowed ValueError discarded ALL output
+        on the streaming path."""
+        executor = ProgramExecutor()
+        op_id = await emitter.start_tool_operation(
+            AgentOperationType.COMMAND_EXECUTE, "Execute: big", {"tool": "Bash"}
+        )
+        result = await executor._execute_command(
+            "python3 -c \"print('x' * 200000)\"", progress_op_id=op_id
+        )
+        assert result.success
+        assert len(result.data["stdout"]) >= 200000

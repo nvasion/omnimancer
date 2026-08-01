@@ -8,11 +8,13 @@ handle high-volume event logging with file size limits and queue management.
 from __future__ import annotations
 
 import logging
+import os
 import pathlib
 import queue
+import re
 import threading
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,43 +27,45 @@ class JsonlWriter:
         path: pathlib.Path,
         max_file_mb: int = 20,
         queue_size: int = 1000,
-        cap_notice_line: Optional[str] = None,
+        cap_notice: Optional[Callable[[], str]] = None,
+        on_start: Optional[Callable[[], None]] = None,
         autostart: bool = True,
     ) -> None:
         """Initialize the JSONL writer.
+
+        No filesystem I/O happens here: directory creation, the initial
+        size stat, and the optional on_start hook (e.g. retention cleanup)
+        all run on the writer thread, so constructing a writer can never
+        block the caller on a slow filesystem.
 
         Args:
             path: The file path to write JSONL events to.
             max_file_mb: Maximum file size in MB before stopping writes.
             queue_size: Maximum number of events to queue.
-            cap_notice_line: Line to write when file size limit is reached.
+            cap_notice: Called at cap time to build the final line, so its
+                timestamp reflects when the cap was actually reached.
+            on_start: Ran once on the writer thread before draining.
             autostart: Whether to start the writer thread automatically.
         """
-        path.parent.mkdir(parents=True, exist_ok=True)
         self._path = path
         self._max_file_mb = max_file_mb
         self._queue: queue.Queue[str] = queue.Queue(maxsize=queue_size)
-        self._cap_notice_line = cap_notice_line
+        self._cap_notice = cap_notice
+        self._on_start = on_start
         # _stopped: no new enqueues, drain loop exits once the queue empties.
         # _capped: file size limit reached — drain and discard, never write.
         # Distinct flags: shutdown must flush in-flight lines, the cap must not.
         self._stopped = False
         self._capped = False
+        # _writing: a dequeued batch is mid-write; flush() must wait for it.
+        self._writing = False
         self._dropped = 0
         self._write_errors = 0
         self._written_bytes = 0
 
-        # Record existing file size
-        try:
-            self._written_bytes = path.stat().st_size
-        except FileNotFoundError:
-            self._written_bytes = 0
-
         self._thread: Optional[threading.Thread] = None
         if autostart:
             self._start_thread()
-            # Small delay to ensure thread is ready
-            time.sleep(0.001)
 
     def _start_thread(self) -> None:
         """Start the writer thread."""
@@ -89,12 +93,35 @@ class JsonlWriter:
             self._dropped += 1
             return False
 
+    def _prepare(self) -> None:
+        """Thread-side startup: hook, directory, and initial size stat."""
+        if self._on_start is not None:
+            try:
+                self._on_start()
+            except Exception as e:
+                logger.debug(f"JSONL writer on_start hook failed: {e}")
+        try:
+            # 0o700: event files carry command targets and output previews.
+            self._path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            self._written_bytes = self._path.stat().st_size
+        except FileNotFoundError:
+            self._written_bytes = 0
+        except Exception as e:
+            logger.debug(f"JSONL writer startup failed: {e}")
+
+    def _open_append(self):  # type: ignore[no-untyped-def]
+        """Open the event file for appending with owner-only permissions."""
+        fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        return os.fdopen(fd, "a", encoding="utf-8")
+
     def _drain_loop(self) -> None:
         """Drain the queue and write lines to the file."""
+        self._prepare()
         while not self._stopped or not self._queue.empty():
             try:
                 # Get first item with timeout
                 line = self._queue.get(timeout=0.2)
+                self._writing = True
                 lines = [line]
 
                 # Get any additional items that are ready immediately
@@ -110,7 +137,7 @@ class JsonlWriter:
                     continue
 
                 # Write all lines
-                with open(self._path, "a", encoding="utf-8") as f:
+                with self._open_append() as f:
                     for line in lines:
                         # Check if adding this line would exceed the limit
                         line_bytes = len(line.encode("utf-8")) + 1  # +1 for newline
@@ -118,8 +145,8 @@ class JsonlWriter:
                             self._written_bytes + line_bytes
                             > self._max_file_mb * 1024 * 1024
                         ):
-                            if self._cap_notice_line:
-                                f.write(self._cap_notice_line + "\n")
+                            if self._cap_notice is not None:
+                                f.write(self._cap_notice() + "\n")
                             self._capped = True
                             break
 
@@ -135,6 +162,8 @@ class JsonlWriter:
                 self._write_errors += 1
                 logger.debug(f"Error in JSONL writer: {e}")
                 continue
+            finally:
+                self._writing = False
 
     def flush(self, timeout: float = 2.0) -> bool:
         """Flush all queued items to disk.
@@ -146,9 +175,11 @@ class JsonlWriter:
             True if flushed successfully, False on timeout.
         """
         deadline = time.monotonic() + timeout
-        while not self._queue.empty() and time.monotonic() < deadline:
+        while (
+            not self._queue.empty() or self._writing
+        ) and time.monotonic() < deadline:
             time.sleep(0.01)
-        return self._queue.empty()
+        return self._queue.empty() and not self._writing
 
     def shutdown(self, timeout: float = 2.0) -> None:
         """Shutdown the writer gracefully.
@@ -174,28 +205,37 @@ class JsonlWriter:
         return self._write_errors
 
 
-def cleanup_old_files(directory: pathlib.Path, retention_days: int) -> int:
+def cleanup_old_files(
+    directory: pathlib.Path, retention_days: int, name_re: Optional[str] = None
+) -> int:
     """Clean up old .jsonl files in the directory.
 
     Args:
         directory: Directory to scan for old files.
         retention_days: Number of days to retain files.
+        name_re: When set, only filenames matching this regex are eligible.
+            The emitter passes a session-uuid pattern so a user-configured
+            shared directory never loses unrelated .jsonl data.
 
     Returns:
         Number of files deleted.
     """
     deleted_count = 0
     cutoff_time = time.time() - (retention_days * 24 * 60 * 60)
+    pattern = re.compile(name_re) if name_re else None
 
     try:
         for item in directory.iterdir():
-            if item.is_file() and item.suffix == ".jsonl":
-                try:
-                    if item.stat().st_mtime < cutoff_time:
-                        item.unlink()
-                        deleted_count += 1
-                except Exception as e:
-                    logger.debug(f"Error deleting file {item}: {e}")
+            if not (item.is_file() and item.suffix == ".jsonl"):
+                continue
+            if pattern is not None and not pattern.match(item.name):
+                continue
+            try:
+                if item.stat().st_mtime < cutoff_time:
+                    item.unlink()
+                    deleted_count += 1
+            except Exception as e:
+                logger.debug(f"Error deleting file {item}: {e}")
     except FileNotFoundError:
         pass
 

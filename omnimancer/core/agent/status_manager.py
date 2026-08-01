@@ -178,15 +178,23 @@ class UnifiedStatusManager:
         if not self.running:
             return
 
+        # Close out active operations while the processors are still
+        # running so their terminal OPERATION_CANCELLED events reach
+        # listeners — flipping the flags first would strand them.
+        for operation_id in list(self.active_operations.keys()):
+            await self.cancel_operation(operation_id, "System shutdown")
+        deadline = asyncio.get_event_loop().time() + 0.5
+        while (
+            not self.event_queue.empty() and asyncio.get_event_loop().time() < deadline
+        ):
+            await asyncio.sleep(0.01)
+        # The final event may still be mid-listener-dispatch after the
+        # queue empties; give the processor one more beat before teardown.
+        await asyncio.sleep(0.05)
+
         self._shutdown = True
         self.running = False
         self.shutdown_event.set()
-
-        # Cancel all active operations
-        async with self._lock:
-            for operation in self.active_operations.values():
-                if operation.is_active:
-                    operation.cancel("System shutdown")
 
         # Stop background tasks
         tasks = [

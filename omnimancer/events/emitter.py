@@ -50,6 +50,7 @@ from omnimancer.events.schema import (
     EVENT_TOOL_START,
     EVENT_TURN_END,
     EVENT_TURN_START,
+    MESSAGE_PREVIEW_CHARS,
     PREVIEW_CHARS,
     FleetEvent,
     translate_operation_type,
@@ -59,6 +60,31 @@ from omnimancer.events.schema import (
 logger = logging.getLogger(__name__)
 
 ENV_KILL_SWITCH = "OMNIMANCER_EVENTS"
+
+# Retention cleanup deletes ONLY files matching this (session uuid4 names),
+# so a user-configured shared directory never loses unrelated .jsonl data.
+SESSION_FILE_RE = (
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$"
+)
+
+# Payload fields clipped before serialization; everything else the gate
+# sends is already bounded. Targets/descriptions can embed secrets-adjacent
+# command text — same exposure class as hook payloads, but capped here.
+_CLIP_LIMITS: Dict[str, int] = {
+    "target": PREVIEW_CHARS,
+    "description": PREVIEW_CHARS,
+    "error": MESSAGE_PREVIEW_CHARS,
+}
+
+
+def _clip(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Truncate known free-text payload fields in place and return it."""
+    for key, limit in _CLIP_LIMITS.items():
+        value = data.get(key)
+        if isinstance(value, str):
+            data[key] = truncate(value, limit)
+    return data
+
 
 # Bus EventType -> omn.event.v1 event name. AGENT_STATE_CHANGED is
 # intentionally unmapped: it is not part of the v1 schema.
@@ -207,17 +233,28 @@ async def init_events(
         directory = (
             Path(cfg.directory).expanduser() if cfg.directory else default_events_dir()
         )
-        cleanup_old_files(directory, cfg.retention_days)
-        cap_line = FleetEvent(
-            event=EVENT_ERROR,
-            session_id=session_id,
-            mode=mode,
-            data={"message": "event file size cap reached"},
-        ).to_json_line()
+
+        def _cap_notice() -> str:
+            # Built at cap time so the timestamp is honest; seq=-1 marks it
+            # as an out-of-band writer notice, not a bus-ordered event.
+            return FleetEvent(
+                event=EVENT_ERROR,
+                session_id=session_id,
+                mode=mode,
+                seq=-1,
+                data={"message": "event file size cap reached"},
+            ).to_json_line()
+
+        def _startup_cleanup() -> None:
+            # Runs on the writer thread — init_events does no filesystem
+            # I/O on the event loop.
+            cleanup_old_files(directory, cfg.retention_days, name_re=SESSION_FILE_RE)
+
         writer = JsonlWriter(
             directory / f"{session_id}.jsonl",
             max_file_mb=cfg.max_file_mb,
-            cap_notice_line=cap_line,
+            cap_notice=_cap_notice,
+            on_start=_startup_cleanup,
         )
         manager = await initialize_status_system()
         listener = JsonlEventListener(session_id, mode, writer)
@@ -243,7 +280,7 @@ async def emit_event(
     """Emit one event onto the bus (no-op when the pipeline is down)."""
     if not events_enabled() or _state.manager is None:
         return
-    payload = dict(data or {})
+    payload = _clip(dict(data or {}))
     parent_id = current_parent_id()
     if parent_id is not None:
         payload["parent_id"] = parent_id
@@ -269,7 +306,10 @@ def emit_event_threadsafe(
     """Emit from a non-loop thread (e.g. process output readers)."""
     if not events_enabled() or _state.loop is None or _state.loop.is_closed():
         return
-    payload = dict(data or {})
+    payload = _clip(dict(data or {}))
+    parent_id = current_parent_id()
+    if parent_id is not None:
+        payload["parent_id"] = parent_id
     event = AgentEvent(
         event_type=event_type,
         agent_id=current_agent_id(),
@@ -341,7 +381,7 @@ async def start_tool_operation(
     """
     if not events_enabled() or _state.manager is None:
         return None
-    metadata = dict(data or {})
+    metadata = _clip(dict(data or {}))
     parent_id = current_parent_id()
     if parent_id is not None:
         metadata["parent_id"] = parent_id
@@ -368,22 +408,31 @@ async def end_tool_operation(
     """Close a bus-tracked tool operation (emits tool_end)."""
     if operation_id is None or not events_enabled() or _state.manager is None:
         return
+    clipped_error = (
+        truncate(error, MESSAGE_PREVIEW_CHARS) if isinstance(error, str) else error
+    )
     try:
         if was_cancelled:
-            await _state.manager.cancel_operation(operation_id, error or "cancelled")
+            await _state.manager.cancel_operation(
+                operation_id, clipped_error or "cancelled"
+            )
         elif success:
             await _state.manager.complete_operation(operation_id)
         else:
-            await _state.manager.fail_operation(operation_id, error or "failed")
+            await _state.manager.fail_operation(operation_id, clipped_error or "failed")
     except Exception as exc:
         logger.debug(f"end_tool_operation failed: {exc}")
 
 
 async def shutdown_events(timeout: float = 1.0) -> None:
-    """Drain queued events, stop the bus, and close the writer."""
+    """Stop the bus (which closes out active operations) and the writer.
+
+    Order matters: the manager's shutdown emits terminal
+    OPERATION_CANCELLED events for anything still active and drains its
+    queue while the listener is attached — only then is the writer flushed.
+    """
     manager = _state.manager
     writer = _state.writer
-    listener = _state.listener
     _state.manager = None
     _state.writer = None
     _state.listener = None
@@ -391,14 +440,6 @@ async def shutdown_events(timeout: float = 1.0) -> None:
     if manager is None:
         return
     try:
-        deadline = asyncio.get_running_loop().time() + timeout
-        while (
-            not manager.event_queue.empty()
-            and asyncio.get_running_loop().time() < deadline
-        ):
-            await asyncio.sleep(0.01)
-        if listener is not None:
-            manager.remove_event_listener(listener)
         await shutdown_status_system()
     except Exception as exc:
         logger.debug(f"Event pipeline shutdown error: {exc}")

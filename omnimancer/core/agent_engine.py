@@ -6,6 +6,8 @@ autonomous operation capabilities including file system management,
 program execution, web client operations, and approval workflows.
 """
 
+import asyncio
+import contextlib
 import logging
 import time
 from pathlib import Path
@@ -368,6 +370,23 @@ class AgentEngine(CoreEngine):
             )
 
             return result
+
+        except asyncio.CancelledError:
+            # A cancelled turn (Ctrl+C) must still close the event lifecycle
+            # or tool_start records stay unmatched. Shielded because the
+            # emission must survive the surrounding cancellation; hooks are
+            # deliberately not fired here (no subprocess spawns during
+            # teardown). The cancellation always propagates.
+            with contextlib.suppress(Exception, asyncio.CancelledError):
+                await asyncio.shield(
+                    fleet_events.end_tool_operation(
+                        fleet_op_id,
+                        success=False,
+                        error="turn cancelled",
+                        was_cancelled=True,
+                    )
+                )
+            raise
 
         except Exception as e:
             # Enhanced error context for agent operations
