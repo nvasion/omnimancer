@@ -284,7 +284,7 @@ def enforce_size_budget(
         max_total_bytes: Maximum allowed total size of remaining considered
             files in bytes.
         name_re: Optional regex string. When set, only files whose name
-            matches ``re.compile(name_re).match(...)`` are considered.
+            matches ``re.compile(name_re).fullmatch(...)`` are considered.
         min_age_s: Minimum file age in seconds. Files younger than this are
             protected from deletion. Defaults to 600.0 (10 minutes).
 
