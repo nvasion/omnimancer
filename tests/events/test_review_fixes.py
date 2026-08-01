@@ -30,7 +30,7 @@ async def event_file(tmp_path):
         "sess-fixes", "headless", EventsConfig(directory=str(tmp_path))
     )
     assert ok
-    yield tmp_path / "sess-fixes.jsonl"
+    yield tmp_path / "omn-sess-fixes.jsonl"
     await emitter.shutdown_events()
 
 
@@ -72,7 +72,7 @@ class TestCancellationLifecycle:
         # Shut down with the operation still open: a terminal cancelled
         # tool_end must land before the pipeline stops.
         await emitter.shutdown_events()
-        path = tmp_path / "sess-shutdown.jsonl"
+        path = tmp_path / "omn-sess-shutdown.jsonl"
         lines = [
             json.loads(line) for line in path.read_text().splitlines() if line.strip()
         ]
@@ -83,20 +83,23 @@ class TestCancellationLifecycle:
 
 
 class TestRetentionScope:
-    def test_cleanup_only_touches_matching_names(self, tmp_path):
+    def test_cleanup_only_touches_omn_namespaced_names(self, tmp_path):
         old = time.time() - 10 * 24 * 3600
-        session = tmp_path / "aaaabbbb-cccc-dddd-eeee-ffff00001111.jsonl"
+        session = tmp_path / "omn-aaaabbbb-cccc-dddd-eeee-ffff00001111.jsonl"
+        # Foreign data AND un-prefixed uuid files (another app could name
+        # files by bare uuid too) must both survive.
         foreign = tmp_path / "user-data.jsonl"
-        session.write_text("{}\n")
-        foreign.write_text("{}\n")
-        os.utime(session, (old, old))
-        os.utime(foreign, (old, old))
+        bare_uuid = tmp_path / "aaaabbbb-cccc-dddd-eeee-ffff00001111.jsonl"
+        for path in (session, foreign, bare_uuid):
+            path.write_text("{}\n")
+            os.utime(path, (old, old))
         deleted = cleanup_old_files(
             tmp_path, retention_days=7, name_re=emitter.SESSION_FILE_RE
         )
         assert deleted == 1
         assert not session.exists()
         assert foreign.exists()
+        assert bare_uuid.exists()
 
 
 class TestFilePermissions:

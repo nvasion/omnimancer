@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -67,7 +68,9 @@ class SessionInfo:
     cwd: str = ""
     model: str = ""
     provider: str = ""
-    last_seen: float = field(default_factory=time.time)
+    # 0.0, not now(): a session discovered from replayed history must age
+    # from its own event timestamps, never from when the dashboard read it.
+    last_seen: float = 0.0
     turns: int = 0
     ended: bool = False
 
@@ -253,13 +256,27 @@ class FleetApp(App[None]):
         for entry in message.ledger:
             comms.write(comms_line(entry))
 
+    @staticmethod
+    def _event_epoch(event: dict) -> float:
+        """Epoch seconds of an event's own timestamp (ingestion time only
+        as a fallback for unparsable ts). Using the event's clock means a
+        dashboard started after a session died sees its true age instead
+        of treating replayed history as fresh activity."""
+        ts = event.get("ts")
+        if isinstance(ts, str):
+            try:
+                return datetime.fromisoformat(ts).timestamp()
+            except ValueError:
+                pass
+        return time.time()
+
     def _track_session(self, event: dict) -> None:
         """Maintain the omn-session registry from lifecycle events."""
         session_id = str(event.get("session_id") or "")
         if not session_id:
             return
         info = self._sessions.setdefault(session_id, SessionInfo(session_id))
-        info.last_seen = time.time()
+        info.last_seen = max(info.last_seen, self._event_epoch(event))
         info.mode = str(event.get("mode") or info.mode)
         info.cwd = str(event.get("cwd") or info.cwd)
         data = event.get("data") or {}

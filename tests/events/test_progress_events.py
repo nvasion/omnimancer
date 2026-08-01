@@ -24,7 +24,7 @@ async def event_file(tmp_path):
         "sess-progress", "headless", EventsConfig(directory=str(tmp_path))
     )
     assert ok
-    yield tmp_path / "sess-progress.jsonl"
+    yield tmp_path / "omn-sess-progress.jsonl"
     await emitter.shutdown_events()
 
 

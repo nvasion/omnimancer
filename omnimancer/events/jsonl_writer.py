@@ -57,8 +57,6 @@ class JsonlWriter:
         # Distinct flags: shutdown must flush in-flight lines, the cap must not.
         self._stopped = False
         self._capped = False
-        # _writing: a dequeued batch is mid-write; flush() must wait for it.
-        self._writing = False
         self._dropped = 0
         self._write_errors = 0
         self._written_bytes = 0
@@ -94,15 +92,22 @@ class JsonlWriter:
             return False
 
     def _prepare(self) -> None:
-        """Thread-side startup: hook, directory, and initial size stat."""
+        """Thread-side startup: directory first, then hook, then size stat.
+
+        The directory exists before on_start runs so the hook can operate
+        on it (e.g. permission repair + retention sweep).
+        """
+        try:
+            # 0o700: event files carry command targets and output previews.
+            self._path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        except Exception as e:
+            logger.debug(f"JSONL writer mkdir failed: {e}")
         if self._on_start is not None:
             try:
                 self._on_start()
             except Exception as e:
                 logger.debug(f"JSONL writer on_start hook failed: {e}")
         try:
-            # 0o700: event files carry command targets and output previews.
-            self._path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             self._written_bytes = self._path.stat().st_size
         except FileNotFoundError:
             self._written_bytes = 0
@@ -115,19 +120,26 @@ class JsonlWriter:
         return os.fdopen(fd, "a", encoding="utf-8")
 
     def _drain_loop(self) -> None:
-        """Drain the queue and write lines to the file."""
+        """Drain the queue and write lines to the file.
+
+        Every dequeued item is acknowledged with task_done() exactly once
+        (written, cap-discarded, or failed) — flush() relies on the queue's
+        unfinished-task count, which has no empty-but-in-flight race.
+        """
         self._prepare()
         while not self._stopped or not self._queue.empty():
+            batch_size = 0
             try:
                 # Get first item with timeout
                 line = self._queue.get(timeout=0.2)
-                self._writing = True
+                batch_size = 1
                 lines = [line]
 
                 # Get any additional items that are ready immediately
                 while True:
                     try:
                         lines.append(self._queue.get_nowait())
+                        batch_size += 1
                     except queue.Empty:
                         break
 
@@ -163,7 +175,8 @@ class JsonlWriter:
                 logger.debug(f"Error in JSONL writer: {e}")
                 continue
             finally:
-                self._writing = False
+                for _ in range(batch_size):
+                    self._queue.task_done()
 
     def flush(self, timeout: float = 2.0) -> bool:
         """Flush all queued items to disk.
@@ -175,11 +188,9 @@ class JsonlWriter:
             True if flushed successfully, False on timeout.
         """
         deadline = time.monotonic() + timeout
-        while (
-            not self._queue.empty() or self._writing
-        ) and time.monotonic() < deadline:
+        while self._queue.unfinished_tasks > 0 and time.monotonic() < deadline:
             time.sleep(0.01)
-        return self._queue.empty() and not self._writing
+        return self._queue.unfinished_tasks == 0
 
     def shutdown(self, timeout: float = 2.0) -> None:
         """Shutdown the writer gracefully.

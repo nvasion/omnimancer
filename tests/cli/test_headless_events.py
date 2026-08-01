@@ -110,7 +110,7 @@ class TestHeadlessRunnerEventFeed:
         assert status == 0
 
         # Event feed: full session/turn lifecycle in the JSONL file.
-        event_path = tmp_path / f"{runner._turn_notifier.session_id}.jsonl"
+        event_path = tmp_path / f"omn-{runner._turn_notifier.session_id}.jsonl"
         assert event_path.exists()
         events = [
             json.loads(line)

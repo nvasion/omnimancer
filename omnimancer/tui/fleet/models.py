@@ -55,6 +55,46 @@ class JobRecord:
     malformed: bool = False
 
 
+def normalize_usage(raw: dict) -> dict:
+    """
+    Normalize usage dictionary from different formats to standard format.
+
+    Converts short-form keys ("input", "output") to long-form keys
+    ("input_tokens", "output_tokens") and ensures token counts are integers.
+
+    Args:
+        raw: Raw usage dictionary that may have short or long keys
+
+    Returns:
+        Normalized usage dictionary with standardized keys and integer values
+    """
+    if not isinstance(raw, dict):
+        return None
+
+    normalized = {}
+
+    # Handle input tokens
+    input_value = raw.get("input_tokens", raw.get("input", 0))
+    try:
+        normalized["input_tokens"] = int(input_value)
+    except (ValueError, TypeError):
+        normalized["input_tokens"] = 0
+
+    # Handle output tokens
+    output_value = raw.get("output_tokens", raw.get("output", 0))
+    try:
+        normalized["output_tokens"] = int(output_value)
+    except (ValueError, TypeError):
+        normalized["output_tokens"] = 0
+
+    # Pass through any other keys
+    for key, value in raw.items():
+        if key not in ("input_tokens", "output_tokens", "input", "output"):
+            normalized[key] = value
+
+    return normalized
+
+
 def parse_job(data: object) -> JobRecord:
     """
     Parse job data into a JobRecord.
@@ -114,6 +154,13 @@ def parse_job(data: object) -> JobRecord:
                 except (ValueError, TypeError):
                     # Fall back to default for invalid values
                     pass
+
+    # Handle usage mapping
+    raw_usage = data.get("usage")
+    if isinstance(raw_usage, dict):
+        job.usage = normalize_usage(raw_usage)
+    else:
+        job.usage = None
 
     return job
 

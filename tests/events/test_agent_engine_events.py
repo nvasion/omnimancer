@@ -73,7 +73,7 @@ async def event_file(tmp_path):
         "sess-gate", "headless", EventsConfig(directory=str(tmp_path))
     )
     assert ok
-    yield tmp_path / "sess-gate.jsonl"
+    yield tmp_path / "omn-sess-gate.jsonl"
     await emitter.shutdown_events()
 
 

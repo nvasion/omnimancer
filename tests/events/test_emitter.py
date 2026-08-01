@@ -37,7 +37,7 @@ async def live_pipeline(events_dir):
         "sess-test", "interactive", EventsConfig(directory=str(events_dir))
     )
     assert ok
-    yield events_dir / "sess-test.jsonl"
+    yield events_dir / "omn-sess-test.jsonl"
     await emitter.shutdown_events()
 
 
@@ -97,6 +97,9 @@ class TestPipeline:
         assert by_event["tool_start"]["data"]["tool"] == "Write"
         assert by_event["tool_start"]["data"]["op_id"] == operation.operation_id
         assert by_event["tool_end"]["data"]["success"] is True
+        # Terminal events carry the operation's identity too — renderers
+        # must never fall back to a bare "tool_end" label.
+        assert by_event["tool_end"]["data"]["tool"] == "Write"
         assert by_event["turn_end"]["data"]["turn"] == 1
         # Envelope invariants
         for line in lines:

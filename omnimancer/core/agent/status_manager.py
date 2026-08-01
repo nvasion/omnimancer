@@ -367,7 +367,9 @@ class UnifiedStatusManager:
 
             self.stats["operations_completed"] += 1
 
-            # Emit completion event
+            # Emit completion event. Includes the operation's metadata so
+            # terminal events carry the same tool/target identity the start
+            # event had — renderers otherwise fall back to "tool_end".
             await self._emit_event(
                 AgentEvent(
                     event_type=EventType.OPERATION_COMPLETED,
@@ -380,6 +382,7 @@ class UnifiedStatusManager:
                             else 0
                         ),
                         "result_metadata": result_metadata or {},
+                        "metadata": operation.metadata,
                     },
                     source="UnifiedStatusManager",
                 )
@@ -423,6 +426,7 @@ class UnifiedStatusManager:
                             else 0
                         ),
                         "error_metadata": error_metadata or {},
+                        "metadata": operation.metadata,
                     },
                     source="UnifiedStatusManager",
                 )
@@ -461,6 +465,7 @@ class UnifiedStatusManager:
                             if operation.duration
                             else 0
                         ),
+                        "metadata": operation.metadata,
                     },
                     source="UnifiedStatusManager",
                 )

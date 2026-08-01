@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -171,6 +172,34 @@ def test_poll_missing_dir(tmp_path: Path) -> None:
     assert result == []
 
 
+def test_tailer_multibyte_split_across_polls(tmp_path: Path) -> None:
+    # Create a line with a 4-byte UTF-8 character (𝄞)
+    line = json.dumps({"v": "a𝄞b"}, ensure_ascii=False).encode("utf-8")
+
+    # Split the 4-byte sequence in half
+    split_index = 2  # Split inside the 4-byte sequence
+    part1 = line[:split_index]
+    part2 = line[split_index:]
+
+    # Write first part
+    with open(tmp_path / "test.jsonl", "ab") as f:
+        f.write(part1)
+
+    t = EventsTailer(tmp_path)
+    result1 = t.poll()  # Should return empty since line is incomplete
+
+    assert result1 == []
+
+    # Write second part and newline
+    with open(tmp_path / "test.jsonl", "ab") as f:
+        f.write(part2 + b"\n")
+
+    result2 = t.poll()  # Should return the complete line
+
+    assert len(result2) == 1
+    assert result2[0]["v"] == "a𝄞b"  # Should contain the intact character
+
+
 def test_parse_entries(tmp_path: Path) -> None:
     log_content = """## Session: 2026-08-01 03:10
 ### Spawned: aabbccdd - 03:11
@@ -235,3 +264,32 @@ def test_parse_missing_file(tmp_path: Path) -> None:
     entries = p.poll()
 
     assert entries == []
+
+
+def test_logparser_multibyte_split_across_polls(tmp_path: Path) -> None:
+    # Create a line with a 4-byte UTF-8 character (𝄞)
+    line_bytes = b"### Spawned: aabbccdd - \xf0\x9d\x84\x9e\n"
+
+    # Split the 4-byte sequence in half
+    split_index = 18  # Split inside the 4-byte sequence
+    part1 = line_bytes[:split_index]
+    part2 = line_bytes[split_index:]
+
+    # Write first part
+    with open(tmp_path / "agents.log", "ab") as f:
+        f.write(part1)
+
+    p = AgentsLogParser(tmp_path / "agents.log")
+    result1 = p.poll()  # Should return empty since line is incomplete
+
+    assert result1 == []
+
+    # Write second part
+    with open(tmp_path / "agents.log", "ab") as f:
+        f.write(part2)
+
+    result2 = p.poll()  # Should return the complete line
+
+    assert len(result2) == 1
+    assert result2[0]["kind"] == "spawned"
+    assert result2[0]["job_id"] == "aabbccdd"  # Should contain the intact character

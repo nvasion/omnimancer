@@ -131,6 +131,48 @@ class TestFleetAppData:
             assert len(after) > len(before)
             assert "✓ Bash" in after
 
+    async def test_session_freshness_uses_event_ts_not_ingestion(self, tmp_path):
+        """A dashboard started after a session died must show it STALE:
+        freshness comes from the events' own timestamps, never from when
+        the dashboard happened to read them."""
+        from datetime import datetime, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+
+        def _session_event(session_id: str, ts: str) -> str:
+            event = dict(EVENT_SESSION_START)
+            event["session_id"] = session_id
+            event["ts"] = ts
+            return json.dumps(event)
+
+        fresh_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        (events / "fresh.jsonl").write_text(
+            _session_event("fresh-sess-1111", fresh_ts) + "\n"
+        )
+        # The fixture timestamp is hours in the past relative to any test run.
+        (events / "dead.jsonl").write_text(
+            _session_event("dead-sess-2222", "2026-08-01T03:14:34.686+00:00") + "\n"
+        )
+
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            states = {}
+            for row_index in range(table.row_count):
+                cells = [cell.plain for cell in table.get_row_at(row_index)]
+                states[cells[0]] = cells[2]
+            assert states["fresh-se"] == "working"
+            assert states["dead-ses"] == "stale"
+
     async def test_row_selection_opens_detail_modal(self, fleet_dirs):
         app = _app(fleet_dirs)
         async with app.run_test() as pilot:

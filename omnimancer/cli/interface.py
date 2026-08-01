@@ -277,9 +277,13 @@ class CommandLineInterface(
             events_live = await fleet_events.init_events(
                 self.turn_notifier.session_id, "interactive", session_config.events
             )
-            if events_live:
+            if events_live and self.prompt_input is not None:
                 # Recent-tool-activity window rendered inside the streaming
                 # display's existing Live (never a second Live region).
+                # Gated on prompt_input: it is only constructed on real
+                # interactive TTYs (OMNIMANCER_PLAIN_INPUT and non-TTY
+                # sessions never build one), so plain sessions keep their
+                # exact pre-existing display behavior.
                 from ..ui.turn_activity import TurnActivityLog
 
                 self.turn_activity = TurnActivityLog()

@@ -61,11 +61,20 @@ logger = logging.getLogger(__name__)
 
 ENV_KILL_SWITCH = "OMNIMANCER_EVENTS"
 
-# Retention cleanup deletes ONLY files matching this (session uuid4 names),
-# so a user-configured shared directory never loses unrelated .jsonl data.
+# Event files are namespaced "omn-<uuid4>.jsonl" so ownership is explicit;
+# retention cleanup deletes ONLY names matching this, and therefore can
+# never unlink another application's .jsonl data even in a user-configured
+# shared directory. (Un-prefixed uuid files from pre-release builds are
+# deliberately left alone.)
 SESSION_FILE_RE = (
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$"
+    r"^omn-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$"
 )
+
+
+def session_file_name(session_id: str) -> str:
+    """Return the namespaced event filename for a session."""
+    return f"omn-{session_id}.jsonl"
+
 
 # Payload fields clipped before serialization; everything else the gate
 # sends is already bounded. Targets/descriptions can embed secrets-adjacent
@@ -258,12 +267,20 @@ async def init_events(
             ).to_json_line()
 
         def _startup_cleanup() -> None:
-            # Runs on the writer thread — init_events does no filesystem
-            # I/O on the event loop.
+            # Runs on the writer thread (after it mkdirs) — init_events does
+            # no filesystem I/O on the event loop.
+            if directory == default_events_dir():
+                # Our directory by definition: repair pre-existing loose
+                # permissions (mkdir exist_ok does not chmod). A custom
+                # user-configured directory's permissions are theirs.
+                try:
+                    os.chmod(directory, 0o700)
+                except OSError as exc:
+                    logger.debug(f"events dir chmod failed: {exc}")
             cleanup_old_files(directory, cfg.retention_days, name_re=SESSION_FILE_RE)
 
         writer = JsonlWriter(
-            directory / f"{session_id}.jsonl",
+            directory / session_file_name(session_id),
             max_file_mb=cfg.max_file_mb,
             cap_notice=_cap_notice,
             on_start=_startup_cleanup,

@@ -114,7 +114,7 @@ class EventsTailer:
 
     def __init__(self, events_dir: Path):
         self.events_dir = events_dir
-        self._file_states: Dict[str, Tuple[int, str]] = {}  # (offset, buffer)
+        self._file_states: Dict[str, Tuple[int, bytes]] = {}  # (offset, buffer)
 
     def poll(self) -> List[dict]:
         """
@@ -135,7 +135,7 @@ class EventsTailer:
             try:
                 # Get current file state or initialize it
                 if jsonl_file.name not in self._file_states:
-                    self._file_states[jsonl_file.name] = (0, "")
+                    self._file_states[jsonl_file.name] = (0, b"")
 
                 offset, buffer = self._file_states[jsonl_file.name]
 
@@ -144,7 +144,7 @@ class EventsTailer:
                 if stat.st_size < offset:
                     # File was truncated, reset state
                     offset = 0
-                    buffer = ""
+                    buffer = b""
 
                 # Open file and read from offset
                 with open(jsonl_file, "rb") as f:
@@ -155,27 +155,30 @@ class EventsTailer:
                 new_offset = offset + len(content)
                 self._file_states[jsonl_file.name] = (new_offset, buffer)
 
-                # Decode content
-                decoded_content = content.decode("utf-8", errors="replace")
+                # Combine buffer with new content
+                full = buffer + content
 
-                # Prepend buffer and split into lines
-                full_content = buffer + decoded_content
-                lines = full_content.split("\n")
+                # Split on newlines to get complete lines
+                parts = full.split(b"\n")
 
-                # Last element might be incomplete
-                buffer = lines[-1] if full_content.endswith("\n") else lines[-1]
+                # The last part might be incomplete (if it doesn't end with \n)
+                # so we save it as our new buffer
+                buffer = parts[-1]
                 self._file_states[jsonl_file.name] = (new_offset, buffer)
 
-                # Process complete lines
-                for line in lines[:-1]:  # Exclude the last (possibly incomplete) line
-                    if not line.strip():
+                # Process complete lines (everything except the last part)
+                for part in parts[:-1]:
+                    if not part.strip():
                         continue
                     try:
+                        # Decode each complete line individually to preserve UTF-8
+                        line = part.decode("utf-8", errors="replace")
                         event = json.loads(line)
                         events.append(event)
-                    except json.JSONDecodeError as e:
+                    except (json.JSONDecodeError, UnicodeDecodeError) as e:
                         logger.debug(
-                            f"Bad JSON line in {jsonl_file}: " f"{line[:100]}... ({e})"
+                            f"Bad JSON line in {jsonl_file}: "
+                            f"{part.decode('utf-8', errors='replace')[:100]}... ({e})"
                         )
 
             except OSError as e:
@@ -194,7 +197,7 @@ class AgentsLogParser:
     def __init__(self, log_path: Path):
         self.log_path = log_path
         self._offset: int = 0
-        self._buffer: str = ""
+        self._buffer: bytes = b""
 
     def poll(self) -> List[dict]:
         """
@@ -211,7 +214,7 @@ class AgentsLogParser:
             if stat.st_size < self._offset:
                 # File was truncated, reset state
                 self._offset = 0
-                self._buffer = ""
+                self._buffer = b""
 
             # Binary read: the offset tracks bytes, and len(str) is not a
             # byte count for multibyte content.
@@ -221,17 +224,23 @@ class AgentsLogParser:
 
             self._offset += len(raw)
 
-            # Prepend buffer and split into lines; the final element (no
-            # trailing newline yet) becomes the new buffer.
-            full_content = self._buffer + raw.decode("utf-8", errors="replace")
-            lines = full_content.split("\n")
-            self._buffer = lines[-1]
+            # Combine buffer with new content
+            full = self._buffer + raw
+
+            # Split on newlines to get complete lines
+            parts = full.split(b"\n")
+
+            # The last part might be incomplete (if it doesn't end with \n)
+            # so we save it as our new buffer
+            self._buffer = parts[-1]
 
             entries = []
-            for line in lines[:-1]:
-                if not line.strip():
+            for part in parts[:-1]:
+                if not part.strip():
                     continue
 
+                # Decode each complete line individually to preserve UTF-8
+                line = part.decode("utf-8", errors="replace")
                 entry = self._parse_line(line)
                 if entry:
                     entries.append(entry)

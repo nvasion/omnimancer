@@ -66,6 +66,27 @@ def test_parse_garbage_returns_placeholder():
     assert job2.malformed is True
 
 
+def test_usage_mapped_long_keys():
+    """Test that usage with long keys is mapped correctly."""
+    job = parse_job(
+        {"id": "aabbccdd", "usage": {"input_tokens": 100, "output_tokens": 50}}
+    )
+    assert job.usage == {"input_tokens": 100, "output_tokens": 50}
+
+
+def test_usage_mapped_short_codex_keys():
+    """Test that usage with short codex keys is mapped correctly."""
+    job = parse_job({"id": "aabbccdd", "usage": {"input": 7, "output": 3}})
+    assert job.usage["input_tokens"] == 7
+    assert job.usage["output_tokens"] == 3
+
+
+def test_usage_non_dict_is_none():
+    """Test that non-dict usage is handled as None."""
+    job = parse_job({"id": "aabbccdd", "usage": "garbage"})
+    assert job.usage is None
+
+
 def test_display_state_enum():
     """Test DisplayState enum has correct values."""
     assert DisplayState.PENDING.value == "pending"
