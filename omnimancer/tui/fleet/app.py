@@ -174,6 +174,11 @@ class FleetApp(App[None]):
         self._ledger_parser = AgentsLogParser(project_dir / "agents.log")
         self._snapshot: JobsSnapshot = JobsSnapshot.empty()
         self._sessions: Dict[str, SessionInfo] = {}
+        # --once exits only after BOTH initial polls have landed (jobs scan
+        # AND event/ledger replay) — otherwise session rows would be absent
+        # from the snapshot instead of correctly aged.
+        self._once_seen = {"jobs": False, "feeds": False}
+        self._once_finishing = False
 
     def compose(self) -> ComposeResult:
         """Build the static widget tree."""
@@ -228,11 +233,14 @@ class FleetApp(App[None]):
         self.post_message(JobsUpdated(self._jobs_source.scan()))
 
     def _tail_feeds(self) -> None:
-        """Thread worker: poll both tails and post new entries."""
+        """Thread worker: poll both tails and post new entries.
+
+        Posts even when empty: --once completion and liveness both key off
+        "a poll finished", not "a poll found something".
+        """
         events = self._events_tailer.poll()
         ledger = self._ledger_parser.poll()
-        if events or ledger:
-            self.post_message(FeedsUpdated(events, ledger))
+        self.post_message(FeedsUpdated(events, ledger))
 
     # UI-thread message handlers --------------------------------------
 
@@ -240,8 +248,7 @@ class FleetApp(App[None]):
         """Rebuild the agents table from a fresh snapshot."""
         self._snapshot = message.snapshot
         self._rebuild_table()
-        if self.once:
-            self.call_after_refresh(self.exit)
+        self._maybe_finish_once("jobs")
 
     def on_feeds_updated(self, message: FeedsUpdated) -> None:
         """Route new events/ledger entries into the feed panels."""
@@ -255,6 +262,21 @@ class FleetApp(App[None]):
                 activity.write(feed_line(event))
         for entry in message.ledger:
             comms.write(comms_line(entry))
+        self._maybe_finish_once("feeds")
+
+    def _maybe_finish_once(self, source: str) -> None:
+        """In --once mode, exit after both initial polls have been applied.
+
+        The final rebuild runs after the second poll lands so session rows
+        discovered from the event replay are in the snapshot table.
+        """
+        if not self.once or self._once_finishing:
+            return
+        self._once_seen[source] = True
+        if all(self._once_seen.values()):
+            self._once_finishing = True
+            self._rebuild_table()
+            self.call_after_refresh(self.exit)
 
     @staticmethod
     def _event_epoch(event: dict) -> float:

@@ -168,15 +168,19 @@ class JsonlEventListener(EventListener):
             if isinstance(metadata, dict):
                 data.update(metadata)
             parent_id = data.pop("parent_id", None)
+            # Authoritative fields are assigned AFTER metadata flattening —
+            # the event type and operation id are the source of truth, and
+            # a metadata dict carrying success/op_id keys must never
+            # override them.
             if event.event_type == EventType.OPERATION_COMPLETED:
-                data.setdefault("success", True)
+                data["success"] = True
             elif event.event_type == EventType.OPERATION_FAILED:
-                data.setdefault("success", False)
+                data["success"] = False
             elif event.event_type == EventType.OPERATION_CANCELLED:
-                data.setdefault("success", False)
-                data.setdefault("was_cancelled", True)
+                data["success"] = False
+                data["was_cancelled"] = True
             if event.operation_id:
-                data.setdefault("op_id", event.operation_id)
+                data["op_id"] = event.operation_id
             fleet_event = FleetEvent(
                 event=name,
                 session_id=self.session_id,

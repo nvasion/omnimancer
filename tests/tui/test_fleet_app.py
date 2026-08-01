@@ -173,6 +173,49 @@ class TestFleetAppData:
             assert states["fresh-se"] == "working"
             assert states["dead-ses"] == "stale"
 
+    async def test_once_waits_for_event_replay(self, tmp_path):
+        """--once must include session rows from the initial event replay:
+        exiting after the jobs scan alone would drop them entirely."""
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        event = dict(EVENT_SESSION_START)
+        event["session_id"] = "dead-sess-3333"
+        event["ts"] = "2026-08-01T03:14:34.686+00:00"
+        (events / "dead.jsonl").write_text(json.dumps(event) + "\n")
+
+        app = FleetApp(
+            jobs_dir=jobs,
+            events_dir=events,
+            project_dir=project,
+            refresh=0.05,
+            once=True,
+        )
+        # The app unmounts its widgets on exit, so snapshot the table at
+        # the exact moment --once decides to leave.
+        from textual.widgets import DataTable
+
+        rows_at_exit = []
+        original_exit = app.exit
+
+        def capturing_exit(*args, **kwargs):
+            table = app.query_one("#agents", DataTable)
+            for row_index in range(table.row_count):
+                rows_at_exit.append(
+                    [cell.plain for cell in table.get_row_at(row_index)]
+                )
+            original_exit(*args, **kwargs)
+
+        app.exit = capturing_exit  # type: ignore[method-assign]
+        async with app.run_test() as pilot:
+            await _settle(pilot, 0.6)
+
+        assert len(rows_at_exit) == 1
+        assert rows_at_exit[0][0] == "dead-ses"
+        assert rows_at_exit[0][2] == "stale"
+
     async def test_row_selection_opens_detail_modal(self, fleet_dirs):
         app = _app(fleet_dirs)
         async with app.run_test() as pilot:

@@ -176,8 +176,11 @@ def test_tailer_multibyte_split_across_polls(tmp_path: Path) -> None:
     # Create a line with a 4-byte UTF-8 character (𝄞)
     line = json.dumps({"v": "a𝄞b"}, ensure_ascii=False).encode("utf-8")
 
-    # Split the 4-byte sequence in half
-    split_index = 2  # Split inside the 4-byte sequence
+    # Cut two bytes INTO the 4-byte sequence — computed from its actual
+    # position so the test genuinely exercises a mid-code-point split.
+    glyph = "𝄞".encode("utf-8")
+    assert len(glyph) == 4
+    split_index = line.index(glyph) + 2
     part1 = line[:split_index]
     part2 = line[split_index:]
 
@@ -270,8 +273,8 @@ def test_logparser_multibyte_split_across_polls(tmp_path: Path) -> None:
     # Create a line with a 4-byte UTF-8 character (𝄞)
     line_bytes = b"### Spawned: aabbccdd - \xf0\x9d\x84\x9e\n"
 
-    # Split the 4-byte sequence in half
-    split_index = 18  # Split inside the 4-byte sequence
+    # Cut two bytes INTO the 4-byte sequence — computed, not hardcoded.
+    split_index = line_bytes.index(b"\xf0\x9d\x84\x9e") + 2
     part1 = line_bytes[:split_index]
     part2 = line_bytes[split_index:]
 

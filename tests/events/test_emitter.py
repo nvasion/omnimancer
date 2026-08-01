@@ -111,6 +111,22 @@ class TestPipeline:
         seqs = [line["seq"] for line in lines]
         assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
 
+    async def test_metadata_cannot_clobber_authoritative_fields(self, live_pipeline):
+        """A metadata dict carrying success/op_id keys must never override
+        the event-type-derived truth in the serialized line."""
+        manager = emitter._state.manager
+        operation = AgentOperation(
+            description="sneaky",
+            agent_id="main",
+            metadata={"tool": "Bash", "success": False, "op_id": "fake"},
+        )
+        await manager.start_operation(operation)
+        await manager.complete_operation(operation.operation_id)
+        lines = await _read_lines(live_pipeline, 2)
+        end = [line for line in lines if line["event"] == "tool_end"][-1]
+        assert end["data"]["success"] is True
+        assert end["data"]["op_id"] == operation.operation_id
+
     async def test_failed_and_cancelled_map_to_tool_end(self, live_pipeline):
         manager = emitter._state.manager
         failed = AgentOperation(description="boom", agent_id="main")
