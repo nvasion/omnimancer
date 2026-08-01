@@ -49,8 +49,10 @@ from .command_dispatch import CommandDispatchMixin
 from .commands import Command, parse_command
 from .completion import CompletionManager, CompletionMixin
 from .display import DisplayManager, DisplayMixin
+from .session import apply_session_overrides
 from .system_prompts import build_agent_prompt, get_agent_capabilities_prompt
 from .tool_handler import DUPLICATE_CALL_NUDGE, RepeatedCallTracker, ToolHandler
+from .turn_notify import TurnNotifier, fire_turn_complete
 
 logger = logging.getLogger(__name__)
 
@@ -61,39 +63,20 @@ except ImportError:
     __version__ = "unknown"
 
 
-def apply_session_overrides(
-    config_manager: "ConfigManager",
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    base_url: Optional[str] = None,
+def validate_prompt_options(
+    prompt: Optional[str], initial_prompt: Optional[str]
 ) -> None:
-    """Apply --provider/--model/--base-url overrides to the in-memory config.
+    """Reject simultaneous headless and interactive initial prompts.
 
-    These are ephemeral (never written to disk). ``initialize_providers()``
-    reads the in-memory config, so mutating it here is enough for the overrides
-    to take effect for the session.
+    Args:
+        prompt: Headless prompt value.
+        initial_prompt: Interactive first-message value.
+
+    Raises:
+        click.UsageError: If both prompt modes were requested.
     """
-    if not (provider or model or base_url):
-        return
-
-    from ..core.models import ProviderConfig
-
-    cfg = config_manager.get_config()
-    if provider:
-        cfg.default_provider = provider
-
-    target = provider or cfg.default_provider
-    if not target:
-        return
-
-    provider_cfg = cfg.providers.get(target)
-    if provider_cfg is None:
-        provider_cfg = ProviderConfig(model=model or "")
-        cfg.providers[target] = provider_cfg
-    if model:
-        provider_cfg.model = model
-    if base_url:
-        provider_cfg.base_url = base_url.rstrip("/")
+    if prompt is not None and initial_prompt is not None:
+        raise click.UsageError("--initial-prompt cannot be used with -p/--prompt")
 
 
 class CommandLineInterface(
@@ -109,16 +92,32 @@ class CommandLineInterface(
     formatting for the terminal-based interface.
     """
 
-    def __init__(self, engine: CoreEngine, no_approval: bool = False):
+    def __init__(
+        self,
+        engine: CoreEngine,
+        no_approval: bool = False,
+        full_trust: bool = False,
+        notify_cmd: Optional[str] = None,
+        initial_prompt: Optional[str] = None,
+        read_only: bool = False,
+    ) -> None:
         """
         Initialize the CLI interface.
 
         Args:
             engine: Core engine instance
             no_approval: Whether to skip approval prompts (DANGEROUS)
+            full_trust: Whether to relax project-local security restrictions.
+            notify_cmd: Optional external turn-completion command.
+            initial_prompt: Optional first message submitted before the input loop.
+            read_only: Whether to deny write and command operations for the session.
         """
         self.engine = engine
         self.no_approval = no_approval
+        self.full_trust = full_trust
+        self.initial_prompt = initial_prompt
+        self.read_only = read_only
+        self.turn_notifier = TurnNotifier(notify_cmd=notify_cmd, cwd=os.getcwd())
         # Initialize console with robust terminal handling and fallback mechanism
         self.console = self._initialize_console_with_fallback()
         self.running = False
@@ -164,7 +163,11 @@ class CommandLineInterface(
         # path. Only the fallback registers readline's atexit history
         # writer, so prompt_toolkit mode never touches readline_history.
         self.prompt_input = None
-        if sys.stdin.isatty() and sys.stdout.isatty():
+        if (
+            os.environ.get("OMNIMANCER_PLAIN_INPUT") != "1"
+            and sys.stdin.isatty()
+            and sys.stdout.isatty()
+        ):
             try:
                 from prompt_toolkit.completion import ThreadedCompleter
 
@@ -258,6 +261,13 @@ class CommandLineInterface(
                 # Continue without agent mode
 
             # Enhanced input already initialized in constructor
+
+            self._configure_agent_engine_session()
+
+            if self.initial_prompt is not None:
+                initial_prompt = self.initial_prompt
+                self.initial_prompt = None
+                await self._process_command(Command.create_chat_message(initial_prompt))
 
             # Main interaction loop
             while self.running and not self.signal_handler.shutdown_event.is_set():
@@ -611,6 +621,12 @@ class CommandLineInterface(
                 agent_engine, self.approval_integration
             )
 
+            if self.full_trust:
+                from .headless import HeadlessRunner
+
+                HeadlessRunner._enable_auto_approval(agent_engine)
+                HeadlessRunner._enable_full_trust(agent_engine)
+
             logger.info("✅ CLI approval integration set up successfully")
 
             # Clean up deferred setup params if they exist
@@ -622,6 +638,21 @@ class CommandLineInterface(
                 f"Failed to complete async approval integration setup: {e}",
                 exc_info=True,
             )
+
+    def _configure_agent_engine_session(self) -> None:
+        """Apply process-only trust and read-only settings to the agent engine."""
+        agent_engine = getattr(self.engine, "agent_engine", None)
+        if agent_engine is None:
+            return
+
+        if self.read_only and hasattr(agent_engine, "set_read_only"):
+            agent_engine.set_read_only(True)
+
+        if self.full_trust:
+            from .headless import HeadlessRunner
+
+            HeadlessRunner._enable_auto_approval(agent_engine)
+            HeadlessRunner._enable_full_trust(agent_engine)
 
     def _setup_file_interaction_integration(self) -> Any:
         """Set up file interaction integration."""
@@ -761,6 +792,21 @@ class CommandLineInterface(
         if not command.content.strip():
             return
 
+        self.turn_notifier.reset_turn()
+        self._turn_final_response = None
+
+        try:
+            await self._handle_chat_message_turn(command)
+        finally:
+            await fire_turn_complete(self.engine, self.turn_notifier)
+
+    async def _handle_chat_message_turn(self, command: Command) -> None:
+        """Process one non-empty chat turn without finalization.
+
+        Args:
+            command: Chat message command whose completion is owned by the caller.
+        """
+
         # Show user message
         self._show_user_message(command.content)
 
@@ -863,6 +909,11 @@ class CommandLineInterface(
                                 response.content, response.model_used
                             )
                         self._show_token_status(response)
+                        final_response = self._turn_final_response
+                        if agent_mode and final_response is not None:
+                            self.turn_notifier.record_assistant(
+                                final_response.content, final_response
+                            )
                     else:
                         self._show_error(f"Failed to get response: {response.error}")
 
@@ -1195,6 +1246,24 @@ def main() -> None:
         help="Run in headless mode with the given prompt",
     )
     @click.option(
+        "--initial-prompt",
+        type=str,
+        default=None,
+        help="Submit an initial message, then continue in interactive mode",
+    )
+    @click.option(
+        "--notify-cmd",
+        type=str,
+        default=None,
+        help="Command invoked with a turn-completion JSON payload",
+    )
+    @click.option(
+        "--read-only",
+        is_flag=True,
+        default=False,
+        help="Deny file writes and command execution for this session",
+    )
+    @click.option(
         "--output-format",
         "output_format",
         type=click.Choice(["text", "json", "stream-json"]),
@@ -1245,6 +1314,9 @@ def main() -> None:
         config: Any,
         no_approval: Any,
         prompt: Any,
+        initial_prompt: Any,
+        notify_cmd: Any,
+        read_only: Any,
         output_format: Any,
         verbose: Any,
         max_iterations: Any,
@@ -1264,8 +1336,10 @@ def main() -> None:
             click.echo(f"Omnimancer CLI v{__version__}")
             return
 
+        validate_prompt_options(prompt, initial_prompt)
+
         # Headless pipe mode
-        if prompt:
+        if prompt is not None:
             full_prompt = prompt
 
             if not sys.stdin.isatty():
@@ -1286,6 +1360,8 @@ def main() -> None:
                     model=model,
                     base_url=base_url,
                     max_iterations=max_iterations,
+                    notify_cmd=notify_cmd,
+                    read_only=read_only,
                 )
             )
             sys.exit(exit_code)
@@ -1301,6 +1377,10 @@ def main() -> None:
             cli = CommandLineInterface(
                 engine,
                 no_approval=no_approval or dangerously_skip_permissions,
+                full_trust=dangerously_skip_permissions,
+                notify_cmd=notify_cmd,
+                initial_prompt=initial_prompt,
+                read_only=read_only,
             )
             cli.start()
 

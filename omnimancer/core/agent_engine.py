@@ -25,8 +25,9 @@ from .mcp_integration_layer import (
     ToolCapability,
     ToolExecutionContext,
 )
+from .models import PermissionRule, PermissionsConfig
 from .security.approval_workflow import ApprovalWorkflow
-from .security.permission_rules import PermissionDecision
+from .security.permission_rules import PermissionDecision, PermissionRuleEngine
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,35 @@ class AgentEngine(CoreEngine):
         self.pending_operations: List[Operation] = []
         self.operation_history: List[Dict[str, Any]] = []
         self.current_workflow: Optional[str] = None
+        self._session_permissions = PermissionsConfig()
+
+    def set_read_only(self, enabled: bool) -> None:
+        """Deny mutating and command operations for this process only.
+
+        Args:
+            enabled: Whether session-level read-only rules should be active.
+        """
+        denied_tools = (
+            OperationType.FILE_WRITE,
+            OperationType.FILE_DELETE,
+            OperationType.DIRECTORY_CREATE,
+            OperationType.DIRECTORY_DELETE,
+            OperationType.COMMAND_EXECUTE,
+        )
+        rules = (
+            [PermissionRule(tool=operation.value) for operation in denied_tools]
+            if enabled
+            else []
+        )
+        self._session_permissions = PermissionsConfig(always_deny=rules)
+
+    def _permission_decision(self, tool: str, target: str = "") -> PermissionDecision:
+        """Apply session rules before the persisted configuration rules."""
+        session_config = getattr(self, "_session_permissions", None)
+        session_decision = PermissionRuleEngine(session_config).evaluate(tool, target)
+        if session_decision == PermissionDecision.DENY:
+            return session_decision
+        return super()._permission_decision(tool, target)
 
     def configure_approval_settings(
         self,

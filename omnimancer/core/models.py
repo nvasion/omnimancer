@@ -1230,6 +1230,8 @@ class HooksConfig(BaseModel):
     tool_use_request: List[HookCommand] = []
     # Fired after an agent tool/operation completes (observe-only).
     post_tool: List[HookCommand] = []
+    # Fired after an interactive or headless agent turn completes (observe-only).
+    turn_complete: List[HookCommand] = []
 
     def hooks_for(self, event: str) -> List[HookCommand]:
         """Return the configured hooks for ``event`` (empty if unknown)."""

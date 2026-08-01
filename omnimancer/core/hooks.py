@@ -124,7 +124,10 @@ class HooksManager:
             return outcome
 
         payload = dict(context or {})
-        payload.setdefault("event", event)
+        # turn_complete is also sent to the external notifier. Keep that
+        # payload byte-for-schema compatible instead of injecting an extra key.
+        if event != "turn_complete":
+            payload.setdefault("event", event)
         stdin_data = self._safe_json(payload)
         env_extra = self._env_for(event, payload)
 
