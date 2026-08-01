@@ -201,6 +201,18 @@ def events_enabled() -> bool:
     return _state.manager is not None and _state.manager.running
 
 
+def register_listener(listener: EventListener) -> bool:
+    """Attach an extra in-process listener (e.g. the REPL activity panel).
+
+    Returns:
+        True when attached; False when the pipeline is down.
+    """
+    if not events_enabled() or _state.manager is None:
+        return False
+    _state.manager.add_event_listener(listener)
+    return True
+
+
 def default_events_dir() -> Path:
     """Return the default events directory (~/.omnimancer/events)."""
     return Path.home() / ".omnimancer" / "events"

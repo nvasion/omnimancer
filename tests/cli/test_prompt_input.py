@@ -98,3 +98,75 @@ class TestHistoryMigration:
         content = (tmp_path / "prompt_history").read_text()
         assert "+kept" in content
         assert "+old" not in content
+
+
+class TestStatusToolbar:
+    @pytest.mark.asyncio
+    async def test_toolbar_uses_status_provider(self, make_prompt):
+        """Test that toolbar uses status provider when provided."""
+
+        def status_provider():
+            return "gateway/qwen3-coder-30b · $0.03 · read-only"
+
+        prompt = make_prompt("test\r", history_dir=None)
+        # Manually set the status provider since we're not using the factory
+        prompt._status_provider = status_provider
+
+        # Access the toolbar rendering directly
+        toolbar_text = prompt._render_toolbar()
+        assert toolbar_text is not None
+        assert "gateway/qwen3-coder-30b" in toolbar_text
+        assert "read-only" in toolbar_text
+
+    @pytest.mark.asyncio
+    async def test_toolbar_combines_status_and_approval_mode(self, make_prompt):
+        """Test that toolbar combines status and approval mode when both present."""
+
+        def status_provider():
+            return "m1 · $0.00"
+
+        def mode_provider():
+            return "ask"
+
+        prompt = make_prompt("test\r", history_dir=None)
+        prompt._status_provider = status_provider
+        prompt._mode_provider = mode_provider
+
+        toolbar_text = prompt._render_toolbar()
+        assert toolbar_text is not None
+        assert "m1 · $0.00" in toolbar_text
+        assert "approval: ask" in toolbar_text
+        assert " | " in toolbar_text  # Should be combined with separator
+
+    @pytest.mark.asyncio
+    async def test_toolbar_none_without_provider_or_mode(self, make_prompt):
+        """Test that toolbar is None when no status provider and normal mode."""
+
+        def mode_provider():
+            return "normal"
+
+        prompt = make_prompt("test\r", history_dir=None)
+        prompt._mode_provider = mode_provider
+        # No status_provider set
+
+        toolbar_text = prompt._render_toolbar()
+        assert toolbar_text is None  # Should be None like original behavior
+
+    @pytest.mark.asyncio
+    async def test_toolbar_provider_exception_safe(self, make_prompt):
+        """Test that toolbar handles exceptions in status provider gracefully."""
+
+        def failing_status_provider():
+            raise RuntimeError("Test exception")
+
+        def mode_provider():
+            return "ask"
+
+        prompt = make_prompt("test\r", history_dir=None)
+        prompt._status_provider = failing_status_provider
+        prompt._mode_provider = mode_provider
+
+        # Should fall back to mode-only behavior
+        toolbar_text = prompt._render_toolbar()
+        assert toolbar_text is not None  # Should still show approval mode
+        assert "approval: ask" in toolbar_text

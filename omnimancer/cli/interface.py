@@ -122,6 +122,8 @@ class CommandLineInterface(
         self.read_only = read_only
         self.turn_notifier = TurnNotifier(notify_cmd=notify_cmd, cwd=os.getcwd())
         self._turn_seq = 0
+        # Set in _async_start when the event feed is live.
+        self.turn_activity: Optional[Any] = None
         # Initialize console with robust terminal handling and fallback mechanism
         self.console = self._initialize_console_with_fallback()
         self.running = False
@@ -186,6 +188,7 @@ class CommandLineInterface(
                     ),
                     mode_toggle=self._cycle_session_approval_mode,
                     mode_provider=self._session_approval_mode_name,
+                    status_provider=self._toolbar_status,
                 )
             except Exception as e:
                 logger.warning(
@@ -271,9 +274,16 @@ class CommandLineInterface(
             # Fleet event feed: one JSONL per session (default-on; see
             # EventsConfig). init/emit never raise and no-op when disabled.
             session_config = self.engine.config_manager.get_config()
-            await fleet_events.init_events(
+            events_live = await fleet_events.init_events(
                 self.turn_notifier.session_id, "interactive", session_config.events
             )
+            if events_live:
+                # Recent-tool-activity window rendered inside the streaming
+                # display's existing Live (never a second Live region).
+                from ..ui.turn_activity import TurnActivityLog
+
+                self.turn_activity = TurnActivityLog()
+                fleet_events.register_listener(self.turn_activity)
             provider_entry = session_config.providers.get(
                 session_config.default_provider
             )
@@ -716,6 +726,28 @@ class CommandLineInterface(
         except Exception as e:
             logger.error("Failed to set up file interaction" f" integration: {e}")
 
+    def _toolbar_status(self) -> Optional[str]:
+        """Persistent status text: provider/model, session cost, read-only.
+
+        Rendered by PromptInput's bottom toolbar on every prompt; must never
+        raise (the toolbar falls back to approval-mode-only on error).
+        """
+        try:
+            config = self.engine.config_manager.get_config()
+            provider_name = config.default_provider
+            entry = config.providers.get(provider_name)
+            model = getattr(entry, "model", None) or ""
+            parts = [f"{provider_name}/{model}" if model else provider_name]
+            usage = getattr(self, "usage", None)
+            if usage is not None:
+                cost = usage.total.get("total_cost_usd", 0.0)
+                parts.append(f"${cost:.2f}")
+            if getattr(self, "read_only", False):
+                parts.append("read-only")
+            return " · ".join(parts)
+        except Exception:
+            return None
+
     def _reset_terminal(self) -> None:
         """Reset terminal to ensure it's in normal mode."""
         try:
@@ -820,6 +852,8 @@ class CommandLineInterface(
 
         self.turn_notifier.reset_turn()
         self._turn_final_response = None
+        if self.turn_activity is not None:
+            self.turn_activity.reset_turn()
         self._turn_seq += 1
         await fleet_events.emit_event(
             EventType.TURN_START,
@@ -1132,7 +1166,12 @@ class CommandLineInterface(
         from ..core.models import ChatResponse, StreamEventType, describe_tool_calls
         from ..ui.streaming_display import StreamingDisplay
 
-        display = StreamingDisplay(self.console)
+        display = StreamingDisplay(
+            self.console,
+            activity_provider=(
+                self.turn_activity.render if self.turn_activity is not None else None
+            ),
+        )
         display.start()
         final_response: Optional[ChatResponse] = None
 
@@ -1186,7 +1225,12 @@ class CommandLineInterface(
         from ..core.models import ChatResponse, StreamEventType
         from ..ui.streaming_display import StreamingDisplay
 
-        display = StreamingDisplay(self.console)
+        display = StreamingDisplay(
+            self.console,
+            activity_provider=(
+                self.turn_activity.render if self.turn_activity is not None else None
+            ),
+        )
         display.start()
         final_response: Optional[ChatResponse] = None
 

@@ -177,6 +177,7 @@ async def test_interactive_turn_finalizes_once_for_every_outcome(
     cli.engine = MagicMock()
     cli.turn_notifier = MagicMock()
     cli._turn_seq = 0
+    cli.turn_activity = None
     cli._handle_chat_message_turn = AsyncMock(side_effect=effect)
     command = Command.create_chat_message("hello")
 
