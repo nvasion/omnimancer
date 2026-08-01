@@ -45,7 +45,11 @@ class StreamingDisplay:
 
     def stop(self) -> None:
         if self._live:
-            self._live.update(self._render())
+            # Persist ONLY the assistant panel to scrollback. Activity rows
+            # are live-context: leaving them in the final frame duplicates
+            # the per-tool result lines the agent loop already prints
+            # (field-reported as doubled tool output).
+            self._live.update(self._render(include_activity=False))
             self._live.stop()
             self._live = None
 
@@ -82,7 +86,7 @@ class StreamingDisplay:
         if self._live:
             self._live.update(self._render())
 
-    def _render(self) -> RenderableType:
+    def _render(self, include_activity: bool = True) -> RenderableType:
         # Progressive markdown: re-parsing a few KB at 15fps is cheap, and
         # an unclosed fence mid-stream just renders as code-so-far.
         content: Union[str, Markdown]
@@ -94,7 +98,7 @@ class StreamingDisplay:
             except Exception:
                 content = self.accumulated_text
         panel = Panel(content, title=f"Assistant ({self.model})", border_style="blue")
-        if self._activity_provider is not None:
+        if include_activity and self._activity_provider is not None:
             try:
                 activity = self._activity_provider()
             except Exception:

@@ -243,3 +243,23 @@ class TestFleetAppData:
             await _settle(pilot)
             assert isinstance(app.screen, JobDetailScreen)
             assert app.screen.job_id == "aabbccdd"
+
+    async def test_detail_modal_survives_ansi_log_tail(self, fleet_dirs):
+        """Field-reported crash: tmux .log files carry raw ANSI escapes and
+        bracket junk that exploded Textual's markup parser in the modal."""
+        jobs, _events, _project = fleet_dirs
+        (jobs / "aabbccdd.log").write_bytes(
+            b"\x1b[31mred line\x1b[39m\x1b[49m\x1b[0m\n"
+            b"[not markup] [bold nonsense [\n"
+        )
+        app = _app(fleet_dirs)
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            await pilot.press("enter")
+            await _settle(pilot)
+            assert isinstance(app.screen, JobDetailScreen)
+            assert "red line" in app.screen.log_tail
+            # And it must survive being rendered + dismissed.
+            await pilot.press("escape")
+            await _settle(pilot)
+            assert not isinstance(app.screen, JobDetailScreen)

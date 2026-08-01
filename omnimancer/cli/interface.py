@@ -733,15 +733,24 @@ class CommandLineInterface(
     def _toolbar_status(self) -> Optional[str]:
         """Persistent status text: provider/model, session cost, read-only.
 
-        Rendered by PromptInput's bottom toolbar on every prompt; must never
-        raise (the toolbar falls back to approval-mode-only on error).
+        Reads the LIVE session provider (engine.current_provider), not the
+        stored config defaults — /switch must be reflected on the very next
+        prompt. Rendered by PromptInput's bottom toolbar; must never raise
+        (the toolbar falls back to approval-mode-only on error).
         """
         try:
-            config = self.engine.config_manager.get_config()
-            provider_name = config.default_provider
-            entry = config.providers.get(provider_name)
-            model = getattr(entry, "model", None) or ""
-            parts = [f"{provider_name}/{model}" if model else provider_name]
+            provider = getattr(self.engine, "current_provider", None)
+            if provider is None:
+                return None
+            entry_name = None
+            for name, candidate in getattr(self.engine, "providers", {}).items():
+                if candidate is provider:
+                    entry_name = name
+                    break
+            if entry_name is None:
+                entry_name = provider.get_provider_name()
+            model = getattr(provider, "model", "") or ""
+            parts = [f"{entry_name}/{model}" if model else entry_name]
             usage = getattr(self, "usage", None)
             if usage is not None:
                 cost = usage.total.get("total_cost_usd", 0.0)

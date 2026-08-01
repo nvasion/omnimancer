@@ -82,6 +82,24 @@ class TestStreamingDisplayComposition:
         # Load-bearing: the agent loop reads accumulated_text back.
         assert display.accumulated_text == "hello"
 
+    def test_stop_persists_panel_only(self):
+        """Field-reported: persisting activity rows in the final Live frame
+        duplicated the per-tool scrollback lines on every stream segment."""
+        from unittest.mock import MagicMock
+
+        table = Table.grid()
+        display = StreamingDisplay(self._console(), activity_provider=lambda: table)
+        display.accumulated_text = "hello"
+        live = MagicMock()
+        display._live = live
+        display.stop()
+        assert display._live is None
+        live.stop.assert_called_once()
+        (frame,), _ = live.update.call_args
+        # The frame handed to the final update is the bare panel, never a
+        # Group carrying the activity table.
+        assert isinstance(frame, Panel)
+
     def test_render_falls_back_when_provider_empty_or_raises(self):
         display = StreamingDisplay(self._console(), activity_provider=lambda: None)
         assert isinstance(display._render(), Panel)

@@ -22,6 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, VerticalScroll
@@ -106,9 +107,14 @@ class JobDetailScreen(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="detail"):
             yield Static(f"[b]Job {self.job_id}[/b]", id="detail-title")
-            yield Static(json.dumps(self.raw_job, indent=2, default=str))
+            # Text objects bypass markup parsing entirely: job JSON and
+            # tmux log tails contain brackets and raw ANSI escapes that
+            # crash the markup parser (field-reported). from_ansi renders
+            # the log's own colors instead of choking on them.
+            yield Static(Text(json.dumps(self.raw_job, indent=2, default=str)))
             if self.log_tail:
-                yield Static(f"[b]log tail[/b]\n{self.log_tail}")
+                yield Static(Text("log tail", style="bold"))
+                yield Static(Text.from_ansi(self.log_tail))
 
 
 class FleetApp(App[None]):
