@@ -153,7 +153,9 @@ def build_line(payload: Dict[str, Any]) -> Optional[str]:
     if event is None:
         return None
     session_id = payload.get("session_id")
-    if not isinstance(session_id, str) or not SESSION_ID_RE.match(session_id):
+    # fullmatch, not match: $ tolerates a trailing newline, which would
+    # mint a filename that escapes the retention/budget sweeps.
+    if not isinstance(session_id, str) or not SESSION_ID_RE.fullmatch(session_id):
         return None
     agent_id, parent_id = _agent_identity(payload)
     envelope = {
@@ -194,7 +196,12 @@ def main() -> int:
         path = os.path.join(directory, f"omn-{payload['session_id'].lower()}.jsonl")
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
         try:
-            os.fchmod(fd, 0o600)
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, 0o600)
+            else:
+                # Windows has no fchmod; best-effort by path so the write
+                # below still happens instead of dying on AttributeError.
+                os.chmod(path, 0o600)
             os.write(fd, (line + "\n").encode("utf-8"))
         finally:
             os.close(fd)

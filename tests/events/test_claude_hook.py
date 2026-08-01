@@ -210,14 +210,41 @@ class TestSafety:
 
     def test_non_uuid_session_id_rejected(self, tmp_path):
         # Loose hex ids would mint filenames outside SESSION_FILE_RE and
-        # escape the retention/budget sweeps entirely.
-        for bad in ("deadbeef", "a" * 36, "aaaabbbb-cccc-dddd-eeee"):
+        # escape the retention/budget sweeps entirely. The trailing-newline
+        # case is the $-anchor footgun: match() tolerates it, fullmatch
+        # must not.
+        for bad in (
+            "deadbeef",
+            "a" * 36,
+            "aaaabbbb-cccc-dddd-eeee",
+            SESSION + "\n",
+        ):
             result = _run(
                 _payload("Stop", last_assistant_message="x") | {"session_id": bad},
                 tmp_path,
             )
             assert result.returncode == 0
         assert not tmp_path.exists() or not list(tmp_path.iterdir())
+
+    def test_writes_without_fchmod(self, tmp_path, monkeypatch):
+        """Windows has no os.fchmod: the hook must fall back to chmod-by-
+        path and still write the event (an AttributeError was previously
+        swallowed, silently emitting nothing)."""
+        import io
+
+        import omn_fleet_hook
+
+        monkeypatch.delattr(os, "fchmod", raising=False)
+        monkeypatch.setenv("OMNIMANCER_EVENTS_DIR", str(tmp_path))
+        monkeypatch.delenv("OMNIMANCER_EVENTS", raising=False)
+        payload = json.dumps(_payload("Stop", last_assistant_message="x")).encode()
+
+        class _Stdin:
+            buffer = io.BytesIO(payload)
+
+        monkeypatch.setattr(sys, "stdin", _Stdin())
+        assert omn_fleet_hook.main() == 0
+        assert len(_lines(tmp_path)) == 1
 
     def test_file_permissions(self, tmp_path):
         events_dir = tmp_path / "evdir"

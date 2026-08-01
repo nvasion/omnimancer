@@ -246,7 +246,7 @@ def cleanup_old_files(
         for item in directory.iterdir():
             if not (item.is_file() and item.suffix == ".jsonl"):
                 continue
-            if pattern is not None and not pattern.match(item.name):
+            if pattern is not None and not pattern.fullmatch(item.name):
                 continue
             try:
                 if item.stat().st_mtime < cutoff_time:
@@ -306,7 +306,7 @@ def enforce_size_budget(
     for item in directory.iterdir():
         if not (item.is_file() and item.suffix == ".jsonl"):
             continue
-        if pattern is not None and not pattern.match(item.name):
+        if pattern is not None and not pattern.fullmatch(item.name):
             continue
         try:
             st = item.stat()
