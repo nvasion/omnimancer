@@ -216,6 +216,25 @@ class TestFleetAppData:
         assert rows_at_exit[0][0] == "dead-ses"
         assert rows_at_exit[0][2] == "stale"
 
+    async def test_once_deadline_exits_nonzero_on_wedged_source(self, tmp_path):
+        """If an initial poll never lands, --once must exit non-zero with a
+        warning — a partial snapshot must never masquerade as complete."""
+        for name in ("jobs", "events", "proj"):
+            (tmp_path / name).mkdir()
+        app = FleetApp(
+            jobs_dir=tmp_path / "jobs",
+            events_dir=tmp_path / "events",
+            project_dir=tmp_path / "proj",
+            refresh=0.05,
+            once=True,
+            once_fallback_s=0.3,
+        )
+        # Wedge the jobs source: its snapshot message never arrives.
+        app._scan_jobs = lambda: None  # type: ignore[method-assign]
+        async with app.run_test() as pilot:
+            await _settle(pilot, 0.8)
+        assert app.return_code == 1
+
     async def test_row_selection_opens_detail_modal(self, fleet_dirs):
         app = _app(fleet_dirs)
         async with app.run_test() as pilot:

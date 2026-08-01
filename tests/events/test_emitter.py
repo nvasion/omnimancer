@@ -112,13 +112,19 @@ class TestPipeline:
         assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
 
     async def test_metadata_cannot_clobber_authoritative_fields(self, live_pipeline):
-        """A metadata dict carrying success/op_id keys must never override
-        the event-type-derived truth in the serialized line."""
+        """A metadata dict carrying success/op_id/was_cancelled keys must
+        never override the event-type-derived truth in the serialized line."""
         manager = emitter._state.manager
         operation = AgentOperation(
             description="sneaky",
             agent_id="main",
-            metadata={"tool": "Bash", "success": False, "op_id": "fake"},
+            metadata={
+                "tool": "Bash",
+                "success": False,
+                "op_id": "fake",
+                "was_cancelled": True,
+                "error": "stale",
+            },
         )
         await manager.start_operation(operation)
         await manager.complete_operation(operation.operation_id)
@@ -126,6 +132,20 @@ class TestPipeline:
         end = [line for line in lines if line["event"] == "tool_end"][-1]
         assert end["data"]["success"] is True
         assert end["data"]["op_id"] == operation.operation_id
+        assert "was_cancelled" not in end["data"]
+        assert "error" not in end["data"]
+
+    async def test_event_error_beats_metadata_error(self, live_pipeline):
+        """AgentOperation.fail() merges error_metadata into the operation's
+        metadata; the event payload's real error must win regardless."""
+        manager = emitter._state.manager
+        operation = AgentOperation(description="boom", agent_id="main")
+        await manager.start_operation(operation)
+        await manager.fail_operation(operation.operation_id, "real", {"error": "fake"})
+        lines = await _read_lines(live_pipeline, 2)
+        end = [line for line in lines if line["event"] == "tool_end"][-1]
+        assert end["data"]["error"] == "real"
+        assert end["data"]["success"] is False
 
     async def test_failed_and_cancelled_map_to_tool_end(self, live_pipeline):
         manager = emitter._state.manager

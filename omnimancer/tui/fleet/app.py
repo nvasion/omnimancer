@@ -152,6 +152,7 @@ class FleetApp(App[None]):
         project_dir: Path,
         refresh: float = 1.0,
         once: bool = False,
+        once_fallback_s: float = 10.0,
     ) -> None:
         """Store data-source locations and refresh cadence.
 
@@ -161,6 +162,9 @@ class FleetApp(App[None]):
             project_dir: project root containing agents.log.
             refresh: jobs rescan interval seconds; tails poll at half this.
             once: render a single snapshot and exit (smoke/scripting mode).
+            once_fallback_s: --once deadline for the initial polls; hitting
+                it exits with return code 1 and an incompleteness warning
+                instead of silently shipping a partial snapshot.
         """
         super().__init__()
         self.jobs_dir = jobs_dir
@@ -168,6 +172,7 @@ class FleetApp(App[None]):
         self.project_dir = project_dir
         self.refresh_interval = refresh
         self.once = once
+        self.once_fallback_s = once_fallback_s
         self.paused = False
         self._jobs_source = JobsSource(jobs_dir)
         self._events_tailer = EventsTailer(events_dir)
@@ -202,9 +207,11 @@ class FleetApp(App[None]):
         self.refresh_jobs()
         self.refresh_feeds()
         if self.once:
-            # Snapshot mode exits after the first populated table render
-            # (see on_jobs_updated); this timer is the no-data fallback.
-            self.set_timer(3.0, self.exit)
+            # Snapshot mode exits after BOTH initial polls have been
+            # applied (_maybe_finish_once); this deadline is the wedged-
+            # source escape hatch, and it reports incompleteness instead
+            # of silently shipping a partial snapshot.
+            self.set_timer(self.once_fallback_s, self._once_deadline)
 
     def action_toggle_pause(self) -> None:
         """Toggle feed auto-scroll / polling."""
@@ -277,6 +284,26 @@ class FleetApp(App[None]):
             self._once_finishing = True
             self._rebuild_table()
             self.call_after_refresh(self.exit)
+
+    def _once_deadline(self) -> None:
+        """--once escape hatch for a wedged data source.
+
+        Exits non-zero with a warning: a deadline exit means the snapshot
+        is missing at least one initial poll and must not be mistaken for
+        a complete render.
+        """
+        if self._once_finishing:
+            return
+        self._once_finishing = True
+        missing = [name for name, seen in self._once_seen.items() if not seen]
+        self._rebuild_table()
+        self.exit(
+            return_code=1,
+            message=(
+                "omn fleet --once: timed out waiting for initial data "
+                f"({', '.join(missing)}); snapshot incomplete"
+            ),
+        )
 
     @staticmethod
     def _event_epoch(event: dict) -> float:

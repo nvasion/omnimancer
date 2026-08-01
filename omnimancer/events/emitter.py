@@ -163,24 +163,32 @@ class JsonlEventListener(EventListener):
             name = _EVENT_NAME_BY_TYPE.get(event.event_type)
             if name is None:
                 return
-            data = dict(event.data or {})
-            metadata = data.pop("metadata", None)
+            # Precedence, lowest to highest: flattened operation metadata,
+            # then the event's own payload (so e.g. fail_operation's real
+            # error beats an "error" key that AgentOperation.fail() merged
+            # into metadata), then the event-type-derived truth.
+            payload = dict(event.data or {})
+            metadata = payload.pop("metadata", None)
+            data: Dict[str, Any] = {}
             if isinstance(metadata, dict):
                 data.update(metadata)
+            data.update(payload)
             parent_id = data.pop("parent_id", None)
-            # Authoritative fields are assigned AFTER metadata flattening —
-            # the event type and operation id are the source of truth, and
-            # a metadata dict carrying success/op_id keys must never
-            # override them.
             if event.event_type == EventType.OPERATION_COMPLETED:
                 data["success"] = True
+                data.pop("was_cancelled", None)
+                data.pop("error", None)
             elif event.event_type == EventType.OPERATION_FAILED:
                 data["success"] = False
+                data.pop("was_cancelled", None)
             elif event.event_type == EventType.OPERATION_CANCELLED:
                 data["success"] = False
                 data["was_cancelled"] = True
             if event.operation_id:
                 data["op_id"] = event.operation_id
+            # Clip at serialization — the one point every line passes
+            # through, regardless of which merge branch a field came from.
+            data = _clip(data)
             fleet_event = FleetEvent(
                 event=name,
                 session_id=self.session_id,
