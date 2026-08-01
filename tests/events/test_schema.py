@@ -105,6 +105,21 @@ def test_translate_all_members():
         assert translate_operation_type(member) is status_member
 
 
+def test_translate_unmapped_degrades_to_api_call():
+    """An unmapped operation type degrades to API_CALL, never raises.
+
+    translate_operation_type runs on the agent's tool path; if the map
+    ever drifts behind the enum, the event must be mislabeled rather
+    than crash the turn (the exhaustive test above still fails CI).
+    """
+    from omnimancer.core.agent.status_core import OperationType as StatusOperationType
+
+    class _UnmappedOp:
+        """Stand-in for a future enum member missing from the map."""
+
+    assert translate_operation_type(_UnmappedOp()) is StatusOperationType.API_CALL
+
+
 def test_event_name_constants():
     """Test that all event name constants are correctly defined."""
     assert EVENT_SESSION_START == "session_start"

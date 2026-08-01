@@ -134,6 +134,10 @@ def translate_operation_type(op: AgentOperationType) -> StatusOperationType:
         op: Agent operation type to translate
 
     Returns:
-        Corresponding status operation type
+        Corresponding status operation type. An unmapped member degrades
+        to API_CALL instead of raising: this runs on the agent's tool
+        path (emitter.start_tool_operation, outside its try/except), so
+        a mapping gap must mislabel an event, never crash the turn.
+        test_translate_all_members keeps the map exhaustive in CI.
     """
-    return _OP_TYPE_MAP[op]
+    return _OP_TYPE_MAP.get(op, StatusOperationType.API_CALL)

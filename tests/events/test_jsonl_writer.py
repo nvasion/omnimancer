@@ -40,6 +40,25 @@ def test_appends_to_existing_file(tmp_path: pathlib.Path) -> None:
     w.shutdown()
 
 
+def test_repairs_preexisting_permissive_file(tmp_path: pathlib.Path) -> None:
+    """A pre-existing file with loose permissions is repaired to 0o600.
+
+    os.open's mode only applies at creation, so a file left behind with
+    permissive bits (e.g. by an older version) must be chmod-repaired on
+    the first append.
+    """
+    file_path = tmp_path / "s.jsonl"
+    file_path.write_text('{"old":1}\n')
+    os.chmod(file_path, 0o666)
+
+    w = JsonlWriter(file_path)
+    assert w.enqueue('{"new":2}') is True
+    w.flush()
+    w.shutdown()
+
+    assert (file_path.stat().st_mode & 0o777) == 0o600
+
+
 def test_drop_on_full_never_blocks_never_raises(tmp_path: pathlib.Path) -> None:
     """Test that queue drops items when full and never blocks or raises."""
     w = JsonlWriter(tmp_path / "s.jsonl", queue_size=2, autostart=False)

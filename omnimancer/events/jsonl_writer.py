@@ -124,6 +124,17 @@ class JsonlWriter:
     def _open_append(self):  # type: ignore[no-untyped-def]
         """Open the event file for appending with owner-only permissions."""
         fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        # The mode above only applies at creation: repair a pre-existing
+        # permissive file too — event lines carry command/output previews.
+        # Best-effort; a chmod failure must not block the write itself.
+        try:
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, 0o600)
+            else:
+                # Windows has no fchmod; fall back to chmod by path.
+                os.chmod(self._path, 0o600)
+        except OSError as e:
+            logger.debug(f"event file chmod failed: {e}")
         return os.fdopen(fd, "a", encoding="utf-8")
 
     def _drain_loop(self) -> None:
