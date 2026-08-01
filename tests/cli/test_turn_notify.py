@@ -143,6 +143,7 @@ async def test_headless_notifier_and_hook_share_payload(tmp_path) -> None:
         cost_estimate=0.02,
     )
     engine = MagicMock()
+    engine.runtime_identity.return_value = ("p", "test-model")
     engine.agent_engine = MagicMock()
     engine.config_manager.get_config.return_value.default_provider = "test"
     engine.provider_supports_tools.return_value = True

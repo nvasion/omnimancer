@@ -107,6 +107,7 @@ class TestFleetAppSmoke:
                 "backend",
                 "state",
                 "model",
+                "provider",
                 "turns",
                 "blocker",
                 "usage",

@@ -71,7 +71,32 @@ class TestStreamJsonSchemaLock:
     def test_error_keys(self):
         emitter, buf = self._emitter()
         emitter.emit_error("boom")
-        assert self._keys(buf) == {"type", "is_error", "message", "session_id"}
+        assert self._keys(buf) == {
+            "type",
+            "is_error",
+            "message",
+            "session_id",
+            "model",
+            "provider",
+        }
+
+    def test_result_keys(self):
+        emitter, buf = self._emitter()
+        emitter.emit_result("hi", "m", {}, 0.0, "end_turn")
+        assert self._keys(buf) == {
+            "type",
+            "subtype",
+            "is_error",
+            "result",
+            "model",
+            "provider",
+            "num_turns",
+            "usage",
+            "total_cost_usd",
+            "stop_reason",
+            "stop_cause",
+            "session_id",
+        }
 
 
 def _headless_config(events_dir) -> Config:
@@ -85,6 +110,7 @@ def _headless_config(events_dir) -> Config:
 
 def _mock_engine(events_dir) -> MagicMock:
     engine = MagicMock()
+    engine.runtime_identity.return_value = ("p", "test-model")
     engine.config_manager.get_config.return_value = _headless_config(events_dir)
     engine.provider_supports_tools.return_value = True
     engine.send_message_with_tools = AsyncMock(
@@ -153,3 +179,34 @@ class TestHeadlessRunnerEventFeed:
         status = await runner.run("say DONE")
         assert status == 0
         assert not list(tmp_path.glob("*.jsonl"))
+
+    @pytest.mark.asyncio
+    async def test_session_start_reports_runtime_identity(self, tmp_path):
+        engine = MagicMock()
+        engine.runtime_identity.return_value = ("gateway", "qwen3.5-9b")
+        engine.config_manager.get_config.return_value = _headless_config(tmp_path)
+        engine.provider_supports_tools.return_value = True
+        engine.send_message_with_tools = AsyncMock(
+            return_value=ChatResponse(
+                content="DONE",
+                model_used="test-model",
+                tokens_used=3,
+                input_tokens=2,
+                output_tokens=1,
+                stop_reason="end_turn",
+            )
+        )
+        engine._fire_hook = AsyncMock()
+        runner = HeadlessRunner(engine, OutputFormat.STREAM_JSON)
+        status = await runner.run("say DONE")
+        assert status == 0
+
+        event_path = tmp_path / f"omn-{runner._turn_notifier.session_id}.jsonl"
+        events = [
+            json.loads(line)
+            for line in event_path.read_text().splitlines()
+            if line.strip()
+        ]
+        by_name = {event["event"]: event for event in events}
+        assert by_name["session_start"]["data"]["model"] == "qwen3.5-9b"
+        assert by_name["session_start"]["data"]["provider"] == "gateway"

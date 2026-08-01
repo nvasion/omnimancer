@@ -49,6 +49,7 @@ AGENT_COLUMNS = (
     "backend",
     "state",
     "model",
+    "provider",
     "turns",
     "blocker",
     "usage",
@@ -91,12 +92,30 @@ FILTERS: tuple = (
     ),
 )
 
+# Ended sessions stay visible this long; codex job records persist as rows
+# indefinitely (their JSON files stay on disk), so recently-finished omn
+# sessions get the same operator visibility without resurrecting all of
+# replayed history.
+ENDED_RETENTION_S: float = 24 * 3600.0
+
+TERMINAL_STATES = {DisplayState.COMPLETED, DisplayState.FAILED, DisplayState.CANCELLED}
+
+# A terminal job JSON "covers" an ended session in the same cwd when the
+# job file was written within this window around the session's last
+# activity: that pair is one run seen through two data sources, not two
+# runs. Bounded on BOTH sides so an unrelated terminal job hours later
+# cannot suppress an ended session it never represented.
+ENDED_JOB_COVER_SLACK_S: float = 300.0
+
 
 @dataclass
 class SessionInfo:
     """Live view of one omn session discovered from the event feed."""
 
     session_id: str
+    agent_id: str = "main"
+    parent_id: str = ""
+    subagent: str = ""
     mode: str = ""
     cwd: str = ""
     model: str = ""
@@ -109,6 +128,7 @@ class SessionInfo:
     # Last lifecycle event name: a session whose latest event is turn_end
     # is idle at its prompt — WAITING in operator terms, not stale.
     last_event: str = ""
+    exit_status: Optional[int] = None
 
 
 class JobsUpdated(Message):
@@ -395,7 +415,10 @@ class FleetApp(App[None]):
         session_id = str(event.get("session_id") or "")
         if not session_id:
             return
-        info = self._sessions.setdefault(session_id, SessionInfo(session_id))
+        agent_id = str(event.get("agent_id") or "main")
+        info = self._sessions.setdefault(
+            f"{session_id}:{agent_id}", SessionInfo(session_id, agent_id=agent_id)
+        )
         info.last_seen = max(info.last_seen, self._event_epoch(event))
         info.mode = str(event.get("mode") or info.mode)
         info.cwd = str(event.get("cwd") or info.cwd)
@@ -409,20 +432,34 @@ class FleetApp(App[None]):
             # A resumed session (claude --resume) re-uses its session id:
             # a fresh start must always bring the row back.
             info.ended = False
+            sub = data.get("subagent")
+            if sub:
+                info.subagent = str(sub)
         elif name == "turn_end":
             info.turns += 1
         elif name == "session_end":
             info.ended = True
+            status = data.get("status")
+            info.exit_status = status if isinstance(status, int) else None
+        # Capture parent linkage.
+        parent = event.get("parent_id")
+        if parent:
+            info.parent_id = str(parent)
+        # Keep the parent row fresh when a subagent is active.
+        if agent_id != "main":
+            parent_info = self._sessions.get(f"{session_id}:main")
+            if parent_info is not None:
+                parent_info.last_seen = max(parent_info.last_seen, info.last_seen)
 
     def _collect_rows(self) -> list:
         """Build (key, state, cells) for every job and loose session."""
         now = time.time()
         snapshot = self._snapshot
         rows = []
-        job_cwds = set()
+        active_cwds: set = set()
+        terminal_mtimes_by_cwd: Dict[str, List[float]] = {}
         for job_id, raw in sorted(snapshot.jobs.items()):
             job = parse_job(raw)
-            job_cwds.add(job.cwd)
             age = self._job_age_s(job_id, now)
             state = derive_state(
                 job,
@@ -430,9 +467,82 @@ class FleetApp(App[None]):
                 activity_age_s=age,
             )
             rows.append((job_id, state, job_row(job, state, age)))
-        for session in sorted(self._sessions.values(), key=lambda s: s.session_id):
-            if session.ended or session.cwd in job_cwds:
+            if job.cwd:
+                if state not in TERMINAL_STATES:
+                    active_cwds.add(job.cwd)
+                else:
+                    mtime = snapshot.json_mtimes.get(job_id)
+                    if mtime is not None:
+                        terminal_mtimes_by_cwd.setdefault(job.cwd, []).append(mtime)
+        for session in sorted(
+            self._sessions.values(), key=lambda s: (s.session_id, s.agent_id)
+        ):
+            # Subagent rows: additive detail, never suppressed by cwd rules.
+            if session.agent_id != "main":
+                # Guard against stray tool events from older omn versions.
+                if not (session.subagent or session.model):
+                    continue
+                if session.ended:
+                    ended_age = now - session.last_seen
+                    if ended_age > ENDED_RETENTION_S:
+                        continue
+                    state = (
+                        DisplayState.FAILED
+                        if session.exit_status not in (None, 0)
+                        else DisplayState.COMPLETED
+                    )
+                else:
+                    age = now - session.last_seen
+                    if session.last_event == "turn_end":
+                        state = DisplayState.WAITING
+                    elif age > 120.0:
+                        state = DisplayState.STALE
+                    else:
+                        state = DisplayState.WORKING
+                name_label = session.subagent or session.agent_id.removeprefix(
+                    "subagent-"
+                )
+                record = JobRecord(
+                    job_id=f"↳{name_label[:12]}",
+                    backend="sub",
+                    status="running",
+                    model=session.model,
+                    provider=session.provider,
+                    turns_completed=session.turns,
+                )
+                row_key = f"session-{session.session_id}:{session.agent_id}"
+                rows.append(
+                    (row_key, state, job_row(record, state, now - session.last_seen))
+                )
                 continue
+            # Main-agent rows — keep existing behaviour.
+            if session.cwd in active_cwds:
+                continue
+            if session.ended:
+                window_lo = session.last_seen - ENDED_JOB_COVER_SLACK_S
+                window_hi = session.last_seen + ENDED_JOB_COVER_SLACK_S
+                if any(
+                    window_lo <= mtime <= window_hi
+                    for mtime in terminal_mtimes_by_cwd.get(session.cwd, ())
+                ):
+                    continue
+                ended_age = now - session.last_seen
+                if ended_age > ENDED_RETENTION_S:
+                    continue
+                state = (
+                    DisplayState.FAILED
+                    if session.exit_status not in (None, 0)
+                    else DisplayState.COMPLETED
+                )
+            else:
+                age = now - session.last_seen
+                if session.last_event == "turn_end":
+                    # Idle at its prompt: answered and waiting for a human.
+                    state = DisplayState.WAITING
+                elif age > 120.0:
+                    state = DisplayState.STALE
+                else:
+                    state = DisplayState.WORKING
             if session.mode == "claude":
                 backend = "claude"
             elif session.mode:
@@ -444,16 +554,10 @@ class FleetApp(App[None]):
                 backend=backend,
                 status="running",
                 model=session.model,
+                provider=session.provider,
                 turns_completed=session.turns,
             )
             age = now - session.last_seen
-            if session.last_event == "turn_end":
-                # Idle at its prompt: answered and waiting for a human.
-                state = DisplayState.WAITING
-            elif age > 120.0:
-                state = DisplayState.STALE
-            else:
-                state = DisplayState.WORKING
             rows.append(
                 (f"session-{session.session_id}", state, job_row(record, state, age))
             )

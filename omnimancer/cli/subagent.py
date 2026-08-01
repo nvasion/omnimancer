@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
+from ..core.agent.status_core import EventType
 from ..core.models import ChatContext, SubAgentDefinition
 from ..events import emitter as fleet_events
 from .tool_handler import ToolHandler
@@ -24,6 +25,7 @@ class SubAgentResult:
     """Result of running a subagent."""
 
     name: str
+    model: str = ""
     output: str = ""
     iterations: int = 0
     tool_calls: List[str] = field(default_factory=list)
@@ -64,6 +66,23 @@ class SubAgentRunner:
         if definition.model:
             provider.model = definition.model
 
+        # Compute the provider/model identity for fleet lifecycle events.
+        raw_model = getattr(provider, "model", "")
+        model_used: str = raw_model if isinstance(raw_model, str) else ""
+        provider_name = ""
+        providers = getattr(self.engine, "providers", None)
+        if isinstance(providers, dict):
+            for name, instance in providers.items():
+                if instance is provider:
+                    provider_name = name
+                    break
+        if not provider_name:
+            getter = getattr(provider, "get_provider_name", None)
+            if callable(getter):
+                raw_name = getter()
+                if isinstance(raw_name, str):
+                    provider_name = raw_name
+
         # Isolated context — the parent conversation is never modified. The
         # run id is unique per invocation so two runs of the same subagent
         # are distinguishable in the event feed.
@@ -77,11 +96,21 @@ class SubAgentRunner:
         tool_calls_made: List[str] = []
         output = ""
         iterations = 0
+        # Reported on SESSION_END; only the clean-success path clears it.
+        exit_status = 1
 
         # Every tool event inside the loop carries the subagent's identity;
         # parent is whatever agent spawned us (supports nested subagents).
         with fleet_events.agent_context(run_id, fleet_events.current_agent_id()):
             try:
+                await fleet_events.emit_event(
+                    EventType.SESSION_START,
+                    {
+                        "provider": provider_name,
+                        "model": model_used,
+                        "subagent": definition.name,
+                    },
+                )
                 for i in range(max(1, definition.max_iterations)):
                     iterations = i + 1
                     response = await provider.send_message_with_tools(
@@ -90,6 +119,7 @@ class SubAgentRunner:
                     if not response.is_success:
                         return SubAgentResult(
                             name=definition.name,
+                            model=model_used,
                             output=output,
                             iterations=iterations,
                             tool_calls=tool_calls_made,
@@ -111,8 +141,10 @@ class SubAgentRunner:
                             result_parts.append(f"[{tc.name}] Result: {result.content}")
                     message = "Tool results:\n\n" + "\n\n".join(result_parts)
 
+                exit_status = 0
                 return SubAgentResult(
                     name=definition.name,
+                    model=model_used,
                     output=output,
                     iterations=iterations,
                     tool_calls=tool_calls_made,
@@ -122,6 +154,7 @@ class SubAgentRunner:
                 logger.warning("Subagent '%s' failed: %s", definition.name, e)
                 return SubAgentResult(
                     name=definition.name,
+                    model=model_used,
                     output=output,
                     iterations=iterations,
                     tool_calls=tool_calls_made,
@@ -129,5 +162,15 @@ class SubAgentRunner:
                     error=str(e),
                 )
             finally:
+                # Restore the shared provider BEFORE any await: a cancellation
+                # during the emit must never leave the parent conversation
+                # running on the subagent's model.
                 if definition.model and original_model is not None:
                     provider.model = original_model
+                try:
+                    await fleet_events.emit_event(
+                        EventType.SESSION_END,
+                        {"reason": "subagent_complete", "status": exit_status},
+                    )
+                except Exception as exc:
+                    logger.debug(f"subagent session_end emission failed: {exc}")

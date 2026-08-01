@@ -32,15 +32,16 @@ def test_job_row_columns():
         DisplayState.WORKING,
         age_s=95.0,
     )
-    assert len(row) == 8
+    assert len(row) == 9
     assert row[0].plain == "4553891c"
     assert row[1].plain == "codex"
     assert row[2].plain == "working"
     assert row[3].plain == "gpt-5.6-sol"
-    assert row[4].plain == "3"
-    assert row[5].plain == "-"
-    assert row[6].plain == "12.3k/0.7k"
-    assert row[7].plain == "1m"
+    assert row[4].plain == "-"
+    assert row[5].plain == "3"
+    assert row[6].plain == "-"
+    assert row[7].plain == "12.3k/0.7k"
+    assert row[8].plain == "1m"
 
 
 def test_job_row_blocker_and_missing_usage():
@@ -57,9 +58,10 @@ def test_job_row_blocker_and_missing_usage():
         DisplayState.BLOCKED,
         age_s=None,
     )
-    assert row[5].plain == "context_limit"
-    assert row[6].plain == "-"
+    assert row[4].plain == "-"
+    assert row[6].plain == "context_limit"
     assert row[7].plain == "-"
+    assert row[8].plain == "-"
 
 
 def test_format_age():

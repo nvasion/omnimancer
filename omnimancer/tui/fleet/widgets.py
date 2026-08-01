@@ -112,13 +112,14 @@ def job_row(job: JobRecord, state: DisplayState, age_s: Optional[float]) -> tupl
         age_s: Age of the job in seconds, or None if unknown
 
     Returns:
-        Tuple of 8 rich Text objects representing the row columns
+        Tuple of 9 rich Text objects representing the row columns
     """
     return (
         Text(job.job_id),
         Text(job.backend),
         Text(state.value, style=STATE_STYLES[state]),
         Text(job.model),
+        Text(job.provider or "-"),
         Text(str(job.turns_completed)),
         Text(job.blocker_kind or "-"),
         Text(format_tokens(job.usage)),

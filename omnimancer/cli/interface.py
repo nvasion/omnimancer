@@ -288,14 +288,12 @@ class CommandLineInterface(
 
                 self.turn_activity = TurnActivityLog()
                 fleet_events.register_listener(self.turn_activity)
-            provider_entry = session_config.providers.get(
-                session_config.default_provider
-            )
+            provider_name, model = self.engine.runtime_identity()
             await fleet_events.emit_event(
                 EventType.SESSION_START,
                 {
-                    "provider": session_config.default_provider,
-                    "model": getattr(provider_entry, "model", None),
+                    "provider": provider_name,
+                    "model": model,
                     "read_only": bool(getattr(self, "read_only", False)),
                 },
             )
@@ -356,8 +354,12 @@ class CommandLineInterface(
             if self.signal_handler.shutdown_in_progress:
                 await self.signal_handler.wait_for_shutdown()
 
-            # Close the fleet event feed.
-            await fleet_events.emit_event(EventType.SESSION_END, {"reason": "exit"})
+            # Close the fleet event feed. Status 1 when this finally is
+            # unwinding an exception, so the fleet row renders FAILED.
+            exit_status = 0 if sys.exc_info()[0] is None else 1
+            await fleet_events.emit_event(
+                EventType.SESSION_END, {"reason": "exit", "status": exit_status}
+            )
             await fleet_events.shutdown_events()
 
             # Ensure terminal is reset on exit

@@ -99,10 +99,12 @@ class TestFleetAppData:
             # idle + .turn-complete signal -> WAITING (codex stays "running")
             assert first[0] == "aabbccdd"
             assert first[2] == "waiting"
+            assert first[4] == "-"
             second = [cell.plain for cell in table.get_row_at(1)]
             assert second[0] == "11112222"
             assert second[1] == "omn:interactive"
             assert second[3] == "qwen3-coder-30b"
+            assert second[4] == "gateway"
 
     async def test_feeds_populate(self, fleet_dirs):
         app = _app(fleet_dirs)
@@ -445,3 +447,609 @@ class TestFleetAppData:
             await pilot.press("escape")
             await _settle(pilot)
             assert not isinstance(app.screen, JobDetailScreen)
+
+
+class TestEndedSessionVisibility:
+    """P5 — ended sessions render with correct state and respect retention."""
+
+    async def test_ended_session_renders_completed_with_model(self, tmp_path):
+        """An ended session with exit status 0 renders as completed,
+        showing the model from session_start."""
+        from datetime import datetime, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        (events / "sess.jsonl").write_text(
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "eeee1111-2222",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3.5-9b"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_end",
+                    "session_id": "eeee1111-2222",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"reason": "exit", "status": 0},
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 1
+            cells = [cell.plain for cell in table.get_row_at(0)]
+            assert cells[2] == "completed"
+            assert cells[3] == "qwen3.5-9b"
+
+    async def test_ended_session_nonzero_status_renders_failed(self, tmp_path):
+        """An ended session with a non-zero exit status renders as failed."""
+        from datetime import datetime, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        (events / "sess.jsonl").write_text(
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "ffff3333-4444",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3.5-9b"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_end",
+                    "session_id": "ffff3333-4444",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"reason": "exit", "status": 3},
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 1
+            cells = [cell.plain for cell in table.get_row_at(0)]
+            assert cells[2] == "failed"
+
+    async def test_ended_session_older_than_retention_hidden(self, tmp_path):
+        """A session whose last event is >24h old must not render at all."""
+        from datetime import datetime, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        old_ts = (
+            datetime.now(timezone.utc) - __import__("datetime").timedelta(hours=25)
+        ).isoformat(timespec="milliseconds")
+        (events / "sess.jsonl").write_text(
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": old_ts,
+                    "event": "session_start",
+                    "session_id": "aaaa5555-6666",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3.5-9b"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "v": 1,
+                    "ts": old_ts,
+                    "event": "session_end",
+                    "session_id": "aaaa5555-6666",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"reason": "exit", "status": 0},
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 0
+
+
+class TestJobSessionDedup:
+    """P5 — job/session dedup only suppresses where actually deduplicating."""
+
+    async def test_live_session_not_hidden_by_dead_job(self, tmp_path):
+        """A terminal job and a live session in the same cwd must both render;
+        the dedup only applies when the job is terminal AND the session is ended."""
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        (jobs / "11111111.json").write_text(
+            json.dumps(
+                {
+                    "id": "11111111",
+                    "backend": "codex",
+                    "status": "completed",
+                    "cwd": "/tmp/proj",
+                }
+            )
+        )
+        from datetime import datetime, timezone
+
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        (events / "sess.jsonl").write_text(
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "bbbb7777-8888",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3.5-9b"},
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 2
+            keys = {table.get_row_at(i)[0].plain for i in range(table.row_count)}
+            assert "11111111" in keys
+            assert "bbbb7777" in keys
+
+    async def test_live_session_hidden_by_running_job_same_cwd(self, tmp_path):
+        """A live session in the same cwd as a running job must be hidden;
+        the job row alone represents the run."""
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        (jobs / "22222222.json").write_text(
+            json.dumps(
+                {
+                    "id": "22222222",
+                    "backend": "codex",
+                    "status": "running",
+                    "turnState": "working",
+                    "cwd": "/tmp/proj",
+                }
+            )
+        )
+        from datetime import datetime, timezone
+
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        (events / "sess.jsonl").write_text(
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "cccc9999-0000",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3.5-9b"},
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 1
+            assert table.get_row_at(0)[0].plain == "22222222"
+
+    async def test_ended_session_deduped_by_fresh_terminal_job(self, tmp_path):
+        """A terminal job whose file mtime is now covers an ended session in
+        the same cwd — the pair is one run seen through two data sources."""
+        import os
+        import time
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        # Write a terminal job; mtime will be set to now.
+        job_data = {
+            "id": "33333333",
+            "backend": "codex",
+            "status": "completed",
+            "cwd": "/tmp/proj",
+        }
+        (jobs / "33333333.json").write_text(json.dumps(job_data))
+        # Pin mtime to "now" so it covers the session.
+        now = time.time()
+        os.utime(jobs / "33333333.json", (now, now))
+        from datetime import datetime, timezone
+
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        (events / "sess.jsonl").write_text(
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "dddd1111-2222",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3.5-9b"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_end",
+                    "session_id": "dddd1111-2222",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"reason": "exit", "status": 0},
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 1
+            assert table.get_row_at(0)[0].plain == "33333333"
+
+    async def test_ended_session_not_deduped_by_much_newer_job(self, tmp_path):
+        """A terminal job written hours AFTER the session ended is a
+        different run: the ended session must still render (the cover
+        window is bounded on both sides)."""
+        import os
+        import time
+        from datetime import datetime, timedelta, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        (jobs / "44444444.json").write_text(
+            json.dumps(
+                {
+                    "id": "44444444",
+                    "backend": "codex",
+                    "status": "completed",
+                    "cwd": "/tmp/proj",
+                }
+            )
+        )
+        # Job file written "now"; the session ended two hours earlier.
+        now = time.time()
+        os.utime(jobs / "44444444.json", (now, now))
+        old_ts = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(
+            timespec="milliseconds"
+        )
+        (events / "sess.jsonl").write_text(
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": old_ts,
+                    "event": "session_start",
+                    "session_id": "hhhh1111-2222",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3.5-9b"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "v": 1,
+                    "ts": old_ts,
+                    "event": "session_end",
+                    "session_id": "hhhh1111-2222",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"reason": "exit", "status": 0},
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 2
+            keys = {table.get_row_at(i)[0].plain for i in range(table.row_count)}
+            assert "44444444" in keys
+            assert "hhhh1111" in keys
+
+    async def test_subagent_row_renders_without_clobbering_parent(self, tmp_path):
+        """A subagent session_start must create its own row and NOT
+        overwrite the parent main row's model."""
+        from datetime import datetime, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        (events / "sess.jsonl").write_text(
+            # Main session_start — no agent_id (or "main") matches real fixtures.
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "eeee5555-6666",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3-coder-30b"},
+                }
+            )
+            + "\n"
+            # Subagent session_start.
+            + json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "eeee5555-6666",
+                    "agent_id": "subagent-researcher-ab12cd34",
+                    "parent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {
+                        "provider": "gateway",
+                        "model": "qwen3-4b",
+                        "subagent": "researcher",
+                    },
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 2
+            # Gather rows by id column.
+            rows = {}
+            for i in range(table.row_count):
+                cells = [cell.plain for cell in table.get_row_at(i)]
+                rows[cells[0]] = cells
+            # Main row: model must STILL be qwen3-coder-30b (anti-clobber).
+            assert "eeee5555" in rows
+            assert rows["eeee5555"][3] == "qwen3-coder-30b"
+            # Subagent row: id starts with ↳researcher, backend "sub", model "qwen3-4b".
+            sub_rows = [v for v in rows.values() if v[0].startswith("↳")]
+            assert len(sub_rows) == 1
+            sr = sub_rows[0]
+            assert sr[0].startswith("↳researcher")
+            assert sr[1] == "sub"
+            assert sr[3] == "qwen3-4b"
+            assert sr[4] == "gateway"
+
+    async def test_subagent_end_flips_subagent_row_only(self, tmp_path):
+        """A subagent session_end must flip the subagent row to completed
+        while the main row stays non-ended."""
+        from datetime import datetime, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        (events / "sess.jsonl").write_text(
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "ffff7777-8888",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3-coder-30b"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "ffff7777-8888",
+                    "agent_id": "subagent-researcher-abcdef01",
+                    "parent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {
+                        "provider": "gateway",
+                        "model": "qwen3-4b",
+                        "subagent": "researcher",
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_end",
+                    "session_id": "ffff7777-8888",
+                    "agent_id": "subagent-researcher-abcdef01",
+                    "parent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"reason": "subagent_complete"},
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            assert table.row_count == 2
+            states = {}
+            for i in range(table.row_count):
+                cells = [cell.plain for cell in table.get_row_at(i)]
+                states[cells[0]] = cells[2]
+            # Main row stays non-ended (WORKING).
+            assert states["ffff7777"] == "working"
+            # Subagent row is completed.
+            sub_states = [v for k, v in states.items() if k.startswith("↳")]
+            assert len(sub_states) == 1
+            assert sub_states[0] == "completed"
+
+    async def test_subagent_activity_keeps_parent_fresh(self, tmp_path):
+        """A main session with an old-ish timestamp alone would render STALE,
+        but a subagent event with a fresh timestamp must keep the parent
+        row from being stale."""
+        from datetime import datetime, timedelta, timezone
+
+        jobs = tmp_path / "jobs"
+        events = tmp_path / "events"
+        project = tmp_path / "proj"
+        for directory in (jobs, events, project):
+            directory.mkdir()
+        # 10 minutes ago for the main session.
+        old_ts = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(
+            timespec="milliseconds"
+        )
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        (events / "sess.jsonl").write_text(
+            json.dumps(
+                {
+                    "v": 1,
+                    "ts": old_ts,
+                    "event": "session_start",
+                    "session_id": "gggg9999-0000",
+                    "agent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {"provider": "gateway", "model": "qwen3-coder-30b"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "v": 1,
+                    "ts": now_ts,
+                    "event": "session_start",
+                    "session_id": "gggg9999-0000",
+                    "agent_id": "subagent-researcher-11223344",
+                    "parent_id": "main",
+                    "mode": "interactive",
+                    "cwd": "/tmp/proj",
+                    "data": {
+                        "provider": "gateway",
+                        "model": "qwen3-4b",
+                        "subagent": "researcher",
+                    },
+                }
+            )
+            + "\n"
+        )
+        app = FleetApp(
+            jobs_dir=jobs, events_dir=events, project_dir=project, refresh=0.05
+        )
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            from textual.widgets import DataTable
+
+            table = app.query_one("#agents", DataTable)
+            states = {}
+            for i in range(table.row_count):
+                cells = [cell.plain for cell in table.get_row_at(i)]
+                states[cells[0]] = cells[2]
+            # Main row must NOT be stale.
+            assert states["gggg9999"] != "stale"
+            assert states["gggg9999"] == "working"
