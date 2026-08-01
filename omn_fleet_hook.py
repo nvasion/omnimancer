@@ -188,9 +188,13 @@ def main() -> int:
             return 0
         directory = _events_dir()
         os.makedirs(directory, mode=0o700, exist_ok=True)
+        # mode= only applies at creation: repair pre-existing permissive
+        # dirs/files too — these paths carry prompt/command previews.
+        os.chmod(directory, 0o700)
         path = os.path.join(directory, f"omn-{payload['session_id'].lower()}.jsonl")
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
         try:
+            os.fchmod(fd, 0o600)
             os.write(fd, (line + "\n").encode("utf-8"))
         finally:
             os.close(fd)

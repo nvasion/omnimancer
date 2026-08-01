@@ -220,13 +220,26 @@ class TestSafety:
         assert not tmp_path.exists() or not list(tmp_path.iterdir())
 
     def test_file_permissions(self, tmp_path):
-        # A directory the hook itself creates (tmp_path pre-exists with
-        # pytest's own mode, which makedirs must not alter).
         events_dir = tmp_path / "evdir"
         _run(_payload("Stop", last_assistant_message="x"), events_dir)
         path = events_dir / f"omn-{SESSION}.jsonl"
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
         assert stat.S_IMODE(events_dir.stat().st_mode) == 0o700
+
+    def test_preexisting_loose_permissions_repaired(self, tmp_path):
+        """mode= on makedirs/open only applies at creation: a pre-existing
+        world-readable dir or session file must be repaired, not left
+        exposing prompt/command previews."""
+        events_dir = tmp_path / "evdir"
+        events_dir.mkdir(mode=0o755)
+        loose_file = events_dir / f"omn-{SESSION}.jsonl"
+        loose_file.write_text("{}\n")
+        loose_file.chmod(0o644)
+
+        _run(_payload("Stop", last_assistant_message="x"), events_dir)
+
+        assert stat.S_IMODE(events_dir.stat().st_mode) == 0o700
+        assert stat.S_IMODE(loose_file.stat().st_mode) == 0o600
 
     def test_startup_speed(self, tmp_path):
         start = time.monotonic()
