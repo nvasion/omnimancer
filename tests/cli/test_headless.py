@@ -771,6 +771,8 @@ class TestHeadlessRunner:
 
     @pytest.mark.asyncio
     async def test_max_iterations_respected(self):
+        import json
+
         from omnimancer.cli.headless import HeadlessRunner, OutputFormat
         from omnimancer.cli.tool_handler import MAX_TOOL_ITERATIONS
 
@@ -810,14 +812,21 @@ class TestHeadlessRunner:
         stdout_buf = StringIO()
         runner = HeadlessRunner(
             engine=mock_engine,
-            output_format=OutputFormat.TEXT,
+            output_format=OutputFormat.JSON,
             no_approval=True,
             verbose=False,
         )
         runner._emitter._stdout = stdout_buf
 
-        await runner.run("loop")
+        exit_code = await runner.run("loop")
+        assert exit_code == 3
         assert mock_engine.send_message_with_tools.call_count == MAX_TOOL_ITERATIONS
+
+        # Verify the emitted JSON result line contains stop_cause
+        stdout_content = runner._emitter._stdout.getvalue()
+        result_line = stdout_content.strip()
+        result_data = json.loads(result_line)
+        assert result_data["stop_cause"] == "max_iterations"
 
     @pytest.mark.asyncio
     async def test_max_iterations_override(self):
@@ -947,6 +956,8 @@ class TestHeadlessRunner:
 
     @pytest.mark.asyncio
     async def test_repeated_tool_call_stops_early(self):
+        import json
+
         from omnimancer.cli.headless import HeadlessRunner, OutputFormat
 
         # Same tool call every time → executed twice, nudged twice, then
@@ -971,15 +982,21 @@ class TestHeadlessRunner:
         mock_engine.agent_engine = mock_agent_engine
 
         runner = HeadlessRunner(
-            engine=mock_engine, output_format=OutputFormat.TEXT, no_approval=True
+            engine=mock_engine, output_format=OutputFormat.JSON, no_approval=True
         )
         runner._emitter._stdout = StringIO()
 
         exit_code = await runner.run("loop")
-        assert exit_code == 0
+        assert exit_code == 3
         assert mock_engine.send_message_with_tools.call_count == 5
         # Only the first two occurrences actually executed.
         assert mock_agent_engine.execute_with_approval.call_count == 2
+
+        # Verify the emitted JSON result line contains stop_cause
+        stdout_content = runner._emitter._stdout.getvalue()
+        result_line = stdout_content.strip()
+        result_data = json.loads(result_line)
+        assert result_data["stop_cause"] == "repeat_abort"
 
 
 class TestNoToolCallNudge:
@@ -1047,6 +1064,8 @@ class TestNoToolCallNudge:
 
     @pytest.mark.asyncio
     async def test_persistent_narration_ends_after_max_nudges(self):
+        import json
+
         from omnimancer.cli.headless import HeadlessRunner, OutputFormat
 
         narration = ChatResponse(
@@ -1061,7 +1080,7 @@ class TestNoToolCallNudge:
         )
 
         runner = HeadlessRunner(
-            engine=mock_engine, output_format=OutputFormat.TEXT, no_approval=True
+            engine=mock_engine, output_format=OutputFormat.JSON, no_approval=True
         )
         runner._emitter._stdout = StringIO()
 
@@ -1071,8 +1090,16 @@ class TestNoToolCallNudge:
         assert mock_engine.send_message_with_tools.call_count == 3
         assert mock_agent_engine.execute_with_approval.call_count == 0
 
+        # Verify the emitted JSON result line contains stop_cause
+        stdout_content = runner._emitter._stdout.getvalue()
+        result_line = stdout_content.strip()
+        result_data = json.loads(result_line)
+        assert result_data["stop_cause"] == "nudge_exhausted"
+
     @pytest.mark.asyncio
     async def test_done_reply_ends_run_without_nudge(self):
+        import json
+
         from omnimancer.cli.headless import HeadlessRunner, OutputFormat
 
         responses = [
@@ -1087,13 +1114,19 @@ class TestNoToolCallNudge:
         mock_engine, _ = self._mock_engine(responses)
 
         runner = HeadlessRunner(
-            engine=mock_engine, output_format=OutputFormat.TEXT, no_approval=True
+            engine=mock_engine, output_format=OutputFormat.JSON, no_approval=True
         )
         runner._emitter._stdout = StringIO()
 
         exit_code = await runner.run("check something")
         assert exit_code == 0
         assert mock_engine.send_message_with_tools.call_count == 1
+
+        # Verify the emitted JSON result line contains stop_cause
+        stdout_content = runner._emitter._stdout.getvalue()
+        result_line = stdout_content.strip()
+        result_data = json.loads(result_line)
+        assert result_data["stop_cause"] == "done"
 
 
 class TestMaxIterationsEnv:

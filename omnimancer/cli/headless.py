@@ -178,11 +178,19 @@ class HeadlessOutputEmitter:
         stop_reason: Optional[str],
         tool_calls: Optional[list] = None,
         num_turns: int = 0,
+        stop_cause: Optional[str] = None,
     ) -> None:
         if self._format == OutputFormat.TEXT:
             if content != self._last_content:
                 self._stdout.write(content + "\n")
                 self._stdout.flush()
+            # stdout stays pure payload; truncation is a stderr concern.
+            if stop_cause in ("max_iterations", "repeat_abort"):
+                self._stderr.write(
+                    f"Warning: run ended early (stop_cause={stop_cause}); "
+                    "the result is partial\n"
+                )
+                self._stderr.flush()
         elif self._format == OutputFormat.JSON:
             blob = {
                 "type": "result",
@@ -196,6 +204,7 @@ class HeadlessOutputEmitter:
                 "usage": usage,
                 "total_cost_usd": cost,
                 "stop_reason": stop_reason,
+                "stop_cause": stop_cause,
             }
             self._stdout.write(json.dumps(blob, default=str) + "\n")
             self._stdout.flush()
@@ -211,6 +220,7 @@ class HeadlessOutputEmitter:
                     "usage": usage,
                     "total_cost_usd": cost,
                     "stop_reason": stop_reason,
+                    "stop_cause": stop_cause,
                 }
             )
 
@@ -359,6 +369,10 @@ class HeadlessRunner:
         repeat_tracker = RepeatedCallTracker()
         no_tool_nudges = 0
 
+        # Each break below overwrites this; only loop fall-through — the
+        # iteration cap — leaves it standing.
+        stop_cause = "max_iterations"
+
         for iteration in range(self._max_iterations):
             turns = iteration + 1
             response = await self._engine.send_message_with_tools(
@@ -409,6 +423,10 @@ class HeadlessRunner:
                             and prev_content
                         ):
                             last_content = prev_content
+                        if _is_done_reply(response.content):
+                            stop_cause = "done"
+                        else:
+                            stop_cause = "nudge_exhausted"
                         break
                     no_tool_nudges += 1
                     current_message = NO_TOOL_CALL_NUDGE
@@ -418,6 +436,7 @@ class HeadlessRunner:
             repeat_tracker.record(response.tool_calls)
             offender = repeat_tracker.abort_offender(response.tool_calls)
             if offender is not None:
+                stop_cause = "repeat_abort"
                 if not last_content:
                     last_content = (
                         f"Stopped: the model repeated the same tool call "
@@ -491,9 +510,15 @@ class HeadlessRunner:
             usage,
             usage["total_cost_usd"],
             last_stop_reason,
+            stop_cause=stop_cause,
             tool_calls=tool_log,
             num_turns=turns,
         )
+        # 3 = the run ended without the model finishing its work (cap hit or
+        # duplicate-call abort) even though a result was emitted; orchestrators
+        # need that distinction and 2 is reserved by click for usage errors.
+        if stop_cause in ("max_iterations", "repeat_abort"):
+            return 3
         return 0
 
 
