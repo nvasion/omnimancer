@@ -200,6 +200,7 @@ class ProgramExecutor(BaseManager):
             args,
             working_dir,
             timeout_seconds=operation.data.get("timeout"),
+            progress_op_id=operation.data.get("_fleet_op_id"),
         )
 
     async def preview_operation(self, operation: Operation) -> str:
@@ -318,6 +319,7 @@ class ProgramExecutor(BaseManager):
         args: Optional[List[str]] = None,
         working_dir: Optional[str] = None,  # type: ignore[valid-type]
         timeout_seconds: Optional[int] = None,
+        progress_op_id: Optional[str] = None,
     ) -> OperationResult:
         """
         Execute command for backward compatibility with tests.
@@ -327,6 +329,8 @@ class ProgramExecutor(BaseManager):
             args: Command arguments
             working_dir: Working directory for execution
             timeout_seconds: Per-command timeout (defaults to manager setting)
+            progress_op_id: Fleet-event operation to stream tool_progress to;
+                None keeps the non-streaming execution path.
 
         Returns:
             OperationResult with execution details
@@ -335,7 +339,13 @@ class ProgramExecutor(BaseManager):
         self._validate_command(command)
 
         # Import needed classes
+        from ..events.emitter import build_progress_callback
         from .agent.program_executor import ExecutionConfig, ExecutionMode
+
+        # Live-output progress events for the fleet feed. None when the
+        # event pipeline is off, which keeps enable_streaming=False and the
+        # execution path byte-identical to before.
+        stream_callback = build_progress_callback(progress_op_id)
 
         # Create execution config
         config = ExecutionConfig(
@@ -343,7 +353,8 @@ class ProgramExecutor(BaseManager):
             max_memory_mb=self.default_config.max_memory_mb,
             working_directory=working_dir,  # type: ignore[name-defined]
             execution_mode=ExecutionMode.FULL_ACCESS,
-            enable_streaming=False,
+            enable_streaming=stream_callback is not None,
+            stream_callback=stream_callback,
             require_approval=False,  # Direct execution for backward compatibility
         )
 

@@ -177,6 +177,7 @@ class ToolHandler:
                     content="",
                     error=f"Unknown tool: {tool_call.name}",
                 )
+            self._stamp_native(operation, tool_call.name)
 
             result = await self.agent_engine.execute_with_approval(operation)
             return self._operation_result_to_tool_result(result)
@@ -189,15 +190,30 @@ class ToolHandler:
         """Accept Claude Code's ``file_path``/``path`` or legacy ``path``."""
         return args.get("file_path") or args.get("path") or ""
 
+    @staticmethod
+    def _stamp_native(operation: Operation, tool_name: str) -> Operation:
+        """Tag an operation with its originating native tool for the event feed.
+
+        The engine defaults untagged operations to the marker path, so every
+        native-path Operation must pass through here (Edit's internal read and
+        write are both tagged Edit).
+        """
+        operation.data["_tool_name"] = tool_name
+        operation.data["_invocation"] = "native"
+        return operation
+
     async def _execute_read(self, tool_call: ToolCall) -> ToolResult:
         """Read a file, honoring optional offset/limit line slicing."""
         args = tool_call.arguments
         path = self._path_arg(args)
-        operation = Operation(
-            type=OperationType.FILE_READ,
-            description=f"Read file: {path}",
-            data={"path": path},
-            requires_approval=False,
+        operation = self._stamp_native(
+            Operation(
+                type=OperationType.FILE_READ,
+                description=f"Read file: {path}",
+                data={"path": path},
+                requires_approval=False,
+            ),
+            tool_call.name,
         )
         result = await self.agent_engine.execute_with_approval(operation)
         if not result.success:
@@ -230,11 +246,14 @@ class ToolHandler:
                 content="", error="old_string and new_string are identical"
             )
 
-        read_op = Operation(
-            type=OperationType.FILE_READ,
-            description=f"Read file: {path}",
-            data={"path": path},
-            requires_approval=False,
+        read_op = self._stamp_native(
+            Operation(
+                type=OperationType.FILE_READ,
+                description=f"Read file: {path}",
+                data={"path": path},
+                requires_approval=False,
+            ),
+            tool_call.name,
         )
         read_result = await self.agent_engine.execute_with_approval(read_op)
         if not read_result.success:
@@ -265,11 +284,14 @@ class ToolHandler:
             if replace_all
             else content.replace(old_string, new_string, 1)
         )
-        write_op = Operation(
-            type=OperationType.FILE_WRITE,
-            description=f"Edit file: {path}",
-            data={"path": path, "content": new_content},
-            requires_approval=True,
+        write_op = self._stamp_native(
+            Operation(
+                type=OperationType.FILE_WRITE,
+                description=f"Edit file: {path}",
+                data={"path": path, "content": new_content},
+                requires_approval=True,
+            ),
+            tool_call.name,
         )
         write_result = await self.agent_engine.execute_with_approval(write_op)
         if not write_result.success:
@@ -331,6 +353,8 @@ class ToolHandler:
         kills the turn.
         """
         operation = self._tool_call_to_operation(tool_call)
+        if operation is not None:
+            self._stamp_native(operation, tool_call.name)
         result = await self.agent_engine.execute_with_approval(operation)
 
         data = result.data if isinstance(result.data, dict) else {}

@@ -22,6 +22,7 @@ from rich.console import Console
 from rich.prompt import Confirm
 
 # Internal imports - Core
+from ..core.agent.status_core import EventType
 from ..core.agent_mode_manager import AgentModeManager
 from ..core.config_manager import ConfigManager
 from ..core.engine import CoreEngine
@@ -34,6 +35,8 @@ from ..core.models import (
     parse_described_tool_calls,
 )
 from ..core.signal_handler import SignalHandler
+from ..events import emitter as fleet_events
+from ..events.schema import MESSAGE_PREVIEW_CHARS, PREVIEW_CHARS, truncate
 
 # UI imports
 from ..ui.cancellation_handler import CancellationHandler, EnhancedStatusDisplay
@@ -118,6 +121,7 @@ class CommandLineInterface(
         self.initial_prompt = initial_prompt
         self.read_only = read_only
         self.turn_notifier = TurnNotifier(notify_cmd=notify_cmd, cwd=os.getcwd())
+        self._turn_seq = 0
         # Initialize console with robust terminal handling and fallback mechanism
         self.console = self._initialize_console_with_fallback()
         self.running = False
@@ -264,6 +268,24 @@ class CommandLineInterface(
 
             self._configure_agent_engine_session()
 
+            # Fleet event feed: one JSONL per session (default-on; see
+            # EventsConfig). init/emit never raise and no-op when disabled.
+            session_config = self.engine.config_manager.get_config()
+            await fleet_events.init_events(
+                self.turn_notifier.session_id, "interactive", session_config.events
+            )
+            provider_entry = session_config.providers.get(
+                session_config.default_provider
+            )
+            await fleet_events.emit_event(
+                EventType.SESSION_START,
+                {
+                    "provider": session_config.default_provider,
+                    "model": getattr(provider_entry, "model", None),
+                    "read_only": bool(getattr(self, "read_only", False)),
+                },
+            )
+
             if self.initial_prompt is not None:
                 initial_prompt = self.initial_prompt
                 self.initial_prompt = None
@@ -319,6 +341,10 @@ class CommandLineInterface(
             # Wait for graceful shutdown if needed
             if self.signal_handler.shutdown_in_progress:
                 await self.signal_handler.wait_for_shutdown()
+
+            # Close the fleet event feed.
+            await fleet_events.emit_event(EventType.SESSION_END, {"reason": "exit"})
+            await fleet_events.shutdown_events()
 
             # Ensure terminal is reset on exit
             self._reset_terminal()
@@ -794,11 +820,37 @@ class CommandLineInterface(
 
         self.turn_notifier.reset_turn()
         self._turn_final_response = None
+        self._turn_seq += 1
+        await fleet_events.emit_event(
+            EventType.TURN_START,
+            {
+                "turn": self._turn_seq,
+                "prompt_preview": truncate(command.content, PREVIEW_CHARS),
+                "prompt_chars": len(command.content),
+            },
+        )
 
         try:
             await self._handle_chat_message_turn(command)
         finally:
             await fire_turn_complete(self.engine, self.turn_notifier)
+            # Guarded: a diagnostics emission inside a finally must never
+            # mask the turn's real exception.
+            try:
+                turn_payload = self.turn_notifier.build_payload()
+                await fleet_events.emit_event(
+                    EventType.TURN_END,
+                    {
+                        "turn": self._turn_seq,
+                        "usage": turn_payload.get("usage"),
+                        "last_message_preview": truncate(
+                            str(turn_payload.get("last-assistant-message") or ""),
+                            MESSAGE_PREVIEW_CHARS,
+                        ),
+                    },
+                )
+            except Exception as exc:
+                logger.debug(f"turn_end event emission failed: {exc}")
 
     async def _handle_chat_message_turn(self, command: Command) -> None:
         """Process one non-empty chat turn without finalization.

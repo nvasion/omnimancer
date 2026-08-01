@@ -11,12 +11,15 @@ import sys
 from enum import Enum
 from typing import Any, Optional
 
+from ..core.agent.status_core import EventType
 from ..core.models import (
     ChatResponse,
     ToolResult,
     ToolResultRecord,
     parse_described_tool_calls,
 )
+from ..events import emitter as fleet_events
+from ..events.schema import MESSAGE_PREVIEW_CHARS, PREVIEW_CHARS, truncate
 from .session import apply_session_overrides
 from .system_prompts import build_agent_prompt
 from .tool_handler import (
@@ -328,10 +331,54 @@ class HeadlessRunner:
             Process-style status code: zero for success, one for failure.
         """
         self._turn_notifier.reset_turn()
+        config = self._engine.config_manager.get_config()
+        await fleet_events.init_events(
+            self._turn_notifier.session_id, "headless", config.events
+        )
+        provider_entry = config.providers.get(config.default_provider)
+        await fleet_events.emit_event(
+            EventType.SESSION_START,
+            {
+                "provider": config.default_provider,
+                "model": getattr(provider_entry, "model", None),
+                "read_only": self._read_only,
+            },
+        )
+        await fleet_events.emit_event(
+            EventType.TURN_START,
+            {
+                "turn": 1,
+                "prompt_preview": truncate(prompt, PREVIEW_CHARS),
+                "prompt_chars": len(prompt),
+            },
+        )
+        status = 1
         try:
-            return await self._run(prompt)
+            status = await self._run(prompt)
+            return status
         finally:
             await fire_turn_complete(self._engine, self._turn_notifier)
+            # Guarded: a diagnostics emission inside a finally must never
+            # mask the run's real exception.
+            try:
+                turn_payload = self._turn_notifier.build_payload()
+                await fleet_events.emit_event(
+                    EventType.TURN_END,
+                    {
+                        "turn": 1,
+                        "usage": turn_payload.get("usage"),
+                        "last_message_preview": truncate(
+                            str(turn_payload.get("last-assistant-message") or ""),
+                            MESSAGE_PREVIEW_CHARS,
+                        ),
+                    },
+                )
+                await fleet_events.emit_event(
+                    EventType.SESSION_END, {"reason": "exit", "status": status}
+                )
+            except Exception as exc:
+                logger.debug(f"session_end event emission failed: {exc}")
+            await fleet_events.shutdown_events()
 
     async def _run(self, prompt: str) -> int:
         """Execute the headless agent loop without completion finalization."""

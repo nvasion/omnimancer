@@ -6,15 +6,17 @@ autonomous operation capabilities including file system management,
 program execution, web client operations, and approval workflows.
 """
 
-import asyncio
 import logging
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from ..events import emitter as fleet_events
 from ..utils.errors import AgentError, PermissionError, SecurityError
 from .agent.approval_interface import ApprovalInterface
 from .agent.approval_manager import EnhancedApprovalManager
 from .agent.file_system_manager import FileSystemManager as EnhancedFileSystemManager
+from .agent.status_core import EventType
 from .agent.types import Operation, OperationResult, OperationType
 from .agent.workflow_orchestrator import WorkflowContext, WorkflowOrchestrator
 from .config_manager import ConfigManager
@@ -193,6 +195,9 @@ class AgentEngine(CoreEngine):
         Returns:
             Result of the operation
         """
+        fleet_op_id: Optional[str] = None
+        hook_ctx: Optional[Dict[str, Any]] = None
+        match_target = ""
         try:
             # Generate preview
             preview = await self._generate_preview(operation)
@@ -201,9 +206,43 @@ class AgentEngine(CoreEngine):
             hook_ctx, match_target = self._hook_context_for_operation(operation)
             op_tool = hook_ctx["tool"]
 
+            # Fleet event feed: tool_start + operation tracking. Emission is
+            # drop-on-full and no-ops when events are disabled — it can never
+            # stall or reorder the gate stages below.
+            event_data: Dict[str, Any] = {
+                "tool": operation.data.get("_tool_name", op_tool),
+                "op_type": op_tool,
+                "description": operation.description,
+                "requires_approval": operation.requires_approval,
+                "invocation": operation.data.get("_invocation", "marker"),
+            }
+            if hook_ctx.get("target"):
+                event_data["target"] = hook_ctx["target"]
+            fleet_op_id = await fleet_events.start_tool_operation(
+                operation.type, operation.description, event_data
+            )
+            if fleet_op_id is not None:
+                # Lets the command manager attach tool_progress events from
+                # live process output to this operation.
+                operation.data["_fleet_op_id"] = fleet_op_id
+
             # Apply config-driven permission rules (deny > ask > allow).
             decision = self._permission_decision(op_tool, match_target)
             if decision == PermissionDecision.DENY:
+                await fleet_events.emit_event(
+                    EventType.APPROVAL_DENIED,
+                    {
+                        "tool": event_data["tool"],
+                        "target": event_data.get("target"),
+                        "source": "permission_rule",
+                    },
+                    operation_id=fleet_op_id,
+                )
+                await fleet_events.end_tool_operation(
+                    fleet_op_id,
+                    success=False,
+                    error=f"denied by permission rule ({op_tool})",
+                )
                 return OperationResult(
                     success=False,
                     error=f"Operation denied by permission rule ({op_tool}).",
@@ -221,6 +260,20 @@ class AgentEngine(CoreEngine):
                 "tool_use_request", hook_ctx, match_target=match_target
             )
             if not outcome.allowed:
+                await fleet_events.emit_event(
+                    EventType.APPROVAL_DENIED,
+                    {
+                        "tool": event_data["tool"],
+                        "target": event_data.get("target"),
+                        "source": "hook",
+                    },
+                    operation_id=fleet_op_id,
+                )
+                await fleet_events.end_tool_operation(
+                    fleet_op_id,
+                    success=False,
+                    error=f"blocked by {outcome.reason}",
+                )
                 return OperationResult(
                     success=False,
                     error=f"Operation blocked by {outcome.reason}.",
@@ -228,6 +281,14 @@ class AgentEngine(CoreEngine):
 
             # Request approval if needed
             if operation.requires_approval:
+                await fleet_events.emit_event(
+                    EventType.APPROVAL_REQUESTED,
+                    {
+                        "tool": event_data["tool"],
+                        "target": event_data.get("target"),
+                    },
+                    operation_id=fleet_op_id,
+                )
                 approval_result = await self.approval.request_approval(operation)
 
                 # Handle both old bool and new tuple return
@@ -240,6 +301,26 @@ class AgentEngine(CoreEngine):
                     was_cancelled = operation.data.get("was_cancelled", False)
 
                 if not approved:
+                    await fleet_events.emit_event(
+                        EventType.APPROVAL_DENIED,
+                        {
+                            "tool": event_data["tool"],
+                            "target": event_data.get("target"),
+                            "source": "user",
+                            "cancelled": was_cancelled,
+                        },
+                        operation_id=fleet_op_id,
+                    )
+                    await fleet_events.end_tool_operation(
+                        fleet_op_id,
+                        success=False,
+                        error=(
+                            "cancelled by user"
+                            if was_cancelled
+                            else "not approved by user"
+                        ),
+                        was_cancelled=was_cancelled,
+                    )
                     return OperationResult(
                         success=False,
                         error=(
@@ -249,6 +330,14 @@ class AgentEngine(CoreEngine):
                         ),
                         was_cancelled=was_cancelled,
                     )
+                await fleet_events.emit_event(
+                    EventType.APPROVAL_GRANTED,
+                    {
+                        "tool": event_data["tool"],
+                        "target": event_data.get("target"),
+                    },
+                    operation_id=fleet_op_id,
+                )
                 # Set approval flag to enable security check in execute_operation
                 operation.data["_approval_granted"] = True
 
@@ -267,8 +356,15 @@ class AgentEngine(CoreEngine):
                 {
                     "operation": operation,
                     "result": result,
-                    "timestamp": asyncio.get_event_loop().time(),
+                    "timestamp": time.time(),
                 }
+            )
+
+            await fleet_events.end_tool_operation(
+                fleet_op_id,
+                success=result.success,
+                error=result.error,
+                was_cancelled=bool(getattr(result, "was_cancelled", False)),
             )
 
             return result
@@ -310,6 +406,18 @@ class AgentEngine(CoreEngine):
             else:
                 user_error = f"Operation execution failed: {e}"
 
+            # Terminal observability on crash: previously an exception skipped
+            # post_tool entirely, so hooks and the event feed never saw the
+            # operation end. _fire_hook never raises.
+            if hook_ctx is not None:
+                post_ctx = dict(hook_ctx)
+                post_ctx["success"] = False
+                post_ctx["error"] = str(e)
+                await self._fire_hook("post_tool", post_ctx, match_target=match_target)
+            await fleet_events.end_tool_operation(
+                fleet_op_id, success=False, error=user_error
+            )
+
             return OperationResult(
                 success=False,
                 error=user_error,
@@ -350,7 +458,7 @@ class AgentEngine(CoreEngine):
                 {
                     "operation": operation,
                     "result": result,
-                    "timestamp": asyncio.get_event_loop().time(),
+                    "timestamp": time.time(),
                 }
             )
 
@@ -421,7 +529,7 @@ class AgentEngine(CoreEngine):
                     {
                         "operation": operation,
                         "result": result,
-                        "timestamp": asyncio.get_event_loop().time(),
+                        "timestamp": time.time(),
                     }
                 )
 
@@ -440,7 +548,7 @@ class AgentEngine(CoreEngine):
                             {
                                 "operation": operation,
                                 "result": result,
-                                "timestamp": asyncio.get_event_loop().time(),
+                                "timestamp": time.time(),
                             }
                         )
                     else:

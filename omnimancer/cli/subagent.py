@@ -8,10 +8,12 @@ touched. This is the lightweight counterpart to Claude Code's AgentTool.
 """
 
 import logging
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 from ..core.models import ChatContext, SubAgentDefinition
+from ..events import emitter as fleet_events
 from .tool_handler import ToolHandler
 
 logger = logging.getLogger(__name__)
@@ -62,64 +64,70 @@ class SubAgentRunner:
         if definition.model:
             provider.model = definition.model
 
-        # Isolated context — the parent conversation is never modified.
+        # Isolated context — the parent conversation is never modified. The
+        # run id is unique per invocation so two runs of the same subagent
+        # are distinguishable in the event feed.
+        run_id = f"subagent-{definition.name}-{uuid.uuid4().hex[:8]}"
         context = ChatContext(
             messages=[],
             current_model=getattr(provider, "model", "") or "",
-            session_id=f"subagent-{definition.name}",
+            session_id=run_id,
         )
         message = f"{definition.prompt}\n\n{task}" if definition.prompt else task
         tool_calls_made: List[str] = []
         output = ""
         iterations = 0
 
-        try:
-            for i in range(max(1, definition.max_iterations)):
-                iterations = i + 1
-                response = await provider.send_message_with_tools(
-                    message, context, tools
-                )
-                if not response.is_success:
-                    return SubAgentResult(
-                        name=definition.name,
-                        output=output,
-                        iterations=iterations,
-                        tool_calls=tool_calls_made,
-                        success=False,
-                        error=response.error or "Subagent provider call failed.",
+        # Every tool event inside the loop carries the subagent's identity;
+        # parent is whatever agent spawned us (supports nested subagents).
+        with fleet_events.agent_context(run_id, fleet_events.current_agent_id()):
+            try:
+                for i in range(max(1, definition.max_iterations)):
+                    iterations = i + 1
+                    response = await provider.send_message_with_tools(
+                        message, context, tools
                     )
-                if response.content:
-                    output = response.content
-                if not response.tool_calls:
-                    break
+                    if not response.is_success:
+                        return SubAgentResult(
+                            name=definition.name,
+                            output=output,
+                            iterations=iterations,
+                            tool_calls=tool_calls_made,
+                            success=False,
+                            error=response.error or "Subagent provider call failed.",
+                        )
+                    if response.content:
+                        output = response.content
+                    if not response.tool_calls:
+                        break
 
-                result_parts = []
-                for tc in response.tool_calls:
-                    tool_calls_made.append(tc.name)
-                    result = await tool_handler.execute_tool_call(tc)
-                    if result.error:
-                        result_parts.append(f"[{tc.name}] Error: {result.error}")
-                    else:
-                        result_parts.append(f"[{tc.name}] Result: {result.content}")
-                message = "Tool results:\n\n" + "\n\n".join(result_parts)
+                    result_parts = []
+                    for tc in response.tool_calls:
+                        tool_calls_made.append(tc.name)
+                        result = await tool_handler.execute_tool_call(tc)
+                        if result.error:
+                            result_parts.append(f"[{tc.name}] Error: {result.error}")
+                        else:
+                            result_parts.append(f"[{tc.name}] Result: {result.content}")
+                    message = "Tool results:\n\n" + "\n\n".join(result_parts)
 
-            return SubAgentResult(
-                name=definition.name,
-                output=output,
-                iterations=iterations,
-                tool_calls=tool_calls_made,
-                success=True,
-            )
-        except Exception as e:  # never let a subagent crash the parent
-            logger.warning("Subagent '%s' failed: %s", definition.name, e)
-            return SubAgentResult(
-                name=definition.name,
-                output=output,
-                iterations=iterations,
-                tool_calls=tool_calls_made,
-                success=False,
-                error=str(e),
-            )
-        finally:
-            if definition.model and original_model is not None:
-                provider.model = original_model
+                return SubAgentResult(
+                    name=definition.name,
+                    output=output,
+                    iterations=iterations,
+                    tool_calls=tool_calls_made,
+                    success=True,
+                )
+            except Exception as e:  # never let a subagent crash the parent
+                logger.warning("Subagent '%s' failed: %s", definition.name, e)
+                return SubAgentResult(
+                    name=definition.name,
+                    output=output,
+                    iterations=iterations,
+                    tool_calls=tool_calls_made,
+                    success=False,
+                    error=str(e),
+                )
+            finally:
+                if definition.model and original_model is not None:
+                    provider.model = original_model

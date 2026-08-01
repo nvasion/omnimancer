@@ -31,6 +31,7 @@ async def test_initial_prompt_runs_once_before_input_loop() -> None:
     cli.initial_prompt = "start here"
     cli.read_only = False
     cli.full_trust = False
+    cli.turn_notifier = MagicMock(session_id="sess-initial-prompt")
 
     manager = MagicMock()
     manager.mode = SimpleNamespace(value="off")

@@ -493,6 +493,23 @@ class UnifiedStatusManager:
             self.event_listeners.remove(listener)
             listener.stop()
 
+    async def emit_event(
+        self,
+        event: AgentEvent,
+        stream_priority: Optional[StreamPriority] = None,
+    ) -> None:
+        """
+        Emit an arbitrary agent event to listeners and the status stream.
+
+        Approval, turn, and session events have no operation lifecycle
+        method on this manager; emitters use this public entry point.
+
+        Args:
+            event: The event to emit
+            stream_priority: Optional explicit stream priority
+        """
+        await self._emit_event(event, stream_priority)
+
     # Streaming System
     async def emit_stream_event(
         self,
@@ -515,11 +532,13 @@ class UnifiedStatusManager:
         try:
             stream_event = StatusStreamEvent(event=event, priority=priority)
 
-            # Use priority queue for high/critical events
+            # put_nowait, never await put: both queues are bounded, so an
+            # await here blocks the emitting turn whenever a listener stalls.
+            # Dropping via the QueueFull branch below is the intended behavior.
             if priority in [StreamPriority.HIGH, StreamPriority.CRITICAL]:
-                await self.priority_queue.put(stream_event)
+                self.priority_queue.put_nowait(stream_event)
             else:
-                await self.stream_event_queue.put(stream_event)
+                self.stream_event_queue.put_nowait(stream_event)
 
             return True
 
