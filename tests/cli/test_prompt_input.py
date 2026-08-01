@@ -101,8 +101,7 @@ class TestHistoryMigration:
 
 
 class TestStatusToolbar:
-    @pytest.mark.asyncio
-    async def test_toolbar_uses_status_provider(self, make_prompt):
+    def test_toolbar_uses_status_provider(self, make_prompt):
         """Test that toolbar uses status provider when provided."""
 
         def status_provider():
@@ -118,8 +117,7 @@ class TestStatusToolbar:
         assert "gateway/qwen3-coder-30b" in toolbar_text
         assert "read-only" in toolbar_text
 
-    @pytest.mark.asyncio
-    async def test_toolbar_combines_status_and_approval_mode(self, make_prompt):
+    def test_toolbar_combines_status_and_approval_mode(self, make_prompt):
         """Test that toolbar combines status and approval mode when both present."""
 
         def status_provider():
@@ -138,8 +136,7 @@ class TestStatusToolbar:
         assert "approval: ask" in toolbar_text
         assert " | " in toolbar_text  # Should be combined with separator
 
-    @pytest.mark.asyncio
-    async def test_toolbar_none_without_provider_or_mode(self, make_prompt):
+    def test_toolbar_none_without_provider_or_mode(self, make_prompt):
         """Test that toolbar is None when no status provider and normal mode."""
 
         def mode_provider():
@@ -152,8 +149,7 @@ class TestStatusToolbar:
         toolbar_text = prompt._render_toolbar()
         assert toolbar_text is None  # Should be None like original behavior
 
-    @pytest.mark.asyncio
-    async def test_toolbar_provider_exception_safe(self, make_prompt):
+    def test_toolbar_provider_exception_safe(self, make_prompt):
         """Test that toolbar handles exceptions in status provider gracefully."""
 
         def failing_status_provider():

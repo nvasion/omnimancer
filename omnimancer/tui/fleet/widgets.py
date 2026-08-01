@@ -51,8 +51,13 @@ def format_tokens(usage: Optional[dict]) -> str:
     """
     if usage is None or "input_tokens" not in usage or "output_tokens" not in usage:
         return "-"
-    input_tokens = usage.get("input_tokens", 0)
-    output_tokens = usage.get("output_tokens", 0)
+    # Usage values come from external JSON: guard the arithmetic so a
+    # malformed None/string value renders "-" instead of crashing the feed.
+    try:
+        input_tokens = float(usage.get("input_tokens", 0))
+        output_tokens = float(usage.get("output_tokens", 0))
+    except (TypeError, ValueError):
+        return "-"
     return f"{input_tokens/1000:.1f}k/{output_tokens/1000:.1f}k"
 
 
@@ -143,15 +148,15 @@ def feed_line(event: dict) -> Text:
     # Extract details - but handle approval events specially
     detail = data.get("error") or data.get("target") or data.get("description") or ""
 
-    # For approval events, we should not include the event name as tool
+    # For approval events, we should not include the event name as tool;
+    # tool_end never falls back to the event name (a bare "tool_end" label
+    # is noise).
     if event_name in ["approval_requested", "approval_denied"]:
         tool = ""
+    elif event_name == "tool_end":
+        tool = data.get("tool", "")
     else:
         tool = data.get("tool") or event_name
-
-    # Failed tool_end events still show the tool name
-    if event_name == "tool_end" and not data.get("success", True):
-        tool = data.get("tool", "")
 
     # Build the text line
     if tool:
