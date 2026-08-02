@@ -178,15 +178,23 @@ class UnifiedStatusManager:
         if not self.running:
             return
 
+        # Close out active operations while the processors are still
+        # running so their terminal OPERATION_CANCELLED events reach
+        # listeners — flipping the flags first would strand them.
+        for operation_id in list(self.active_operations.keys()):
+            await self.cancel_operation(operation_id, "System shutdown")
+        deadline = asyncio.get_event_loop().time() + 0.5
+        while (
+            not self.event_queue.empty() and asyncio.get_event_loop().time() < deadline
+        ):
+            await asyncio.sleep(0.01)
+        # The final event may still be mid-listener-dispatch after the
+        # queue empties; give the processor one more beat before teardown.
+        await asyncio.sleep(0.05)
+
         self._shutdown = True
         self.running = False
         self.shutdown_event.set()
-
-        # Cancel all active operations
-        async with self._lock:
-            for operation in self.active_operations.values():
-                if operation.is_active:
-                    operation.cancel("System shutdown")
 
         # Stop background tasks
         tasks = [
@@ -359,7 +367,9 @@ class UnifiedStatusManager:
 
             self.stats["operations_completed"] += 1
 
-            # Emit completion event
+            # Emit completion event. Includes the operation's metadata so
+            # terminal events carry the same tool/target identity the start
+            # event had — renderers otherwise fall back to "tool_end".
             await self._emit_event(
                 AgentEvent(
                     event_type=EventType.OPERATION_COMPLETED,
@@ -372,6 +382,7 @@ class UnifiedStatusManager:
                             else 0
                         ),
                         "result_metadata": result_metadata or {},
+                        "metadata": operation.metadata,
                     },
                     source="UnifiedStatusManager",
                 )
@@ -415,6 +426,7 @@ class UnifiedStatusManager:
                             else 0
                         ),
                         "error_metadata": error_metadata or {},
+                        "metadata": operation.metadata,
                     },
                     source="UnifiedStatusManager",
                 )
@@ -453,6 +465,7 @@ class UnifiedStatusManager:
                             if operation.duration
                             else 0
                         ),
+                        "metadata": operation.metadata,
                     },
                     source="UnifiedStatusManager",
                 )
@@ -493,6 +506,23 @@ class UnifiedStatusManager:
             self.event_listeners.remove(listener)
             listener.stop()
 
+    async def emit_event(
+        self,
+        event: AgentEvent,
+        stream_priority: Optional[StreamPriority] = None,
+    ) -> None:
+        """
+        Emit an arbitrary agent event to listeners and the status stream.
+
+        Approval, turn, and session events have no operation lifecycle
+        method on this manager; emitters use this public entry point.
+
+        Args:
+            event: The event to emit
+            stream_priority: Optional explicit stream priority
+        """
+        await self._emit_event(event, stream_priority)
+
     # Streaming System
     async def emit_stream_event(
         self,
@@ -515,11 +545,13 @@ class UnifiedStatusManager:
         try:
             stream_event = StatusStreamEvent(event=event, priority=priority)
 
-            # Use priority queue for high/critical events
+            # put_nowait, never await put: both queues are bounded, so an
+            # await here blocks the emitting turn whenever a listener stalls.
+            # Dropping via the QueueFull branch below is the intended behavior.
             if priority in [StreamPriority.HIGH, StreamPriority.CRITICAL]:
-                await self.priority_queue.put(stream_event)
+                self.priority_queue.put_nowait(stream_event)
             else:
-                await self.stream_event_queue.put(stream_event)
+                self.stream_event_queue.put_nowait(stream_event)
 
             return True
 

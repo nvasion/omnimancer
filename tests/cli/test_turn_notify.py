@@ -143,6 +143,7 @@ async def test_headless_notifier_and_hook_share_payload(tmp_path) -> None:
         cost_estimate=0.02,
     )
     engine = MagicMock()
+    engine.runtime_identity.return_value = ("p", "test-model")
     engine.agent_engine = MagicMock()
     engine.config_manager.get_config.return_value.default_provider = "test"
     engine.provider_supports_tools.return_value = True
@@ -176,6 +177,8 @@ async def test_interactive_turn_finalizes_once_for_every_outcome(
     cli = CommandLineInterface.__new__(CommandLineInterface)
     cli.engine = MagicMock()
     cli.turn_notifier = MagicMock()
+    cli._turn_seq = 0
+    cli.turn_activity = None
     cli._handle_chat_message_turn = AsyncMock(side_effect=effect)
     command = Command.create_chat_message("hello")
 

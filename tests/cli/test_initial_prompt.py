@@ -12,6 +12,7 @@ from omnimancer.cli.interface import CommandLineInterface, validate_prompt_optio
 async def test_initial_prompt_runs_once_before_input_loop() -> None:
     cli = CommandLineInterface.__new__(CommandLineInterface)
     cli.engine = MagicMock()
+    cli.engine.runtime_identity.return_value = ("p", "test-model")
     cli.engine.initialize_providers = AsyncMock()
     cli.engine.initialize_mcp = AsyncMock()
     cli.engine.shutdown_mcp = AsyncMock()
@@ -31,6 +32,7 @@ async def test_initial_prompt_runs_once_before_input_loop() -> None:
     cli.initial_prompt = "start here"
     cli.read_only = False
     cli.full_trust = False
+    cli.turn_notifier = MagicMock(session_id="sess-initial-prompt")
 
     manager = MagicMock()
     manager.mode = SimpleNamespace(value="off")

@@ -318,6 +318,7 @@ class ConfigMigration:
             "permissions",
             "hooks",
             "subagents",
+            "events",
         ):
             if passthrough_key in old_config:
                 new_config[passthrough_key] = old_config[passthrough_key]

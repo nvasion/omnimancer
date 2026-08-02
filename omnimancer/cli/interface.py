@@ -22,6 +22,7 @@ from rich.console import Console
 from rich.prompt import Confirm
 
 # Internal imports - Core
+from ..core.agent.status_core import EventType
 from ..core.agent_mode_manager import AgentModeManager
 from ..core.config_manager import ConfigManager
 from ..core.engine import CoreEngine
@@ -34,6 +35,8 @@ from ..core.models import (
     parse_described_tool_calls,
 )
 from ..core.signal_handler import SignalHandler
+from ..events import emitter as fleet_events
+from ..events.schema import MESSAGE_PREVIEW_CHARS, PREVIEW_CHARS, truncate
 
 # UI imports
 from ..ui.cancellation_handler import CancellationHandler, EnhancedStatusDisplay
@@ -118,6 +121,9 @@ class CommandLineInterface(
         self.initial_prompt = initial_prompt
         self.read_only = read_only
         self.turn_notifier = TurnNotifier(notify_cmd=notify_cmd, cwd=os.getcwd())
+        self._turn_seq = 0
+        # Set in _async_start when the event feed is live.
+        self.turn_activity: Optional[Any] = None
         # Initialize console with robust terminal handling and fallback mechanism
         self.console = self._initialize_console_with_fallback()
         self.running = False
@@ -182,6 +188,7 @@ class CommandLineInterface(
                     ),
                     mode_toggle=self._cycle_session_approval_mode,
                     mode_provider=self._session_approval_mode_name,
+                    status_provider=self._toolbar_status,
                 )
             except Exception as e:
                 logger.warning(
@@ -264,6 +271,33 @@ class CommandLineInterface(
 
             self._configure_agent_engine_session()
 
+            # Fleet event feed: one JSONL per session (default-on; see
+            # EventsConfig). init/emit never raise and no-op when disabled.
+            session_config = self.engine.config_manager.get_config()
+            events_live = await fleet_events.init_events(
+                self.turn_notifier.session_id, "interactive", session_config.events
+            )
+            if events_live and self.prompt_input is not None:
+                # Recent-tool-activity window rendered inside the streaming
+                # display's existing Live (never a second Live region).
+                # Gated on prompt_input: it is only constructed on real
+                # interactive TTYs (OMNIMANCER_PLAIN_INPUT and non-TTY
+                # sessions never build one), so plain sessions keep their
+                # exact pre-existing display behavior.
+                from ..ui.turn_activity import TurnActivityLog
+
+                self.turn_activity = TurnActivityLog()
+                fleet_events.register_listener(self.turn_activity)
+            provider_name, model = self.engine.runtime_identity()
+            await fleet_events.emit_event(
+                EventType.SESSION_START,
+                {
+                    "provider": provider_name,
+                    "model": model,
+                    "read_only": bool(getattr(self, "read_only", False)),
+                },
+            )
+
             if self.initial_prompt is not None:
                 initial_prompt = self.initial_prompt
                 self.initial_prompt = None
@@ -319,6 +353,14 @@ class CommandLineInterface(
             # Wait for graceful shutdown if needed
             if self.signal_handler.shutdown_in_progress:
                 await self.signal_handler.wait_for_shutdown()
+
+            # Close the fleet event feed. Status 1 when this finally is
+            # unwinding an exception, so the fleet row renders FAILED.
+            exit_status = 0 if sys.exc_info()[0] is None else 1
+            await fleet_events.emit_event(
+                EventType.SESSION_END, {"reason": "exit", "status": exit_status}
+            )
+            await fleet_events.shutdown_events()
 
             # Ensure terminal is reset on exit
             self._reset_terminal()
@@ -690,6 +732,37 @@ class CommandLineInterface(
         except Exception as e:
             logger.error("Failed to set up file interaction" f" integration: {e}")
 
+    def _toolbar_status(self) -> Optional[str]:
+        """Persistent status text: provider/model, session cost, read-only.
+
+        Reads the LIVE session provider (engine.current_provider), not the
+        stored config defaults — /switch must be reflected on the very next
+        prompt. Rendered by PromptInput's bottom toolbar; must never raise
+        (the toolbar falls back to approval-mode-only on error).
+        """
+        try:
+            provider = getattr(self.engine, "current_provider", None)
+            if provider is None:
+                return None
+            entry_name = None
+            for name, candidate in getattr(self.engine, "providers", {}).items():
+                if candidate is provider:
+                    entry_name = name
+                    break
+            if entry_name is None:
+                entry_name = provider.get_provider_name()
+            model = getattr(provider, "model", "") or ""
+            parts = [f"{entry_name}/{model}" if model else entry_name]
+            usage = getattr(self, "usage", None)
+            if usage is not None:
+                cost = usage.total.get("total_cost_usd", 0.0)
+                parts.append(f"${cost:.2f}")
+            if getattr(self, "read_only", False):
+                parts.append("read-only")
+            return " · ".join(parts)
+        except Exception:
+            return None
+
     def _reset_terminal(self) -> None:
         """Reset terminal to ensure it's in normal mode."""
         try:
@@ -794,11 +867,39 @@ class CommandLineInterface(
 
         self.turn_notifier.reset_turn()
         self._turn_final_response = None
+        if self.turn_activity is not None:
+            self.turn_activity.reset_turn()
+        self._turn_seq += 1
+        await fleet_events.emit_event(
+            EventType.TURN_START,
+            {
+                "turn": self._turn_seq,
+                "prompt_preview": truncate(command.content, PREVIEW_CHARS),
+                "prompt_chars": len(command.content),
+            },
+        )
 
         try:
             await self._handle_chat_message_turn(command)
         finally:
             await fire_turn_complete(self.engine, self.turn_notifier)
+            # Guarded: a diagnostics emission inside a finally must never
+            # mask the turn's real exception.
+            try:
+                turn_payload = self.turn_notifier.build_payload()
+                await fleet_events.emit_event(
+                    EventType.TURN_END,
+                    {
+                        "turn": self._turn_seq,
+                        "usage": turn_payload.get("usage"),
+                        "last_message_preview": truncate(
+                            str(turn_payload.get("last-assistant-message") or ""),
+                            MESSAGE_PREVIEW_CHARS,
+                        ),
+                    },
+                )
+            except Exception as exc:
+                logger.debug(f"turn_end event emission failed: {exc}")
 
     async def _handle_chat_message_turn(self, command: Command) -> None:
         """Process one non-empty chat turn without finalization.
@@ -1080,7 +1181,12 @@ class CommandLineInterface(
         from ..core.models import ChatResponse, StreamEventType, describe_tool_calls
         from ..ui.streaming_display import StreamingDisplay
 
-        display = StreamingDisplay(self.console)
+        display = StreamingDisplay(
+            self.console,
+            activity_provider=(
+                self.turn_activity.render if self.turn_activity is not None else None
+            ),
+        )
         display.start()
         final_response: Optional[ChatResponse] = None
 
@@ -1134,7 +1240,12 @@ class CommandLineInterface(
         from ..core.models import ChatResponse, StreamEventType
         from ..ui.streaming_display import StreamingDisplay
 
-        display = StreamingDisplay(self.console)
+        display = StreamingDisplay(
+            self.console,
+            activity_provider=(
+                self.turn_activity.render if self.turn_activity is not None else None
+            ),
+        )
         display.start()
         final_response: Optional[ChatResponse] = None
 
@@ -1218,6 +1329,15 @@ def main() -> None:
 
     This function initializes the application and starts the interactive CLI.
     """
+
+    # Subcommand pre-dispatch. cli_main stays a single @click.command (not a
+    # group) because converting it would change --help and flag parsing for
+    # `omn -p`, which codex-orchestrator and the fleet wrapper parse.
+    if len(sys.argv) > 1 and sys.argv[1] == "fleet":
+        from omnimancer.tui.fleet.cli import fleet_main
+
+        fleet_main.main(args=sys.argv[2:], prog_name="omn fleet")
+        return
 
     @click.command()
     @click.option(

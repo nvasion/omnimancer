@@ -11,12 +11,15 @@ import sys
 from enum import Enum
 from typing import Any, Optional
 
+from ..core.agent.status_core import EventType
 from ..core.models import (
     ChatResponse,
     ToolResult,
     ToolResultRecord,
     parse_described_tool_calls,
 )
+from ..events import emitter as fleet_events
+from ..events.schema import MESSAGE_PREVIEW_CHARS, PREVIEW_CHARS, truncate
 from .session import apply_session_overrides
 from .system_prompts import build_agent_prompt
 from .tool_handler import (
@@ -179,6 +182,7 @@ class HeadlessOutputEmitter:
         tool_calls: Optional[list] = None,
         num_turns: int = 0,
         stop_cause: Optional[str] = None,
+        provider: str = "",
     ) -> None:
         if self._format == OutputFormat.TEXT:
             if content != self._last_content:
@@ -199,6 +203,7 @@ class HeadlessOutputEmitter:
                 "result": content,
                 "session_id": self._session_id,
                 "model": model,
+                "provider": provider,
                 "num_turns": num_turns,
                 "tool_calls": tool_calls or [],
                 "usage": usage,
@@ -216,6 +221,7 @@ class HeadlessOutputEmitter:
                     "is_error": False,
                     "result": content,
                     "model": model,
+                    "provider": provider,
                     "num_turns": num_turns,
                     "usage": usage,
                     "total_cost_usd": cost,
@@ -224,7 +230,13 @@ class HeadlessOutputEmitter:
                 }
             )
 
-    def emit_error(self, message: str, tool_calls: Optional[list] = None) -> None:
+    def emit_error(
+        self,
+        message: str,
+        tool_calls: Optional[list] = None,
+        model: str = "",
+        provider: str = "",
+    ) -> None:
         # Always surface a human-readable line on stderr (stdout stays
         # reserved for the structured result in JSON modes).
         self._stderr.write(f"Error: {message}\n")
@@ -239,6 +251,8 @@ class HeadlessOutputEmitter:
                         "is_error": True,
                         "error": message,
                         "session_id": self._session_id,
+                        "model": model,
+                        "provider": provider,
                         "tool_calls": tool_calls or [],
                     },
                     default=str,
@@ -248,7 +262,13 @@ class HeadlessOutputEmitter:
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
             self._write_json_line(
-                {"type": "error", "is_error": True, "message": message}
+                {
+                    "type": "error",
+                    "is_error": True,
+                    "message": message,
+                    "model": model,
+                    "provider": provider,
+                }
             )
 
 
@@ -276,6 +296,8 @@ class HeadlessRunner:
         session_id = self._turn_notifier.session_id
         self._emitter = HeadlessOutputEmitter(output_format, session_id, verbose)
         self._tokens = TokenAccumulator()
+        self._provider_name: str = ""
+        self._model: str = ""
 
     @staticmethod
     def _enable_auto_approval(agent_engine: Any) -> None:
@@ -328,16 +350,64 @@ class HeadlessRunner:
             Process-style status code: zero for success, one for failure.
         """
         self._turn_notifier.reset_turn()
+        config = self._engine.config_manager.get_config()
+        await fleet_events.init_events(
+            self._turn_notifier.session_id, "headless", config.events
+        )
+        self._provider_name, self._model = self._engine.runtime_identity()
+        await fleet_events.emit_event(
+            EventType.SESSION_START,
+            {
+                "provider": self._provider_name,
+                "model": self._model,
+                "read_only": self._read_only,
+            },
+        )
+        await fleet_events.emit_event(
+            EventType.TURN_START,
+            {
+                "turn": 1,
+                "prompt_preview": truncate(prompt, PREVIEW_CHARS),
+                "prompt_chars": len(prompt),
+            },
+        )
+        status = 1
         try:
-            return await self._run(prompt)
+            status = await self._run(prompt)
+            return status
         finally:
             await fire_turn_complete(self._engine, self._turn_notifier)
+            # Guarded: a diagnostics emission inside a finally must never
+            # mask the run's real exception.
+            try:
+                turn_payload = self._turn_notifier.build_payload()
+                await fleet_events.emit_event(
+                    EventType.TURN_END,
+                    {
+                        "turn": 1,
+                        "usage": turn_payload.get("usage"),
+                        "last_message_preview": truncate(
+                            str(turn_payload.get("last-assistant-message") or ""),
+                            MESSAGE_PREVIEW_CHARS,
+                        ),
+                    },
+                )
+                await fleet_events.emit_event(
+                    EventType.SESSION_END, {"reason": "exit", "status": status}
+                )
+            except Exception as exc:
+                logger.debug(f"session_end event emission failed: {exc}")
+            await fleet_events.shutdown_events()
 
     async def _run(self, prompt: str) -> int:
         """Execute the headless agent loop without completion finalization."""
         agent_engine = getattr(self._engine, "agent_engine", None)
         if not agent_engine:
-            self._emitter.emit_error("Agent engine not available.")
+            self._emitter.emit_error(
+                "Agent engine not available.",
+                model=self._model,
+                provider=self._provider_name,
+            )
             return 1
 
         if self._read_only and hasattr(agent_engine, "set_read_only"):
@@ -347,7 +417,7 @@ class HeadlessRunner:
             self._enable_auto_approval(agent_engine)
             self._enable_full_trust(agent_engine)
 
-        model = self._engine.config_manager.get_config().default_provider or "unknown"
+        model = self._model or "unknown"
         self._emitter.emit_init(model)
 
         supports_tools = self._engine.provider_supports_tools()
@@ -382,8 +452,14 @@ class HeadlessRunner:
             self._turn_notifier.record_assistant(response.content, response)
 
             if not response.is_success:
+                # Re-resolve at emit time: rate-limit fallback may have
+                # switched the engine's provider since the run started.
+                provider_name, model_name = self._engine.runtime_identity()
                 self._emitter.emit_error(
-                    response.error or "Unknown error", tool_calls=tool_log
+                    response.error or "Unknown error",
+                    tool_calls=tool_log,
+                    model=model_name or self._model,
+                    provider=provider_name or self._provider_name,
                 )
                 return 1
 
@@ -504,6 +580,10 @@ class HeadlessRunner:
             stop_reason=last_stop_reason,
         )
         self._turn_notifier.record_assistant(last_content or None, aggregate_response)
+        # Re-resolve at emit time: rate-limit fallback may have switched the
+        # engine's provider mid-run, and the envelope must stay consistent
+        # with the model that actually answered.
+        provider_name, _ = self._engine.runtime_identity()
         self._emitter.emit_result(
             last_content,
             last_model,
@@ -513,6 +593,7 @@ class HeadlessRunner:
             stop_cause=stop_cause,
             tool_calls=tool_log,
             num_turns=turns,
+            provider=provider_name or self._provider_name,
         )
         # 3 = the run ended without the model finishing its work (cap hit or
         # duplicate-call abort) even though a result was emitted; orchestrators

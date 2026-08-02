@@ -28,7 +28,9 @@ classifiers = [
 
 dependencies = [
     "click>=8.0.0",
-    "rich>=13.0.0",
+    # >=15: Console tolerates stacked Live regions (_live_stack); 13.x had a
+    # single _live slot and is below our tested floor.
+    "rich>=15.0.0",
     "httpx>=0.24.0",
     "pydantic>=2.0.0",
     "cryptography>=41.0.0",
@@ -50,6 +52,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The fleet dashboard (omn fleet) needs Textual; kept out of the core
+# dependencies so headless/worker installs stay lean. Lazy-imported with a
+# friendly install hint (see omnimancer/tui/fleet/cli.py).
+tui = [
+    "textual>=8.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -59,17 +67,26 @@ dev = [
     "isort>=5.12.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    # For the Textual Pilot tests in tests/tui/.
+    "textual>=8.0",
 ]
 
 [project.scripts]
 omnimancer = "omnimancer.cli.interface:main"
 omn = "omnimancer.cli.interface:main"
 omniman = "omnimancer.cli.interface:main"
+# Claude Code hook adapter — a top-level stdlib-only module so each hook
+# invocation starts in bare-python time (importing the omnimancer package
+# would pull pydantic on every tool call).
+omn-fleet-hook = "omn_fleet_hook:main"
 
 [project.urls]
 Homepage = "https://github.com/nvasion/omnimancer"
 Repository = "https://github.com/nvasion/omnimancer"
 Issues = "https://github.com/nvasion/omnimancer/issues"
+
+[tool.setuptools]
+py-modules = ["omn_fleet_hook"]
 
 [tool.setuptools.packages.find]
 where = ["."]

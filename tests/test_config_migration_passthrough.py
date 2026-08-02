@@ -41,6 +41,7 @@ V1_CONFIG = {
         }
     ],
     "fallback": {"fallback_order": ["gateway"], "auto_fallback": False},
+    "events": {"enabled": False, "max_file_mb": 5},
 }
 
 
@@ -65,6 +66,12 @@ class TestMigrationPassthrough:
 
     def test_fallback_block_survives(self, migrated):
         assert migrated.get("fallback", {}).get("fallback_order") == ["gateway"]
+
+    def test_events_block_survives(self, migrated):
+        # An explicit opt-out must not be silently reverted to the
+        # default-on EventsConfig by a migration.
+        assert migrated.get("events", {}).get("enabled") is False
+        assert migrated.get("events", {}).get("max_file_mb") == 5
 
 
 class TestProviderMigrationPreservesUserValues:

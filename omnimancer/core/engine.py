@@ -9,7 +9,7 @@ Version: 1.0.0
 
 import logging
 import re
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from ..core.models import (
     ChatResponse,
@@ -166,6 +166,43 @@ class CoreEngine:
         except Exception as e:
             logger.error(f"Failed to initialize providers: {e}")
             raise ConfigurationError(f"Provider initialization failed: {e}")
+
+    def runtime_identity(self) -> Tuple[str, str]:
+        """Return ``(provider_name, model)`` for the active runtime provider.
+
+        Reads the initialized provider instance (environment overlays already
+        applied) instead of the on-disk config, so headless workers spawned
+        with ``OMNIMANCER_*_MODEL`` overlays report the model they actually
+        use. Falls back to on-disk config values when no provider is live.
+        Never writes anything back to the ConfigManager.
+
+        Returns:
+            Tuple of (provider config key, model name); either element may be
+            an empty string or a config fallback when unknown.
+        """
+        provider_name = ""
+        model = ""
+        current = self.current_provider
+        if current is not None:
+            raw_model = getattr(current, "model", "")
+            if isinstance(raw_model, str):
+                model = raw_model
+            for name, instance in self.providers.items():
+                if instance is current:
+                    provider_name = name
+                    break
+        if not provider_name or not model:
+            try:
+                config = self.config_manager.get_config()
+                if not provider_name:
+                    provider_name = config.default_provider or "unknown"
+                if not model:
+                    entry = config.providers.get(config.default_provider)
+                    raw = getattr(entry, "model", "")
+                    model = raw if isinstance(raw, str) else ""
+            except Exception as e:  # identity is best-effort diagnostics
+                logger.debug(f"runtime_identity config fallback failed: {e}")
+        return provider_name, model
 
     async def switch_model(
         self, provider_name: str, model_name: Optional[str] = None

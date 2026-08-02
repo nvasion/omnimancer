@@ -220,13 +220,14 @@ class TestStreamingExecutor:
         mock_stdout = AsyncMock()
         mock_stderr = AsyncMock()
 
-        # Simulate output lines
-        mock_stdout.readline.side_effect = [
+        # Simulate output chunks (the reader uses read(), not readline(),
+        # so single lines longer than the StreamReader limit can't be lost)
+        mock_stdout.read.side_effect = [
             b"line 1\n",
             b"line 2\n",
             b"",
         ]  # EOF
-        mock_stderr.readline.side_effect = [b"error 1\n", b""]  # EOF
+        mock_stderr.read.side_effect = [b"error 1\n", b""]  # EOF
 
         mock_process.stdout = mock_stdout
         mock_process.stderr = mock_stderr
