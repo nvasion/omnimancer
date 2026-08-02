@@ -14,7 +14,13 @@ import pytest
 
 pytest.importorskip("textual")
 
-from omnimancer.tui.fleet.app import FleetApp, JobDetailScreen  # noqa: E402
+from textual.css.query import NoMatches  # noqa: E402
+
+from omnimancer.tui.fleet.app import (  # noqa: E402
+    FeedsUpdated,
+    FleetApp,
+    JobDetailScreen,
+)
 
 JOB = {
     "id": "aabbccdd",
@@ -487,6 +493,60 @@ class TestFleetAppData:
             await pilot.press("escape")
             await _settle(pilot)
             assert not isinstance(app.screen, JobDetailScreen)
+
+    async def test_query_live_swallows_nomatches(self, fleet_dirs):
+        """_query_live is the shared guard behind _rebuild_table and
+        on_feeds_updated: a missing widget must come back as None, never
+        raise, so one transient DOM race can't crash the whole app."""
+        from textual.widgets import DataTable
+
+        app = _app(fleet_dirs)
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            assert app._query_live("#does-not-exist", DataTable) is None
+            # The happy path still returns the real widget.
+            assert app._query_live("#agents", DataTable) is not None
+
+    async def test_rebuild_table_tolerates_missing_agents_widget(
+        self, fleet_dirs, monkeypatch
+    ):
+        """A NoMatches on '#agents' (observed as a flaky race between the
+        jobs-scan/feeds-tail workers and Textual DOM teardown/remount)
+        must not crash _rebuild_table — it should simply skip that
+        rebuild, matching the same tolerance on_feeds_updated already
+        has for '#activity'/'#comms'."""
+        app = _app(fleet_dirs)
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            original_query_one = app.query_one
+
+            def flaky_query_one(selector, expect_type=None):
+                if selector == "#agents":
+                    raise NoMatches("simulated DOM race")
+                return original_query_one(selector, expect_type)
+
+            monkeypatch.setattr(app, "query_one", flaky_query_one)
+            app._rebuild_table()  # must not raise
+
+    async def test_feeds_updated_tolerates_missing_feed_widgets(
+        self, fleet_dirs, monkeypatch
+    ):
+        """Mirrors test_rebuild_table_tolerates_missing_agents_widget for
+        the '#activity'/'#comms' guard in on_feeds_updated."""
+        app = _app(fleet_dirs)
+        async with app.run_test() as pilot:
+            await _settle(pilot)
+            original_query_one = app.query_one
+
+            def flaky_query_one(selector, expect_type=None):
+                if selector == "#activity":
+                    raise NoMatches("simulated DOM race")
+                return original_query_one(selector, expect_type)
+
+            monkeypatch.setattr(app, "query_one", flaky_query_one)
+            # Should not raise even though the activity log briefly
+            # can't be resolved.
+            app.on_feeds_updated(FeedsUpdated(events=[], ledger=[]))
 
 
 class TestEndedSessionVisibility:
