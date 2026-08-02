@@ -46,7 +46,7 @@ class TestHooksSnippet:
 
     def test_negative_budget_rejected(self):
         result = CliRunner().invoke(fleet_main, ["--budget-gb", "-1"])
-        assert result.exit_code != 0
+        assert result.exit_code == 2  # Click UsageError: option value out of range
         assert "not in the range" in result.output or "Invalid" in result.output
 
 
@@ -55,7 +55,7 @@ class TestTextualGuard:
         # sys.modules[name] = None makes `import textual` raise ImportError.
         monkeypatch.setitem(sys.modules, "textual", None)
         result = CliRunner().invoke(fleet_main, [])
-        assert result.exit_code != 0
+        assert result.exit_code == 1  # click.ClickException exit code
         assert "omnimancer-cli[tui]" in result.output
 
     def test_hint_names_the_command(self):

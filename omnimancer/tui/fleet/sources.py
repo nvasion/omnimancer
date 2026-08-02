@@ -153,7 +153,6 @@ class EventsTailer:
 
                 # Update offset
                 new_offset = offset + len(content)
-                self._file_states[jsonl_file.name] = (new_offset, buffer)
 
                 # Combine buffer with new content
                 full = buffer + content

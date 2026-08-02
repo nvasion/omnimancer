@@ -136,6 +136,16 @@ async def _wait_for(pilot, condition, timeout_s: float = 5.0) -> None:
         await _settle(pilot, 0.1)
 
 
+def _fleet_tmp_dirs(tmp_path):
+    """Create the standard empty jobs/events/project directory triple."""
+    jobs = tmp_path / "jobs"
+    events = tmp_path / "events"
+    project = tmp_path / "proj"
+    for directory in (jobs, events, project):
+        directory.mkdir()
+    return jobs, events, project
+
+
 class TestFleetAppData:
     async def test_job_row_waiting_and_session_row(self, fleet_dirs):
         app = _app(fleet_dirs)
@@ -189,11 +199,7 @@ class TestFleetAppData:
         the dashboard happened to read them."""
         from datetime import datetime, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
 
         def _session_event(session_id: str, ts: str) -> str:
             event = dict(EVENT_SESSION_START)
@@ -228,11 +234,7 @@ class TestFleetAppData:
     async def test_once_waits_for_event_replay(self, tmp_path):
         """--once must include session rows from the initial event replay:
         exiting after the jobs scan alone would drop them entirely."""
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         event = dict(EVENT_SESSION_START)
         event["session_id"] = "dead-sess-3333"
         event["ts"] = "2026-08-01T03:14:34.686+00:00"
@@ -274,11 +276,7 @@ class TestFleetAppData:
         latest event is turn_end (idle at prompt)."""
         from datetime import datetime, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
 
         now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
         claude_events = [
@@ -338,11 +336,7 @@ class TestFleetAppData:
         session_start must bring the row back (ended cleared)."""
         from datetime import datetime, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
         def event(name: str, data: dict) -> str:
@@ -413,11 +407,7 @@ class TestFleetAppData:
         """Operator console behaviors: active work sorts to the top, `f`
         cycles htop-style state filters, and the 1s rescan never yanks the
         cursor back to the top (field-reported)."""
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         (jobs / "11111111.json").write_text(
             json.dumps({"id": "11111111", "backend": "codex", "status": "completed"})
         )
@@ -507,11 +497,7 @@ class TestEndedSessionVisibility:
         showing the model from session_start."""
         from datetime import datetime, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
         (events / "sess.jsonl").write_text(
             json.dumps(
@@ -558,11 +544,7 @@ class TestEndedSessionVisibility:
         """An ended session with a non-zero exit status renders as failed."""
         from datetime import datetime, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
         (events / "sess.jsonl").write_text(
             json.dumps(
@@ -608,11 +590,7 @@ class TestEndedSessionVisibility:
         """A session whose last event is >24h old must not render at all."""
         from datetime import datetime, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         old_ts = (
             datetime.now(timezone.utc) - __import__("datetime").timedelta(hours=25)
         ).isoformat(timespec="milliseconds")
@@ -661,11 +639,7 @@ class TestJobSessionDedup:
     async def test_live_session_not_hidden_by_dead_job(self, tmp_path):
         """A terminal job and a live session in the same cwd must both render;
         the dedup only applies when the job is terminal AND the session is ended."""
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         (jobs / "11111111.json").write_text(
             json.dumps(
                 {
@@ -710,11 +684,7 @@ class TestJobSessionDedup:
     async def test_live_session_hidden_by_running_job_same_cwd(self, tmp_path):
         """A live session in the same cwd as a running job must be hidden;
         the job row alone represents the run."""
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         (jobs / "22222222.json").write_text(
             json.dumps(
                 {
@@ -761,11 +731,7 @@ class TestJobSessionDedup:
         import os
         import time
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         # Write a terminal job; mtime will be set to now.
         job_data = {
             "id": "33333333",
@@ -827,11 +793,7 @@ class TestJobSessionDedup:
         import time
         from datetime import datetime, timedelta, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         (jobs / "44444444.json").write_text(
             json.dumps(
                 {
@@ -894,11 +856,7 @@ class TestJobSessionDedup:
         overwrite the parent main row's model."""
         from datetime import datetime, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
         (events / "sess.jsonl").write_text(
             # Main session_start — no agent_id (or "main") matches real fixtures.
@@ -966,11 +924,7 @@ class TestJobSessionDedup:
         while the main row stays non-ended."""
         from datetime import datetime, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
         (events / "sess.jsonl").write_text(
             json.dumps(
@@ -1045,11 +999,7 @@ class TestJobSessionDedup:
         row from being stale."""
         from datetime import datetime, timedelta, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         # 10 minutes ago for the main session.
         old_ts = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(
             timespec="milliseconds"
@@ -1253,11 +1203,7 @@ class TestSessionDetail:
             assert not isinstance(app.screen, SessionDetailScreen)
 
     async def test_enter_on_session_row_canonical_file(self, tmp_path):
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         (events / "omn-11112222-3333.jsonl").write_text(
             json.dumps(EVENT_SESSION_START) + "\n" + json.dumps(EVENT_TOOL_START) + "\n"
         )
@@ -1290,11 +1236,7 @@ class TestSessionDetail:
     async def test_enter_on_subagent_row_filters_events(self, tmp_path):
         from datetime import datetime, timezone
 
-        jobs = tmp_path / "jobs"
-        events = tmp_path / "events"
-        project = tmp_path / "proj"
-        for directory in (jobs, events, project):
-            directory.mkdir()
+        jobs, events, project = _fleet_tmp_dirs(tmp_path)
         now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
         main_start = {
             "v": 1,
