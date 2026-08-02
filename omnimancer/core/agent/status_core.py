@@ -66,6 +66,11 @@ class EventType(Enum):
     APPROVAL_REQUESTED = "approval_requested"
     APPROVAL_GRANTED = "approval_granted"
     APPROVAL_DENIED = "approval_denied"
+    # Session/turn lifecycle for the fleet event feed (omn.event.v1).
+    SESSION_START = "session_start"
+    SESSION_END = "session_end"
+    TURN_START = "turn_start"
+    TURN_END = "turn_end"
 
 
 class StreamPriority(Enum):

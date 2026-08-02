@@ -4,8 +4,11 @@ import json
 import os
 import tempfile
 
+import pytest
+
 from omnimancer.cli.interface import apply_session_overrides
 from omnimancer.core.config_manager import ConfigManager
+from omnimancer.core.models import ProviderConfig
 
 
 def _config_manager(default="digitalocean", model="llama3.3-70b-instruct"):
@@ -57,6 +60,41 @@ class TestApplySessionOverrides:
         assert cfg.providers["openrouter"].model == "anthropic/claude"
 
 
+@pytest.mark.asyncio
+async def test_headless_provider_override_does_not_persist(monkeypatch, tmp_path):
+    import omnimancer.cli.headless as headless
+    import omnimancer.core.engine as engine_module
+
+    config_path = tmp_path / "config.json"
+    config_manager = ConfigManager(str(config_path))
+    config = config_manager.get_config()
+    config.default_provider = "stored"
+    config.providers = {"stored": ProviderConfig(api_key="k", model="m")}
+    config.storage_path = str(tmp_path)
+    config_manager.save_config(config)
+    original = config_path.read_bytes()
+
+    class FakeCoreEngine:
+        def __init__(self, config_manager):
+            self.config_manager = config_manager
+
+        async def initialize_providers(self):
+            return None
+
+    async def fake_run(self, prompt):
+        return 0
+
+    monkeypatch.setattr(engine_module, "CoreEngine", FakeCoreEngine)
+    monkeypatch.setattr(headless.HeadlessRunner, "run", fake_run)
+
+    result = await headless.run_headless(
+        "hello", config_path=str(config_path), provider="openai"
+    )
+
+    assert result == 0
+    assert config_path.read_bytes() == original
+
+
 class TestDangerouslySkipPermissionsWiring:
     """--dangerously-skip-permissions must skip approvals in interactive mode too.
 
@@ -75,8 +113,15 @@ class TestDangerouslySkipPermissionsWiring:
         captured = {}
 
         class _FakeCLI:
-            def __init__(self, engine, no_approval=False):
+            def __init__(
+                self,
+                engine,
+                no_approval=False,
+                full_trust=False,
+                **kwargs,
+            ):
                 captured["no_approval"] = no_approval
+                captured["full_trust"] = full_trust
 
             def start(self):
                 return None
@@ -107,10 +152,12 @@ class TestDangerouslySkipPermissionsWiring:
     def test_flag_enables_no_approval_interactive(self):
         captured = self._invoke(["omn", "--dangerously-skip-permissions"])
         assert captured["no_approval"] is True
+        assert captured["full_trust"] is True
 
     def test_no_approval_flag_enables_interactive(self):
         captured = self._invoke(["omn", "--no-approval"])
         assert captured["no_approval"] is True
+        assert captured["full_trust"] is False
 
     def test_default_keeps_approvals_on(self):
         captured = self._invoke(["omn"])

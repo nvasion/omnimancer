@@ -8,15 +8,19 @@ import json
 import logging
 import os
 import sys
-import uuid
 from enum import Enum
 from typing import Any, Optional
 
+from ..core.agent.status_core import EventType
 from ..core.models import (
+    ChatResponse,
     ToolResult,
     ToolResultRecord,
     parse_described_tool_calls,
 )
+from ..events import emitter as fleet_events
+from ..events.schema import MESSAGE_PREVIEW_CHARS, PREVIEW_CHARS, truncate
+from .session import apply_session_overrides
 from .system_prompts import build_agent_prompt
 from .tool_handler import (
     DUPLICATE_CALL_NUDGE,
@@ -24,6 +28,7 @@ from .tool_handler import (
     RepeatedCallTracker,
     ToolHandler,
 )
+from .turn_notify import TurnNotifier, fire_turn_complete
 from .usage import TokenAccumulator  # noqa: F401  (re-export; moved to usage.py)
 
 logger = logging.getLogger(__name__)
@@ -176,11 +181,20 @@ class HeadlessOutputEmitter:
         stop_reason: Optional[str],
         tool_calls: Optional[list] = None,
         num_turns: int = 0,
+        stop_cause: Optional[str] = None,
+        provider: str = "",
     ) -> None:
         if self._format == OutputFormat.TEXT:
             if content != self._last_content:
                 self._stdout.write(content + "\n")
                 self._stdout.flush()
+            # stdout stays pure payload; truncation is a stderr concern.
+            if stop_cause in ("max_iterations", "repeat_abort"):
+                self._stderr.write(
+                    f"Warning: run ended early (stop_cause={stop_cause}); "
+                    "the result is partial\n"
+                )
+                self._stderr.flush()
         elif self._format == OutputFormat.JSON:
             blob = {
                 "type": "result",
@@ -189,11 +203,13 @@ class HeadlessOutputEmitter:
                 "result": content,
                 "session_id": self._session_id,
                 "model": model,
+                "provider": provider,
                 "num_turns": num_turns,
                 "tool_calls": tool_calls or [],
                 "usage": usage,
                 "total_cost_usd": cost,
                 "stop_reason": stop_reason,
+                "stop_cause": stop_cause,
             }
             self._stdout.write(json.dumps(blob, default=str) + "\n")
             self._stdout.flush()
@@ -205,14 +221,22 @@ class HeadlessOutputEmitter:
                     "is_error": False,
                     "result": content,
                     "model": model,
+                    "provider": provider,
                     "num_turns": num_turns,
                     "usage": usage,
                     "total_cost_usd": cost,
                     "stop_reason": stop_reason,
+                    "stop_cause": stop_cause,
                 }
             )
 
-    def emit_error(self, message: str, tool_calls: Optional[list] = None) -> None:
+    def emit_error(
+        self,
+        message: str,
+        tool_calls: Optional[list] = None,
+        model: str = "",
+        provider: str = "",
+    ) -> None:
         # Always surface a human-readable line on stderr (stdout stays
         # reserved for the structured result in JSON modes).
         self._stderr.write(f"Error: {message}\n")
@@ -227,6 +251,8 @@ class HeadlessOutputEmitter:
                         "is_error": True,
                         "error": message,
                         "session_id": self._session_id,
+                        "model": model,
+                        "provider": provider,
                         "tool_calls": tool_calls or [],
                     },
                     default=str,
@@ -236,7 +262,13 @@ class HeadlessOutputEmitter:
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
             self._write_json_line(
-                {"type": "error", "is_error": True, "message": message}
+                {
+                    "type": "error",
+                    "is_error": True,
+                    "message": message,
+                    "model": model,
+                    "provider": provider,
+                }
             )
 
 
@@ -250,16 +282,22 @@ class HeadlessRunner:
         no_approval: bool = False,
         verbose: bool = False,
         max_iterations: Optional[int] = None,
+        notify_cmd: Optional[str] = None,
+        read_only: bool = False,
     ) -> None:
         self._engine = engine
         self._no_approval = no_approval
         self._verbose = verbose
+        self._read_only = read_only
         # Headless runs are unattended, so a cap (not a check-in prompt) is
         # the safety net; --max-iterations sizes it to the job.
         self._max_iterations = _resolve_max_iterations(max_iterations)
-        session_id = str(uuid.uuid4())
+        self._turn_notifier = TurnNotifier(notify_cmd=notify_cmd, cwd=os.getcwd())
+        session_id = self._turn_notifier.session_id
         self._emitter = HeadlessOutputEmitter(output_format, session_id, verbose)
         self._tokens = TokenAccumulator()
+        self._provider_name: str = ""
+        self._model: str = ""
 
     @staticmethod
     def _enable_auto_approval(agent_engine: Any) -> None:
@@ -303,16 +341,83 @@ class HeadlessRunner:
             file_system.set_full_trust(True)
 
     async def run(self, prompt: str) -> int:
+        """Execute one prompt and always emit turn-completion signals.
+
+        Args:
+            prompt: User request to run through the coding agent.
+
+        Returns:
+            Process-style status code: zero for success, one for failure.
+        """
+        self._turn_notifier.reset_turn()
+        config = self._engine.config_manager.get_config()
+        await fleet_events.init_events(
+            self._turn_notifier.session_id, "headless", config.events
+        )
+        self._provider_name, self._model = self._engine.runtime_identity()
+        await fleet_events.emit_event(
+            EventType.SESSION_START,
+            {
+                "provider": self._provider_name,
+                "model": self._model,
+                "read_only": self._read_only,
+            },
+        )
+        await fleet_events.emit_event(
+            EventType.TURN_START,
+            {
+                "turn": 1,
+                "prompt_preview": truncate(prompt, PREVIEW_CHARS),
+                "prompt_chars": len(prompt),
+            },
+        )
+        status = 1
+        try:
+            status = await self._run(prompt)
+            return status
+        finally:
+            await fire_turn_complete(self._engine, self._turn_notifier)
+            # Guarded: a diagnostics emission inside a finally must never
+            # mask the run's real exception.
+            try:
+                turn_payload = self._turn_notifier.build_payload()
+                await fleet_events.emit_event(
+                    EventType.TURN_END,
+                    {
+                        "turn": 1,
+                        "usage": turn_payload.get("usage"),
+                        "last_message_preview": truncate(
+                            str(turn_payload.get("last-assistant-message") or ""),
+                            MESSAGE_PREVIEW_CHARS,
+                        ),
+                    },
+                )
+                await fleet_events.emit_event(
+                    EventType.SESSION_END, {"reason": "exit", "status": status}
+                )
+            except Exception as exc:
+                logger.debug(f"session_end event emission failed: {exc}")
+            await fleet_events.shutdown_events()
+
+    async def _run(self, prompt: str) -> int:
+        """Execute the headless agent loop without completion finalization."""
         agent_engine = getattr(self._engine, "agent_engine", None)
         if not agent_engine:
-            self._emitter.emit_error("Agent engine not available.")
+            self._emitter.emit_error(
+                "Agent engine not available.",
+                model=self._model,
+                provider=self._provider_name,
+            )
             return 1
+
+        if self._read_only and hasattr(agent_engine, "set_read_only"):
+            agent_engine.set_read_only(True)
 
         if self._no_approval:
             self._enable_auto_approval(agent_engine)
             self._enable_full_trust(agent_engine)
 
-        model = self._engine.config_manager.get_config().default_provider or "unknown"
+        model = self._model or "unknown"
         self._emitter.emit_init(model)
 
         supports_tools = self._engine.provider_supports_tools()
@@ -334,16 +439,27 @@ class HeadlessRunner:
         repeat_tracker = RepeatedCallTracker()
         no_tool_nudges = 0
 
+        # Each break below overwrites this; only loop fall-through — the
+        # iteration cap — leaves it standing.
+        stop_cause = "max_iterations"
+
         for iteration in range(self._max_iterations):
             turns = iteration + 1
             response = await self._engine.send_message_with_tools(
                 current_message, tools
             )
             self._tokens.add(response)
+            self._turn_notifier.record_assistant(response.content, response)
 
             if not response.is_success:
+                # Re-resolve at emit time: rate-limit fallback may have
+                # switched the engine's provider since the run started.
+                provider_name, model_name = self._engine.runtime_identity()
                 self._emitter.emit_error(
-                    response.error or "Unknown error", tool_calls=tool_log
+                    response.error or "Unknown error",
+                    tool_calls=tool_log,
+                    model=model_name or self._model,
+                    provider=provider_name or self._provider_name,
                 )
                 return 1
 
@@ -383,6 +499,10 @@ class HeadlessRunner:
                             and prev_content
                         ):
                             last_content = prev_content
+                        if _is_done_reply(response.content):
+                            stop_cause = "done"
+                        else:
+                            stop_cause = "nudge_exhausted"
                         break
                     no_tool_nudges += 1
                     current_message = NO_TOOL_CALL_NUDGE
@@ -392,6 +512,7 @@ class HeadlessRunner:
             repeat_tracker.record(response.tool_calls)
             offender = repeat_tracker.abort_offender(response.tool_calls)
             if offender is not None:
+                stop_cause = "repeat_abort"
                 if not last_content:
                     last_content = (
                         f"Stopped: the model repeated the same tool call "
@@ -449,15 +570,36 @@ class HeadlessRunner:
                 current_message = results_text
 
         usage = self._tokens.total
+        aggregate_response = ChatResponse(
+            content=last_content,
+            model_used=last_model,
+            tokens_used=usage["input_tokens"] + usage["output_tokens"],
+            input_tokens=usage["input_tokens"],
+            output_tokens=usage["output_tokens"],
+            cost_estimate=usage["total_cost_usd"],
+            stop_reason=last_stop_reason,
+        )
+        self._turn_notifier.record_assistant(last_content or None, aggregate_response)
+        # Re-resolve at emit time: rate-limit fallback may have switched the
+        # engine's provider mid-run, and the envelope must stay consistent
+        # with the model that actually answered.
+        provider_name, _ = self._engine.runtime_identity()
         self._emitter.emit_result(
             last_content,
             last_model,
             usage,
             usage["total_cost_usd"],
             last_stop_reason,
+            stop_cause=stop_cause,
             tool_calls=tool_log,
             num_turns=turns,
+            provider=provider_name or self._provider_name,
         )
+        # 3 = the run ended without the model finishing its work (cap hit or
+        # duplicate-call abort) even though a result was emitted; orchestrators
+        # need that distinction and 2 is reserved by click for usage errors.
+        if stop_cause in ("max_iterations", "repeat_abort"):
+            return 3
         return 0
 
 
@@ -471,34 +613,17 @@ async def run_headless(
     model: Optional[str] = None,
     base_url: Optional[str] = None,
     max_iterations: Optional[int] = None,
+    notify_cmd: Optional[str] = None,
+    read_only: bool = False,
 ) -> int:
     from ..core.config_manager import ConfigManager
     from ..core.engine import CoreEngine
 
     config_manager = ConfigManager(config_path)
-
-    if provider:
-        config = config_manager.get_config()
-        config.default_provider = provider
-        config_manager.save_config(config)
+    apply_session_overrides(config_manager, provider, model, base_url)
 
     engine = CoreEngine(config_manager)
     await engine.initialize_providers()
-
-    current_provider_name = engine.config_manager.get_config().default_provider
-
-    if model and current_provider_name and current_provider_name in engine.providers:
-        engine.providers[current_provider_name].model = model
-
-    # Ephemeral endpoint override for this run (does not touch saved config).
-    # base_url is defined on the OpenAI-family/Claude providers but not on the
-    # BaseProvider contract, so set it dynamically.
-    if base_url and current_provider_name and current_provider_name in engine.providers:
-        setattr(
-            engine.providers[current_provider_name],
-            "base_url",
-            base_url.rstrip("/"),
-        )
 
     fmt = OutputFormat(output_format)
     runner = HeadlessRunner(
@@ -507,5 +632,7 @@ async def run_headless(
         no_approval=no_approval,
         verbose=verbose,
         max_iterations=max_iterations,
+        notify_cmd=notify_cmd,
+        read_only=read_only,
     )
     return await runner.run(prompt)

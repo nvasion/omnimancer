@@ -19,7 +19,7 @@ behavior:
 
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -71,6 +71,7 @@ class PromptInput:
         output: Optional[Any] = None,
         mode_toggle: Optional[Any] = None,
         mode_provider: Optional[Any] = None,
+        status_provider: Optional[Callable[[], Optional[str]]] = None,
     ) -> None:
         """
         Args:
@@ -83,9 +84,12 @@ class PromptInput:
             mode_provider: Zero-arg callable returning the current approval
                 mode string; a non-"normal" mode shows in the bottom
                 toolbar as a safety indicator.
+            status_provider: Zero-arg callable returning status text to display
+                in the toolbar. If provided, the toolbar is always shown.
         """
         self._mode_toggle = mode_toggle
         self._mode_provider = mode_provider
+        self._status_provider = status_provider
         history_dir = Path(history_dir)
         history_dir.mkdir(parents=True, exist_ok=True)
         history_path = _migrate_readline_history(history_dir)
@@ -104,7 +108,9 @@ class PromptInput:
         if completer is not None:
             session_kwargs["completer"] = completer
             session_kwargs["complete_while_typing"] = True
-        if mode_provider is not None:
+        # Toolbar is shown when either status_provider is set OR mode_provider
+        # indicates non-normal mode (preserving existing behavior)
+        if status_provider is not None or mode_provider is not None:
             session_kwargs["bottom_toolbar"] = self._render_toolbar
         if input is not None:
             session_kwargs["input"] = input
@@ -162,16 +168,41 @@ class PromptInput:
         return self._exit_armed
 
     def _render_toolbar(self) -> Optional[str]:
-        """Approval-mode safety indicator; hidden in normal mode."""
-        if self._mode_provider is None:
+        """Approval-mode safety indicator; hidden in normal mode.
+
+        If a status_provider is set, the toolbar is always shown and includes
+        status information combined with approval mode information.
+        """
+        # Get status information if provider is set
+        status = None
+        if self._status_provider is not None:
+            try:
+                status = self._status_provider()
+            except Exception:
+                # If status provider fails, treat as no status
+                status = None
+
+        # Get approval mode information
+        mode_text = None
+        if self._mode_provider is not None:
+            try:
+                mode = self._mode_provider()
+            except Exception:
+                # If mode provider fails, treat as no mode
+                mode = None
+            if mode and mode != "normal":
+                mode_text = f" approval: {mode} (Shift+Tab cycles) "
+
+        # Combine status and mode information
+        if status is not None and mode_text is not None:
+            return f"{status} | {mode_text}"
+        elif status is not None:
+            return status
+        elif mode_text is not None:
+            return mode_text
+        else:
+            # Neither status nor non-normal mode - return None to hide toolbar
             return None
-        try:
-            mode = self._mode_provider()
-        except Exception:
-            return None
-        if not mode or mode == "normal":
-            return None
-        return f" approval: {mode} (Shift+Tab cycles) "
 
     async def prompt_async(self, message: str = ">>> ") -> str:
         """Read one submission from the user.

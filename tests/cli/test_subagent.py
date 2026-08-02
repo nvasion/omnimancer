@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from omnimancer.cli.subagent import SubAgentRunner
+from omnimancer.core.agent.status_core import EventType
 from omnimancer.core.models import (
     ChatResponse,
     SubAgentDefinition,
@@ -12,6 +13,7 @@ from omnimancer.core.models import (
     ToolDefinition,
     ToolResult,
 )
+from omnimancer.events import emitter as fleet_events
 
 
 def _response(content="", tool_calls=None, error=None):
@@ -160,6 +162,112 @@ class TestSubAgentRunner:
             result = await runner.run(SubAgentDefinition(name="x"), "task")
         assert result.success is False
         assert result.error == "boom"
+
+    @pytest.mark.asyncio
+    async def test_subagent_emits_lifecycle_events_with_model(self):
+        provider = MagicMock()
+        provider.model = "base"
+        provider.send_message_with_tools = AsyncMock(
+            return_value=_response(content="done")
+        )
+        engine = _engine(provider)
+        engine.providers = {"openai": provider}
+        runner = SubAgentRunner(engine)
+        defn = SubAgentDefinition(name="researcher", model="qwen3-4b")
+
+        calls = []
+
+        async def _spy(event_type, data, *args, **kwargs):
+            calls.append(
+                (
+                    event_type,
+                    data,
+                    fleet_events.current_agent_id(),
+                    fleet_events.current_parent_id(),
+                )
+            )
+
+        with patch(
+            "omnimancer.cli.subagent.ToolHandler",
+            return_value=_fake_tool_handler(TOOLS),
+        ):
+            with patch.object(fleet_events, "emit_event", _spy):
+                result = await runner.run(defn, "task")
+
+        start_calls = [c for c in calls if c[0] == EventType.SESSION_START]
+        end_calls = [c for c in calls if c[0] == EventType.SESSION_END]
+        assert len(start_calls) == 1
+        assert start_calls[0][1]["model"] == "qwen3-4b"
+        assert start_calls[0][1]["subagent"] == "researcher"
+        assert "provider" in start_calls[0][1]
+        assert start_calls[0][2].startswith("subagent-researcher-")
+        assert len(end_calls) == 1
+        assert end_calls[0][1]["reason"] == "subagent_complete"
+        assert end_calls[0][1]["status"] == 0
+        assert result.model == "qwen3-4b"
+
+    @pytest.mark.asyncio
+    async def test_subagent_emits_session_end_on_provider_error(self):
+        provider = MagicMock()
+        provider.model = "base"
+        provider.send_message_with_tools = AsyncMock(
+            return_value=_response(error="boom")
+        )
+        engine = _engine(provider)
+        engine.providers = {"openai": provider}
+        runner = SubAgentRunner(engine)
+
+        calls = []
+
+        async def _spy(event_type, data, *args, **kwargs):
+            calls.append((event_type, data))
+
+        with patch(
+            "omnimancer.cli.subagent.ToolHandler",
+            return_value=_fake_tool_handler(TOOLS),
+        ):
+            with patch.object(fleet_events, "emit_event", _spy):
+                result = await runner.run(
+                    SubAgentDefinition(name="x", model="qwen3-4b"), "task"
+                )
+
+        end_calls = [c for c in calls if c[0] == EventType.SESSION_END]
+        assert len(end_calls) == 1
+        assert end_calls[0][1]["reason"] == "subagent_complete"
+        assert end_calls[0][1]["status"] == 1
+        assert result.success is False
+        assert result.model == "qwen3-4b"
+
+    @pytest.mark.asyncio
+    async def test_subagent_emits_session_end_on_exception(self):
+        provider = MagicMock()
+        provider.model = "base"
+        provider.send_message_with_tools = AsyncMock(
+            side_effect=RuntimeError("connection lost")
+        )
+        engine = _engine(provider)
+        engine.providers = {"openai": provider}
+        runner = SubAgentRunner(engine)
+
+        calls = []
+
+        async def _spy(event_type, data, *args, **kwargs):
+            calls.append((event_type, data))
+
+        with patch(
+            "omnimancer.cli.subagent.ToolHandler",
+            return_value=_fake_tool_handler(TOOLS),
+        ):
+            with patch.object(fleet_events, "emit_event", _spy):
+                result = await runner.run(
+                    SubAgentDefinition(name="x", model="qwen3-4b"), "task"
+                )
+
+        end_calls = [c for c in calls if c[0] == EventType.SESSION_END]
+        assert len(end_calls) == 1
+        assert end_calls[0][1]["reason"] == "subagent_complete"
+        assert end_calls[0][1]["status"] == 1
+        assert result.success is False
 
 
 class TestSubAgentsCommand:

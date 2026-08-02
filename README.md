@@ -77,7 +77,8 @@ object — including the tool calls the agent made along the way:
   ],
   "usage": {"input_tokens": 1523, "output_tokens": 892, "total_cost_usd": 0.04},
   "total_cost_usd": 0.04,
-  "stop_reason": "end_turn"
+  "stop_reason": "end_turn",
+  "stop_cause": "done"
 }
 ```
 
@@ -86,6 +87,14 @@ On failure it stays valid JSON (stdout), with the error and any tool calls made:
 ```json
 {"type": "result", "subtype": "error", "is_error": true, "error": "…", "tool_calls": [...]}
 ```
+
+`stop_cause` reports why the run ended: `done` (model declared completion), `nudge_exhausted` (model stopped acting without declaring completion), `max_iterations` (tool-iteration cap hit), or `repeat_abort` (aborted after repeating an identical tool call). Exit codes:
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Run completed (`stop_cause` of `done` or `nudge_exhausted`) |
+| 1 | Provider or engine error (`subtype: "error"`) |
+| 3 | Run truncated: `max_iterations` or `repeat_abort` — the result is partial |
 
 For a live, line-by-line stream of what the agent is doing (assistant text,
 each `tool_use`, each `tool_result`, then the final `result`), use

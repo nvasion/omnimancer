@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import os
 import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -176,6 +177,12 @@ class AuditLogger:
             maxBytes=self.max_file_size,
             backupCount=self.backup_count,
         )
+        # Owner-only: the audit log carries full command lines and file
+        # paths. Repairs pre-existing world-readable files too.
+        try:
+            os.chmod(self.log_file, 0o600)
+        except OSError:
+            pass
 
         # Console handler
         if self.enable_console:

@@ -1,5 +1,6 @@
 """Tests for the lifecycle hooks system (HooksManager + config models)."""
 
+import json
 import sys
 from unittest.mock import AsyncMock, MagicMock
 
@@ -22,6 +23,7 @@ class TestHooksConfigModel:
         cfg = HooksConfig()
         assert cfg.enabled is True
         assert cfg.pre_send_message == []
+        assert cfg.turn_complete == []
         assert cfg.hooks_for("tool_use_request") == []
 
     def test_hooks_for_unknown_event_is_empty(self):
@@ -36,10 +38,14 @@ class TestHooksConfigModel:
             HookCommand(name="x", command="   ")
 
     def test_roundtrips_through_json(self):
-        cfg = HooksConfig(post_tool=[_hook("echo hi", name="log", blocking=True)])
+        cfg = HooksConfig(
+            post_tool=[_hook("echo hi", name="log", blocking=True)],
+            turn_complete=[_hook("true", name="turn")],
+        )
         restored = HooksConfig.model_validate(cfg.model_dump(mode="json"))
         assert restored.post_tool[0].name == "log"
         assert restored.post_tool[0].blocking is True
+        assert restored.turn_complete[0].name == "turn"
 
 
 class TestHooksManagerFiring:
@@ -166,6 +172,41 @@ class TestHooksManagerContext:
         out = await HooksManager(cfg).fire("pre_send_message", {"obj": object()})
         assert out.allowed is True
         assert out.results[0].succeeded is True
+
+    @pytest.mark.asyncio
+    async def test_turn_complete_payload_is_not_modified(self, tmp_path):
+        out_file = tmp_path / "turn.json"
+        recorder = tmp_path / "record_turn.py"
+        recorder.write_text(
+            "import pathlib, sys\n"
+            "pathlib.Path(sys.argv[1]).write_bytes(sys.stdin.buffer.read())\n"
+        )
+        payload = {
+            "type": "agent-turn-complete",
+            "turn-id": "turn-1",
+            "last-assistant-message": "done",
+            "session_id": "session-1",
+            "usage": {
+                "input_tokens": 2,
+                "output_tokens": 1,
+                "total_cost_usd": 0.01,
+            },
+            "cwd": str(tmp_path),
+        }
+        cfg = HooksConfig(
+            turn_complete=[
+                _hook(
+                    f"{sys.executable} {recorder} {out_file}",
+                    name="capture-turn",
+                    blocking=True,
+                )
+            ]
+        )
+
+        outcome = await HooksManager(cfg).fire("turn_complete", payload)
+
+        assert outcome.allowed is True
+        assert json.loads(out_file.read_text()) == payload
 
 
 class TestHooksManagerRobustness:

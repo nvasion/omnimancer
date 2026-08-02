@@ -370,7 +370,7 @@ class TestProgramExecutor:
 
             assert result.success is True
             mock_execute.assert_called_once_with(
-                "ls", ["-l"], None, timeout_seconds=None
+                "ls", ["-l"], None, timeout_seconds=None, progress_op_id=None
             )
 
     @pytest.mark.asyncio

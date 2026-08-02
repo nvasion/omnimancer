@@ -1230,6 +1230,8 @@ class HooksConfig(BaseModel):
     tool_use_request: List[HookCommand] = []
     # Fired after an agent tool/operation completes (observe-only).
     post_tool: List[HookCommand] = []
+    # Fired after an interactive or headless agent turn completes (observe-only).
+    turn_complete: List[HookCommand] = []
 
     def hooks_for(self, event: str) -> List[HookCommand]:
         """Return the configured hooks for ``event`` (empty if unknown)."""
@@ -1338,6 +1340,34 @@ class EnhancementConfig(BaseModel):
     enabled: bool = True
 
 
+class EventsConfig(BaseModel):
+    """Fleet event emission settings (omn.event.v1 JSONL transport).
+
+    Default-on so fleet workers emit with zero per-worker config plumbing;
+    the OMNIMANCER_EVENTS=0 env var is the session kill switch. Emission is
+    a buffered background-thread append with drop-on-full semantics — it
+    never blocks a turn.
+    """
+
+    enabled: bool = True
+    # None -> ~/.omnimancer/events
+    directory: Optional[str] = None
+    max_file_mb: int = 20
+    retention_days: int = 7
+    # Total size budget for the events dir (the machine's agent audit
+    # store); oldest sessions are pruned first, active files protected.
+    max_total_gb: float = 50.0
+
+    @field_validator("max_file_mb", "retention_days", "max_total_gb")
+    @classmethod
+    def validate_non_negative(cls, v: Any) -> Any:
+        # A negative limit would turn the retention/budget sweeps into
+        # delete-everything; reject at the config boundary.
+        if v < 0:
+            raise ValueError("events limits must be non-negative")
+        return v
+
+
 class Config(BaseModel):
     """Main configuration model."""
 
@@ -1390,6 +1420,11 @@ class Config(BaseModel):
     # the feature is off — a default block would silently assume a
     # "gateway" provider most installs don't have.
     enhancement: Optional[EnhancementConfig] = None
+
+    # Fleet event emission (JSONL activity feed). Opt-out, unlike
+    # enhancement: it has no provider dependency, and the fleet dashboard
+    # depends on workers emitting without per-worker config.
+    events: EventsConfig = EventsConfig()
 
     @field_validator("default_provider")
     @classmethod
