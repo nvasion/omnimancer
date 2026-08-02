@@ -39,7 +39,7 @@
     "License": "Apache-2.0 AND MIT",
     "Name": "aiohttp",
     "URL": "https://github.com/aio-libs/aiohttp",
-    "Version": "3.14.2"
+    "Version": "3.14.3"
   },
   {
     "Description": "aiosignal: a list of registered asynchronous callbacks",
@@ -50,10 +50,10 @@
   },
   {
     "Description": "Reusable constraint types to use with typing.Annotated",
-    "License": "MIT License",
+    "License": "MIT",
     "Name": "annotated-types",
     "URL": "https://github.com/annotated-types/annotated-types",
-    "Version": "0.7.0"
+    "Version": "0.8.0"
   },
   {
     "Description": "High-level concurrency and networking framework on top of asyncio or Trio",
@@ -95,7 +95,7 @@
     "License": "Mozilla Public License 2.0 (MPL 2.0)",
     "Name": "certifi",
     "URL": "https://github.com/certifi/python-certifi",
-    "Version": "2026.6.17"
+    "Version": "2026.7.22"
   },
   {
     "Description": "Foreign Function Interface for Python calling C code.",
@@ -130,14 +130,14 @@
     "License": "Apache-2.0 OR BSD-3-Clause",
     "Name": "cryptography",
     "URL": "https://github.com/pyca/cryptography",
-    "Version": "49.0.0"
+    "Version": "50.0.0"
   },
   {
     "Description": "cssselect parses CSS3 Selectors and translates them to XPath 1.0",
     "License": "BSD-3-Clause",
     "Name": "cssselect",
     "URL": "https://github.com/scrapy/cssselect",
-    "Version": "1.4.0"
+    "Version": "1.5.0"
   },
   {
     "Description": "the modular source code checker: pep8 pyflakes and co",
@@ -263,7 +263,7 @@
     "License": "MIT License",
     "Name": "mcp",
     "URL": "https://modelcontextprotocol.io",
-    "Version": "1.28.1"
+    "Version": "1.29.0"
   },
   {
     "Description": "Markdown URL utilities",
@@ -298,7 +298,7 @@
     "License": "MIT License",
     "Name": "omnimancer-cli",
     "URL": "https://github.com/nvasion/omnimancer",
-    "Version": "0.2.22"
+    "Version": "0.2.24"
   },
   {
     "Description": "Core utilities for Python packages",
@@ -319,7 +319,7 @@
     "License": "MIT",
     "Name": "platformdirs",
     "URL": "https://github.com/tox-dev/platformdirs",
-    "Version": "4.10.1"
+    "Version": "4.11.0"
   },
   {
     "Description": "plugin and hook calling mechanisms for python",
@@ -327,6 +327,13 @@
     "Name": "pluggy",
     "URL": "UNKNOWN",
     "Version": "1.6.0"
+  },
+  {
+    "Description": "Library for building powerful interactive command lines in Python",
+    "License": "BSD License",
+    "Name": "prompt_toolkit",
+    "URL": "https://github.com/prompt-toolkit/python-prompt-toolkit",
+    "Version": "3.0.53"
   },
   {
     "Description": "Accelerated property cache",
@@ -466,7 +473,7 @@
     "License": "MIT",
     "Name": "soupsieve",
     "URL": "https://github.com/facelessuser/soupsieve",
-    "Version": "2.9"
+    "Version": "2.9.1"
   },
   {
     "Description": "SSE plugin for Starlette",
@@ -508,7 +515,7 @@
     "License": "BSD-3-Clause",
     "Name": "uvicorn",
     "URL": "https://uvicorn.dev/",
-    "Version": "0.51.0"
+    "Version": "0.52.0"
   },
   {
     "Description": "Yet another URL library",
