@@ -667,7 +667,9 @@ class FleetApp(App[None]):
         """Row key under the cursor, or None."""
         return self._cursor_position(table)[0]
 
-    def _query_live(self, selector: str, widget_type: type[WidgetT]) -> Optional[WidgetT]:
+    def _query_live(
+        self, selector: str, widget_type: type[WidgetT]
+    ) -> Optional[WidgetT]:
         """Query a mounted widget, tolerating an in-flight DOM race.
 
         ``refresh_jobs``/``refresh_feeds`` run their scans on thread
@@ -681,7 +683,8 @@ class FleetApp(App[None]):
         crashing the whole app over one missed refresh.
         """
         try:
-            return self.query_one(selector, widget_type)
+            widget: WidgetT = self.query_one(selector, widget_type)
+            return widget
         except NoMatches:
             self.log.debug(
                 f"{selector}: query skipped ({NoMatches.__name__}); "
