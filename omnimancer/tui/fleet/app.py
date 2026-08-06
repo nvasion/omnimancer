@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TypeVar
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -29,6 +29,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.message import Message
 from textual.screen import ModalScreen
+from textual.widget import Widget
 from textual.widgets import DataTable, Footer, Header, RichLog, Static
 from textual.widgets.data_table import CellDoesNotExist, RowDoesNotExist
 
@@ -57,6 +58,8 @@ AGENT_COLUMNS = (
     "usage",
     "age",
 )
+
+WidgetT = TypeVar("WidgetT", bound=Widget)
 
 FEED_MAX_LINES = 2000
 
@@ -432,13 +435,13 @@ class FleetApp(App[None]):
 
     def on_feeds_updated(self, message: FeedsUpdated) -> None:
         """Route new events/ledger entries into the feed panels."""
-        try:
-            activity = self.query_one("#activity", RichLog)
-            comms = self.query_one("#comms", RichLog)
-        except NoMatches:
+        activity = self._query_live("#activity", RichLog)
+        comms = self._query_live("#comms", RichLog)
+        if activity is None or comms is None:
             # Thread workers can post one final batch while the DOM is
-            # being torn down (observed as a flaky NoMatches under
-            # pytest); dropping it is safe — feeds are append-only UI.
+            # transiently unqueryable (teardown or a screen remount);
+            # dropping it is safe — feeds are append-only UI and the
+            # next poll supersedes it. See _query_live.
             return
         for event in message.events:
             self._track_session(event)
@@ -664,11 +667,37 @@ class FleetApp(App[None]):
         """Row key under the cursor, or None."""
         return self._cursor_position(table)[0]
 
+    def _query_live(self, selector: str, widget_type: type[WidgetT]) -> Optional[WidgetT]:
+        """Query a mounted widget, tolerating an in-flight DOM race.
+
+        ``refresh_jobs``/``refresh_feeds`` run their scans on thread
+        workers and post the result back as a message; by the time the
+        UI thread gets to processing it, Textual may be mid-teardown
+        (app exit) or mid-remount (screen transition), and the target
+        widget can transiently fail to resolve even though the app is
+        healthy. That's an expected race under polling/pytest scheduling
+        — the next timer tick or event batch supersedes the dropped one —
+        so it is logged at debug level and swallowed here instead of
+        crashing the whole app over one missed refresh.
+        """
+        try:
+            return self.query_one(selector, widget_type)
+        except NoMatches:
+            self.log.debug(
+                f"{selector}: query skipped ({NoMatches.__name__}); "
+                "treating as a transient DOM teardown/remount race"
+            )
+            return None
+
     def _rebuild_table(self) -> None:
         """Recompute the agents table: filtered, operator-sorted, and with
         the cursor AND scroll offset kept stable across rescans (a 1s
         refresh must never yank the operator back to the top)."""
-        table = self.query_one("#agents", DataTable)
+        table = self._query_live("#agents", DataTable)
+        if table is None:
+            # DOM transiently unqueryable (teardown or remount); the next
+            # jobs-scan/feeds-tail tick will retry. See _query_live.
+            return
 
         rows = self._collect_rows()
         total = len(rows)
