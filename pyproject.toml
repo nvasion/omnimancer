@@ -43,6 +43,12 @@ dependencies = [
     "html2text>=2020.1.16",
     "jsonschema>=4.17.0",
     "readability-lxml>=0.8.1",
+    # readability-lxml imports `lxml_html_clean.Cleaner`; lxml>=5.2 split
+    # its html-cleaning code out of the core package into this module, so
+    # it must be installed explicitly or `import readability` raises
+    # ModuleNotFoundError on any lxml>=5.2 (breaks web_client's html
+    # sanitizer import, which cascades into every collected test module).
+    "lxml_html_clean>=0.1.0",
     "PyYAML>=6.0.0",
     "toml>=0.10.2",
     # <2: mcp 2.0 dropped mcp.server.fastmcp (breaks the MCP test server)
