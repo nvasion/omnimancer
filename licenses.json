@@ -238,6 +238,13 @@
     "Version": "2.1.0"
   },
   {
+    "Description": "Links recognition library with FULL unicode support.",
+    "License": "MIT License",
+    "Name": "linkify-it-py",
+    "URL": "https://github.com/tsutsu3/linkify-it-py",
+    "Version": "2.1.0"
+  },
+  {
     "Description": "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API.",
     "License": "BSD-3-Clause",
     "Name": "lxml",
@@ -502,6 +509,13 @@
     "Name": "starlette",
     "URL": "https://github.com/Kludex/starlette",
     "Version": "1.5.1"
+  },
+  {
+    "Description": "Modern Text User Interface framework",
+    "License": "MIT License",
+    "Name": "textual",
+    "URL": "https://github.com/Textualize/textual",
+    "Version": "8.2.8"
   },
   {
     "Description": "Modern Text User Interface framework",
