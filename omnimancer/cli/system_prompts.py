@@ -6,6 +6,7 @@ including capability descriptions, operation markers, and execution patterns.
 """
 
 import logging
+import os
 import re
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -15,6 +16,28 @@ logger = logging.getLogger(__name__)
 # Maximum bytes read from any single instruction file.  Prevents memory
 # exhaustion if a file is unexpectedly large (accidental or malicious).
 _MAX_INSTRUCTION_FILE_BYTES: int = 100_000  # 100 KB
+
+
+def _instruction_byte_cap() -> int:
+    """Per-file byte cap for instruction files (CLAUDE.md / OMNIMANCER.md).
+
+    The OMNIMANCER_INSTRUCTION_BYTES environment variable overrides the
+    100 KB default. Instruction files ride in the conversation and are
+    retransmitted on every agent-loop iteration, so orchestrators that
+    already pass task-scoped prompts (e.g. Factory) set a low cap to keep
+    per-iteration token cost down.
+    """
+    raw = os.environ.get("OMNIMANCER_INSTRUCTION_BYTES")
+    if raw:
+        try:
+            value = int(raw)
+            if value > 0:
+                return value
+            logger.warning("Ignoring non-positive OMNIMANCER_INSTRUCTION_BYTES %r", raw)
+        except ValueError:
+            logger.warning("Ignoring invalid OMNIMANCER_INSTRUCTION_BYTES %r", raw)
+    return _MAX_INSTRUCTION_FILE_BYTES
+
 
 # Regex that matches fenced code blocks (``` … ``` or ~~~ … ~~~).
 # These are stripped before insertion to prevent an attacker from embedding
@@ -67,7 +90,7 @@ def _sanitize_instruction_content(raw: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     # 4. Belt-and-suspenders length cap (file read is already capped)
-    text = text[:_MAX_INSTRUCTION_FILE_BYTES]
+    text = text[: _instruction_byte_cap()]
 
     return text.strip()
 
@@ -81,7 +104,7 @@ def _read_instruction_file(path: Path) -> Optional[str]:
     try:
         # Read only up to the byte cap; do not load the entire file first.
         with path.open("r", encoding="utf-8", errors="replace") as fh:
-            raw = fh.read(_MAX_INSTRUCTION_FILE_BYTES)
+            raw = fh.read(_instruction_byte_cap())
     except OSError as exc:
         logger.debug("Failed to read instruction file %s: %s", path, exc)
         return None
@@ -475,6 +498,13 @@ EXECUTION RULES:
 def build_agent_prompt(supports_tools: bool = False) -> str:
     """Build system prompt based on provider capabilities.
 
+    Tool-capable providers get a lean prompt: just the header, directory
+    context, and the tool-calling contract. The marker/approval sections
+    describe the text-marker execution flow that native tool calling never
+    uses — the ``<!--read-only-->`` metadata-comment instructions actively
+    conflict with native Bash calls — and every byte here is retransmitted
+    with the conversation on each agent-loop iteration.
+
     Args:
         supports_tools: Whether the provider supports native tool calling
 
@@ -484,25 +514,26 @@ def build_agent_prompt(supports_tools: bool = False) -> str:
     directory_info = get_directory_context()
     custom_instructions = load_project_instructions()
 
-    sections = [
-        (
-            "SYSTEM: You are an autonomous coding agent"
-            " with the ability to perform actions on"
-            " the local system."
-        ),
-        directory_info,
-        FILE_OPERATIONS_SECTION,
-        COMMAND_EXECUTION_SECTION,
-        WEB_OPERATIONS_SECTION,
-        SECURITY_FEATURES_SECTION,
-        AGENT_EXECUTION_PATTERN_SECTION,
-    ]
+    header = (
+        "SYSTEM: You are an autonomous coding agent"
+        " with the ability to perform actions on"
+        " the local system."
+    )
 
     if supports_tools:
-        sections.append(TOOL_CALLING_SECTION)
+        sections = [header, directory_info, TOOL_CALLING_SECTION]
     else:
-        sections.append(OPERATION_MARKERS_SECTION)
-        sections.append(EXECUTION_EXAMPLES_SECTION)
+        sections = [
+            header,
+            directory_info,
+            FILE_OPERATIONS_SECTION,
+            COMMAND_EXECUTION_SECTION,
+            WEB_OPERATIONS_SECTION,
+            SECURITY_FEATURES_SECTION,
+            AGENT_EXECUTION_PATTERN_SECTION,
+            OPERATION_MARKERS_SECTION,
+            EXECUTION_EXAMPLES_SECTION,
+        ]
 
     if custom_instructions:
         sections.append(custom_instructions)

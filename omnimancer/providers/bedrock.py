@@ -28,6 +28,7 @@ from ..utils.errors import (
     RateLimitError,
 )
 from .base import BaseProvider
+from .cache_tokens import prompt_cache_enabled
 
 
 class BedrockProvider(BaseProvider):
@@ -372,6 +373,38 @@ class BedrockProvider(BaseProvider):
                 "message": f"Failed to test model: {str(e)}",
             }
 
+    # Converse prompt caching is model-gated: sending a cachePoint to an
+    # unsupported model is a hard ValidationException, so only inject for
+    # families AWS documents as supported.
+    _CACHE_POINT_MODELS = (
+        "claude-3-5-haiku",
+        "claude-3-5-sonnet-20241022-v2",
+        "claude-3-7-sonnet",
+        "claude-sonnet-4",
+        "claude-opus-4",
+        "claude-haiku-4",
+        "nova-micro",
+        "nova-lite",
+        "nova-pro",
+        "nova-premier",
+    )
+
+    def _supports_cache_point(self) -> bool:
+        model = (self.model or "").lower()
+        return any(family in model for family in self._CACHE_POINT_MODELS)
+
+    def _apply_cache_point(self, request_data: Dict) -> None:
+        """Add Converse-API prompt-cache breakpoints (tools + last message)."""
+        if not prompt_cache_enabled() or not self._supports_cache_point():
+            return
+        cache_point = {"cachePoint": {"type": "default"}}
+        tool_config = request_data.get("toolConfig")
+        if tool_config and tool_config.get("tools"):
+            tool_config["tools"].append(dict(cache_point))
+        messages = request_data.get("messages")
+        if messages and isinstance(messages[-1].get("content"), list):
+            messages[-1]["content"].append(dict(cache_point))
+
     def _prepare_bedrock_request(self, message: str, context: ChatContext) -> str:
         """
         Prepare request body for AWS Bedrock Converse API.
@@ -407,6 +440,7 @@ class BedrockProvider(BaseProvider):
         if self._is_arn(self.model):
             request_data["modelId"] = self.model
 
+        self._apply_cache_point(request_data)
         return json.dumps(request_data)
 
     def _prepare_bedrock_request_with_tools(
@@ -449,6 +483,7 @@ class BedrockProvider(BaseProvider):
                 "tools": [self._convert_tool_to_bedrock_format(tool) for tool in tools]
             }
 
+        self._apply_cache_point(request_data)
         return json.dumps(request_data)
 
     def _convert_tool_to_bedrock_format(self, tool: ToolDefinition) -> Dict:
@@ -498,6 +533,10 @@ class BedrockProvider(BaseProvider):
                         model_used=self.model,
                         tokens_used=usage.get("outputTokens", 0),
                         timestamp=datetime.now(),
+                        input_tokens=usage.get("inputTokens"),
+                        output_tokens=usage.get("outputTokens"),
+                        cache_read_input_tokens=usage.get("cacheReadInputTokens"),
+                        cache_creation_input_tokens=usage.get("cacheWriteInputTokens"),
                     )
                 else:
                     raise ProviderError("Empty content in Bedrock response")
@@ -567,6 +606,10 @@ class BedrockProvider(BaseProvider):
                     tokens_used=usage.get("outputTokens", 0),
                     tool_calls=tool_calls if tool_calls else None,
                     timestamp=datetime.now(),
+                    input_tokens=usage.get("inputTokens"),
+                    output_tokens=usage.get("outputTokens"),
+                    cache_read_input_tokens=usage.get("cacheReadInputTokens"),
+                    cache_creation_input_tokens=usage.get("cacheWriteInputTokens"),
                 )
             else:
                 raise ProviderError(

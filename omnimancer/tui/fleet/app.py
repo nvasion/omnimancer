@@ -32,12 +32,7 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, RichLog, Static
 from textual.widgets.data_table import CellDoesNotExist, RowDoesNotExist
 
-from omnimancer.tui.fleet.models import (
-    DisplayState,
-    JobRecord,
-    derive_state,
-    parse_job,
-)
+from omnimancer.tui.fleet.models import DisplayState, JobRecord, derive_state, parse_job
 from omnimancer.tui.fleet.sources import (
     AgentsLogParser,
     EventsTailer,
@@ -405,10 +400,7 @@ class FleetApp(App[None]):
 
     def _run_budget_sweep(self) -> None:
         """Thread worker: oldest-first pruning down to budget_bytes."""
-        from omnimancer.events.jsonl_writer import (
-            SESSION_FILE_RE,
-            enforce_size_budget,
-        )
+        from omnimancer.events.jsonl_writer import SESSION_FILE_RE, enforce_size_budget
 
         enforce_size_budget(self.events_dir, self.budget_bytes, name_re=SESSION_FILE_RE)
 
