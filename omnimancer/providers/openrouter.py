@@ -27,6 +27,7 @@ from ..utils.errors import (
     RateLimitError,
 )
 from .base import BaseProvider
+from .cache_tokens import openai_cached_tokens, prompt_cache_enabled
 
 
 class OpenRouterProvider(BaseProvider):
@@ -93,6 +94,7 @@ class OpenRouterProvider(BaseProvider):
         """
         # Prepare messages for OpenRouter API
         messages = self._prepare_messages(message, context)
+        self._apply_cache_control(messages)
 
         # Build request payload
         payload = {
@@ -174,6 +176,7 @@ class OpenRouterProvider(BaseProvider):
         """
         # Prepare messages for OpenRouter API
         messages = self._prepare_messages(message, context)
+        self._apply_cache_control(messages)
 
         # Convert tools to OpenRouter format
         tools = self._convert_tools_to_openrouter_format(available_tools)
@@ -311,6 +314,33 @@ class OpenRouterProvider(BaseProvider):
 
         return headers
 
+    def _is_anthropic_model(self) -> bool:
+        model = (self.model or "").lower()
+        return "anthropic/" in model or "claude" in model
+
+    def _apply_cache_control(self, messages: List[Dict[str, Any]]) -> None:
+        """Add an Anthropic cache_control breakpoint to the last message.
+
+        OpenRouter forwards cache_control to Anthropic models, where caching
+        is opt-in per request; OpenAI-family models cache automatically and
+        need no markers, so non-Anthropic models are left untouched.
+        """
+        if not prompt_cache_enabled() or not self._is_anthropic_model():
+            return
+        if not messages:
+            return
+        content = messages[-1].get("content")
+        if isinstance(content, str) and content:
+            messages[-1]["content"] = [
+                {
+                    "type": "text",
+                    "text": content,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+        elif isinstance(content, list) and content:
+            content[-1]["cache_control"] = {"type": "ephemeral"}
+
     def _prepare_messages(
         self, message: str, context: ChatContext
     ) -> List[Dict[str, str]]:
@@ -416,6 +446,9 @@ class OpenRouterProvider(BaseProvider):
                     content=final_content,
                     model_used=model_used,
                     tokens_used=usage.get("total_tokens", 0),
+                    input_tokens=usage.get("prompt_tokens"),
+                    output_tokens=usage.get("completion_tokens"),
+                    cache_read_input_tokens=openai_cached_tokens(usage),
                     timestamp=datetime.now(),
                 )
             else:
@@ -503,6 +536,9 @@ class OpenRouterProvider(BaseProvider):
                     content=final_content,
                     model_used=model_used,
                     tokens_used=usage.get("total_tokens", 0),
+                    input_tokens=usage.get("prompt_tokens"),
+                    output_tokens=usage.get("completion_tokens"),
+                    cache_read_input_tokens=openai_cached_tokens(usage),
                     tool_calls=tool_calls if tool_calls else None,
                     timestamp=datetime.now(),
                 )

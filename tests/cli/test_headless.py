@@ -674,7 +674,7 @@ class TestHeadlessRunner:
                 content="",
                 model_used="",
                 tokens_used=0,
-                error="Rate limit exceeded",
+                error="Provider exploded",
             )
         )
         mock_engine.agent_engine = MagicMock()
@@ -690,7 +690,7 @@ class TestHeadlessRunner:
 
         exit_code = await runner.run("test")
         assert exit_code == 1
-        assert "Rate limit" in stderr_buf.getvalue()
+        assert "Provider exploded" in stderr_buf.getvalue()
 
     @pytest.mark.asyncio
     async def test_json_error_is_structured_json(self):

@@ -21,6 +21,7 @@ from ..utils.errors import (
     RateLimitError,
 )
 from .base import BaseProvider
+from .cache_tokens import gemini_cached_tokens
 
 
 class GeminiProvider(BaseProvider):
@@ -260,6 +261,11 @@ class GeminiProvider(BaseProvider):
                             model_used=self.model,
                             tokens_used=usage_metadata.get("totalTokenCount", 0),
                             timestamp=datetime.now(),
+                            input_tokens=usage_metadata.get("promptTokenCount"),
+                            output_tokens=usage_metadata.get("candidatesTokenCount"),
+                            cache_read_input_tokens=gemini_cached_tokens(
+                                usage_metadata
+                            ),
                         )
                     else:
                         raise ProviderError(
@@ -704,6 +710,9 @@ class GeminiProvider(BaseProvider):
                     tokens_used=usage_metadata.get("totalTokenCount", 0),
                     timestamp=datetime.now(),
                     tool_calls=tool_calls if tool_calls else None,
+                    input_tokens=usage_metadata.get("promptTokenCount"),
+                    output_tokens=usage_metadata.get("candidatesTokenCount"),
+                    cache_read_input_tokens=gemini_cached_tokens(usage_metadata),
                 )
             else:
                 raise ProviderError("Empty candidates in Gemini API response")

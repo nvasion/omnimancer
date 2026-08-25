@@ -4,8 +4,11 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from omnimancer.cli.system_prompts import (
     _MAX_INSTRUCTION_FILE_BYTES,
+    _instruction_byte_cap,
     _sanitize_instruction_content,
     build_agent_prompt,
     get_agent_capabilities_prompt,
@@ -16,6 +19,15 @@ from omnimancer.cli.system_prompts import (
 
 
 class TestBuildAgentPrompt:
+
+    @pytest.fixture(autouse=True)
+    def _no_project_instructions(self, monkeypatch):
+        """Isolate from the repo's own CLAUDE.md — its content (which documents
+        the marker syntax literally) otherwise leaks into every built prompt
+        and makes these assertions depend on the test runner's cwd."""
+        monkeypatch.setattr(
+            "omnimancer.cli.system_prompts.load_project_instructions", lambda: ""
+        )
 
     def test_tool_capable_provider_gets_tool_section(self):
         prompt = build_agent_prompt(supports_tools=True)
@@ -41,14 +53,28 @@ class TestBuildAgentPrompt:
         prompt = build_agent_prompt(supports_tools=False)
         assert "TOOL CALLING:" not in prompt
 
-    def test_both_have_core_sections(self):
-        for supports_tools in [True, False]:
-            prompt = build_agent_prompt(supports_tools=supports_tools)
-            assert "SECURITY FEATURES" in prompt
-            assert "FILE OPERATIONS" in prompt
-            assert "COMMAND EXECUTION" in prompt
-            assert "AGENT EXECUTION PATTERN" in prompt
-            assert "Working Directory" in prompt
+    def test_non_tool_provider_has_full_sections(self):
+        prompt = build_agent_prompt(supports_tools=False)
+        assert "SECURITY FEATURES" in prompt
+        assert "FILE OPERATIONS" in prompt
+        assert "COMMAND EXECUTION" in prompt
+        assert "AGENT EXECUTION PATTERN" in prompt
+        assert "Working Directory" in prompt
+
+    def test_tool_provider_prompt_is_lean(self):
+        """Native tool calling gets only header + directory + tool contract.
+
+        The marker/approval sections describe the text-marker flow native
+        tools never use, and every byte is retransmitted per loop iteration.
+        """
+        prompt = build_agent_prompt(supports_tools=True)
+        assert "Working Directory" in prompt
+        assert "TOOL CALLING" in prompt
+        assert "SECURITY FEATURES" not in prompt
+        assert "FILE OPERATIONS" not in prompt
+        assert "COMMAND EXECUTION" not in prompt
+        assert "AGENT EXECUTION PATTERN" not in prompt
+        assert "<!--read-only-->" not in prompt
 
     def test_default_is_no_tools(self):
         prompt = build_agent_prompt()
@@ -443,6 +469,23 @@ class TestSanitizeInstructionContent:
         long_content = "A" * (_MAX_INSTRUCTION_FILE_BYTES + 10_000)
         result = _sanitize_instruction_content(long_content)
         assert len(result) <= _MAX_INSTRUCTION_FILE_BYTES
+
+    def test_env_override_caps_instruction_content(self, monkeypatch):
+        monkeypatch.setenv("OMNIMANCER_INSTRUCTION_BYTES", "500")
+        result = _sanitize_instruction_content("A" * 5_000)
+        assert len(result) <= 500
+
+    def test_instruction_cap_default_when_env_unset(self, monkeypatch):
+        monkeypatch.delenv("OMNIMANCER_INSTRUCTION_BYTES", raising=False)
+        assert _instruction_byte_cap() == _MAX_INSTRUCTION_FILE_BYTES
+
+    def test_instruction_cap_ignores_invalid_env(self, monkeypatch):
+        monkeypatch.setenv("OMNIMANCER_INSTRUCTION_BYTES", "banana")
+        assert _instruction_byte_cap() == _MAX_INSTRUCTION_FILE_BYTES
+
+    def test_instruction_cap_ignores_non_positive_env(self, monkeypatch):
+        monkeypatch.setenv("OMNIMANCER_INSTRUCTION_BYTES", "0")
+        assert _instruction_byte_cap() == _MAX_INSTRUCTION_FILE_BYTES
 
     def test_empty_string_returns_empty(self):
         assert _sanitize_instruction_content("") == ""

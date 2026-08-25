@@ -15,17 +15,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from omnimancer.cli.headless import (
-    HeadlessOutputEmitter,
-    HeadlessRunner,
-    OutputFormat,
-)
-from omnimancer.core.models import (
-    ChatResponse,
-    Config,
-    EventsConfig,
-    ProviderConfig,
-)
+from omnimancer.cli.headless import HeadlessOutputEmitter, HeadlessRunner, OutputFormat
+from omnimancer.core.models import ChatResponse, Config, EventsConfig, ProviderConfig
 
 
 class TestStreamJsonSchemaLock:
@@ -78,6 +69,8 @@ class TestStreamJsonSchemaLock:
             "session_id",
             "model",
             "provider",
+            "stop_cause",
+            "resume_session_id",
         }
 
     def test_result_keys(self):
