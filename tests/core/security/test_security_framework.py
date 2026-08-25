@@ -3,7 +3,9 @@
 import asyncio
 import os
 import shutil
+import subprocess
 import tempfile
+from unittest import mock
 
 import pytest
 
@@ -17,7 +19,11 @@ from omnimancer.core.security import (
 from omnimancer.core.security.approval_workflow import ApprovalStatus, RiskLevel
 from omnimancer.core.security.audit_logger import AuditEventType, AuditLevel
 from omnimancer.core.security.permission_controller import PermissionOperation
-from omnimancer.core.security.sandbox_manager import ResourceLimits
+from omnimancer.core.security.sandbox_manager import (
+    ResourceLimits,
+    SandboxedProcess,
+    _timeout_reason,
+)
 
 
 class TestPermissionController:
@@ -191,6 +197,149 @@ class TestSandboxManager:
         # Required variables should be added
         assert "PATH" in filtered
         assert "LANG" in filtered
+
+    def test_timeout_keeps_partial_output(self):
+        """Output written before the timeout is still reported."""
+        result = self.manager.execute_sandboxed_command(
+            ["sh", "-c", "echo partial; sleep 5"],
+            limits=ResourceLimits(timeout_seconds=1),
+        )
+
+        assert result["success"] is False
+        assert "partial" in result["stdout"]
+        assert "timed out" in result["stderr"].lower()
+
+    def test_timeout_reported_when_monitor_wins_the_race(self):
+        """A monitor-triggered kill is explained, not reported as empty output.
+
+        The monitor thread and ``communicate()`` both enforce the timeout, so
+        either may terminate the process first. Simulate the monitor winning by
+        having it fire well before the ``communicate()`` deadline.
+        """
+        limits = ResourceLimits(timeout_seconds=1)
+        original_terminate = SandboxedProcess.terminate
+
+        def monitor_style_terminate(sandboxed_proc):
+            """Terminate the way the monitor thread does, then run normally."""
+            original_terminate(sandboxed_proc, _timeout_reason(1))
+
+        with mock.patch.object(
+            SandboxManager,
+            "_monitor_process",
+            lambda _self, proc: monitor_style_terminate(proc),
+        ):
+            result = self.manager.execute_sandboxed_command(
+                ["sleep", "5"], limits=limits
+            )
+
+        assert result["success"] is False
+        assert result["return_code"] != 0
+        assert "timed out" in result["stderr"].lower()
+
+    def test_monitor_reports_the_limit_it_enforced(self):
+        """The monitor names the limit that caused it to kill a process."""
+        process = subprocess.Popen(["sleep", "5"])
+        sandbox_dir = tempfile.mkdtemp(prefix="omnimancer_sandbox_test_")
+        sandboxed_proc = SandboxedProcess(
+            process,
+            sandbox_dir,
+            # A real process always uses more than zero megabytes.
+            ResourceLimits(max_memory_mb=0, timeout_seconds=30),
+        )
+
+        try:
+            self.manager._monitor_process(sandboxed_proc)
+
+            assert sandboxed_proc.termination_reason is not None
+            assert "memory" in sandboxed_proc.termination_reason.lower()
+            assert sandboxed_proc.is_running() is False
+        finally:
+            sandboxed_proc.cleanup()
+
+    def test_monitor_stops_when_process_exits(self):
+        """The monitor exits without a reason when the process finishes."""
+        process = subprocess.Popen(["true"])
+        process.wait(timeout=10)
+        sandbox_dir = tempfile.mkdtemp(prefix="omnimancer_sandbox_test_")
+        sandboxed_proc = SandboxedProcess(process, sandbox_dir, ResourceLimits())
+
+        try:
+            self.manager._monitor_process(sandboxed_proc)
+
+            assert sandboxed_proc.termination_reason is None
+        finally:
+            sandboxed_proc.cleanup()
+
+    def test_successful_command_ignores_late_termination(self):
+        """A clean exit stays a success even if a kill was recorded."""
+        result = SandboxManager._build_result(
+            return_code=0,
+            stdout="done",
+            stderr="",
+            sandbox_dir="/tmp/sandbox",
+            termination_reason=_timeout_reason(1),
+        )
+
+        assert result["success"] is True
+        assert result["stderr"] == ""
+
+    def test_build_result_appends_reason_to_existing_stderr(self):
+        """Existing stderr is preserved alongside the termination reason."""
+        result = SandboxManager._build_result(
+            return_code=-15,
+            stdout="",
+            stderr="boom\n",
+            sandbox_dir="/tmp/sandbox",
+            termination_reason=_timeout_reason(2),
+        )
+
+        assert result["success"] is False
+        assert result["stderr"].startswith("boom")
+        assert "timed out after 2 seconds" in result["stderr"]
+
+    def test_missing_executable_reports_error(self):
+        """A command that cannot be spawned reports a contextual error."""
+        result = self.manager.execute_sandboxed_command(
+            ["omnimancer_definitely_not_a_real_command"],
+            limits=ResourceLimits(timeout_seconds=5),
+        )
+
+        assert result["success"] is False
+        assert result["return_code"] == -1
+        assert "sandbox execution error" in result["stderr"].lower()
+
+    def test_execution_untracks_and_cleans_up_process(self):
+        """Sandbox directories and process tracking do not leak."""
+        result = self.manager.execute_sandboxed_command(
+            ["echo", "cleanup"], limits=ResourceLimits(timeout_seconds=10)
+        )
+
+        assert self.manager.get_active_process_count() == 0
+        assert not os.path.exists(result["sandbox_dir"])
+
+    def test_terminate_is_idempotent_and_keeps_first_reason(self):
+        """Repeated termination keeps the reason recorded by the first caller."""
+        process = subprocess.Popen(["sleep", "5"])
+        sandbox_dir = tempfile.mkdtemp(prefix="omnimancer_sandbox_test_")
+        sandboxed_proc = SandboxedProcess(process, sandbox_dir, ResourceLimits())
+
+        try:
+            sandboxed_proc.terminate("first reason")
+            sandboxed_proc.terminate("second reason")
+
+            assert sandboxed_proc.termination_reason == "first reason"
+            assert sandboxed_proc.is_running() is False
+        finally:
+            sandboxed_proc.cleanup()
+
+    def test_stdin_input_is_forwarded(self):
+        """Input data reaches the sandboxed process."""
+        result = self.manager.execute_sandboxed_command(
+            ["cat"], limits=ResourceLimits(timeout_seconds=10), input_data="piped"
+        )
+
+        assert result["success"] is True
+        assert "piped" in result["stdout"]
 
 
 class TestApprovalWorkflow:
