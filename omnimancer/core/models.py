@@ -233,6 +233,11 @@ class ChatResponse:
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     stop_reason: Optional[str] = None
+    # Anthropic prompt-cache accounting: tokens served from cache (~0.1x cost)
+    # and tokens written to cache (~1.25x cost). None when the provider does
+    # not report them.
+    cache_read_input_tokens: Optional[int] = None
+    cache_creation_input_tokens: Optional[int] = None
 
     @property
     def is_success(self) -> bool:

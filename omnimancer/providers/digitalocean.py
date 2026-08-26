@@ -8,9 +8,10 @@ overridden per-config via ``base_url`` (e.g. a regional gateway or an agent
 endpoint).
 """
 
-from typing import Any, List
+from typing import Any, Dict, List
 
 from ..core.models import ModelInfo
+from .cache_tokens import prompt_cache_enabled
 from .openai import OpenAIProvider
 
 
@@ -34,6 +35,34 @@ class DigitalOceanProvider(OpenAIProvider):
                 at a custom DigitalOcean inference endpoint.
         """
         super().__init__(api_key, model or "llama3.3-70b-instruct", **kwargs)
+
+    def _apply_prompt_cache(self, request_body: Dict[str, Any]) -> None:
+        """Opt in to DigitalOcean prompt caching, which varies per family.
+
+        Anthropic models take Anthropic-style cache_control breakpoints;
+        OpenAI models take a prompt_cache_retention field; open-source models
+        cache automatically and must be left untouched.
+        """
+        if not prompt_cache_enabled():
+            return
+        model = (self.model or "").lower()
+        if "anthropic" in model or "claude" in model:
+            messages = request_body.get("messages")
+            if not messages:
+                return
+            content = messages[-1].get("content")
+            if isinstance(content, str) and content:
+                messages[-1]["content"] = [
+                    {
+                        "type": "text",
+                        "text": content,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
+            elif isinstance(content, list) and content:
+                content[-1]["cache_control"] = {"type": "ephemeral"}
+        elif "openai" in model or "gpt" in model:
+            request_body["prompt_cache_retention"] = "in_memory"
 
     def get_model_info(self) -> ModelInfo:
         info = super().get_model_info()

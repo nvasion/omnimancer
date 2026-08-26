@@ -187,6 +187,42 @@ say `DONE` (max 2 nudges; a bare DONE is swapped out of the final result text).
   in-memory config (regression-tested: config file stays byte-identical).
 - The headless `session_id` and the notify payload `session_id` are the same UUID.
 
+### Resilience surface (backoff, checkpoints, prompt caching)
+
+- **Same-provider backoff**: `core/engine.py::build_rate_limit_retry_handler` wraps every
+  provider send in `utils/retry.py::RetryHandler` — exponential backoff with jitter on
+  `RateLimitError`/`NetworkError`, honoring provider `Retry-After`, *before* the
+  provider-switch fallback. Env: `OMNIMANCER_RATE_LIMIT_RETRIES` (default 5; 0 disables),
+  `OMNIMANCER_RATE_LIMIT_BASE_DELAY` (2.0s), `OMNIMANCER_RATE_LIMIT_MAX_DELAY` (60s).
+  The claude provider maps 529 (overloaded) to `RateLimitError` too.
+- **Headless checkpoints**: `cli/headless_checkpoint.py` — the runner snapshots the full
+  conversation (lossless: `tool_calls`/`tool_results`/`raw_content`), pending message,
+  iteration, tool log, and usage totals at the top of every iteration
+  (`~/.omnimancer/headless_checkpoints/<session_id>.json`, override dir with
+  `OMNIMANCER_CHECKPOINT_DIR`, disable with `OMNIMANCER_CHECKPOINT=0`). Clean completion
+  deletes the file; failures and cap-hits keep it and print `Resume with: omn --resume
+  <session_id>` on stderr.
+- **Exit codes**: 0 done, 1 hard error, 3 cap/repeat-abort (partial result emitted),
+  **4 rate-limited after retries** — resumable; the JSON/stream-json error blob carries
+  `stop_cause` (`"rate_limited"`/`"error"`) and `resume_session_id`. Orchestrators should
+  re-invoke `omn --resume <id>` on exit 4 instead of restarting the task.
+- **Prompt caching**: request-side markers where the vendor takes them —
+  `providers/claude.py::_apply_cache_control` (Anthropic `cache_control` on last tool +
+  last message), `providers/bedrock.py::_apply_cache_point` (Converse `cachePoint`,
+  gated to `_CACHE_POINT_MODELS` because unsupported models hard-reject it), and
+  `providers/openrouter.py::_apply_cache_control` (forwarded `cache_control` for
+  anthropic/claude models only), and `providers/digitalocean.py::_apply_prompt_cache`
+  (DO Gradient: `cache_control` for its anthropic models, `prompt_cache_retention:
+  "in_memory"` for its openai models, nothing for open-source models which cache
+  automatically; hook point is `OpenAIProvider._post_chat`). OpenAI-family and
+  Gemini/Vertex cache automatically
+  server-side — there `providers/cache_tokens.py` helpers just parse the cached-token
+  usage (`prompt_tokens_details.cached_tokens`, `cachedContentTokenCount`). All
+  request-side markers share the `OMNIMANCER_PROMPT_CACHE=0` kill switch.
+  `cache_read_input_tokens`/`cache_creation_input_tokens` flow through `ChatResponse`
+  into the headless `usage` totals (the same pass also fixed azure/xai/mistral/
+  openrouter/gemini/vertex/bedrock never reporting `input_tokens`/`output_tokens`).
+
 ### Core engine + config (`core/`)
 
 - `models.py` (~2200 lines) — the shared vocabulary: `ChatMessage`/`ChatContext` (flattened

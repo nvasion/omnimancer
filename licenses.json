@@ -280,6 +280,13 @@
     "Version": "0.6.1"
   },
   {
+    "Description": "Collection of plugins for markdown-it-py",
+    "License": "MIT License",
+    "Name": "mdit-py-plugins",
+    "URL": "https://github.com/executablebooks/mdit-py-plugins",
+    "Version": "0.6.1"
+  },
+  {
     "Description": "Markdown URL utilities",
     "License": "MIT License",
     "Name": "mdurl",

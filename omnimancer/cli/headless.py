@@ -18,8 +18,17 @@ from ..core.models import (
     ToolResultRecord,
     parse_described_tool_calls,
 )
+from ..core.rate_limit_fallback import matches_rate_limit
 from ..events import emitter as fleet_events
 from ..events.schema import MESSAGE_PREVIEW_CHARS, PREVIEW_CHARS, truncate
+from .headless_checkpoint import (
+    HeadlessCheckpoint,
+    delete_checkpoint,
+    load_checkpoint,
+    message_from_dict,
+    message_to_dict,
+    save_checkpoint,
+)
 from .session import apply_session_overrides
 from .system_prompts import build_agent_prompt
 from .tool_handler import (
@@ -45,6 +54,78 @@ NO_TOOL_CALL_NUDGE = (
 
 # Consecutive tool-less turns tolerated before the run is ended anyway.
 MAX_NO_TOOL_NUDGES = 2
+
+# Total characters of tool-result history kept verbatim in the conversation.
+# The full history is retransmitted to the provider on every loop iteration,
+# so unbounded accumulation of 16 KB tool results grows token cost
+# quadratically with run length. Once the budget is exceeded, the OLDEST
+# results are replaced with a short stub — the model can always re-run a tool
+# if it needs elided output again. The newest result batch is never elided.
+TOOL_RESULT_HISTORY_BUDGET = 60_000
+
+# Stub that replaces an elided tool result. Also serves as the marker that a
+# message has already been elided (so it is not re-processed every iteration).
+ELIDED_RESULT_STUB = (
+    "[Older tool output elided to save context — re-run the tool if you "
+    "need it again.]"
+)
+
+
+def _resolve_tool_result_budget() -> int:
+    """Resolve the tool-result history budget: the OMNIMANCER_TOOL_RESULT_BUDGET
+    environment variable wins, then the default."""
+    raw = os.environ.get("OMNIMANCER_TOOL_RESULT_BUDGET")
+    if raw:
+        try:
+            value = int(raw)
+            if value > 0:
+                return value
+            logger.warning(
+                "Ignoring non-positive OMNIMANCER_TOOL_RESULT_BUDGET %r", raw
+            )
+        except ValueError:
+            logger.warning("Ignoring invalid OMNIMANCER_TOOL_RESULT_BUDGET %r", raw)
+    return TOOL_RESULT_HISTORY_BUDGET
+
+
+def _message_tool_result_size(msg: Any) -> int:
+    """Characters of tool-result payload a history message carries (0 if none)."""
+    records = getattr(msg, "tool_results", None)
+    if records:
+        return sum(len(r.content or "") for r in records)
+    content = getattr(msg, "content", "") or ""
+    if getattr(msg, "role", None) is not None and msg.role.value == "user":
+        if content.startswith("Tool results:"):
+            return len(content)
+    return 0
+
+
+def _elide_stale_tool_results(context: Any, budget: int) -> None:
+    """Replace old tool-result payloads in the conversation with a stub.
+
+    Walks history newest-first, keeping tool results verbatim until `budget`
+    characters are retained; everything older is elided in place. Covers both
+    the native path (ToolResultRecord list on a user message) and the
+    text-protocol path ("Tool results:" user messages). Already-elided
+    messages are skipped via the stub marker.
+    """
+    kept = 0
+    for msg in reversed(context.messages):
+        size = _message_tool_result_size(msg)
+        if size == 0:
+            continue
+        content = getattr(msg, "content", "") or ""
+        if ELIDED_RESULT_STUB in content:
+            continue
+        # Always keep the newest result batch, then keep within budget.
+        if kept == 0 or kept + size <= budget:
+            kept += size
+            continue
+        records = getattr(msg, "tool_results", None)
+        if records:
+            for record in records:
+                record.content = ELIDED_RESULT_STUB
+        msg.content = ELIDED_RESULT_STUB
 
 
 def _is_done_reply(content: Optional[str]) -> bool:
@@ -77,6 +158,12 @@ def _resolve_max_iterations(explicit: Optional[int]) -> int:
         except ValueError:
             logger.warning("Ignoring invalid OMNIMANCER_MAX_ITERATIONS %r", raw)
     return MAX_TOOL_ITERATIONS
+
+
+def _checkpointing_enabled() -> bool:
+    """Checkpointing is on by default; OMNIMANCER_CHECKPOINT=0 disables it."""
+    raw = os.environ.get("OMNIMANCER_CHECKPOINT", "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
 
 
 class OutputFormat(Enum):
@@ -236,6 +323,8 @@ class HeadlessOutputEmitter:
         tool_calls: Optional[list] = None,
         model: str = "",
         provider: str = "",
+        stop_cause: Optional[str] = None,
+        resume_session_id: Optional[str] = None,
     ) -> None:
         # Always surface a human-readable line on stderr (stdout stays
         # reserved for the structured result in JSON modes).
@@ -254,6 +343,8 @@ class HeadlessOutputEmitter:
                         "model": model,
                         "provider": provider,
                         "tool_calls": tool_calls or [],
+                        "stop_cause": stop_cause,
+                        "resume_session_id": resume_session_id,
                     },
                     default=str,
                 )
@@ -268,8 +359,15 @@ class HeadlessOutputEmitter:
                     "message": message,
                     "model": model,
                     "provider": provider,
+                    "stop_cause": stop_cause,
+                    "resume_session_id": resume_session_id,
                 }
             )
+
+    def emit_resume_hint(self, session_id: str) -> None:
+        """Tell the caller (human or orchestrator log) how to continue."""
+        self._stderr.write(f"Resume with: omn --resume {session_id}\n")
+        self._stderr.flush()
 
 
 class HeadlessRunner:
@@ -284,6 +382,7 @@ class HeadlessRunner:
         max_iterations: Optional[int] = None,
         notify_cmd: Optional[str] = None,
         read_only: bool = False,
+        resume_session_id: Optional[str] = None,
     ) -> None:
         self._engine = engine
         self._no_approval = no_approval
@@ -298,6 +397,12 @@ class HeadlessRunner:
         self._tokens = TokenAccumulator()
         self._provider_name: str = ""
         self._model: str = ""
+        # Checkpoint identity: a resumed run keeps writing to the checkpoint
+        # it was resumed from, so repeated failures stay resumable under one
+        # id instead of scattering files.
+        self._resume_session_id = resume_session_id
+        self._checkpoint_id = resume_session_id or session_id
+        self._checkpoint_saved = False
 
     @staticmethod
     def _enable_auto_approval(agent_engine: Any) -> None:
@@ -438,13 +543,51 @@ class HeadlessRunner:
         # run is aborted only if the model keeps repeating despite nudges.
         repeat_tracker = RepeatedCallTracker()
         no_tool_nudges = 0
+        start_iteration = 0
+
+        if self._resume_session_id:
+            restored = load_checkpoint(self._resume_session_id)
+            if restored is None:
+                self._emitter.emit_error(
+                    "No checkpoint found for session "
+                    f"'{self._resume_session_id}' — nothing to resume.",
+                    model=self._model,
+                    provider=self._provider_name,
+                )
+                return 1
+            self._restore_from_checkpoint(restored)
+            prompt = prompt or restored.prompt
+            current_message = restored.current_message
+            tool_log = list(restored.tool_log)
+            no_tool_nudges = restored.no_tool_nudges
+            start_iteration = restored.iteration
+            # A prior save exists on disk; keep resume hints available even
+            # if this run fails before its first save.
+            self._checkpoint_saved = True
 
         # Each break below overwrites this; only loop fall-through — the
         # iteration cap — leaves it standing.
         stop_cause = "max_iterations"
 
-        for iteration in range(self._max_iterations):
+        result_budget = _resolve_tool_result_budget()
+
+        for iteration in range(start_iteration, self._max_iterations):
             turns = iteration + 1
+            # The whole history is retransmitted each iteration — elide old
+            # tool results beyond the budget before sending.
+            context = getattr(
+                getattr(self._engine, "chat_manager", None), "current_context", None
+            )
+            if context is not None and isinstance(
+                getattr(context, "messages", None), list
+            ):
+                _elide_stale_tool_results(context, result_budget)
+            # Snapshot resumable state before spending tokens: on a failed or
+            # killed run, --resume re-sends `current_message` on top of the
+            # saved history instead of restarting the whole task.
+            self._save_checkpoint(
+                prompt, iteration, current_message, tool_log, no_tool_nudges
+            )
             response = await self._engine.send_message_with_tools(
                 current_message, tools
             )
@@ -455,13 +598,24 @@ class HeadlessRunner:
                 # Re-resolve at emit time: rate-limit fallback may have
                 # switched the engine's provider since the run started.
                 provider_name, model_name = self._engine.runtime_identity()
+                error_text = response.error or "Unknown error"
+                # Rate limits are transient: the run is resumable, and exit
+                # code 4 tells orchestrators to re-invoke with --resume
+                # instead of restarting the task from zero.
+                rate_limited = matches_rate_limit(error_text)
                 self._emitter.emit_error(
-                    response.error or "Unknown error",
+                    error_text,
                     tool_calls=tool_log,
                     model=model_name or self._model,
                     provider=provider_name or self._provider_name,
+                    stop_cause="rate_limited" if rate_limited else "error",
+                    resume_session_id=(
+                        self._checkpoint_id if self._checkpoint_saved else None
+                    ),
                 )
-                return 1
+                if self._checkpoint_saved:
+                    self._emitter.emit_resume_hint(self._checkpoint_id)
+                return 4 if rate_limited else 1
 
             last_model = response.model_used or model
             last_stop_reason = response.stop_reason or "end_turn"
@@ -599,8 +753,67 @@ class HeadlessRunner:
         # duplicate-call abort) even though a result was emitted; orchestrators
         # need that distinction and 2 is reserved by click for usage errors.
         if stop_cause in ("max_iterations", "repeat_abort"):
+            # Partial run — keep the checkpoint so a re-invocation with a
+            # higher cap continues instead of starting over.
+            if self._checkpoint_saved:
+                self._emitter.emit_resume_hint(self._checkpoint_id)
             return 3
+        # Clean completion: the checkpoint has served its purpose.
+        self._delete_checkpoint()
         return 0
+
+    def _save_checkpoint(
+        self,
+        prompt: str,
+        iteration: int,
+        current_message: str,
+        tool_log: list,
+        no_tool_nudges: int,
+    ) -> None:
+        """Persist resumable state; never let a save failure break the run."""
+        if not _checkpointing_enabled():
+            return
+        context = getattr(
+            getattr(self._engine, "chat_manager", None), "current_context", None
+        )
+        messages = getattr(context, "messages", None)
+        if not isinstance(messages, list):
+            return
+        try:
+            save_checkpoint(
+                HeadlessCheckpoint(
+                    session_id=self._checkpoint_id,
+                    prompt=prompt,
+                    iteration=iteration,
+                    current_message=current_message,
+                    messages=[message_to_dict(m) for m in messages],
+                    tool_log=tool_log,
+                    no_tool_nudges=no_tool_nudges,
+                    usage=self._tokens.total,
+                    provider=self._provider_name,
+                    model=self._model,
+                )
+            )
+            self._checkpoint_saved = True
+        except Exception as exc:
+            logger.warning("Checkpoint save failed: %s", exc)
+
+    def _restore_from_checkpoint(self, checkpoint: Any) -> None:
+        """Rebuild the conversation and usage totals from a saved run."""
+        context = getattr(
+            getattr(self._engine, "chat_manager", None), "current_context", None
+        )
+        if context is not None:
+            context.messages = [message_from_dict(m) for m in checkpoint.messages]
+        self._tokens.restore(checkpoint.usage or {})
+
+    def _delete_checkpoint(self) -> None:
+        if not self._checkpoint_saved:
+            return
+        try:
+            delete_checkpoint(self._checkpoint_id)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("Checkpoint delete failed: %s", exc)
 
 
 async def run_headless(
@@ -615,6 +828,7 @@ async def run_headless(
     max_iterations: Optional[int] = None,
     notify_cmd: Optional[str] = None,
     read_only: bool = False,
+    resume: Optional[str] = None,
 ) -> int:
     from ..core.config_manager import ConfigManager
     from ..core.engine import CoreEngine
@@ -634,5 +848,6 @@ async def run_headless(
         max_iterations=max_iterations,
         notify_cmd=notify_cmd,
         read_only=read_only,
+        resume_session_id=resume,
     )
     return await runner.run(prompt)

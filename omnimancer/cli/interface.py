@@ -1372,6 +1372,12 @@ def main() -> None:
         help="Submit an initial message, then continue in interactive mode",
     )
     @click.option(
+        "--resume",
+        type=str,
+        default=None,
+        help="Resume a headless run from its checkpoint session id",
+    )
+    @click.option(
         "--notify-cmd",
         type=str,
         default=None,
@@ -1435,6 +1441,7 @@ def main() -> None:
         no_approval: Any,
         prompt: Any,
         initial_prompt: Any,
+        resume: Any,
         notify_cmd: Any,
         read_only: Any,
         output_format: Any,
@@ -1457,12 +1464,14 @@ def main() -> None:
             return
 
         validate_prompt_options(prompt, initial_prompt)
+        if resume is not None and initial_prompt is not None:
+            raise click.UsageError("--initial-prompt cannot be used with --resume")
 
-        # Headless pipe mode
-        if prompt is not None:
-            full_prompt = prompt
+        # Headless pipe mode (--resume alone continues a checkpointed run)
+        if prompt is not None or resume is not None:
+            full_prompt = prompt or ""
 
-            if not sys.stdin.isatty():
+            if prompt is not None and not sys.stdin.isatty():
                 stdin_content = sys.stdin.read()
                 if stdin_content.strip():
                     full_prompt = f"Context:\n{stdin_content}\n\nRequest: {prompt}"
@@ -1482,6 +1491,7 @@ def main() -> None:
                     max_iterations=max_iterations,
                     notify_cmd=notify_cmd,
                     read_only=read_only,
+                    resume=resume,
                 )
             )
             sys.exit(exit_code)

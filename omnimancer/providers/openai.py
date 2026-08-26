@@ -29,6 +29,7 @@ from ..utils.errors import (
     RateLimitError,
 )
 from .base import BaseProvider
+from .cache_tokens import openai_cached_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -292,6 +293,14 @@ class OpenAIProvider(BaseProvider):
                 timeout=timeout,
             )
 
+    def _apply_prompt_cache(self, request_body: Dict[str, Any]) -> None:
+        """Hook for gateway-specific prompt-cache opt-in.
+
+        OpenAI's own API caches automatically with no request fields, so the
+        base implementation is a no-op; OpenAI-compatible gateways that need
+        opt-in markers (e.g. DigitalOcean) override this.
+        """
+
     async def _post_chat(
         self, request_body: Dict[str, Any], timeout: float
     ) -> httpx.Response:
@@ -305,6 +314,7 @@ class OpenAIProvider(BaseProvider):
         more useful than failing outright.
         """
         self._require_api_key()
+        self._apply_prompt_cache(request_body)
 
         async def _do_post(body: Dict[str, Any]) -> httpx.Response:
             # Serverless backends (notably DigitalOcean inference) sporadically
@@ -388,6 +398,7 @@ class OpenAIProvider(BaseProvider):
                     timestamp=datetime.now(),
                     input_tokens=usage.get("prompt_tokens", 0),
                     output_tokens=usage.get("completion_tokens", 0),
+                    cache_read_input_tokens=openai_cached_tokens(usage),
                 )
             else:
                 raise ProviderError("Empty response from OpenAI API")
@@ -534,6 +545,7 @@ class OpenAIProvider(BaseProvider):
                     input_tokens=usage.get("prompt_tokens", 0),
                     output_tokens=usage.get("completion_tokens", 0),
                     tool_calls=tool_calls if tool_calls else None,
+                    cache_read_input_tokens=openai_cached_tokens(usage),
                 )
             else:
                 raise ProviderError("Empty response from OpenAI API")
