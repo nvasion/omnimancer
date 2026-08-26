@@ -18,7 +18,7 @@
     "License": "BSD-2-Clause",
     "Name": "Pygments",
     "URL": "https://pygments.org",
-    "Version": "2.20.0"
+    "Version": "2.21.0"
   },
   {
     "Description": "File support for asyncio.",
@@ -109,7 +109,7 @@
     "License": "0BSD",
     "Name": "chardet",
     "URL": "https://github.com/chardet/chardet",
-    "Version": "7.5.1"
+    "Version": "7.6.0"
   },
   {
     "Description": "Composable command line interface toolkit",
@@ -130,7 +130,7 @@
     "License": "Apache-2.0 OR BSD-3-Clause",
     "Name": "cryptography",
     "URL": "https://github.com/pyca/cryptography",
-    "Version": "50.0.0"
+    "Version": "50.0.1"
   },
   {
     "Description": "cssselect parses CSS3 Selectors and translates them to XPath 1.0",
@@ -193,7 +193,7 @@
     "License": "BSD-3-Clause",
     "Name": "idna",
     "URL": "https://github.com/kjd/idna",
-    "Version": "3.18"
+    "Version": "3.19"
   },
   {
     "Description": "brain-dead simple config-ini parsing",
@@ -235,21 +235,14 @@
     "License": "MIT License",
     "Name": "linkify-it-py",
     "URL": "https://github.com/tsutsu3/linkify-it-py",
-    "Version": "2.1.0"
-  },
-  {
-    "Description": "Links recognition library with FULL unicode support.",
-    "License": "MIT License",
-    "Name": "linkify-it-py",
-    "URL": "https://github.com/tsutsu3/linkify-it-py",
-    "Version": "2.1.0"
+    "Version": "2.1.1"
   },
   {
     "Description": "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API.",
     "License": "BSD-3-Clause",
     "Name": "lxml",
     "URL": "https://lxml.de/",
-    "Version": "6.1.1"
+    "Version": "6.1.2"
   },
   {
     "Description": "HTML cleaner from lxml project",
@@ -277,7 +270,14 @@
     "License": "MIT License",
     "Name": "mcp",
     "URL": "https://modelcontextprotocol.io",
-    "Version": "1.29.0"
+    "Version": "1.29.1"
+  },
+  {
+    "Description": "Collection of plugins for markdown-it-py",
+    "License": "MIT License",
+    "Name": "mdit-py-plugins",
+    "URL": "https://github.com/executablebooks/mdit-py-plugins",
+    "Version": "0.6.1"
   },
   {
     "Description": "Collection of plugins for markdown-it-py",
@@ -305,7 +305,7 @@
     "License": "MIT",
     "Name": "mypy",
     "URL": "https://www.mypy-lang.org/",
-    "Version": "2.3.0"
+    "Version": "2.3.1"
   },
   {
     "Description": "Type system extensions for programs checked with the mypy type checker.",
@@ -319,7 +319,7 @@
     "License": "MIT License",
     "Name": "omnimancer-cli",
     "URL": "https://github.com/nvasion/omnimancer",
-    "Version": "0.2.26"
+    "Version": "0.2.27"
   },
   {
     "Description": "Core utilities for Python packages",
@@ -340,7 +340,7 @@
     "License": "MIT",
     "Name": "platformdirs",
     "URL": "https://github.com/tox-dev/platformdirs",
-    "Version": "4.11.1"
+    "Version": "4.11.4"
   },
   {
     "Description": "plugin and hook calling mechanisms for python",
@@ -445,7 +445,7 @@
     "License": "BSD-3-Clause",
     "Name": "python-dotenv",
     "URL": "https://github.com/theskumar/python-dotenv",
-    "Version": "1.2.2"
+    "Version": "1.2.3"
   },
   {
     "Description": "A streaming multipart parser for Python",
@@ -508,14 +508,7 @@
     "License": "BSD-3-Clause",
     "Name": "starlette",
     "URL": "https://github.com/Kludex/starlette",
-    "Version": "1.5.1"
-  },
-  {
-    "Description": "Modern Text User Interface framework",
-    "License": "MIT License",
-    "Name": "textual",
-    "URL": "https://github.com/Textualize/textual",
-    "Version": "8.2.8"
+    "Version": "1.6.0"
   },
   {
     "Description": "Modern Text User Interface framework",
@@ -536,7 +529,7 @@
     "License": "MIT",
     "Name": "typing-inspection",
     "URL": "https://github.com/pydantic/typing-inspection",
-    "Version": "0.4.2"
+    "Version": "0.4.4"
   },
   {
     "Description": "Backported and Experimental Type Hints for Python 3.9+",
@@ -557,7 +550,7 @@
     "License": "BSD-3-Clause",
     "Name": "uvicorn",
     "URL": "https://uvicorn.dev/",
-    "Version": "0.52.1"
+    "Version": "0.52.4"
   },
   {
     "Description": "Yet another URL library",
