@@ -372,6 +372,44 @@ async def test_invalid_worker_output_is_categorical_data(
     assert "PRIVATE" not in report.model_dump_json()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("arm", ["baseline", "jev"])
+async def test_timeout_preserves_outcome_without_inventing_metadata(
+    replay, task, tmp_path, monkeypatch, arm
+):
+    async def child(*args, **kwargs):
+        return replay.ProcessResult(
+            returncode=-9, stdout=b"", stderr=b"", elapsed_ms=120000, timed_out=True
+        )
+
+    async def acceptance(*args, **kwargs):
+        return "pass"
+
+    monkeypatch.setattr(replay, "run_process", child)
+    monkeypatch.setattr(replay, "run_acceptance", acceptance)
+    result = await replay._one(
+        task,
+        arm,
+        endpoint="http://127.0.0.1/v1",
+        workers=replay.Workers(),
+        policy=synthetic_policy(replay),
+        ledger=BudgetLedger(tmp_path / "ledger", 0.003),
+        api_key="synthetic-key",
+        timeout=120,
+        max_turns=8,
+        check_timeout=2,
+    )
+    assert result.success is True
+    assert result.stop_cause == "timeout"
+    assert result.target == ("deep" if arm == "baseline" else None)
+    assert result.routing_ms == (0 if arm == "baseline" else None)
+    assert result.worker_ms == (120000 if arm == "baseline" else None)
+    assert result.turns is None
+    assert result.tool_calls is None
+    assert result.input_tokens is None
+    assert result.output_tokens is None
+
+
 def test_task_schema_rejects_escape_and_private_report_fields(replay, task):
     from pydantic import ValidationError
 

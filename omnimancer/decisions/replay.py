@@ -451,14 +451,15 @@ async def _one(
     check_timeout: float,
 ) -> TaskResult:
     started = time.perf_counter()
-    row = dict(
+    row: dict = dict(
         case_id=task.id,
         arm=arm,
         expected=task.expected,
-        target="deep",
+        target="deep" if arm == "baseline" else None,
         success=False,
         elapsed_ms=0,
-        worker_ms=0,
+        worker_ms=None,
+        routing_ms=0 if arm == "baseline" else None,
         stop_cause="provider_error",
         check="error",
         routing_status="baseline" if arm == "baseline" else "invalid_output",
@@ -504,7 +505,8 @@ async def _one(
             env=worker_environment(home, api_key=api_key if arm == "jev" else None),
             timeout=timeout,
         )
-        row["worker_ms"] = process.elapsed_ms
+        if arm == "baseline":
+            row["worker_ms"] = process.elapsed_ms
         if process.timed_out:
             row["stop_cause"] = "timeout"
         elif process.output_limited:

@@ -105,3 +105,26 @@ def test_report_write_does_not_follow_predicted_temporary_symlink(tmp_path):
     (tmp_path / "report.json.tmp").symlink_to(victim)
     save_report(EvaluationReport(), tmp_path / "report")
     assert victim.read_text() == "preserve me"
+
+
+def test_missing_task_metadata_is_unknown_instead_of_zero_or_deep():
+    from omnimancer.decisions.report import TaskResult
+
+    task = TaskResult(
+        case_id="timed-out",
+        arm="jev",
+        expected="fast",
+        target=None,
+        success=True,
+        elapsed_ms=120000,
+        worker_ms=None,
+        stop_cause="timeout",
+        check="pass",
+        routing_status="invalid_output",
+    )
+    html = render_report(EvaluationReport(tasks=[task]))
+    assert "jev / unknown" in html
+    assert "120.00 / unknown" in html
+    assert "0 known; 1 unknown" in html
+    assert "1 / 1" in html
+    assert task.model_dump()["turns"] is None

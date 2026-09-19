@@ -10,6 +10,11 @@ model routing only: the classifier cannot approve tools or change permissions.
 Vendor speed/cost comparisons are motivation, not measured Omnimancer results.
 See the [TypeSafe introduction](https://docs.typesafe.ai/introduction).
 
+The [local pilot results](evals/typesafe-routing.md) include a standalone HTML
+report and public JSON. The tested worker pair **did not improve speed or
+acceptance success**. Routing remains disabled by default; the example worker
+names are experimental assignments, not performance recommendations.
+
 ## Run a routed task
 
 1. Configure at least two supported worker targets in Omnimancer. This first
@@ -174,6 +179,10 @@ classifier latency, process startup, provider initialization, and model loading.
 Worker process time (minus classification) and stop causes are retained separately. Acceptance success means the final file passes its checks, including when a worker times out after writing a passing repair. The stop cause remains visible. Existing provider-internal HTTP retries may occur within the process deadline; reported model turns are not a count of all HTTP attempts. A shared local
 inference service can incur model-load delays; local worker API cost is zero,
 but electricity and development subscriptions are not included.
+If a process exits without valid final metadata, its route, usage, and timing
+split are unknown (`null` in JSON). Baseline's fixed route and zero classifier
+time remain known. Total elapsed time and acceptance still have measurements;
+missing turn/tool counts are not counted as zero in report totals.
 
 ## Publication and tests
 

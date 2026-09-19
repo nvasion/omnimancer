@@ -65,15 +65,15 @@ class TaskResult(PublicModel):
     case_id: Slug
     arm: Literal["baseline", "jev"]
     expected: Label
-    target: Label
+    target: Label | None
     success: bool
     elapsed_ms: Finite
-    worker_ms: Finite
-    routing_ms: Finite = 0
-    turns: Annotated[int, Field(ge=0)] = 0
-    tool_calls: Annotated[int, Field(ge=0)] = 0
-    input_tokens: Annotated[int, Field(ge=0)] = 0
-    output_tokens: Annotated[int, Field(ge=0)] = 0
+    worker_ms: Finite | None
+    routing_ms: Finite | None = None
+    turns: Annotated[int, Field(ge=0)] | None = None
+    tool_calls: Annotated[int, Field(ge=0)] | None = None
+    input_tokens: Annotated[int, Field(ge=0)] | None = None
+    output_tokens: Annotated[int, Field(ge=0)] | None = None
     stop_cause: Literal[
         "done",
         "nudge_exhausted",
@@ -282,6 +282,12 @@ def _table(headers: list[str], rows: list[list[str]]) -> str:
     )
 
 
+def _known_total(values: list[int | None]) -> str:
+    total = sum(value for value in values if value is not None)
+    missing = sum(value is None for value in values)
+    return f"{total} known; {missing} unknown" if missing else str(total)
+
+
 def render_report(report: EvaluationReport) -> str:
     """Escape dynamic text; accept only the public schema, never raw logs."""
     report = EvaluationReport.model_validate(report.model_dump())
@@ -396,8 +402,8 @@ baseline</strong></div></div>"""]
                         f"{sum(t.success for t in tasks)} / {len(tasks)}",
                         f"{(percentile(times, .5) or 0)/1000:.2f} s",
                         f"{(percentile(times, .95) or 0)/1000:.2f} s",
-                        str(sum(t.turns for t in tasks)),
-                        str(sum(t.tool_calls for t in tasks)),
+                        _known_total([t.turns for t in tasks]),
+                        _known_total([t.tool_calls for t in tasks]),
                     ]
                 )
         parts.append(
@@ -421,7 +427,9 @@ baseline</strong></div></div>"""]
             "process startup, provider initialization and model loading; worker "
             "time is measured separately. Both workers share one local inference "
             "service, so model-load effects matter. Failed and timed-out tasks "
-            "remain in the sample.</p>"
+            "remain in the sample. Missing worker metadata is unknown, not zero; "
+            "incomplete call totals explicitly identify missing runs. A passing "
+            "final repair can coexist with a timeout stop.</p>"
         )
         parts.append(
             _table(
@@ -429,10 +437,15 @@ baseline</strong></div></div>"""]
                 [
                     [
                         escape(t.case_id),
-                        f"{t.arm} / {t.target}",
+                        f"{t.arm} / {t.target or 'unknown'}",
                         f'<span class="{"good" if t.success else "bad"}">'
                         f"{t.check}</span>",
-                        f"{t.elapsed_ms/1000:.2f} / {t.worker_ms/1000:.2f} s",
+                        f"{t.elapsed_ms/1000:.2f} / "
+                        + (
+                            f"{t.worker_ms/1000:.2f} s"
+                            if t.worker_ms is not None
+                            else "unknown s"
+                        ),
                         escape(t.stop_cause),
                     ]
                     for t in report.tasks
