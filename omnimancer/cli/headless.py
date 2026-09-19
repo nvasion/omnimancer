@@ -175,15 +175,28 @@ class OutputFormat(Enum):
 class HeadlessOutputEmitter:
     """Emits structured output to stdout in the configured format."""
 
-    def __init__(self, fmt: OutputFormat, session_id: str, verbose: bool = False):
+    def __init__(
+        self,
+        fmt: OutputFormat,
+        session_id: str,
+        verbose: bool = False,
+        routing: Optional[dict] = None,
+    ):
         self._format = fmt
         self._session_id = session_id
         self._verbose = verbose
         self._stdout = sys.stdout
         self._stderr = sys.stderr
         self._last_content = ""
+        self._routing = routing
 
     def _write_json_line(self, data: dict) -> None:
+        if self._routing is not None and data.get("type") in (
+            "system",
+            "result",
+            "error",
+        ):
+            data["routing"] = self._routing
         data["session_id"] = self._session_id
         self._stdout.write(json.dumps(data, default=str) + "\n")
         self._stdout.flush()
@@ -298,6 +311,8 @@ class HeadlessOutputEmitter:
                 "stop_reason": stop_reason,
                 "stop_cause": stop_cause,
             }
+            if self._routing is not None:
+                blob["routing"] = self._routing
             self._stdout.write(json.dumps(blob, default=str) + "\n")
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
@@ -345,6 +360,11 @@ class HeadlessOutputEmitter:
                         "tool_calls": tool_calls or [],
                         "stop_cause": stop_cause,
                         "resume_session_id": resume_session_id,
+                        **(
+                            {"routing": self._routing}
+                            if self._routing is not None
+                            else {}
+                        ),
                     },
                     default=str,
                 )
@@ -383,6 +403,7 @@ class HeadlessRunner:
         notify_cmd: Optional[str] = None,
         read_only: bool = False,
         resume_session_id: Optional[str] = None,
+        routing: Optional[dict] = None,
     ) -> None:
         self._engine = engine
         self._no_approval = no_approval
@@ -393,7 +414,9 @@ class HeadlessRunner:
         self._max_iterations = _resolve_max_iterations(max_iterations)
         self._turn_notifier = TurnNotifier(notify_cmd=notify_cmd, cwd=os.getcwd())
         session_id = self._turn_notifier.session_id
-        self._emitter = HeadlessOutputEmitter(output_format, session_id, verbose)
+        self._emitter = HeadlessOutputEmitter(
+            output_format, session_id, verbose, routing=routing
+        )
         self._tokens = TokenAccumulator()
         self._provider_name: str = ""
         self._model: str = ""
@@ -829,6 +852,7 @@ async def run_headless(
     notify_cmd: Optional[str] = None,
     read_only: bool = False,
     resume: Optional[str] = None,
+    routing_policy: Optional[str] = None,
 ) -> int:
     from ..core.config_manager import ConfigManager
     from ..core.engine import CoreEngine
@@ -838,6 +862,20 @@ async def run_headless(
 
     engine = CoreEngine(config_manager)
     await engine.initialize_providers()
+
+    routing = None
+    if routing_policy is not None:
+        from ..decisions.integration import route_headless
+
+        routing = await route_headless(
+            engine,
+            prompt,
+            routing_policy,
+            provider=provider,
+            model=model,
+            base_url=base_url,
+            resume=resume,
+        )
 
     fmt = OutputFormat(output_format)
     runner = HeadlessRunner(
@@ -849,5 +887,6 @@ async def run_headless(
         notify_cmd=notify_cmd,
         read_only=read_only,
         resume_session_id=resume,
+        routing=routing,
     )
     return await runner.run(prompt)
