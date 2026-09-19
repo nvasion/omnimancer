@@ -59,6 +59,12 @@ omn -p "migrate every test file to pytest fixtures" --max-iterations 100
 The `--provider`, `--model`, and `--base-url` flags are **session overrides**: they
 modify the in-memory config for this run only and are never written back to disk.
 
+Experimental **TypeSafe model routing** can choose a configured worker once at
+task start with `--routing-policy routes.json`. It is disabled by default;
+explicit provider/model selections bypass it. See the
+[setup and evaluation guide](docs/typesafe-routing.md) for task-data disclosure,
+fallback behavior, shadow mode, and reproducible HTML reports.
+
 Headless mode with `--output-format json` emits a single structured result
 object — including the tool calls the agent made along the way:
 

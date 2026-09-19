@@ -1434,6 +1434,12 @@ def main() -> None:
         default=None,
         help="Override the provider API endpoint (headless mode)",
     )
+    @click.option(
+        "--routing-policy",
+        type=click.Path(path_type=str),
+        default=None,
+        help="Experimental headless routing policy; sends task text to TypeSafe",
+    )
     def cli_main(
         help: Any,
         version: Any,
@@ -1451,6 +1457,7 @@ def main() -> None:
         provider: Any,
         model: Any,
         base_url: Any,
+        routing_policy: Any,
     ) -> None:
         """Omnimancer - A multi-model coding agent for the terminal."""
 
@@ -1466,6 +1473,11 @@ def main() -> None:
         validate_prompt_options(prompt, initial_prompt)
         if resume is not None and initial_prompt is not None:
             raise click.UsageError("--initial-prompt cannot be used with --resume")
+
+        if routing_policy is not None and prompt is None and resume is None:
+            raise click.UsageError(
+                "--routing-policy requires headless mode (-p or --resume)"
+            )
 
         # Headless pipe mode (--resume alone continues a checkpointed run)
         if prompt is not None or resume is not None:
@@ -1492,6 +1504,7 @@ def main() -> None:
                     notify_cmd=notify_cmd,
                     read_only=read_only,
                     resume=resume,
+                    routing_policy=routing_policy,
                 )
             )
             sys.exit(exit_code)

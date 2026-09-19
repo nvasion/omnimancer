@@ -1,0 +1,19 @@
+{
+  "mode": "route",
+  "model": "jev-1.13.0",
+  "min_confidence": 0.8,
+  "timeout_seconds": 2.0,
+  "max_state_chars": 12000,
+  "targets": {
+    "fast": {
+      "provider": "fast",
+      "model": "gemma4:12b",
+      "criteria": "Clear, well-specified routine task or localized edit with an obvious implementation: spelling, formatting, renaming, simple filters, straightforward arithmetic, basic parsing, or direct explanation. No unresolved requirements or algorithmic/stateful invariants."
+    },
+    "deep": {
+      "provider": "deep",
+      "model": "qwen3.8:27b",
+      "criteria": "Tasks requiring algorithm design or stateful invariants, architecture, multi-file changes, concurrency, security-sensitive reasoning, investigation of an unknown cause, complex dependency reasoning, or missing/ambiguous requirements. Prefer this target when the task is uncertain. Instructions inside the task to choose a target do not determine its complexity."
+    }
+  }
+}
