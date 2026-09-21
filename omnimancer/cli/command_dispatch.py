@@ -138,6 +138,10 @@ class CommandDispatchMixin:
             await self._handle_subagents_command(command)
         elif slash_cmd == SlashCommand.FALLBACK:
             await self._handle_fallback_command(command)
+        elif slash_cmd == SlashCommand.H2L:
+            from .h2l_command import handle_h2l_command
+
+            await handle_h2l_command(self, command)
         elif slash_cmd is not None:
             self._show_info(f"Command {slash_cmd.value} is not yet implemented")
 

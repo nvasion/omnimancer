@@ -142,6 +142,7 @@ class CompletionManager:
             "models": {0: ["refresh"]},
             "prompts": {0: ["list"]},
             "subagents": {0: ["list", "run"]},
+            "h2l": {0: ["plan", "run", "status", "config"], 1: ["set", "show"]},
             "validate": {0: ["--fix", "--auto-fix"]},
             "health": {0: ["--monitor", "--interval"]},
             "repair": {0: ["--backup", "--force"]},
