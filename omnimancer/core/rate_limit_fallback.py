@@ -50,7 +50,20 @@ _RATE_LIMIT_PATTERNS: tuple[str, ...] = (
     "requests per minute",
     "tokens per minute",
     "capacity",
+    "overloaded",
+    "529",
 )
+
+
+def matches_rate_limit(error: str) -> bool:
+    """Return True if *error* looks like an HTTP 429/529 rate-limit error.
+
+    Module-level so callers (e.g. the headless runner deciding whether a
+    failed run is resumable) can classify errors without a handler instance.
+    """
+    lowered = error.lower()
+    return any(p in lowered for p in _RATE_LIMIT_PATTERNS)
+
 
 _QUOTA_PATTERNS: tuple[str, ...] = (
     "quota exceeded",
@@ -135,8 +148,7 @@ class RateLimitFallbackHandler:
 
     def is_rate_limit_error(self, error: str) -> bool:
         """Return True if *error* looks like an HTTP 429 / rate-limit error."""
-        lowered = error.lower()
-        return any(p in lowered for p in _RATE_LIMIT_PATTERNS)
+        return matches_rate_limit(error)
 
     def is_quota_error(self, error: str) -> bool:
         """Return True if *error* looks like a quota / billing error."""

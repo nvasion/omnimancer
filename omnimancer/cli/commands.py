@@ -65,6 +65,7 @@ class SlashCommand(Enum):
     PROMPTS = "/prompts"
     SUBAGENTS = "/subagents"
     FALLBACK = "/fallback"
+    H2L = "/h2l"
 
     @classmethod
     def from_string(cls, command_str: str) -> Optional["SlashCommand"]:

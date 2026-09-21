@@ -28,6 +28,7 @@ from ..utils.errors import (
     RateLimitError,
 )
 from .base import BaseProvider
+from .cache_tokens import prompt_cache_enabled
 
 
 class ClaudeProvider(BaseProvider):
@@ -56,6 +57,36 @@ class ClaudeProvider(BaseProvider):
 
     def _is_subscription_token(self) -> bool:
         return self.auth_type == "bearer"  # type: ignore[no-any-return]
+
+    @staticmethod
+    def _prompt_cache_enabled() -> bool:
+        return prompt_cache_enabled()
+
+    def _apply_cache_control(self, request_body: Dict[str, Any]) -> None:
+        """Add prompt-cache breakpoints to the outgoing request.
+
+        The agent loop resends an identical prefix (tools, agent prompt,
+        transcript) on every iteration. A breakpoint on the last tool and on
+        the last message lets the API serve that prefix from cache instead of
+        re-billing it each call. Prefixes below the model's cacheable minimum
+        are silently uncached — the markers are harmless there.
+        """
+        if not self._prompt_cache_enabled():
+            return
+        marker = {"type": "ephemeral"}
+        tools = request_body.get("tools")
+        if tools:
+            tools[-1]["cache_control"] = marker
+        messages = request_body.get("messages")
+        if not messages:
+            return
+        content = messages[-1].get("content")
+        if isinstance(content, str) and content:
+            messages[-1]["content"] = [
+                {"type": "text", "text": content, "cache_control": marker}
+            ]
+        elif isinstance(content, list) and content:
+            content[-1]["cache_control"] = marker
 
     def _is_haiku(self) -> bool:
         return "haiku" in self.model.lower()
@@ -88,6 +119,13 @@ class ClaudeProvider(BaseProvider):
         """
         # Prepare messages for Claude API
         messages = self._prepare_messages(message, context)
+        request_body: Dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "messages": messages,
+        }
+        self._apply_cache_control(request_body)
 
         # Try with SSL verification first, then fall back if needed
         ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
@@ -97,12 +135,7 @@ class ClaudeProvider(BaseProvider):
                     response = await client.post(
                         f"{self.base_url}/messages",
                         headers=self._build_headers(),
-                        json={
-                            "model": self.model,
-                            "max_tokens": self.max_tokens,
-                            "temperature": self.temperature,
-                            "messages": messages,
-                        },
+                        json=request_body,
                         timeout=30.0,
                     )
 
@@ -269,6 +302,10 @@ class ClaudeProvider(BaseProvider):
                     input_tokens=usage.get("input_tokens"),
                     output_tokens=usage.get("output_tokens"),
                     stop_reason=data.get("stop_reason", "end_turn"),
+                    cache_read_input_tokens=usage.get("cache_read_input_tokens"),
+                    cache_creation_input_tokens=usage.get(
+                        "cache_creation_input_tokens"
+                    ),
                 )
             else:
                 raise ProviderError("Empty response from Claude API")
@@ -285,7 +322,16 @@ class ClaudeProvider(BaseProvider):
                     "Set ANTHROPIC_API_KEY or configure"
                     " an API key in Omnimancer."
                 )
-            raise RateLimitError("Claude API rate limit exceeded")
+            raise RateLimitError(
+                "Claude API rate limit exceeded",
+                retry_after=self._parse_retry_after(response),
+            )
+        elif response.status_code == 529:
+            # Overloaded — transient like a 429; the engine's backoff applies.
+            raise RateLimitError(
+                "Claude API overloaded (529)",
+                retry_after=self._parse_retry_after(response),
+            )
         elif response.status_code == 404:
             raise ModelNotFoundError(f"Claude model '{self.model}' not found")
         else:
@@ -306,7 +352,7 @@ class ClaudeProvider(BaseProvider):
         messages = self._prepare_messages(message, context)
         tools = self._convert_tools_to_claude_format(available_tools)
 
-        request_body = {
+        request_body: Dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
@@ -314,6 +360,7 @@ class ClaudeProvider(BaseProvider):
         }
         if tools:
             request_body["tools"] = tools
+        self._apply_cache_control(request_body)
 
         ssl_options: List[Union[bool, str]] = [True, certifi.where(), False]
         for ssl_verify in ssl_options:
@@ -349,6 +396,16 @@ class ClaudeProvider(BaseProvider):
                 raise ProviderError(f"Unexpected error: {e}")
 
         raise NetworkError("Failed to establish SSL connection to Claude API")
+
+    @staticmethod
+    def _parse_retry_after(response: httpx.Response) -> Union[int, None]:
+        raw = response.headers.get("retry-after")
+        if not raw:
+            return None
+        try:
+            return int(float(raw))
+        except ValueError:
+            return None
 
     def _is_subscription_429(self, response: httpx.Response) -> bool:
         if not self._is_subscription_token() or self._is_haiku():
@@ -411,6 +468,8 @@ class ClaudeProvider(BaseProvider):
                 input_tokens=usage.get("input_tokens"),
                 output_tokens=usage.get("output_tokens"),
                 stop_reason=data.get("stop_reason", "end_turn"),
+                cache_read_input_tokens=usage.get("cache_read_input_tokens"),
+                cache_creation_input_tokens=usage.get("cache_creation_input_tokens"),
             )
 
         return self._handle_response(response)
@@ -422,13 +481,14 @@ class ClaudeProvider(BaseProvider):
         self, message: str, context: ChatContext
     ) -> AsyncIterator[StreamEvent]:
         messages = self._prepare_messages(message, context)
-        request_body = {
+        request_body: Dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
             "messages": messages,
             "stream": True,
         }
+        self._apply_cache_control(request_body)
         async for event in self._stream_request(request_body):
             yield event
 
@@ -440,7 +500,7 @@ class ClaudeProvider(BaseProvider):
     ) -> AsyncIterator[StreamEvent]:
         messages = self._prepare_messages(message, context)
         tools = self._convert_tools_to_claude_format(available_tools)
-        request_body = {
+        request_body: Dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
@@ -449,6 +509,7 @@ class ClaudeProvider(BaseProvider):
         }
         if tools:
             request_body["tools"] = tools
+        self._apply_cache_control(request_body)
         async for event in self._stream_request(request_body):
             yield event
 

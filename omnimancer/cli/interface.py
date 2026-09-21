@@ -1372,6 +1372,12 @@ def main() -> None:
         help="Submit an initial message, then continue in interactive mode",
     )
     @click.option(
+        "--resume",
+        type=str,
+        default=None,
+        help="Resume a headless run from its checkpoint session id",
+    )
+    @click.option(
         "--notify-cmd",
         type=str,
         default=None,
@@ -1428,6 +1434,69 @@ def main() -> None:
         default=None,
         help="Override the provider API endpoint (headless mode)",
     )
+    @click.option(
+        "--h2l",
+        "h2l",
+        is_flag=True,
+        default=False,
+        help="Headless H2L mode: high model plans and judges, low models execute",
+    )
+    @click.option(
+        "--high",
+        "h2l_high",
+        type=str,
+        default=None,
+        help="H2L high model as <provider-entry>:<model> (requires --h2l)",
+    )
+    @click.option(
+        "--low",
+        "h2l_low",
+        type=str,
+        multiple=True,
+        help="H2L low model as <provider-entry>:<model>; repeatable (requires --h2l)",
+    )
+    @click.option(
+        "--h2l-parallel",
+        "h2l_parallel",
+        type=int,
+        default=None,
+        help="H2L: concurrent workers (default from config, 2)",
+    )
+    @click.option(
+        "--h2l-retries",
+        "h2l_retries",
+        type=int,
+        default=None,
+        help="H2L: judge send-backs per story before escalation",
+    )
+    @click.option(
+        "--h2l-threshold",
+        "h2l_threshold",
+        type=int,
+        default=None,
+        help="H2L: judge pass score 0-100",
+    )
+    @click.option(
+        "--h2l-escalation",
+        "h2l_escalation",
+        type=click.Choice(["high", "block"]),
+        default=None,
+        help="H2L: after retries, the high model does the story or it is blocked",
+    )
+    @click.option(
+        "--h2l-plan-only",
+        "h2l_plan_only",
+        is_flag=True,
+        default=False,
+        help="H2L: print the plan and stop",
+    )
+    @click.option(
+        "--h2l-plan-iterations",
+        "h2l_plan_iterations",
+        type=int,
+        default=None,
+        help="H2L: cap the planner's exploration turns (unbounded by default)",
+    )
     def cli_main(
         help: Any,
         version: Any,
@@ -1435,6 +1504,7 @@ def main() -> None:
         no_approval: Any,
         prompt: Any,
         initial_prompt: Any,
+        resume: Any,
         notify_cmd: Any,
         read_only: Any,
         output_format: Any,
@@ -1444,6 +1514,15 @@ def main() -> None:
         provider: Any,
         model: Any,
         base_url: Any,
+        h2l: Any,
+        h2l_high: Any,
+        h2l_low: Any,
+        h2l_parallel: Any,
+        h2l_retries: Any,
+        h2l_threshold: Any,
+        h2l_escalation: Any,
+        h2l_plan_only: Any,
+        h2l_plan_iterations: Any,
     ) -> None:
         """Omnimancer - A multi-model coding agent for the terminal."""
 
@@ -1457,12 +1536,47 @@ def main() -> None:
             return
 
         validate_prompt_options(prompt, initial_prompt)
+        if resume is not None and initial_prompt is not None:
+            raise click.UsageError("--initial-prompt cannot be used with --resume")
 
-        # Headless pipe mode
-        if prompt is not None:
-            full_prompt = prompt
+        from .h2l_headless import H2LOptions
 
-            if not sys.stdin.isatty():
+        h2l_options = H2LOptions(
+            enabled=bool(h2l),
+            high=h2l_high,
+            low=list(h2l_low or ()),
+            parallel=h2l_parallel,
+            retries=h2l_retries,
+            threshold=h2l_threshold,
+            escalation=h2l_escalation,
+            plan_only=bool(h2l_plan_only),
+            plan_iterations=h2l_plan_iterations,
+        )
+        h2l_flags_given = any(
+            value not in (None, False, [], ())
+            for value in (
+                h2l_high,
+                h2l_low,
+                h2l_parallel,
+                h2l_retries,
+                h2l_threshold,
+                h2l_escalation,
+                h2l_plan_only,
+                h2l_plan_iterations,
+            )
+        )
+        if h2l_flags_given and not h2l:
+            raise click.UsageError(
+                "--high/--low/--h2l-* options require --h2l (see docs/plans/PRD-h2l.md)"
+            )
+        if h2l and prompt is None:
+            raise click.UsageError("--h2l requires -p/--prompt <goal>")
+
+        # Headless pipe mode (--resume alone continues a checkpointed run)
+        if prompt is not None or resume is not None:
+            full_prompt = prompt or ""
+
+            if prompt is not None and not sys.stdin.isatty():
                 stdin_content = sys.stdin.read()
                 if stdin_content.strip():
                     full_prompt = f"Context:\n{stdin_content}\n\nRequest: {prompt}"
@@ -1482,6 +1596,8 @@ def main() -> None:
                     max_iterations=max_iterations,
                     notify_cmd=notify_cmd,
                     read_only=read_only,
+                    resume=resume,
+                    h2l=h2l_options,
                 )
             )
             sys.exit(exit_code)

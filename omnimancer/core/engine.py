@@ -8,8 +8,9 @@ Version: 1.0.0
 """
 
 import logging
+import os
 import re
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
 
 from ..core.models import (
     ChatResponse,
@@ -24,6 +25,7 @@ from ..core.models import (
 from ..providers.base import BaseProvider
 from ..ui.progress_indicator import OperationType, get_progress_indicator
 from ..utils.errors import ConfigurationError, RateLimitError
+from ..utils.retry import RetryHandler
 from .chat_manager import ChatManager
 from .config_manager import ConfigManager
 from .conversation_manager import ConversationManager
@@ -35,6 +37,43 @@ from .rate_limit_fallback import ApprovalCallback, RateLimitFallbackHandler
 from .security.permission_rules import PermissionDecision, PermissionRuleEngine
 
 logger = logging.getLogger(__name__)
+
+
+def _env_number(name: str, default: Any, cast: Callable[[str], Any]) -> Any:
+    """Read a non-negative numeric env override, falling back on bad input."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = cast(raw)
+    except ValueError:
+        logger.warning("Ignoring invalid %s=%r", name, raw)
+        return default
+    if value < 0:
+        logger.warning("Ignoring negative %s=%r", name, raw)
+        return default
+    return value
+
+
+def build_rate_limit_retry_handler() -> RetryHandler:
+    """Same-provider retry policy applied before any provider-switch fallback.
+
+    A 429/529 used to fail the request (and kill headless runs) immediately.
+    Backoff on the same provider is the cheap fix: the transcript stays
+    intact and prompt caches stay warm. Tunable via environment so
+    orchestrators can size it to their rate-limit windows:
+
+    - OMNIMANCER_RATE_LIMIT_RETRIES     (default 5; 0 disables)
+    - OMNIMANCER_RATE_LIMIT_BASE_DELAY  (seconds, default 2.0)
+    - OMNIMANCER_RATE_LIMIT_MAX_DELAY   (seconds, default 60.0)
+
+    A provider-supplied Retry-After overrides the exponential schedule.
+    """
+    return RetryHandler(
+        max_retries=_env_number("OMNIMANCER_RATE_LIMIT_RETRIES", 5, int),
+        base_delay=_env_number("OMNIMANCER_RATE_LIMIT_BASE_DELAY", 2.0, float),
+        max_delay=_env_number("OMNIMANCER_RATE_LIMIT_MAX_DELAY", 60.0, float),
+    )
 
 
 class CoreEngine:
@@ -442,7 +481,13 @@ class CoreEngine:
                     f"Sending to {self.current_provider.get_provider_name()}",
                 )
             try:
-                response = await self.current_provider.send_message(message, context)
+                # Retry the same provider with backoff before falling through
+                # to the provider-switch fallback below.
+                response: (
+                    ChatResponse
+                ) = await build_rate_limit_retry_handler().execute_with_retry(
+                    self.current_provider.send_message, message, context
+                )
             except RateLimitError as exc:
                 # Convert to a response so we can run the same fallback path.
                 response = ChatResponse(
@@ -566,8 +611,15 @@ class CoreEngine:
             context = self.chat_manager.get_current_context()
 
             try:
-                response = await self.current_provider.send_message_with_tools(
-                    message, context, tools
+                # Retry the same provider with backoff before falling through
+                # to the provider-switch fallback below.
+                response: (
+                    ChatResponse
+                ) = await build_rate_limit_retry_handler().execute_with_retry(
+                    self.current_provider.send_message_with_tools,
+                    message,
+                    context,
+                    tools,
                 )
             except RateLimitError as exc:
                 response = ChatResponse(

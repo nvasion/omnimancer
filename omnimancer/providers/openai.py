@@ -29,6 +29,7 @@ from ..utils.errors import (
     RateLimitError,
 )
 from .base import BaseProvider
+from .cache_tokens import openai_cached_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +250,18 @@ class OpenAIProvider(BaseProvider):
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
 
+    def _served_model(self, data: Dict[str, Any]) -> str:
+        """The model the server reports having used, else the requested one.
+
+        OpenAI-compatible gateways (DigitalOcean, vLLM, OpenRouter-style
+        routers) may serve a different model than the one requested; the
+        response's ``model`` field is the only evidence of what answered.
+        """
+        served = data.get("model") if isinstance(data, dict) else None
+        if isinstance(served, str) and served.strip():
+            return served.strip()
+        return self.model
+
     def _timeout_network_error(self) -> NetworkError:
         """The NetworkError raised when a chat completion times out."""
         return NetworkError(f"Request to {self.PROVIDER_LABEL} API timed out")
@@ -292,6 +305,14 @@ class OpenAIProvider(BaseProvider):
                 timeout=timeout,
             )
 
+    def _apply_prompt_cache(self, request_body: Dict[str, Any]) -> None:
+        """Hook for gateway-specific prompt-cache opt-in.
+
+        OpenAI's own API caches automatically with no request fields, so the
+        base implementation is a no-op; OpenAI-compatible gateways that need
+        opt-in markers (e.g. DigitalOcean) override this.
+        """
+
     async def _post_chat(
         self, request_body: Dict[str, Any], timeout: float
     ) -> httpx.Response:
@@ -305,6 +326,7 @@ class OpenAIProvider(BaseProvider):
         more useful than failing outright.
         """
         self._require_api_key()
+        self._apply_prompt_cache(request_body)
 
         async def _do_post(body: Dict[str, Any]) -> httpx.Response:
             # Serverless backends (notably DigitalOcean inference) sporadically
@@ -383,11 +405,17 @@ class OpenAIProvider(BaseProvider):
 
                 return ChatResponse(
                     content=content,
-                    model_used=self.model,
+                    # "length" = cut off at max_tokens; callers must be able
+                    # to tell a truncated answer from a complete one.
+                    stop_reason=choices[0].get("finish_reason"),
+                    # Report the model the server says it used: gateways can
+                    # route or fall back, and callers (H2L tiers) need proof.
+                    model_used=self._served_model(data),
                     tokens_used=usage.get("total_tokens", 0),
                     timestamp=datetime.now(),
                     input_tokens=usage.get("prompt_tokens", 0),
                     output_tokens=usage.get("completion_tokens", 0),
+                    cache_read_input_tokens=openai_cached_tokens(usage),
                 )
             else:
                 raise ProviderError("Empty response from OpenAI API")
@@ -528,12 +556,16 @@ class OpenAIProvider(BaseProvider):
 
                 return ChatResponse(
                     content=content,
-                    model_used=self.model,
+                    # A tool call cut off at max_tokens arrives with broken
+                    # arguments; "length" is the only signal of that.
+                    stop_reason=choices[0].get("finish_reason"),
+                    model_used=self._served_model(data),
                     tokens_used=usage.get("total_tokens", 0),
                     timestamp=datetime.now(),
                     input_tokens=usage.get("prompt_tokens", 0),
                     output_tokens=usage.get("completion_tokens", 0),
                     tool_calls=tool_calls if tool_calls else None,
+                    cache_read_input_tokens=openai_cached_tokens(usage),
                 )
             else:
                 raise ProviderError("Empty response from OpenAI API")

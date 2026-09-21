@@ -27,6 +27,7 @@ from ..utils.errors import (
     RateLimitError,
 )
 from .base import BaseProvider
+from .cache_tokens import openai_cached_tokens
 
 
 class AzureProvider(BaseProvider):
@@ -324,6 +325,9 @@ class AzureProvider(BaseProvider):
                     model_used=model_name,
                     tokens_used=usage.get("total_tokens", 0),
                     timestamp=datetime.now(),
+                    input_tokens=usage.get("prompt_tokens"),
+                    output_tokens=usage.get("completion_tokens"),
+                    cache_read_input_tokens=openai_cached_tokens(usage),
                 )
             else:
                 raise ProviderError("Empty response from Azure OpenAI API")
@@ -389,6 +393,9 @@ class AzureProvider(BaseProvider):
                     content=content,
                     model_used=model_name,
                     tokens_used=usage.get("total_tokens", 0),
+                    input_tokens=usage.get("prompt_tokens"),
+                    output_tokens=usage.get("completion_tokens"),
+                    cache_read_input_tokens=openai_cached_tokens(usage),
                     tool_calls=tool_calls if tool_calls else None,
                     timestamp=datetime.now(),
                 )

@@ -4,8 +4,11 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from omnimancer.cli.system_prompts import (
     _MAX_INSTRUCTION_FILE_BYTES,
+    _instruction_byte_cap,
     _sanitize_instruction_content,
     build_agent_prompt,
     get_agent_capabilities_prompt,
@@ -16,6 +19,15 @@ from omnimancer.cli.system_prompts import (
 
 
 class TestBuildAgentPrompt:
+
+    @pytest.fixture(autouse=True)
+    def _no_project_instructions(self, monkeypatch):
+        """Isolate from the repo's own CLAUDE.md — its content (which documents
+        the marker syntax literally) otherwise leaks into every built prompt
+        and makes these assertions depend on the test runner's cwd."""
+        monkeypatch.setattr(
+            "omnimancer.cli.system_prompts.load_project_instructions", lambda: ""
+        )
 
     def test_tool_capable_provider_gets_tool_section(self):
         prompt = build_agent_prompt(supports_tools=True)
@@ -41,14 +53,28 @@ class TestBuildAgentPrompt:
         prompt = build_agent_prompt(supports_tools=False)
         assert "TOOL CALLING:" not in prompt
 
-    def test_both_have_core_sections(self):
-        for supports_tools in [True, False]:
-            prompt = build_agent_prompt(supports_tools=supports_tools)
-            assert "SECURITY FEATURES" in prompt
-            assert "FILE OPERATIONS" in prompt
-            assert "COMMAND EXECUTION" in prompt
-            assert "AGENT EXECUTION PATTERN" in prompt
-            assert "Working Directory" in prompt
+    def test_non_tool_provider_has_full_sections(self):
+        prompt = build_agent_prompt(supports_tools=False)
+        assert "SECURITY FEATURES" in prompt
+        assert "FILE OPERATIONS" in prompt
+        assert "COMMAND EXECUTION" in prompt
+        assert "AGENT EXECUTION PATTERN" in prompt
+        assert "Working Directory" in prompt
+
+    def test_tool_provider_prompt_is_lean(self):
+        """Native tool calling gets only header + directory + tool contract.
+
+        The marker/approval sections describe the text-marker flow native
+        tools never use, and every byte is retransmitted per loop iteration.
+        """
+        prompt = build_agent_prompt(supports_tools=True)
+        assert "Working Directory" in prompt
+        assert "TOOL CALLING" in prompt
+        assert "SECURITY FEATURES" not in prompt
+        assert "FILE OPERATIONS" not in prompt
+        assert "COMMAND EXECUTION" not in prompt
+        assert "AGENT EXECUTION PATTERN" not in prompt
+        assert "<!--read-only-->" not in prompt
 
     def test_default_is_no_tools(self):
         prompt = build_agent_prompt()
@@ -143,8 +169,8 @@ class TestLoadProjectInstructions:
     # Priority / combination scenarios
     # ------------------------------------------------------------------
 
-    def test_omnimancer_md_takes_priority_label_order(self, tmp_path):
-        """OMNIMANCER.md should appear after (higher priority) CLAUDE.md."""
+    def test_omnimancer_md_wins_over_claude_md(self, tmp_path):
+        """Either/or: with both present only OMNIMANCER.md is loaded."""
         cwd = tmp_path / "project"
         cwd.mkdir()
         (cwd / "CLAUDE.md").write_text("Claude instructions here.")
@@ -152,14 +178,11 @@ class TestLoadProjectInstructions:
         with self._patch(cwd, tmp_path / "home"):
             result = load_project_instructions()
 
-        claude_pos = result.index("Claude instructions here.")
-        omni_pos = result.index("Omnimancer instructions here.")
-        assert omni_pos > claude_pos, (
-            "OMNIMANCER.md content should appear after CLAUDE.md content "
-            "(higher-priority last)"
-        )
+        assert "Omnimancer instructions here." in result
+        assert "Claude instructions here." not in result
+        assert "--- CLAUDE.md ---" not in result
 
-    def test_all_three_sources_combined(self, tmp_path):
+    def test_global_combines_with_single_project_file(self, tmp_path):
         home = tmp_path / "home"
         global_dir = home / ".omnimancer"
         global_dir.mkdir(parents=True)
@@ -174,14 +197,54 @@ class TestLoadProjectInstructions:
             result = load_project_instructions()
 
         assert "Global rules." in result
-        assert "Project CLAUDE rules." in result
         assert "Project OMNIMANCER rules." in result
+        assert "Project CLAUDE rules." not in result
 
-        # Order: global → CLAUDE.md → OMNIMANCER.md
-        global_pos = result.index("Global rules.")
-        claude_pos = result.index("Project CLAUDE rules.")
-        omni_pos = result.index("Project OMNIMANCER rules.")
-        assert global_pos < claude_pos < omni_pos
+        # Order: global → project file (more specific last)
+        assert result.index("Global rules.") < result.index("Project OMNIMANCER rules.")
+
+    def test_global_combines_with_claude_md_fallback(self, tmp_path):
+        home = tmp_path / "home"
+        global_dir = home / ".omnimancer"
+        global_dir.mkdir(parents=True)
+        (global_dir / "OMNIMANCER.md").write_text("Global rules.")
+
+        cwd = tmp_path / "project"
+        cwd.mkdir()
+        (cwd / "CLAUDE.md").write_text("Project CLAUDE rules.")
+
+        with self._patch(cwd, home):
+            result = load_project_instructions()
+
+        assert result.index("Global rules.") < result.index("Project CLAUDE rules.")
+
+    def test_empty_omnimancer_md_falls_back_to_claude_md(self, tmp_path):
+        """A blank OMNIMANCER.md must not silence a usable CLAUDE.md."""
+        cwd = tmp_path / "project"
+        cwd.mkdir()
+        (cwd / "OMNIMANCER.md").write_text("  \n  ")
+        (cwd / "CLAUDE.md").write_text("Fallback CLAUDE rules.")
+        with self._patch(cwd, tmp_path / "home"):
+            result = load_project_instructions()
+
+        assert "Fallback CLAUDE rules." in result
+        assert "--- OMNIMANCER.md ---" not in result
+
+    def test_ancestor_omnimancer_md_wins_over_nearer_claude_md(self, tmp_path):
+        """OMNIMANCER.md anywhere inside the project beats any CLAUDE.md."""
+        root = tmp_path / "project"
+        root.mkdir()
+        (root / ".git").mkdir()
+        (root / "OMNIMANCER.md").write_text("Root omnimancer rules.")
+        sub = root / "pkg"
+        sub.mkdir()
+        (sub / "CLAUDE.md").write_text("Nearer claude rules.")
+
+        with self._patch(sub, tmp_path / "home"):
+            result = load_project_instructions()
+
+        assert "Root omnimancer rules." in result
+        assert "Nearer claude rules." not in result
 
     # ------------------------------------------------------------------
     # Directory walking scenarios
@@ -444,6 +507,23 @@ class TestSanitizeInstructionContent:
         result = _sanitize_instruction_content(long_content)
         assert len(result) <= _MAX_INSTRUCTION_FILE_BYTES
 
+    def test_env_override_caps_instruction_content(self, monkeypatch):
+        monkeypatch.setenv("OMNIMANCER_INSTRUCTION_BYTES", "500")
+        result = _sanitize_instruction_content("A" * 5_000)
+        assert len(result) <= 500
+
+    def test_instruction_cap_default_when_env_unset(self, monkeypatch):
+        monkeypatch.delenv("OMNIMANCER_INSTRUCTION_BYTES", raising=False)
+        assert _instruction_byte_cap() == _MAX_INSTRUCTION_FILE_BYTES
+
+    def test_instruction_cap_ignores_invalid_env(self, monkeypatch):
+        monkeypatch.setenv("OMNIMANCER_INSTRUCTION_BYTES", "banana")
+        assert _instruction_byte_cap() == _MAX_INSTRUCTION_FILE_BYTES
+
+    def test_instruction_cap_ignores_non_positive_env(self, monkeypatch):
+        monkeypatch.setenv("OMNIMANCER_INSTRUCTION_BYTES", "0")
+        assert _instruction_byte_cap() == _MAX_INSTRUCTION_FILE_BYTES
+
     def test_empty_string_returns_empty(self):
         assert _sanitize_instruction_content("") == ""
 
@@ -535,3 +615,40 @@ class TestLoadProjectInstructionsSecurity:
         with self._patch(cwd, tmp_path / "home"):
             result = load_project_instructions()
         assert "user-provided" in result
+
+
+# ---------------------------------------------------------------------------
+# The repo's own OMNIMANCER.md
+# ---------------------------------------------------------------------------
+
+
+class TestRepoOmnimancerMd:
+    """The checked-in OMNIMANCER.md must survive the loader intact."""
+
+    REPO_ROOT = Path(__file__).resolve().parent.parent
+
+    def test_repo_omnimancer_md_is_loaded_instead_of_claude_md(self, tmp_path):
+        # CLAUDE.md is gitignored, so it exists on dev machines but not in CI;
+        # either way it must never be loaded alongside OMNIMANCER.md.
+        assert (self.REPO_ROOT / "OMNIMANCER.md").is_file()
+        with (
+            patch(
+                "omnimancer.cli.system_prompts.Path.cwd",
+                return_value=self.REPO_ROOT,
+            ),
+            patch(
+                "omnimancer.cli.system_prompts.Path.home",
+                return_value=tmp_path / "home",
+            ),
+        ):
+            result = load_project_instructions()
+        assert "--- OMNIMANCER.md ---" in result
+        assert "--- CLAUDE.md ---" not in result
+
+    def test_repo_omnimancer_md_loses_nothing_to_sanitization(self):
+        """Fenced code blocks are stripped on load, so the file must not use
+        them — anything inside one would silently never reach the model."""
+        raw = (self.REPO_ROOT / "OMNIMANCER.md").read_text(encoding="utf-8")
+        assert len(raw.encode("utf-8")) < _MAX_INSTRUCTION_FILE_BYTES
+        assert "```" not in raw and "~~~" not in raw
+        assert _sanitize_instruction_content(raw) == raw.strip()

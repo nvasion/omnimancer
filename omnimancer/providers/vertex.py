@@ -28,6 +28,7 @@ from ..utils.errors import (
     RateLimitError,
 )
 from .base import BaseProvider
+from .cache_tokens import gemini_cached_tokens
 
 
 class VertexAIProvider(BaseProvider):
@@ -371,6 +372,9 @@ class VertexAIProvider(BaseProvider):
                         model_used=self.model,
                         tokens_used=total_tokens,
                         timestamp=datetime.now(),
+                        input_tokens=usage_metadata.get("promptTokenCount"),
+                        output_tokens=usage_metadata.get("candidatesTokenCount"),
+                        cache_read_input_tokens=gemini_cached_tokens(usage_metadata),
                     )
                 else:
                     raise ProviderError("Empty parts in Vertex AI response")
@@ -436,6 +440,9 @@ class VertexAIProvider(BaseProvider):
                     tokens_used=total_tokens,
                     tool_calls=tool_calls if tool_calls else None,
                     timestamp=datetime.now(),
+                    input_tokens=usage_metadata.get("promptTokenCount"),
+                    output_tokens=usage_metadata.get("candidatesTokenCount"),
+                    cache_read_input_tokens=gemini_cached_tokens(usage_metadata),
                 )
             else:
                 raise ProviderError("Empty candidates in Vertex AI response")

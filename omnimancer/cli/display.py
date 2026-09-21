@@ -252,6 +252,16 @@ Tips:
                 "  /subagents                     list configured subagents\n"
                 "  /subagents run <name> <task>   run a subagent on a task"
             ),
+            "h2l": (
+                "High-to-low: the high model plans and judges, low models "
+                "execute stories.\n\n"
+                "Usage:\n"
+                "  /h2l <goal>              plan, review the stories, then run\n"
+                "  /h2l plan <goal>         plan only (kept pending)\n"
+                "  /h2l run                 run the pending plan\n"
+                "  /h2l status              show the pending plan\n"
+                "  /h2l config [set <field> <value> ...]"
+            ),
             "validate": (
                 "Validate provider configurations.\n\n"
                 "Usage: /validate [provider] [--fix]"

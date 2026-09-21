@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, field_validator, model_validator
 
+from ..h2l.models import H2LConfig
 from ..utils.errors import MCPError
 
 
@@ -233,6 +234,11 @@ class ChatResponse:
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     stop_reason: Optional[str] = None
+    # Anthropic prompt-cache accounting: tokens served from cache (~0.1x cost)
+    # and tokens written to cache (~1.25x cost). None when the provider does
+    # not report them.
+    cache_read_input_tokens: Optional[int] = None
+    cache_creation_input_tokens: Optional[int] = None
 
     @property
     def is_success(self) -> bool:
@@ -1425,6 +1431,11 @@ class Config(BaseModel):
     # enhancement: it has no provider dependency, and the fleet dashboard
     # depends on workers emitting without per-worker config.
     events: EventsConfig = EventsConfig()
+
+    # H2L (high model plans and judges, low models execute). Opt-in like
+    # enhancement: None means off — a default block would name tiers the
+    # install does not have. See docs/plans/PRD-h2l.md.
+    h2l: Optional[H2LConfig] = None
 
     @field_validator("default_provider")
     @classmethod
