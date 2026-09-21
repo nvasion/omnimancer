@@ -16,7 +16,7 @@ from urllib.parse import urljoin, urlparse
 
 import aiohttp
 import html2text
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from readability import Document
 
 from ..security import SecurityManager
@@ -668,6 +668,9 @@ class WebClient:
         # Extract links
         links: List[Dict[str, str]] = []
         for link in soup.find_all("a", href=True):
+            # bs4>=4.13 types find_all() as PageElement | Tag | NavigableString
+            if not isinstance(link, Tag):
+                continue
             href = str(link["href"])
             text = link.get_text().strip()
             if href and text:
@@ -677,6 +680,8 @@ class WebClient:
         # Extract images
         images: List[Dict[str, str]] = []
         for img in soup.find_all("img", src=True):
+            if not isinstance(img, Tag):
+                continue
             src = str(img["src"])
             alt_attr = img.get("alt", "")
             alt = str(alt_attr).strip() if alt_attr else ""
