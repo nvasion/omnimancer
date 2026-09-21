@@ -21,6 +21,7 @@ from ..core.models import (
 from ..core.rate_limit_fallback import matches_rate_limit
 from ..events import emitter as fleet_events
 from ..events.schema import MESSAGE_PREVIEW_CHARS, PREVIEW_CHARS, truncate
+from .h2l_headless import H2LOptions, run_h2l_headless
 from .headless_checkpoint import (
     HeadlessCheckpoint,
     delete_checkpoint,
@@ -220,10 +221,23 @@ class HeadlessOutputEmitter:
                 }
             )
 
+    @staticmethod
+    def _with_h2l_identity(
+        line: dict, story_id: Optional[str], agent_id: Optional[str]
+    ) -> dict:
+        """During an H2L run tool events say which story/worker they belong to."""
+        if story_id is not None:
+            line["story_id"] = story_id
+        if agent_id is not None:
+            line["agent_id"] = agent_id
+        return line
+
     def emit_tool_use(
         self,
         name: str,
         arguments: dict,
+        story_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
     ) -> None:
         if self._format == OutputFormat.TEXT and self._verbose:
             args_json = json.dumps(arguments)
@@ -231,10 +245,14 @@ class HeadlessOutputEmitter:
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
             self._write_json_line(
-                {
-                    "type": "tool_use",
-                    "tool": {"name": name, "arguments": arguments},
-                }
+                self._with_h2l_identity(
+                    {
+                        "type": "tool_use",
+                        "tool": {"name": name, "arguments": arguments},
+                    },
+                    story_id,
+                    agent_id,
+                )
             )
 
     def emit_tool_result(
@@ -242,6 +260,8 @@ class HeadlessOutputEmitter:
         name: str,
         content: str,
         error: Optional[str],
+        story_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
     ) -> None:
         if self._format == OutputFormat.TEXT and self._verbose:
             status = f"error: {error}" if error else "ok"
@@ -249,15 +269,26 @@ class HeadlessOutputEmitter:
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
             self._write_json_line(
-                {
-                    "type": "tool_result",
-                    "tool": {
-                        "name": name,
-                        "content": content,
-                        "error": error,
+                self._with_h2l_identity(
+                    {
+                        "type": "tool_result",
+                        "tool": {
+                            "name": name,
+                            "content": content,
+                            "error": error,
+                        },
                     },
-                }
+                    story_id,
+                    agent_id,
+                )
             )
+
+    def emit_h2l(self, subtype: str, payload: dict) -> None:
+        """One ``{"type": "h2l", "subtype": ...}`` line (stream-json only)."""
+        if self._format == OutputFormat.STREAM_JSON:
+            line = {"type": "h2l", "subtype": subtype}
+            line.update(payload)
+            self._write_json_line(line)
 
     def emit_result(
         self,
@@ -270,6 +301,8 @@ class HeadlessOutputEmitter:
         num_turns: int = 0,
         stop_cause: Optional[str] = None,
         provider: str = "",
+        subtype: str = "success",
+        h2l: Optional[dict] = None,
     ) -> None:
         if self._format == OutputFormat.TEXT:
             if content != self._last_content:
@@ -285,7 +318,7 @@ class HeadlessOutputEmitter:
         elif self._format == OutputFormat.JSON:
             blob = {
                 "type": "result",
-                "subtype": "success",
+                "subtype": subtype,
                 "is_error": False,
                 "result": content,
                 "session_id": self._session_id,
@@ -298,24 +331,27 @@ class HeadlessOutputEmitter:
                 "stop_reason": stop_reason,
                 "stop_cause": stop_cause,
             }
+            if h2l is not None:
+                blob["h2l"] = h2l
             self._stdout.write(json.dumps(blob, default=str) + "\n")
             self._stdout.flush()
         elif self._format == OutputFormat.STREAM_JSON:
-            self._write_json_line(
-                {
-                    "type": "result",
-                    "subtype": "success",
-                    "is_error": False,
-                    "result": content,
-                    "model": model,
-                    "provider": provider,
-                    "num_turns": num_turns,
-                    "usage": usage,
-                    "total_cost_usd": cost,
-                    "stop_reason": stop_reason,
-                    "stop_cause": stop_cause,
-                }
-            )
+            line = {
+                "type": "result",
+                "subtype": subtype,
+                "is_error": False,
+                "result": content,
+                "model": model,
+                "provider": provider,
+                "num_turns": num_turns,
+                "usage": usage,
+                "total_cost_usd": cost,
+                "stop_reason": stop_reason,
+                "stop_cause": stop_cause,
+            }
+            if h2l is not None:
+                line["h2l"] = h2l
+            self._write_json_line(line)
 
     def emit_error(
         self,
@@ -383,11 +419,13 @@ class HeadlessRunner:
         notify_cmd: Optional[str] = None,
         read_only: bool = False,
         resume_session_id: Optional[str] = None,
+        h2l: Optional[H2LOptions] = None,
     ) -> None:
         self._engine = engine
         self._no_approval = no_approval
         self._verbose = verbose
         self._read_only = read_only
+        self._h2l = h2l
         # Headless runs are unattended, so a cap (not a check-in prompt) is
         # the safety net; --max-iterations sizes it to the job.
         self._max_iterations = _resolve_max_iterations(max_iterations)
@@ -521,6 +559,16 @@ class HeadlessRunner:
         if self._no_approval:
             self._enable_auto_approval(agent_engine)
             self._enable_full_trust(agent_engine)
+
+        if self._h2l is not None and self._h2l.enabled:
+            # H2L mode: plan with the high model, execute on the low pool,
+            # judge with the high model (docs/plans/PRD-h2l.md §8).
+            return await run_h2l_headless(
+                self,
+                prompt,
+                self._h2l,
+                text_mode=self._emitter._format == OutputFormat.TEXT,
+            )
 
         model = self._model or "unknown"
         self._emitter.emit_init(model)
@@ -829,6 +877,7 @@ async def run_headless(
     notify_cmd: Optional[str] = None,
     read_only: bool = False,
     resume: Optional[str] = None,
+    h2l: Optional[H2LOptions] = None,
 ) -> int:
     from ..core.config_manager import ConfigManager
     from ..core.engine import CoreEngine
@@ -849,5 +898,6 @@ async def run_headless(
         notify_cmd=notify_cmd,
         read_only=read_only,
         resume_session_id=resume,
+        h2l=h2l,
     )
     return await runner.run(prompt)

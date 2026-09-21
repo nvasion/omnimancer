@@ -169,8 +169,8 @@ class TestLoadProjectInstructions:
     # Priority / combination scenarios
     # ------------------------------------------------------------------
 
-    def test_omnimancer_md_takes_priority_label_order(self, tmp_path):
-        """OMNIMANCER.md should appear after (higher priority) CLAUDE.md."""
+    def test_omnimancer_md_wins_over_claude_md(self, tmp_path):
+        """Either/or: with both present only OMNIMANCER.md is loaded."""
         cwd = tmp_path / "project"
         cwd.mkdir()
         (cwd / "CLAUDE.md").write_text("Claude instructions here.")
@@ -178,14 +178,11 @@ class TestLoadProjectInstructions:
         with self._patch(cwd, tmp_path / "home"):
             result = load_project_instructions()
 
-        claude_pos = result.index("Claude instructions here.")
-        omni_pos = result.index("Omnimancer instructions here.")
-        assert omni_pos > claude_pos, (
-            "OMNIMANCER.md content should appear after CLAUDE.md content "
-            "(higher-priority last)"
-        )
+        assert "Omnimancer instructions here." in result
+        assert "Claude instructions here." not in result
+        assert "--- CLAUDE.md ---" not in result
 
-    def test_all_three_sources_combined(self, tmp_path):
+    def test_global_combines_with_single_project_file(self, tmp_path):
         home = tmp_path / "home"
         global_dir = home / ".omnimancer"
         global_dir.mkdir(parents=True)
@@ -200,14 +197,54 @@ class TestLoadProjectInstructions:
             result = load_project_instructions()
 
         assert "Global rules." in result
-        assert "Project CLAUDE rules." in result
         assert "Project OMNIMANCER rules." in result
+        assert "Project CLAUDE rules." not in result
 
-        # Order: global → CLAUDE.md → OMNIMANCER.md
-        global_pos = result.index("Global rules.")
-        claude_pos = result.index("Project CLAUDE rules.")
-        omni_pos = result.index("Project OMNIMANCER rules.")
-        assert global_pos < claude_pos < omni_pos
+        # Order: global → project file (more specific last)
+        assert result.index("Global rules.") < result.index("Project OMNIMANCER rules.")
+
+    def test_global_combines_with_claude_md_fallback(self, tmp_path):
+        home = tmp_path / "home"
+        global_dir = home / ".omnimancer"
+        global_dir.mkdir(parents=True)
+        (global_dir / "OMNIMANCER.md").write_text("Global rules.")
+
+        cwd = tmp_path / "project"
+        cwd.mkdir()
+        (cwd / "CLAUDE.md").write_text("Project CLAUDE rules.")
+
+        with self._patch(cwd, home):
+            result = load_project_instructions()
+
+        assert result.index("Global rules.") < result.index("Project CLAUDE rules.")
+
+    def test_empty_omnimancer_md_falls_back_to_claude_md(self, tmp_path):
+        """A blank OMNIMANCER.md must not silence a usable CLAUDE.md."""
+        cwd = tmp_path / "project"
+        cwd.mkdir()
+        (cwd / "OMNIMANCER.md").write_text("  \n  ")
+        (cwd / "CLAUDE.md").write_text("Fallback CLAUDE rules.")
+        with self._patch(cwd, tmp_path / "home"):
+            result = load_project_instructions()
+
+        assert "Fallback CLAUDE rules." in result
+        assert "--- OMNIMANCER.md ---" not in result
+
+    def test_ancestor_omnimancer_md_wins_over_nearer_claude_md(self, tmp_path):
+        """OMNIMANCER.md anywhere inside the project beats any CLAUDE.md."""
+        root = tmp_path / "project"
+        root.mkdir()
+        (root / ".git").mkdir()
+        (root / "OMNIMANCER.md").write_text("Root omnimancer rules.")
+        sub = root / "pkg"
+        sub.mkdir()
+        (sub / "CLAUDE.md").write_text("Nearer claude rules.")
+
+        with self._patch(sub, tmp_path / "home"):
+            result = load_project_instructions()
+
+        assert "Root omnimancer rules." in result
+        assert "Nearer claude rules." not in result
 
     # ------------------------------------------------------------------
     # Directory walking scenarios
@@ -578,3 +615,40 @@ class TestLoadProjectInstructionsSecurity:
         with self._patch(cwd, tmp_path / "home"):
             result = load_project_instructions()
         assert "user-provided" in result
+
+
+# ---------------------------------------------------------------------------
+# The repo's own OMNIMANCER.md
+# ---------------------------------------------------------------------------
+
+
+class TestRepoOmnimancerMd:
+    """The checked-in OMNIMANCER.md must survive the loader intact."""
+
+    REPO_ROOT = Path(__file__).resolve().parent.parent
+
+    def test_repo_omnimancer_md_is_loaded_instead_of_claude_md(self, tmp_path):
+        # CLAUDE.md is gitignored, so it exists on dev machines but not in CI;
+        # either way it must never be loaded alongside OMNIMANCER.md.
+        assert (self.REPO_ROOT / "OMNIMANCER.md").is_file()
+        with (
+            patch(
+                "omnimancer.cli.system_prompts.Path.cwd",
+                return_value=self.REPO_ROOT,
+            ),
+            patch(
+                "omnimancer.cli.system_prompts.Path.home",
+                return_value=tmp_path / "home",
+            ),
+        ):
+            result = load_project_instructions()
+        assert "--- OMNIMANCER.md ---" in result
+        assert "--- CLAUDE.md ---" not in result
+
+    def test_repo_omnimancer_md_loses_nothing_to_sanitization(self):
+        """Fenced code blocks are stripped on load, so the file must not use
+        them — anything inside one would silently never reach the model."""
+        raw = (self.REPO_ROOT / "OMNIMANCER.md").read_text(encoding="utf-8")
+        assert len(raw.encode("utf-8")) < _MAX_INSTRUCTION_FILE_BYTES
+        assert "```" not in raw and "~~~" not in raw
+        assert _sanitize_instruction_content(raw) == raw.strip()

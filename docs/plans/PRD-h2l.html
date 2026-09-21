@@ -1,0 +1,338 @@
+<title>H2L PRD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f7f5f0; --surface: #ffffff; --ink: #1f2226; --ink-2: #4c525a; --ink-3: #7a828c;
+    --rule: #ddd8ce; --accent: #1f5f8b; --high: #8a4b1f; --low: #2d6a4f; --judge: #5b3d8f;
+    --warn-bg: #fbf1d7; --warn: #7a5a00; --code-bg: #f0ede6;
+    --status-bg: #e1efe6; --status: #2d6a4f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17191c; --surface: #1f2226; --ink: #e8e4dc; --ink-2: #b4afa6; --ink-3: #847f77;
+      --rule: #34383e; --accent: #6fb1e0; --high: #e0a06a; --low: #7fc9a2; --judge: #b79ae6;
+      --warn-bg: #33290f; --warn: #e6c25c; --code-bg: #24272c;
+      --status-bg: #1c2f26; --status: #7fc9a2;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17191c; --surface: #1f2226; --ink: #e8e4dc; --ink-2: #b4afa6; --ink-3: #847f77;
+    --rule: #34383e; --accent: #6fb1e0; --high: #e0a06a; --low: #7fc9a2; --judge: #b79ae6;
+    --warn-bg: #33290f; --warn: #e6c25c; --code-bg: #24272c;
+    --status-bg: #1c2f26; --status: #7fc9a2;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "IBM Plex Serif", Georgia, serif; font-size: 17px; line-height: 1.55; }
+  .wrap { max-width: 960px; margin: 0 auto; padding-block: 40px 80px; padding-inline: 24px; }
+  header.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 28px; }
+  .eyebrow { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 8px; }
+  h1 { font-size: 36px; line-height: 1.12; margin: 0 0 14px; font-weight: 600; text-wrap: balance; }
+  .meta { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 14px; color: var(--ink-2); display: grid; grid-template-columns: max-content 1fr; gap: 4px 18px; }
+  .meta dt { font-weight: 600; color: var(--ink); }
+  .meta dd { margin: 0; }
+  .status { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 14.5px; background: var(--status-bg); color: var(--status); border-left: 4px solid var(--status); padding: 10px 14px; margin: 18px 0 0; }
+  .status b { font-weight: 600; }
+  blockquote.source { margin: 22px 0 0; padding: 0 0 0 16px; border-left: 3px solid var(--rule); color: var(--ink-2); font-style: italic; font-size: 15.5px; max-width: 70ch; }
+  blockquote.source cite { font-style: normal; font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 13px; color: var(--ink-3); display: block; margin-top: 6px; }
+  h2 { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 22px; font-weight: 600; margin: 46px 0 14px; padding-top: 14px; border-top: 1px solid var(--rule); text-wrap: balance; }
+  h3 { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 17px; font-weight: 600; margin: 28px 0 8px; }
+  p { margin: 0 0 14px; max-width: 70ch; }
+  ul, ol { margin: 0 0 14px; padding-left: 24px; max-width: 70ch; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); }
+  code { font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  pre { font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px; line-height: 1.5; background: var(--code-bg); border-left: 3px solid var(--accent); padding: 14px 18px; overflow-x: auto; margin: 0 0 18px; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .table-wrap { overflow-x: auto; margin: 0 0 18px; }
+  table { border-collapse: collapse; width: 100%; font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+  th { font-weight: 600; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); border-bottom: 2px solid var(--ink); }
+  td code { font-size: 12.5px; }
+  .callout { background: var(--warn-bg); border-left: 4px solid var(--warn); padding: 12px 16px; margin: 0 0 18px; font-size: 15.5px; max-width: 70ch; }
+  .callout b { color: var(--warn); }
+  .roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 16px 0 22px; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  .role { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 14px 16px; }
+  .role .who { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; margin-bottom: 6px; }
+  .role .name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .role p { font-size: 14px; margin: 0; color: var(--ink-2); }
+  .role.high { border-top: 4px solid var(--high); } .role.high .who { color: var(--high); }
+  .role.low { border-top: 4px solid var(--low); } .role.low .who { color: var(--low); }
+  .role.judge { border-top: 4px solid var(--judge); } .role.judge .who { color: var(--judge); }
+  .phases { list-style: none; padding-left: 0; max-width: none; }
+  .phases li { display: grid; grid-template-columns: 130px 1fr; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .phases .ph { font-family: "IBM Plex Sans", system-ui, sans-serif; font-weight: 600; font-size: 14px; color: var(--accent); }
+  .toc { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 14px; columns: 2; column-gap: 32px; margin: 0 0 8px; padding-left: 18px; }
+  .toc li { break-inside: avoid; margin-bottom: 4px; }
+  .toc a { text-decoration: none; } .toc a:hover { text-decoration: underline; }
+  @media (max-width: 640px) {
+    body { font-size: 16px; } h1 { font-size: 28px; }
+    .roles { grid-template-columns: 1fr; } .toc { columns: 1; }
+    .phases li { grid-template-columns: 1fr; gap: 4px; }
+    .meta { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="wrap">
+<header class="masthead">
+  <p class="eyebrow">Omnimancer · PRD · draft for review</p>
+  <h1>H2L: a high model plans and judges, a pool of low models executes</h1>
+  <dl class="meta">
+    <dt>Date</dt><dd>2026-09-20</dd>
+    <dt>Author</dt><dd>Claude (principal on the omnimancer H2L research) · Owner: Kellan</dd>
+    <dt>Repo</dt><dd><code>omnimancer</code>: new package <code>omnimancer/h2l/</code>; touches <code>core/models.py</code>, <code>cli/interface.py</code>, <code>cli/headless.py</code>, <code>cli/command_dispatch.py</code>, <code>cli/completion.py</code>, <code>cli/display.py</code>, <code>cli/headless_checkpoint.py</code></dd>
+    <dt>Research</dt><dd><code>docs/plans/h2l-research.md</code></dd>
+    <dt>Priority</dt><dd>High. Makes local and cheap models useful for real work; moves frontier spend to planning and judging.</dd>
+    <dt>Affects</dt><dd>omnimancer only. No Factory API, MCP, or UI change; Factory consumes the new stream-json events and result fields when it wants to.</dd>
+  </dl>
+  <p class="status"><b>Status:</b> Phase 1 code and tests green 2026-09-20 on branch <code>feat/h2l</code>, uncommitted and not released. 167 new tests; full suite green; flake8, isort, black clean; mypy clean except pre-existing sandbox manager errors. Decisions taken: the recommended defaults for Q1 to Q7. Deviations: prompts are prepended to the first user message rather than sent as a system message because the Claude provider drops system context messages; the first accepted plan stands when the self-check turn produces no resubmission; <code>/h2l config set</code> replaces <code>/config set h2l.*</code>; Edit and Write paths are scope-checked as well as Read; the ask policy also offers a single retry; parallel scheduling and the serialized approval prefix landed early; per-worker activity rows and checkpoint resume have not. The live acceptance with real models has not been run yet. Full detail in the Markdown PRD's Status block.</p>
+  <blockquote class="source">H2L is the process of high model planning to low model execution. Think of it like a principal engineer is creating a design and a backlog of stories and then delegating to juniors. Lower models should only be working, they don't need repository reads. Low models need to be talked to like they are stupid. You should be able to pass a list of low models to do the work. Scoring low models' work by the high model: the low models are the subagents and they return their output where they are judged by the higher model if they meet criteria.<cite>Kellan, 2026-09-20</cite></blockquote>
+</header>
+
+<ol class="toc">
+  <li><a href="#problem">Problem statement</a></li>
+  <li><a href="#what">What it is</a></li>
+  <li><a href="#goals">Goals and non-goals</a></li>
+  <li><a href="#design">Design</a></li>
+  <li><a href="#acceptance">Acceptance</a></li>
+  <li><a href="#rollout">Rollout and risk</a></li>
+  <li><a href="#questions">Open questions for Kellan</a></li>
+</ol>
+
+<h2 id="problem">Problem statement</h2>
+<p>One model does everything in an omnimancer session today: design, exploration, edits, verification. Three costs follow.</p>
+<ol>
+  <li><strong>Frontier tokens are spent on mechanical edits.</strong> Both the interactive loop and the headless loop send every turn, including "replace this string in this file", to the session model.</li>
+  <li><strong>Small and local models are unusable for agent work.</strong> They fail when asked to explore and design. They do well when handed exact instructions, and nothing in omnimancer produces exact instructions for them.</li>
+  <li><strong>Nothing checks the result.</strong> A run ends when the model stops calling tools or says <code>DONE</code>. No criteria, no score, no second opinion.</li>
+</ol>
+<p>The pieces for a two-tier flow already exist; nothing connects them, and one is built the wrong way for concurrency (verified 2026-09-20, HEAD <code>d17b9f8</code>):</p>
+<ul>
+  <li><strong>An isolated worker loop exists.</strong> <code>cli/subagent.py::SubAgentRunner.run</code> has its own context, a tool allowlist, a model override, a capped loop, and parent-tagged events. But it <strong>mutates the shared provider's <code>model</code> attribute</strong>, never appends to its own history, runs only from <code>/subagents run</code>, and prints to a panel. Two concurrent runs on different models would clobber each other.</li>
+  <li><strong>The concurrency-safe way to run a second model exists.</strong> <code>core/prompt_enhancer.py</code> copies a provider config with <code>model_copy(update={"model": ...})</code>, calls <code>ProviderFactory.create_provider</code>, and uses an isolated context. The initializer's cache key includes the model, so one provider with two models yields two instances. Nothing generalizes this.</li>
+  <li><strong>No plan, story, or task type exists.</strong> The workflow orchestrator is instantiated on every engine start and never driven; its steps wrap Python callables.</li>
+  <li><strong>No parallelism exists.</strong> No <code>asyncio.gather</code> in the package. Approval prompts block stdin through <code>asyncio.to_thread(input)</code>.</li>
+  <li><strong>Two loops, no shared turn.</strong> The codebase map says it outright: headless reimplements the agent loop and changes usually land in both files.</li>
+  <li><strong>Only tool-capable providers can execute.</strong> Headless has no marker fallback. <code>ollama</code>, <code>cohere</code>, <code>perplexity</code>, and <code>claude-code</code> report no tool support. An <code>openai-compatible</code> alias pointed at Ollama's OpenAI endpoint works today.</li>
+  <li><strong>The gate is single and shared.</strong> <code>AgentEngine.execute_with_approval</code> is the only path to a write, a command, or a web call on both loops. Workers inherit permission rules, hooks, approval, and hard-restricted paths for free.</li>
+  <li><strong>Observability is already per-agent.</strong> <code>agent_context</code> is ContextVar-based, so it survives <code>asyncio.gather</code>; every tool event carries agent and parent ids; the Fleet TUI renders subagent rows as children.</li>
+</ul>
+<div class="callout"><b>Precedence gotcha the flags must respect.</b> Env beats CLI flags beats stored config. <code>apply_env_overrides</code> runs inside provider initialization after session overrides and assigns unconditionally, so <code>OMNIMANCER_&lt;PROVIDER&gt;_MODEL</code> silently beats <code>--model</code>.</div>
+
+<h2 id="what">What it is</h2>
+<p>A run has three roles and one loop.</p>
+<div class="roles">
+  <div class="role high"><div class="who">High tier</div><div class="name">Principal</div><p>Reads the repo with the read tool set, writes a short design, submits a backlog of stories through <code>submit_plan</code>. Stories carry absolute paths, exact old and new strings or full file content, exact commands, acceptance criteria, an optional verify command, and dependencies.</p></div>
+  <div class="role low"><div class="who">Low tier</div><div class="name">Worker pool</div><p>One story per worker on its own provider instance with its own history. Tools are <code>Edit</code>, <code>Write</code>, <code>Bash</code>, plus <code>Read</code> scoped to the story's files. Returns a diff and the verify output.</p></div>
+  <div class="role judge"><div class="who">High tier</div><div class="name">Judge</div><p>Deterministic checks first. Then the high model scores the diff and verify output against the criteria through <code>submit_verdict</code>. Never sees the worker's narration. Below threshold goes back with feedback, then an escalation policy applies.</p></div>
+</div>
+<p>Both surfaces run the same package. TUI: <code>/h2l &lt;goal&gt;</code> with models from the <code>h2l</code> config block. Headless: <code>omn -p "&lt;goal&gt;" --h2l --high &lt;ref&gt; --low &lt;ref&gt; [--low &lt;ref&gt; ...]</code>.</p>
+<p><code>/subagents</code> is unchanged and kept. H2L's worker runner fixes the subagent runner's seven gaps; re-basing the subagent runner on it is a follow-up, not part of this PRD.</p>
+
+<h2 id="goals">Goals and non-goals</h2>
+<h3>Goals</h3>
+<ul>
+  <li>A user runs a multi-file task where the high model plans, one or more low models execute, and the high model judges, from either surface, with the same package.</li>
+  <li>Workers never explore. Story quality is the lever, and the planner is held to it.</li>
+  <li>Every story is scored before it counts. The user sees per story: model, attempts, score, diff, tokens; and totals by tier.</li>
+  <li>Headless runs are resumable at story granularity and keep the existing exit-code and stream-json contracts.</li>
+  <li>No change to security, permission, or approval behavior. No change at all when the feature is not enabled.</li>
+</ul>
+<h3>Non-goals</h3>
+<p>Automatic model selection or routing. Nested H2L. Per-worker git worktrees (stories sharing a file serialize instead). Replacing <code>/subagents</code>. Judging with any model other than the high one. A marker-protocol fallback for non-tool providers. TUI checkpoints.</p>
+
+<h2 id="design">Design</h2>
+
+<h3>1. Config block and model refs</h3>
+<p>New optional <code>Config.h2l</code> next to <code>enhancement</code>. Absence disables the feature. Added to the migration passthrough key list so it survives v1 to v2 migration.</p>
+<pre><code>class H2LModelRef(BaseModel):
+    provider: str   # key of Config.providers, registered name or alias
+    model: str
+
+class H2LConfig(BaseModel):
+    enabled: bool = True
+    high: H2LModelRef
+    low: List[H2LModelRef]                 # non-empty, ordered pool
+    max_parallel: int = 2
+    max_retries: int = 2                   # judge send-backs per story
+    pass_threshold: int = 80               # 0..100
+    worker_tools: List[str] = ["Edit", "Write", "Bash"]
+    allow_worker_read: bool = True         # Read limited to story.files
+    escalation: Literal["high", "block", "ask"] = "ask"
+    plan_approval: bool = True
+    worker_max_iterations: int = 15        # planner may raise per story, cap 30</code></pre>
+<p>Ref grammar: <code>&lt;entry&gt;:&lt;model&gt;</code>; a bare <code>&lt;model&gt;</code> resolves against <code>default_provider</code>. Resolution runs <strong>after</strong> provider initialization so the env pass cannot rewrite a tier. It copies the provider config with the new model and calls the factory. It never touches <code>engine.providers</code> or <code>current_provider</code>. Errors:</p>
+<ul>
+  <li>unknown entry: <code>H2L: provider entry 'x' is not configured (see /providers)</code></li>
+  <li>non-tool provider: <code>H2L: provider 'ollama' does not support tool calling; use an openai-compatible alias pointed at its OpenAI endpoint (see docs/provider-setup.md)</code></li>
+</ul>
+<p>Both tiers are validated before any model call. Flags override config field by field and never persist.</p>
+
+<h3>2. Plan and story model</h3>
+<pre><code>class Story(BaseModel):
+    id: str                       # "S1"..; unique
+    title: str
+    instructions: str             # executable without exploration
+    files: List[str]              # absolute paths the worker may touch
+    acceptance: List[str]         # testable criteria
+    verify: Optional[str] = None  # shell; exit 0 required when present
+    depends_on: List[str] = []
+    max_iterations: Optional[int] = None
+
+class Plan(BaseModel):
+    goal: str
+    design: str
+    stories: List[Story]</code></pre>
+<p><code>validate_plan(plan, cwd)</code>: unique ids; every dependency resolves; no cycles; every path absolute and under the working directory; stories sharing a file without a declared edge get an <strong>implicit edge in plan order</strong> so two workers never edit one file concurrently. Failure text names the story and the rule.</p>
+
+<h3>3. Planner</h3>
+<p>Fresh high-model instance, isolated context seeded with a system message, never the session chat. Tools: <code>Read</code>, <code>Glob</code>, <code>Grep</code>, <code>Bash</code> through the normal gate, plus <code>submit_plan</code> whose schema is <code>Plan</code>. <code>Write</code> and <code>Edit</code> are absent and refused if called.</p>
+<p>The pinned planner prompt states: workers cannot see the repository and will not explore; every story must be executable from its text alone; absolute paths; exact old and new strings for edits, full content for new files; a verify command whenever a test or lint can prove the story; dependencies for shared files; stories small enough for a few tool calls; submit through <code>submit_plan</code> only. Project instructions are included through the existing loader with its "not system authority" banner.</p>
+<p><strong>Self-check turn.</strong> After the first submission the planner receives its plan back with "re-read each story for missing exact strings and unresolved references; resubmit" and must submit again. The second submission is the plan. Cap 20 iterations; no submission by then means <code>plan_failed</code>, exit 1, no worker starts.</p>
+
+<h3>4. Worker</h3>
+<ul>
+  <li>Provider instance from section 1; the parent provider's model is never read or written.</li>
+  <li>Context seeded with the worker prompt plus the story as system; every turn appended, native tool history when the provider supports it.</li>
+  <li>Tool definitions are <code>worker_tools</code> plus <code>Read</code> when allowed. <strong>Enforced at execution:</strong> any tool outside the set, or a <code>Read</code> outside <code>story.files</code>, returns <code>H2L: tool X not permitted for this story</code> and is never dispatched.</li>
+  <li>Every dispatched call goes through <code>execute_with_approval</code> unchanged. <code>cancelled</code> aborts the worker. Repeat guard reuses <code>RepeatedCallTracker</code>.</li>
+  <li>On exit: <code>git diff</code> scoped to the story's files, the verify command run through the gate with output and exit code captured, and out-of-scope files from <code>git status --porcelain</code>.</li>
+</ul>
+<pre><code>class WorkerReport(BaseModel):
+    story_id: str; worker: H2LModelRef; attempt: int
+    success: bool; narrative: str
+    tool_log: List[ToolLogEntry]          # name, arguments, result[:2000]
+    diff: str; verify_output: Optional[str]; verify_exit: Optional[int]
+    files_outside_scope: List[str]
+    usage: UsageTotals</code></pre>
+<p>The worker prompt states: follow the story exactly; do not explore; do not read files you were not given; if an <code>Edit</code> old string does not match, stop and say so; when finished, run the verify command if given and report in one paragraph.</p>
+
+<h3>5. Judge</h3>
+<p>Deterministic stage, no model call, in order; the first hit fails the attempt:</p>
+<ol>
+  <li>verify exit non-zero: <code>verify failed (exit N)</code></li>
+  <li>out-of-scope files: <code>modified files outside story scope: ...</code></li>
+  <li>empty diff on a story with files: <code>no changes made</code></li>
+</ol>
+<p>Model stage: fresh high instance, isolated context, input is the story, the acceptance list, the diff, and the verify output. <strong>Not</strong> the narrative or tool log.</p>
+<pre><code>class Verdict(BaseModel):
+    story_id: str; attempt: int
+    score: int                 # 0..100
+    passed: bool
+    failures: List[str]        # one per failed criterion
+    feedback: str              # instructions a worker can act on without context
+    judge: Literal["deterministic", "model"]</code></pre>
+<p>Pass means <code>passed</code> and <code>score &gt;= pass_threshold</code>. The judge prompt states: score the diff against the criteria only; verify output is evidence; do not reward length or explanation; list each failed criterion; write feedback as instructions.</p>
+
+<h3>6. Orchestrator</h3>
+<ul>
+  <li>DAG from section 2. Ready stories run under <code>asyncio.gather</code> with a semaphore of <code>max_parallel</code>. One means fully serial.</li>
+  <li>Round-robin assignment in pool order. A retry goes to the <strong>next</strong> model with the verdict's feedback prepended as <code>Feedback from review of attempt N:</code>.</li>
+  <li>After <code>max_retries</code>: <code>high</code> runs the story on the high model with the full tool set, judged deterministically only; <code>block</code> marks the story blocked and dependents skipped; <code>ask</code> prompts in the TUI and behaves as <code>high</code> in headless.</li>
+  <li>Approval callback wrapped in an <code>asyncio.Lock</code>, each preview prefixed <code>[H2L S3 · gateway:qwen3-8b]</code>. Restored on exit.</li>
+  <li>Identity: run id <code>h2l-&lt;session_id&gt;</code>; planner and judge under <code>h2l-high-&lt;hex&gt;</code>; each worker attempt under <code>h2l-&lt;story_id&gt;-&lt;hex&gt;</code>, all with the run as parent. Session events carry provider, model, story, attempt, status, and verdict score. The Fleet TUI needs no change.</li>
+  <li>Rate limit after the engine's retry handler is exhausted: stop with <code>rate_limited</code>, checkpoint kept.</li>
+  <li>Presenter protocol so the logic is written once: <code>approve_plan</code>, <code>on_story_start</code>, <code>on_report</code>, <code>on_verdict</code>, <code>on_escalation</code>, <code>on_done</code>.</li>
+</ul>
+
+<h3>7. TUI surface</h3>
+<ul>
+  <li><code>/h2l &lt;goal&gt;</code>: plan, design paragraph plus story table, prompt <code>[a]ccept [d]rop &lt;id&gt; [e]dit &lt;id&gt; [c]ancel</code>, run, summary table. Edit opens <code>$EDITOR</code> when set, otherwise a multi-line prompt; the edited plan is re-validated.</li>
+  <li><code>/h2l plan &lt;goal&gt;</code> stops after the plan and holds it. <code>/h2l run</code> executes it. <code>/h2l status</code>, <code>/h2l config</code>. Config edits through <code>/config set h2l.&lt;field&gt;</code>.</li>
+  <li>One row per active worker (story, model, current tool, elapsed) above the streaming panel through <code>activity_provider</code>. Never a second live region.</li>
+  <li>The parent conversation gets one assistant message: the summary. Worker transcripts never enter the session chat.</li>
+  <li>Completion and help entries added.</li>
+</ul>
+
+<h3>8. Headless surface</h3>
+<p>New plain options on the single click command (it must stay a command, not a group; orchestrators parse <code>omn -p --help</code>).</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Flag</th><th>Type</th><th>Overrides</th></tr></thead>
+  <tbody>
+    <tr><td><code>--h2l</code></td><td>flag</td><td>enables the mode</td></tr>
+    <tr><td><code>--high REF</code></td><td>str</td><td><code>h2l.high</code></td></tr>
+    <tr><td><code>--low REF</code></td><td>str, repeatable</td><td>replaces <code>h2l.low</code> when given at least once</td></tr>
+    <tr><td><code>--h2l-parallel N</code></td><td>int</td><td><code>h2l.max_parallel</code></td></tr>
+    <tr><td><code>--h2l-retries N</code></td><td>int</td><td><code>h2l.max_retries</code></td></tr>
+    <tr><td><code>--h2l-threshold N</code></td><td>int</td><td><code>h2l.pass_threshold</code></td></tr>
+    <tr><td><code>--h2l-escalation</code></td><td><code>high</code> or <code>block</code></td><td><code>h2l.escalation</code></td></tr>
+    <tr><td><code>--h2l-plan-only</code></td><td>flag</td><td>stop after the plan</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Any H2L flag without <code>--h2l</code> is a usage error. <code>--h2l</code> with no resolvable high or an empty pool exits 1 with <code>H2L: no high model configured (set h2l.high or pass --high)</code>.</p>
+<p>Without <code>--dangerously-skip-permissions</code> workers cannot write, so the run prints the plan and exits 0 with result subtype <code>h2l_plan_only</code>. <code>--h2l-plan-only</code> does the same regardless. That is the dry-run mode.</p>
+<p>stream-json adds one event type with seven subtypes; tool events gain <code>story_id</code> and <code>agent_id</code> during a run:</p>
+<pre><code>{"type":"h2l","subtype":"plan","session_id":"…","plan":{…}}
+{"type":"h2l","subtype":"story_start","session_id":"…","story_id":"S1","attempt":1,"provider":"gateway","model":"qwen3-8b","agent_id":"h2l-S1-a1b2c3d4"}
+{"type":"h2l","subtype":"story_report","session_id":"…","story_id":"S1","attempt":1,"success":true,"files_changed":["/abs/p.py"],"verify_exit":0}
+{"type":"h2l","subtype":"story_verdict","session_id":"…","story_id":"S1","attempt":1,"score":92,"passed":true,"failures":[],"judge":"model"}
+{"type":"h2l","subtype":"story_blocked","session_id":"…","story_id":"S3","reason":"retries_exhausted"}
+{"type":"h2l","subtype":"story_skipped","session_id":"…","story_id":"S4","reason":"dependency_blocked:S3"}
+{"type":"h2l","subtype":"done","session_id":"…","passed":5,"blocked":1,"skipped":1,"cancelled":0}</code></pre>
+<p>The final result blob gains <code>h2l: {stories, usage_by_tier}</code>; each tier carries input, output, cached tokens, and cost. Exit codes: 0 all passed; 1 error before or during planning; 3 finished with any blocked, skipped, or cancelled story; 4 rate-limited and resumable. The notify command and <code>turn_complete</code> hook fire once at the end with <code>"h2l": true</code> added. The events test locks the new shapes.</p>
+
+<h3>9. Checkpoint and resume (headless)</h3>
+<p>Sibling file <code>&lt;session_id&gt;.h2l.json</code> in the checkpoint directory with the same session-id guard and atomic replace. Holds the plan, per-story state, attempts, last verdict, and usage by tier; rewritten after every verdict. <code>omn --resume &lt;id&gt;</code> continues from the first story not passed, blocked, or skipped; a story that was running restarts from its last completed attempt. No sibling means the ordinary headless resume. Clean exit deletes both files; exit 3 and 4 keep them.</p>
+
+<h3>10. Package layout</h3>
+<pre><code>omnimancer/h2l/
+├── __init__.py
+├── models.py        H2LModelRef, H2LConfig, Story, Plan, WorkerReport, Verdict,
+│                    StoryState, StoryOutcome, RunSummary, UsageTotals
+├── refs.py          parse_model_ref, resolve
+├── prompts.py       PLANNER_SYSTEM, WORKER_SYSTEM, JUDGE_SYSTEM (sha256-pinned)
+├── planner.py       Planner
+├── worker.py        WorkerRunner
+├── judge.py         Judge
+├── orchestrator.py  H2LRun, validate_plan, Presenter protocol
+└── checkpoint.py    H2LCheckpoint</code></pre>
+<p>No module in the package imports from the interface or headless modules. The two surfaces supply presenters and call the run.</p>
+
+<h2 id="acceptance">Acceptance</h2>
+<ol>
+  <li><strong>Unit, models and refs.</strong> Ref grammar including bare and colon-in-model forms; config defaults; plan validation rejects cycles, duplicate ids, unresolved dependencies, paths outside the working directory, and adds the implicit shared-file edge in plan order; resolution after a simulated env override still yields the flag's model; a non-tool provider fails with the exact alias message; the resolved provider is never the one in the engine's dict.</li>
+  <li><strong>Unit, planner.</strong> Mocked provider returns <code>submit_plan</code>; a <code>Write</code> call is refused; the self-check turn happens and the second submission wins; a missing submission yields <code>plan_failed</code>; the session chat is never touched.</li>
+  <li><strong>Unit, worker.</strong> History accumulates across three turns; a hallucinated tool and an out-of-scope read return the permitted-error and never reach the gate; cancel aborts; diff scoped to the story's files; verify captured; out-of-scope files populated; the parent provider's model is byte-identical before and after.</li>
+  <li><strong>Unit, judge.</strong> Each deterministic rule short-circuits with no model call; the model prompt excludes narrative and tool log; threshold boundary (79 fails, 80 passes); feedback lands in the retry prompt.</li>
+  <li><strong>Unit, orchestrator.</strong> DAG order with implicit edges; two providers on different models run concurrently under a parallelism of two without clobbering; approval callback serialized and prefixed; round-robin and next-model retry; all three escalation policies; skip on blocked dependency; events carry the right parent id; checkpoint rewritten after each verdict.</li>
+  <li><strong>CLI.</strong> Plan table and accept, drop, edit, cancel; the summary is the only message added to the parent conversation; flags, config fallback, usage error without <code>--h2l</code>; plan-only exit 0; exit codes 0, 1, 3, 4; the seven subtypes and the result block; sibling checkpoint round-trip and story-granular resume; config file byte-identical after a flag run.</li>
+  <li><strong>Prompts.</strong> sha256 pins for the three prompts.</li>
+  <li><strong>Regression.</strong> Full test suite and the four lint gates green; the subagent tests untouched and green.</li>
+  <li><strong>Live.</strong> In this repository, a three-to-five story task with a frontier high model and a local 7B-class low model behind an <code>openai-compatible</code> alias: every story passes or is blocked with a named reason; no file outside any story's list is modified; the summary shows high-tier output tokens below the same task run single-model. Repeat headlessly with stream-json and skipped permissions; kill it after the second verdict; resume finishes with exactly the remaining stories started.</li>
+</ol>
+
+<h2 id="rollout">Rollout and risk</h2>
+<ol class="phases">
+  <li><span class="ph">Phase 1 · serial MVP</span><span><code>feat:</code> commit producing 0.3.0. Sections 1 to 5, section 6 with parallelism forced to 1 and escalation limited to high or block, section 7 without the activity rows, sections 8 and 10. Acceptance 1 to 4, 6 to 8, and the serial half of 9. Proves the loop end to end without touching concurrency.</span></li>
+  <li><span class="ph">Phase 2 · parallel pool</span><span>Parallelism above 1, approval lock and prefix, next-model retry, escalation ask, per-worker activity rows, completion and help entries. Acceptance 5 and the concurrent assertions in 9.</span></li>
+  <li><span class="ph">Phase 3 · resilience</span><span>Section 9 checkpoint and resume, usage by tier in the TUI summary, Ollama native tool support if not already landed. The resume half of 9.</span></li>
+</ol>
+<h3>Risks</h3>
+<ul>
+  <li><strong>Story quality is the whole game.</strong> Vague stories mean blind workers fail and the judge loop burns tokens. Mitigated by the self-check turn, the pinned planner prompt, and plan-only mode so a user can inspect before spending. Measure first-attempt pass rate on a ten-task benchmark in this repo before release; target at least 70 percent with a 7B-class low model.</li>
+  <li><strong>Stale old strings.</strong> Story N+1 may cite text story N changed. The implicit edge orders them, but both were written against the original file. Scoped read plus the feedback loop catch it; if the benchmark shows it often, the planner prompt gains "write later stories against the post-edit file".</li>
+  <li><strong>Judge bias.</strong> The judge grades diffs, never narration, and deterministic checks run first. Hand-assess judge and user disagreement on the benchmark; target under 15 percent.</li>
+  <li><strong>Approval fatigue.</strong> Six workers writing three files each is eighteen prompts. The plan gate, existing accept modes, and permission rules cover it; the prefix makes each prompt attributable.</li>
+  <li><strong>Behaviour change surface.</strong> None when the block is absent and the flag is not passed.</li>
+  <li><strong>Deploy.</strong> omnimancer only. Factory containers pick it up on the next pinned version bump; consuming the result block is optional.</li>
+</ul>
+
+<h2 id="questions">Open questions for Kellan</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>Question</th><th>Recommended default</th></tr></thead>
+  <tbody>
+    <tr><td>Q1</td><td>Should workers see <code>CLAUDE.md</code> project instructions?</td><td>No. Workers get the story only; the planner sees them and encodes what matters.</td></tr>
+    <tr><td>Q2</td><td>Retry on the next model or the same model with feedback?</td><td>Next model in the pool; same model when the pool has one entry.</td></tr>
+    <tr><td>Q3</td><td>Should a high-model escalation result also get a model verdict?</td><td>No, deterministic only; the high model judging its own work adds cost without signal.</td></tr>
+    <tr><td>Q4</td><td>Worker <code>Bash</code>: unrestricted or verify-command only?</td><td>Unrestricted in Phase 1; permission rules already gate it. Revisit after the benchmark.</td></tr>
+    <tr><td>Q5</td><td>Default escalation in headless: high or block?</td><td>High. Factory wants runs to finish; block is one flag away.</td></tr>
+    <tr><td>Q6</td><td>Ollama: document the alias workaround or add native tools first?</td><td>Document now; native tools as a Phase 3 item.</td></tr>
+    <tr><td>Q7</td><td>Register this PRD in Factory Nexus and run it as a swarm, or build it here?</td><td>Build Phase 1 here; consider Factory for Phases 2 and 3 once the loop is proven.</td></tr>
+  </tbody>
+</table>
+</div>
+</div>

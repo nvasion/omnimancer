@@ -71,6 +71,8 @@ class TurnNotifier:
         self.session_id = str(uuid.uuid4())
         self._last_assistant_message: Optional[str] = None
         self._usage = TurnUsage()
+        # Extra payload keys for special modes (e.g. {"h2l": True}).
+        self.extra: Dict[str, Any] = {}
 
     def reset_turn(self) -> None:
         """Clear response state before processing a new turn."""
@@ -89,7 +91,7 @@ class TurnNotifier:
 
     def build_payload(self) -> Dict[str, Any]:
         """Build a turn payload with a fresh per-turn identifier."""
-        return {
+        payload: Dict[str, Any] = {
             "type": "agent-turn-complete",
             "turn-id": str(uuid.uuid4()),
             "last-assistant-message": self._last_assistant_message,
@@ -97,6 +99,10 @@ class TurnNotifier:
             "usage": self._usage.as_dict(),
             "cwd": self.cwd,
         }
+        # Mode flags (e.g. ``h2l``) ride along without changing the base
+        # schema for ordinary turns.
+        payload.update(getattr(self, "extra", {}) or {})
+        return payload
 
     async def fire(self) -> Dict[str, Any]:
         """Invoke the configured notifier, swallowing every failure.

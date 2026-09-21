@@ -116,17 +116,23 @@ def _read_instruction_file(path: Path) -> Optional[str]:
 def load_project_instructions() -> str:
     """Load user-defined instructions from OMNIMANCER.md or CLAUDE.md files.
 
-    Searches for instruction files and combines them in priority order
-    (later entries are more specific and appear last in the prompt):
+    Combines at most two sources (the more specific one appears last in the
+    prompt):
 
     1. Global persona: ``~/.omnimancer/OMNIMANCER.md``
        User-level defaults and persona definitions, always loaded if present.
 
-    2. Project ``CLAUDE.md``: nearest ancestor of CWD (Claude Code compatibility).
-       Useful when a project already ships a CLAUDE.md for Claude Code users.
+    2. ONE project file — either/or, never both:
 
-    3. Project ``OMNIMANCER.md``: nearest ancestor of CWD (highest priority).
-       Omnimancer-specific instructions that override everything else.
+       - ``OMNIMANCER.md``: nearest ancestor of CWD. Omnimancer-specific
+         instructions; wins whenever it has usable content.
+       - ``CLAUDE.md``: nearest ancestor of CWD (Claude Code compatibility).
+         Fallback for projects that only ship a CLAUDE.md, or whose
+         OMNIMANCER.md is empty or unreadable.
+
+       Projects commonly keep both files with overlapping content, and
+       instruction text is retransmitted on every agent-loop iteration, so
+       loading both would pay for the same guidance twice.
 
     The upward walk stops at the first ``.git`` directory so instructions
     stay scoped to the project.  Files above the git root are ignored as
@@ -148,8 +154,8 @@ def load_project_instructions() -> str:
         if content:
             found.append(("~/.omnimancer/OMNIMANCER.md", content))
 
-    # 2 & 3. Walk up from CWD to the git root (or filesystem root) looking
-    # for project-level CLAUDE.md and OMNIMANCER.md.  We collect the *nearest*
+    # 2. Walk up from CWD to the git root (or filesystem root) looking for
+    # project-level CLAUDE.md and OMNIMANCER.md.  We collect the *nearest*
     # occurrence of each so subdirectory instructions win over parent ones.
     claude_md_path: Optional[Path] = None
     omnimancer_md_path: Optional[Path] = None
@@ -173,15 +179,15 @@ def load_project_instructions() -> str:
             break  # filesystem root
         check_dir = parent
 
-    if claude_md_path is not None:
-        content = _read_instruction_file(claude_md_path)
+    # Either/or: OMNIMANCER.md wins; CLAUDE.md only fills in when there is no
+    # usable OMNIMANCER.md (missing, empty, or unreadable).
+    for project_path in (omnimancer_md_path, claude_md_path):
+        if project_path is None:
+            continue
+        content = _read_instruction_file(project_path)
         if content:
-            found.append((claude_md_path.name, content))
-
-    if omnimancer_md_path is not None:
-        content = _read_instruction_file(omnimancer_md_path)
-        if content:
-            found.append((omnimancer_md_path.name, content))
+            found.append((project_path.name, content))
+            break
 
     if not found:
         return ""

@@ -1,0 +1,609 @@
+<title>H2L Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --ink: #1f2226;
+    --ink-2: #4c525a;
+    --ink-3: #7a828c;
+    --rule: #ddd8ce;
+    --accent: #1f5f8b;
+    --accent-ink: #ffffff;
+    --high: #8a4b1f;
+    --high-bg: #f6e9dc;
+    --low: #2d6a4f;
+    --low-bg: #e1efe6;
+    --judge: #5b3d8f;
+    --judge-bg: #ebe4f5;
+    --warn-bg: #fbf1d7;
+    --warn: #7a5a00;
+    --code-bg: #f0ede6;
+    --gap-bg: #fbe9e4;
+    --gap: #8c3a2b;
+    --ok-bg: #e1efe6;
+    --ok: #2d6a4f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17191c;
+      --surface: #1f2226;
+      --ink: #e8e4dc;
+      --ink-2: #b4afa6;
+      --ink-3: #847f77;
+      --rule: #34383e;
+      --accent: #6fb1e0;
+      --accent-ink: #0f1a24;
+      --high: #e0a06a;
+      --high-bg: #35281c;
+      --low: #7fc9a2;
+      --low-bg: #1c2f26;
+      --judge: #b79ae6;
+      --judge-bg: #2a2236;
+      --warn-bg: #33290f;
+      --warn: #e6c25c;
+      --code-bg: #24272c;
+      --gap-bg: #3a241f;
+      --gap: #f0a08d;
+      --ok-bg: #1c2f26;
+      --ok: #7fc9a2;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17191c;
+    --surface: #1f2226;
+    --ink: #e8e4dc;
+    --ink-2: #b4afa6;
+    --ink-3: #847f77;
+    --rule: #34383e;
+    --accent: #6fb1e0;
+    --accent-ink: #0f1a24;
+    --high: #e0a06a;
+    --high-bg: #35281c;
+    --low: #7fc9a2;
+    --low-bg: #1c2f26;
+    --judge: #b79ae6;
+    --judge-bg: #2a2236;
+    --warn-bg: #33290f;
+    --warn: #e6c25c;
+    --code-bg: #24272c;
+    --gap-bg: #3a241f;
+    --gap: #f0a08d;
+    --ok-bg: #1c2f26;
+    --ok: #7fc9a2;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.55;
+  }
+  .wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    padding-block: 40px 80px;
+    padding-inline: 24px;
+  }
+  header.masthead {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 20px;
+    margin-bottom: 36px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 8px;
+  }
+  h1 {
+    font-size: 40px;
+    line-height: 1.1;
+    margin: 0 0 14px;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  .meta {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 14px;
+    color: var(--ink-2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+  }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  h2 {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    margin: 48px 0 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    margin: 28px 0 8px;
+  }
+  p { margin: 0 0 14px; max-width: 70ch; }
+  ul, ol { margin: 0 0 14px; padding-left: 24px; max-width: 70ch; }
+  li { margin-bottom: 6px; }
+  li > ul { margin-top: 6px; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  pre {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 13.5px;
+    line-height: 1.5;
+    background: var(--code-bg);
+    border-left: 3px solid var(--accent);
+    padding: 14px 18px;
+    overflow-x: auto;
+    margin: 0 0 18px;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  .table-wrap { overflow-x: auto; margin: 0 0 18px; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border-bottom: 2px solid var(--ink);
+  }
+  td code { font-size: 12.5px; }
+
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    margin: 18px 0 22px;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 15.5px;
+  }
+  .verdict b { font-weight: 600; }
+
+  .pill {
+    display: inline-block;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .pill.gap { background: var(--gap-bg); color: var(--gap); }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); }
+  .pill.part { background: var(--warn-bg); color: var(--warn); }
+
+  .flow {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 18px 0 24px;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+  }
+  .tier {
+    padding: 14px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+  }
+  .tier .who {
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .tier.high { border-top: 4px solid var(--high); }
+  .tier.high .who { color: var(--high); }
+  .tier.low { border-top: 4px solid var(--low); }
+  .tier.low .who { color: var(--low); }
+  .tier.judge { border-top: 4px solid var(--judge); }
+  .tier.judge .who { color: var(--judge); }
+  .tier p { font-size: 14px; margin: 0; color: var(--ink-2); }
+  .tier .name { font-size: 16px; font-weight: 600; margin-bottom: 4px; color: var(--ink); }
+
+  .callout {
+    background: var(--warn-bg);
+    color: var(--ink);
+    border-left: 4px solid var(--warn);
+    padding: 12px 16px;
+    margin: 0 0 18px;
+    font-size: 15.5px;
+    max-width: 70ch;
+  }
+  .callout b { color: var(--warn); }
+
+  .arch {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin: 14px 0 22px;
+  }
+  .mod {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 14px 16px;
+    border-radius: 4px;
+  }
+  .mod h4 {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 13.5px;
+    font-weight: 500;
+    margin: 0 0 8px;
+    color: var(--accent);
+  }
+  .mod p, .mod ul { font-size: 14.5px; margin-bottom: 8px; }
+  .mod ul { padding-left: 18px; }
+
+  .phases { counter-reset: ph; padding-left: 0; list-style: none; max-width: none; }
+  .phases li {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .phases .ph {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--accent);
+  }
+  .sources li { font-size: 15px; word-break: break-word; }
+
+  .toc {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 14px;
+    columns: 2;
+    column-gap: 32px;
+    margin: 0 0 8px;
+    padding-left: 18px;
+  }
+  .toc li { break-inside: avoid; margin-bottom: 4px; }
+  .toc a { text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    h1 { font-size: 30px; }
+    .flow { grid-template-columns: 1fr; }
+    .toc { columns: 1; }
+    .phases li { grid-template-columns: 1fr; gap: 4px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+<header class="masthead">
+  <p class="eyebrow">Omnimancer · research memo · pre-PRD</p>
+  <h1>High-to-Low planning and execution</h1>
+  <div class="meta">
+    <span><b>Status</b> Research, nothing implemented</span>
+    <span><b>Date</b> 2026-09-20</span>
+    <span><b>Source of record</b> <code>docs/plans/h2l-research.md</code></span>
+  </div>
+</header>
+
+<ol class="toc">
+  <li><a href="#what">What H2L is</a></li>
+  <li><a href="#prior">Prior art</a></li>
+  <li><a href="#fit">Fit assessment</a></li>
+  <li><a href="#findings">Codebase findings</a></li>
+  <li><a href="#arch">Proposed architecture</a></li>
+  <li><a href="#decisions">Design decisions</a></li>
+  <li><a href="#risks">Risks and open questions</a></li>
+  <li><a href="#phasing">Phasing</a></li>
+  <li><a href="#tests">Test plan hooks</a></li>
+  <li><a href="#sources">Sources</a></li>
+</ol>
+
+<h2 id="what">1. What H2L is</h2>
+<p>H2L is a two-tier agent flow. A <strong>high model</strong> acts as the principal engineer: it reads the repository, produces a design, and breaks the work into a backlog of <strong>stories</strong>. Each story is written for a junior who cannot see the repo: absolute paths, exact strings to replace, exact commands to run, and explicit acceptance criteria. A pool of <strong>low models</strong> executes the stories in isolation, one story per worker, using only the instructions they were handed. The high model then <strong>judges</strong> each result against the story's acceptance criteria and either accepts it, sends it back with feedback, or escalates.</p>
+
+<div class="flow">
+  <div class="tier high">
+    <div class="who">High tier · plans</div>
+    <div class="name">Principal</div>
+    <p>Reads the repo with the full tool set. Writes a design and a backlog of explicit stories. Submits the plan through a tool schema.</p>
+  </div>
+  <div class="tier low">
+    <div class="who">Low tier · executes</div>
+    <div class="name">Worker pool</div>
+    <p>One story per worker, own provider instance, own history. Edit, Write, Bash only. No exploration. Returns a diff and verify output.</p>
+  </div>
+  <div class="tier judge">
+    <div class="who">High tier · scores</div>
+    <div class="name">Judge</div>
+    <p>Deterministic checks first, then the high model grades the diff against the acceptance criteria. Below threshold goes back with feedback.</p>
+  </div>
+</div>
+
+<p>Three properties separate this from "just use subagents":</p>
+<ol>
+  <li><strong>Workers are deliberately context-poor.</strong> They do not explore the repo. The planner does all the reading, and run quality is bounded by how explicit the stories are.</li>
+  <li><strong>Workers are a pool, not a single model.</strong> The user supplies a list of low models; the scheduler assigns stories across them and can run them in parallel.</li>
+  <li><strong>There is a judge loop.</strong> The high model scores every result before it counts as done. Failed stories are retried with the judge's feedback attached.</li>
+</ol>
+<p>Both the TUI (<code>omn</code>) and headless (<code>omn -p</code>) must support it. Models come from config in the TUI and from flags in headless.</p>
+
+<h2 id="prior">2. Prior art</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>System</th><th>Shape</th><th>What H2L borrows</th><th>Where H2L differs</th></tr></thead>
+  <tbody>
+    <tr><td>Aider architect/editor mode</td><td>One reasoning model proposes, one editor model turns the proposal into file edits, per turn</td><td>The insight that "propose" and "edit" are separable and that weak editors do well with explicit instructions</td><td>One architect, one editor, one turn. No backlog, no pool, no judge</td></tr>
+    <tr><td>Claude Code orchestrator/worker subagents</td><td>A lead spawns subagents, optionally on cheaper models, each running a full tool loop with repo access</td><td>Per-agent model override, isolated context, parallel fan-out, nested identity</td><td>Claude Code workers are context-rich explorers. H2L workers are deliberately blind</td></tr>
+    <tr><td>LLM-as-judge literature for code</td><td>A strong model grades patches, often after cheaper deterministic screening</td><td>Deterministic checks first, then the judge; grade the diff, not the narration; versioned rubrics</td><td>H2L's judge is the model that wrote the story, so it grades against criteria it authored</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="callout"><b>Judge bias.</b> The literature is consistent that LLM judges favor verbose, confident output and output resembling their own style. The mitigation baked into this design: the judge sees the actual diff and test output, never the worker's narration, and cheap deterministic checks run before the judge sees anything.</div>
+
+<h2 id="fit">3. Fit assessment</h2>
+<div class="verdict"><b>Verdict: H2L fits well.</b> Roughly four fifths of the substrate already exists. The remaining fifth is a real feature, not a wiring job, but nothing in the codebase fights the design.</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>H2L needs</th><th>What exists today</th><th>Gap</th></tr></thead>
+  <tbody>
+    <tr><td>Isolated worker loop with own history and scoped tools</td><td><code>SubAgentRunner</code> in <code>cli/subagent.py</code></td><td><span class="pill part">partial</span> Shares the parent's provider object, never accumulates history, serial only, not reachable from headless</td></tr>
+    <tr><td>A second provider instance on a different model, safely</td><td><code>prompt_enhancer.enhance()</code> builds one via <code>ProviderFactory.create_provider</code> with a <code>model_copy</code>; the instance cache keys on model</td><td><span class="pill part">partial</span> Nothing generalizes it. <code>switch_model</code> and the subagent runner still mutate the shared instance</td></tr>
+    <tr><td>Parallel workers</td><td>Nothing. No <code>asyncio.gather</code> anywhere in the package</td><td><span class="pill gap">new</span> Scheduler, concurrency limit, approval serialization</td></tr>
+    <tr><td>Structured plan and verdict objects</td><td>Nothing. No task, story, plan, or backlog type. <code>WorkflowStep</code> in the dead orchestrator wraps callables</td><td><span class="pill gap">new</span> Models</td></tr>
+    <tr><td>Role-based model config</td><td><code>EnhancementConfig</code> names a provider and model for one job; <code>SubAgentDefinition.model</code> overrides per agent</td><td><span class="pill part">partial</span> An <code>h2l</code> block following the enhancement precedent</td></tr>
+    <tr><td>Headless flags for models</td><td><code>--provider</code>, <code>--model</code>, <code>--base-url</code> via <code>apply_session_overrides</code></td><td><span class="pill gap">new</span> <code>--high</code>, repeatable <code>--low</code>, <code>--h2l</code></td></tr>
+    <tr><td>Shared "run one turn" loop for TUI and headless</td><td>None. <code>interface.py</code> and <code>headless.py</code> each reimplement the loop</td><td><span class="pill gap">new</span> H2L's worker loop should be the first shared one</td></tr>
+    <tr><td>Per-worker observability</td><td>ContextVar <code>agent_context(agent_id, parent_id)</code>; <code>TurnActivityLog</code> groups by agent id; Fleet TUI renders child rows</td><td><span class="pill ok">ready</span> A grouped per-worker REPL view is display-only</td></tr>
+    <tr><td>Resumable long runs</td><td><code>HeadlessCheckpoint</code> snapshots the conversation each iteration</td><td><span class="pill part">partial</span> Plan-level checkpoint so <code>--resume</code> restarts per story</td></tr>
+    <tr><td>Security and approval enforcement</td><td><code>AgentEngine.execute_with_approval</code> is the single gate on both paths</td><td><span class="pill ok">ready</span> Workers inherit it for free</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="findings">4. Codebase findings</h2>
+
+<h3>4.1 The subagent runner is the right seed, with seven known gaps</h3>
+<p><code>cli/subagent.py</code> (176 lines) runs a <code>SubAgentDefinition</code> to completion: isolated <code>ChatContext</code>, tool allowlist, optional model override, capped iterations, and fleet lifecycle events with a unique run id and parent id. Tests live in <code>tests/cli/test_subagent.py</code>. Gaps, in order of how much they matter to H2L:</p>
+<ol>
+  <li><strong>Shared provider mutation.</strong> The runner sets <code>provider.model</code> on the parent's live provider and restores it in <code>finally</code>. Two concurrent runs with different models would clobber each other. This blocks parallelism outright.</li>
+  <li><strong>No history accumulation.</strong> <code>context.messages</code> stays empty for the whole run; continuity is a rewritten "Tool results" message. A worker that edits, tests, and edits again needs real history.</li>
+  <li><strong>Not model-invocable and not headless-reachable.</strong> The only entry is the <code>/subagents run</code> slash command. No Task tool, no marker.</li>
+  <li><strong>Results never re-enter a conversation.</strong> Printed as a Rich panel. <code>SubAgentResult</code> holds only the last text and tool names, no diff and no arguments. A judge needs more.</li>
+  <li><strong>Tool allowlist is advisory.</strong> It filters definitions sent to the model, but execution never re-checks.</li>
+  <li><strong><code>ToolResult.cancelled</code> is ignored</strong> inside the loop.</li>
+  <li><strong>The definition prompt is folded into the first user message</strong>, not sent as a system message.</li>
+</ol>
+<p>Recommendation: do not extend <code>SubAgentRunner</code> in place. Build a new <code>WorkerRunner</code> for H2L that fixes all seven, then consider re-basing the subagent runner on it later.</p>
+
+<h3>4.2 Provider and model binding: the safe pattern already exists</h3>
+<p>The model is a plain attribute on every provider instance, set at construction. <code>CoreEngine.providers</code> holds one live instance per config entry, and <code>current_provider</code> points into that dict. Two ways to run a different model exist today:</p>
+<ul>
+  <li><strong>Mutate the shared instance.</strong> <code>switch_model</code> and the subagent runner do this. Fine for one conversation, unsafe under concurrency.</li>
+  <li><strong>Build a second instance.</strong> The prompt enhancer copies the provider config with <code>model_copy(update={"model": ...})</code>, calls <code>ProviderFactory.create_provider</code>, and talks to the new instance with its own <code>ChatContext</code>. The initializer's cache key includes the model, so one provider with two models yields two distinct instances.</li>
+</ul>
+<p>H2L must use the second pattern for every worker and for the planner. This is the single most important implementation constraint.</p>
+<p>Alias entries matter here. A config entry named <code>gateway</code> with <code>provider_type: "openai-compatible"</code> is a first-class provider name, which is how a local vLLM or Ollama endpoint becomes a low model. H2L model tokens should therefore be <code>&lt;provider-entry&gt;:&lt;model&gt;</code>.</p>
+
+<h3>4.3 Only tool-capable providers can be workers</h3>
+<p>Workers execute through native tool calls. Providers whose <code>supports_tools()</code> is false cannot be workers today: <code>ollama</code>, <code>cohere</code>, <code>perplexity</code>, and <code>claude-code</code>. The Ollama gap is the painful one, because local small models are the obvious low tier.</p>
+<div class="callout"><b>Workaround that already works.</b> Point an <code>openai-compatible</code> alias at Ollama's OpenAI-compatible endpoint, which accepts tools. The PRD should either document this or add native tool support to the Ollama provider as a prerequisite story.</div>
+
+<h3>4.4 Two agent loops, no shared turn function</h3>
+<p>The interactive loop in <code>cli/interface.py</code> and the headless loop in <code>cli/headless.py</code> are separate implementations of the same idea. They differ in iteration cap, checkpointing, history elision, streaming, and approval wiring. The shared pieces are <code>ToolHandler</code>, <code>RepeatedCallTracker</code>, <code>build_agent_prompt</code>, <code>TokenAccumulator</code>, the fleet events, and the approval gate.</p>
+<p>Consequence: the H2L worker loop must not be written a third time inside each surface. It should be one module that both the <code>/h2l</code> command and the headless runner call. It is small and bounded, so it is a good first shared loop.</p>
+<p>Headless also has <strong>no marker fallback</strong>. A non-tool provider under <code>omn -p</code> emits markers as dead text. H2L should reject non-tool providers for both tiers at validation time.</p>
+
+<h3>4.5 Config surface</h3>
+<p>There is no global default model. The model lives on each provider entry, and <code>default_provider</code> picks the active one. Three role-like precedents exist for an <code>h2l</code> block: <code>EnhancementConfig</code> (opt-in by presence), <code>SubAgentDefinition.model</code>, and <code>FallbackConfig.fallback_order</code>.</p>
+<div class="callout"><b>Precedence gotcha.</b> Order is env &gt; CLI flags &gt; stored config, and <code>apply_env_overrides</code> runs inside provider initialization, after session overrides, assigning unconditionally. H2L flags must resolve their model tokens after provider initialization or an <code>OMNIMANCER_&lt;PROVIDER&gt;_MODEL</code> variable will silently rewrite a tier.</div>
+<p>The CLI is a single click command, deliberately not a group because external orchestrators parse <code>omn -p --help</code>. New flags must be plain options on it. Session flags never persist, and a regression test keeps the config file byte-identical.</p>
+
+<h3>4.6 The approval and security gate</h3>
+<p>Every operation from either path funnels through <code>execute_with_approval</code>: preview, permission rules, the blocking <code>tool_use_request</code> hook, the approval callback, execution, then the observe-only <code>post_tool</code> hook. Hard-restricted paths have no bypass at all. Three facts shape H2L:</p>
+<ol>
+  <li><strong>Approval prompts block stdin</strong> via <code>asyncio.to_thread(input)</code>. Parallel workers hitting write prompts would interleave on the terminal. H2L needs a lock around the callback so prompts arrive one at a time, each naming the worker and story.</li>
+  <li><strong>Headless is deny-by-default.</strong> Without <code>--dangerously-skip-permissions</code> no worker can write or run anything. Factory already passes the flag.</li>
+  <li><strong>Approval is per operation, not per story.</strong> A plan-level gate in the TUI is a new concept that fits the existing philosophy and is where the user edits or drops stories.</li>
+</ol>
+
+<h3>4.7 Observability is nearly free</h3>
+<p><code>events/emitter.py</code> keeps the agent id and parent id in ContextVars, so <code>agent_context</code> propagates correctly across <code>asyncio.gather</code>. Every tool event already carries both ids. The Fleet TUI renders subagent rows as indented children, <code>TurnActivityLog</code> groups by agent id, and <code>StreamingDisplay</code> exposes an <code>activity_provider</code> callback as the one sanctioned injection point. A per-worker REPL view is a display change, not new instrumentation.</p>
+
+<h3>4.8 Code to avoid</h3>
+<ul>
+  <li><code>core/agent/workflow_orchestrator.py</code> is instantiated on every engine start and never driven. Its steps wrap Python callables, not model instructions.</li>
+  <li><code>AgentModeManager</code> has a concurrency queue the live loop does not use, and its execute method is a stub.</li>
+  <li><code>core/agent/config.py</code> is a parallel config system with zero instantiations.</li>
+</ul>
+
+<h2 id="arch">5. Proposed architecture</h2>
+<p>A new package, <code>omnimancer/h2l/</code>, with five modules. Both surfaces call into it.</p>
+<div class="arch">
+  <div class="mod"><h4>h2l/models.py</h4><p><code>H2LModelRef</code>, <code>H2LConfig</code>, <code>Story</code>, <code>Plan</code>, <code>WorkerReport</code>, <code>Verdict</code>. Pydantic, mirrored as tool schemas.</p></div>
+  <div class="mod"><h4>h2l/planner.py</h4><p>High model, fresh instance, full tool set. Returns the plan through a <code>submit_plan</code> tool call, never free JSON.</p></div>
+  <div class="mod"><h4>h2l/worker.py</h4><p><code>WorkerRunner.run(story, model_ref)</code>. Own instance, real history, allowlist enforced at execution, <code>Read</code> scoped to <code>story.files</code>, captures diff and verify output.</p></div>
+  <div class="mod"><h4>h2l/judge.py</h4><p>Deterministic checks short-circuit. Then the high model grades diff plus verify output against acceptance criteria via <code>submit_verdict</code>.</p></div>
+  <div class="mod"><h4>h2l/orchestrator.py</h4><p>DAG from <code>depends_on</code> plus implicit shared-file edges. Semaphore, round-robin pool, approval lock, events, plan checkpoint.</p></div>
+</div>
+
+<h3>5.1 Data model</h3>
+<pre><code>class H2LModelRef(BaseModel):
+    provider: str            # config entry name, e.g. "claude", "gateway"
+    model: str
+
+class H2LConfig(BaseModel):
+    enabled: bool = True
+    high: H2LModelRef
+    low: List[H2LModelRef]   # the worker pool, ordered
+    max_parallel: int = 2
+    max_retries: int = 2     # judge send-backs per story before escalation
+    pass_threshold: int = 80 # judge score 0..100
+    worker_tools: List[str] = ["Edit", "Write", "Bash"]
+    allow_worker_read: bool = True   # Read limited to story.files
+
+class Story(BaseModel):
+    id: str
+    title: str
+    instructions: str        # imperative, explicit, no exploration required
+    files: List[str]         # absolute paths the worker may touch
+    acceptance: List[str]    # criteria the judge scores against
+    verify: Optional[str]    # shell command; exit 0 required
+    depends_on: List[str] = []
+
+class Plan(BaseModel):
+    goal: str
+    design: str
+    stories: List[Story]
+
+class WorkerReport(BaseModel):
+    story_id: str
+    worker: H2LModelRef
+    success: bool
+    narrative: str           # worker's final text (shown, not graded)
+    tool_log: List[dict]
+    diff: str                # git diff limited to story.files
+    verify_output: Optional[str]
+    verify_exit: Optional[int]
+    files_outside_scope: List[str]
+
+class Verdict(BaseModel):
+    story_id: str
+    score: int
+    passed: bool
+    failures: List[str]
+    feedback: str            # sent verbatim to the worker on retry</code></pre>
+
+<h3>5.2 Planner</h3>
+<p>Runs the high model on a fresh provider instance with the full coding tool set so it can read the repo. Its system prompt says, in effect: you are writing for a worker that cannot see the repository and will not explore; every story must contain absolute paths, exact text for <code>Edit</code> or full content for <code>Write</code>, exact commands, and testable acceptance criteria; stories touching the same file must declare a dependency. The plan is returned through a <code>submit_plan</code> tool call whose schema is the <code>Plan</code> model. Every tool-capable provider enforces tool schemas, which makes this reliable across vendors.</p>
+
+<h3>5.3 Worker</h3>
+<ul>
+  <li>Fresh provider instance per worker via <code>create_provider</code> on a <code>model_copy</code>.</li>
+  <li>Real <code>ChatContext</code> history that accumulates every turn.</li>
+  <li>System prompt written for someone who follows steps literally: do exactly what the story says, do not explore, if an <code>Edit</code> old string does not match then stop and report it.</li>
+  <li>Tool allowlist enforced at execution time. <code>Read</code> only for paths in <code>story.files</code>.</li>
+  <li>Captures tool arguments and results, a <code>git diff</code> scoped to <code>story.files</code>, the verify command output, and any file touched outside scope.</li>
+  <li>Honors <code>ToolResult.cancelled</code>. Runs inside <code>agent_context(f"h2l-{story.id}-{hex}", parent=run_id)</code>.</li>
+</ul>
+
+<h3>5.4 Judge</h3>
+<p>Deterministic checks first, and they are free: non-zero verify exit, any out-of-scope file modified, or an empty diff on a story that requires edits each fail immediately. Only then does the high model see the story, the acceptance criteria, the diff, and the verify output. It does not see the worker's narrative. A score below <code>pass_threshold</code> sends the story back with feedback prepended, up to <code>max_retries</code>, after which the orchestrator escalates: the high model does the story itself, or the run marks it blocked. Configurable.</p>
+
+<h3>5.5 Orchestrator</h3>
+<ul>
+  <li>DAG from <code>depends_on</code> plus implicit edges between stories that share a file, so concurrent edits to one file never happen.</li>
+  <li>Ready stories run under <code>asyncio.gather</code> with a semaphore of <code>max_parallel</code>.</li>
+  <li>Round-robin assignment from the pool; a retried story goes to the next model, a cheap form of diversity.</li>
+  <li>Approval callback wrapped in an <code>asyncio.Lock</code>, each prompt stamped with worker and story.</li>
+  <li>Emits <code>h2l_plan</code>, <code>h2l_story_start</code>, <code>h2l_story_report</code>, <code>h2l_story_verdict</code>, <code>h2l_done</code> on the fleet bus and as stream-json lines.</li>
+  <li>Checkpoints the plan plus per-story state so <code>omn --resume</code> restarts at the first unfinished story.</li>
+</ul>
+
+<h3>5.6 TUI surface</h3>
+<ul>
+  <li><code>/h2l &lt;goal&gt;</code> plans, shows the stories in a table, asks for approval (edit, drop, accept), then runs the pool with a per-worker activity panel.</li>
+  <li><code>/h2l plan &lt;goal&gt;</code> stops after the plan. <code>/h2l run</code> executes the last plan. <code>/h2l status</code> and <code>/h2l config</code> for inspection.</li>
+  <li>The <code>h2l</code> block in <code>~/.omnimancer/config.json</code> follows the enhancement precedent and is opt-in by presence.</li>
+</ul>
+
+<h3>5.7 Headless surface</h3>
+<pre><code>omn -p "Add rate limiting to the webhook handler" \
+  --h2l \
+  --high claude:claude-opus-5 \
+  --low gateway:qwen3-8b --low ollama-oai:qwen2.5-coder-14b \
+  --h2l-parallel 2 \
+  --output-format stream-json \
+  --dangerously-skip-permissions</code></pre>
+<p>Flags override the config block; missing flags fall back to config. No high model from either source exits 1 with a clear error. Exit codes reuse the existing contract: 0 done, 1 error, 3 partial with blocked stories, 4 rate-limited and resumable. The final JSON result gains a <code>stories</code> array with per-story verdicts and usage split by tier.</p>
+
+<h2 id="decisions">6. Design decisions and rationale</h2>
+<ol>
+  <li><strong>Never mutate a shared provider.</strong> Every participant gets its own instance from the factory. This is what makes parallelism safe and matches the enhancer.</li>
+  <li><strong>Structured outputs through tool schemas.</strong> <code>submit_plan</code> and <code>submit_verdict</code> are tools. Works on every tool-capable provider without JSON repair.</li>
+  <li><strong>Workers get the smallest tool set that can do the job.</strong> <code>Edit</code>, <code>Write</code>, <code>Bash</code> by default, <code>Read</code> scoped to the story's files. If a worker needs to search, the story was under-specified and that is the planner's bug.</li>
+  <li><strong>Deterministic checks before the judge, and the judge grades the diff.</strong> The direct answer to judge bias, and it keeps judge tokens low.</li>
+  <li><strong>File-conflict-aware scheduling now, worktrees later.</strong> Implicit edges between stories sharing a file remove the write race cheaply. Per-worker worktrees are the v2 answer.</li>
+  <li><strong>One worker loop, two surfaces.</strong> Build it once in <code>omnimancer/h2l/</code> and call it from both <code>command_dispatch.py</code> and <code>headless.py</code>.</li>
+  <li><strong>Reject non-tool providers at validation time.</strong> Both tiers require <code>supports_tools()</code>. Fail early with a message naming the alias workaround.</li>
+  <li><strong>Plan approval is a first-class gate in the TUI.</strong> Headless skips it under <code>--dangerously-skip-permissions</code>; otherwise the run stops after the plan and prints it, which doubles as a dry-run mode.</li>
+</ol>
+
+<h2 id="risks">7. Risks and open questions for the PRD</h2>
+<ul>
+  <li><strong>Story quality is the whole game.</strong> Vague stories mean blind workers fail and the judge loop burns tokens. The planner prompt needs the same care as the PromptFoundry meta-prompts, plus a self-check pass for missing exact strings before submitting.</li>
+  <li><strong>Stale <code>Edit</code> old strings.</strong> Story N+1 may reference text that story N changed. The shared-file DAG edge orders them, but both were written against the original file. Scoped <code>Read</code> and the judge loop catch the rest. Worth measuring.</li>
+  <li><strong>Escalation policy.</strong> After <code>max_retries</code>, does the high model do the story itself or does the run stop? Recommend configurable, defaulting to escalate in headless and ask in the TUI.</li>
+  <li><strong>Cost accounting.</strong> <code>TokenAccumulator</code> totals per session. H2L should report per tier and per story, since the point of the feature is moving spend from the high tier to the low tier.</li>
+  <li><strong>Ollama native tools.</strong> Document the alias workaround or give the provider tool support. The second is a small, well-bounded prerequisite.</li>
+  <li><strong>Checkpoint schema.</strong> <code>HeadlessCheckpoint</code> is versioned at 1. Plan state either bumps it or lives in a sibling file keyed by session id. Sibling is less invasive.</li>
+  <li><strong>Approval fatigue.</strong> Six workers each writing three files is eighteen prompts. The plan gate plus existing <code>/accept</code> modes and permission rules should be enough, but the PRD should state the default.</li>
+</ul>
+
+<h2 id="phasing">8. Suggested phasing</h2>
+<ol class="phases">
+  <li><span class="ph">Phase 1 · serial MVP</span><span>Models, planner, worker, judge, orchestrator with <code>max_parallel=1</code>. <code>/h2l</code> in the TUI; <code>--h2l</code>, <code>--high</code>, <code>--low</code> in headless. Plan approval gate. Deterministic checks and the LLM judge. Stream-json events. Proves the loop end to end without touching concurrency.</span></li>
+  <li><span class="ph">Phase 2 · parallel pool</span><span>Per-worker instances already exist from phase 1, so this adds the semaphore, the shared-file DAG, the approval lock, round-robin assignment, and the per-worker activity panel.</span></li>
+  <li><span class="ph">Phase 3 · resilience</span><span>Plan-level checkpoint and <code>--resume</code> at story granularity, per-tier cost reporting, escalation policy, optional worktrees.</span></li>
+</ol>
+
+<h2 id="tests">9. Test plan hooks</h2>
+<p>Per the TDD rule in <code>CLAUDE.md</code>, each module lands with tests first.</p>
+<ul>
+  <li><code>tests/h2l/test_models.py</code>: validation, model token parsing, DAG construction including implicit shared-file edges, cycle rejection.</li>
+  <li><code>tests/h2l/test_planner.py</code>: mocked provider returning a <code>submit_plan</code> call; planner never touches <code>chat_manager</code>; shared-file stories get dependencies.</li>
+  <li><code>tests/h2l/test_worker.py</code>: history accumulates; allowlist enforced at execution; out-of-scope <code>Read</code> refused; <code>cancelled</code> aborts; diff and verify captured; the parent provider's model is never mutated.</li>
+  <li><code>tests/h2l/test_judge.py</code>: deterministic fails short-circuit the model call; the judge prompt excludes the narrative; threshold and retry feedback.</li>
+  <li><code>tests/h2l/test_orchestrator.py</code>: two providers with different models run concurrently without clobbering; approval lock serializes prompts; round-robin and retry reassignment; events carry the right parent id.</li>
+  <li><code>tests/cli/test_h2l_command.py</code> and additions to <code>tests/cli/test_headless.py</code>: flag parsing, config fallback, env-override ordering, exit codes, stream-json schema.</li>
+  <li>Provider validation: a non-tool provider in either tier fails with the alias hint.</li>
+</ul>
+
+<h2 id="sources">10. Sources</h2>
+<ul class="sources">
+  <li><a href="https://aider.chat/docs/usage/modes.html">Aider chat modes, architect and editor models</a></li>
+  <li><a href="https://generaitelabs.com/aider-implements-new-architect-editor-approach-for-ai-assisted-coding/">Aider architect/editor pattern write-up</a></li>
+  <li><a href="https://github.com/pydantic/pydantic-ai-harness/issues/92">Multi-model orchestration issue in pydantic-ai-harness</a></li>
+  <li><a href="https://www.mindstudio.ai/blog/smart-orchestrator-cheaper-sub-agent-models-claude-code">Smart orchestrator with cheaper subagent models in Claude Code</a></li>
+  <li><a href="https://hidekazu-konishi.com/entry/claude_code_subagents_and_orchestration_guide.html">Claude Code subagents and orchestration guide</a></li>
+  <li><a href="https://readysolutions.ai/blog/2026-04-18-sub-agent-orchestration-patterns-claude/">Sub-agent orchestration patterns</a></li>
+  <li><a href="https://arxiv.org/html/2604.16790">Bias in the Loop: auditing LLM-as-a-judge for software engineering</a></li>
+  <li><a href="https://arxiv.org/pdf/2510.24367">LLM-as-a-Judge for software engineering, literature review</a></li>
+  <li><a href="https://arxiv.org/html/2602.11911">Improving code generation via small language model as judge</a></li>
+  <li><a href="https://arxiv.org/pdf/2502.12468">MCTS-Judge: test-time scaling for code correctness judging</a></li>
+  <li>Internal: <code>docs/CODEBASE_MAP.md</code>, <code>cli/subagent.py</code>, <code>core/prompt_enhancer.py</code>, <code>cli/headless.py</code>, <code>core/agent_engine.py</code>, <code>events/emitter.py</code></li>
+</ul>
+</div>

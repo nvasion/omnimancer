@@ -123,6 +123,66 @@ class TestOpenAIToolCalling:
         assert response.tool_calls[0].arguments == {"path": "/src/main.py"}
 
     @pytest.mark.asyncio
+    async def test_model_used_reports_what_the_server_served(
+        self, openai_provider, sample_chat_context, sample_tools, mock_text_response
+    ):
+        # Gateways can route or fall back; the response's "model" is the
+        # evidence of what actually answered (H2L tiers rely on it).
+        served = dict(mock_text_response)
+        served["model"] = "llama3.3-70b-instruct"
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = served
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                return_value=mock_response
+            )
+            response = await openai_provider.send_message_with_tools(
+                "hi", sample_chat_context, sample_tools
+            )
+        assert response.model_used == "llama3.3-70b-instruct"
+
+    @pytest.mark.asyncio
+    async def test_finish_reason_length_is_surfaced(
+        self, openai_provider, sample_chat_context, sample_tools, mock_text_response
+    ):
+        # A response cut off at max_tokens must be distinguishable from a
+        # complete one: a truncated tool call arrives with broken arguments.
+        cut = dict(mock_text_response)
+        cut["choices"] = [dict(cut["choices"][0], finish_reason="length")]
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = cut
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                return_value=mock_response
+            )
+            response = await openai_provider.send_message_with_tools(
+                "hi", sample_chat_context, sample_tools
+            )
+        assert response.stop_reason == "length"
+
+    @pytest.mark.asyncio
+    async def test_model_used_falls_back_to_requested_model(
+        self, openai_provider, sample_chat_context, sample_tools, mock_text_response
+    ):
+        without = {k: v for k, v in mock_text_response.items() if k != "model"}
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = without
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                return_value=mock_response
+            )
+            response = await openai_provider.send_message_with_tools(
+                "hi", sample_chat_context, sample_tools
+            )
+        assert response.model_used == "gpt-4"
+
+    @pytest.mark.asyncio
     async def test_send_message_with_tools_text_only(
         self, openai_provider, sample_chat_context, sample_tools, mock_text_response
     ):

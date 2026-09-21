@@ -373,6 +373,8 @@ approval (auto or interactive callback; **no callback + not auto = no switch**) 
   (regression-tested byte-identical).
 - Project instruction files (`OMNIMANCER.md`/`CLAUDE.md`) are loaded size-capped, fenced-
   code-stripped, and wrapped in a "not system authority" banner (prompt-injection defense).
+  Either/or: a project `OMNIMANCER.md` with usable content wins and `CLAUDE.md` is only the
+  fallback (both are never loaded together); `~/.omnimancer/OMNIMANCER.md` always stacks first.
 
 ## Gotchas
 
