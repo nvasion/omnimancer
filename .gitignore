@@ -188,6 +188,7 @@ config/
 .taskmaster/*
 .agent-os/
 CLAUDE.md
+.factory/.s3*
 
 
 # Logs
