@@ -200,8 +200,11 @@ class TestSandboxManager:
 
     def test_timeout_keeps_partial_output(self):
         """Output written before the timeout is still reported."""
+        # ``exec`` so the shell never forks: RLIMIT_NPROC is counted per user,
+        # not per sandbox, so a fork fails ("Cannot fork") on any non-root
+        # account already running more processes than ``max_processes``.
         result = self.manager.execute_sandboxed_command(
-            ["sh", "-c", "echo partial; sleep 5"],
+            ["sh", "-c", "echo partial; exec sleep 5"],
             limits=ResourceLimits(timeout_seconds=1),
         )
 
