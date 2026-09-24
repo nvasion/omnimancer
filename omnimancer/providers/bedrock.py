@@ -8,7 +8,7 @@ API key authentication, and region configuration.
 
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 
@@ -70,10 +70,13 @@ class BedrockProvider(BaseProvider):
         # AWS-specific configuration
         self.aws_region = kwargs.get("aws_region", "us-east-1")
 
-        # Standard parameters
+        # Standard parameters. Bedrock fronts third-party models that reject
+        # temperature/topP in inferenceConfig outright, and nothing in
+        # Omnimancer lets a user pick these values, so an unset param stays
+        # None and is omitted rather than defaulted into every request.
         self.max_tokens = kwargs.get("max_tokens", 4096)
-        self.temperature = kwargs.get("temperature", 0.7)
-        self.top_p = kwargs.get("top_p", 1.0)
+        self.temperature = kwargs.get("temperature")
+        self.top_p = kwargs.get("top_p")
         self.top_k = kwargs.get("top_k", 250)
 
         # Build base URL for Bedrock API key authentication
@@ -258,7 +261,7 @@ class BedrockProvider(BaseProvider):
             # Test the specific model with a minimal request
             test_request = {
                 "messages": [{"role": "user", "content": [{"text": "Hi"}]}],
-                "inferenceConfig": {"maxTokens": 10, "temperature": 0.1},
+                "inferenceConfig": self._build_inference_config(max_tokens=10),
             }
 
             # If using ARN format, include the model ARN in the request
@@ -373,6 +376,23 @@ class BedrockProvider(BaseProvider):
                 "message": f"Failed to test model: {str(e)}",
             }
 
+    def _build_inference_config(
+        self, max_tokens: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Build inferenceConfig, omitting sampling params that are unset.
+
+        Converse raises a ValidationException for any inference field the
+        target model does not accept, so only configured values are sent.
+        """
+        inference: Dict[str, Any] = {
+            "maxTokens": max_tokens if max_tokens is not None else self.max_tokens
+        }
+        if self.temperature is not None:
+            inference["temperature"] = self.temperature
+        if self.top_p is not None:
+            inference["topP"] = self.top_p
+        return inference
+
     # Converse prompt caching is model-gated: sending a cachePoint to an
     # unsupported model is a hard ValidationException, so only inject for
     # families AWS documents as supported.
@@ -429,11 +449,7 @@ class BedrockProvider(BaseProvider):
 
         request_data = {
             "messages": messages,
-            "inferenceConfig": {
-                "maxTokens": self.max_tokens,
-                "temperature": self.temperature,
-                "topP": self.top_p,
-            },
+            "inferenceConfig": self._build_inference_config(),
         }
 
         # If using ARN format, include the model ARN in the request
@@ -470,11 +486,7 @@ class BedrockProvider(BaseProvider):
 
         request_data = {
             "messages": messages,
-            "inferenceConfig": {
-                "maxTokens": self.max_tokens,
-                "temperature": self.temperature,
-                "topP": self.top_p,
-            },
+            "inferenceConfig": self._build_inference_config(),
         }
 
         # Add tools in Bedrock Converse format
