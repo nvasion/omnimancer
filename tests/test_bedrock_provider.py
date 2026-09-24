@@ -158,17 +158,24 @@ def mock_converse_response():
 
 @pytest.fixture
 def mock_tool_response():
-    """Create a mock Bedrock Converse API response with tool use."""
+    """Create a mock Bedrock Converse API response with tool use.
+
+    Converse identifies content blocks by key, not by a ``type`` field:
+    a text block is ``{"text": ...}`` and a tool call is
+    ``{"toolUse": {"toolUseId", "name", "input"}}``.
+    """
     return {
         "output": {
             "message": {
                 "role": "assistant",
                 "content": [
-                    {"type": "text", "text": "I will query the database."},
+                    {"text": "I will query the database."},
                     {
-                        "type": "toolUse",
-                        "name": "query_database",
-                        "input": {"sql": "SELECT * FROM users LIMIT 10"},
+                        "toolUse": {
+                            "toolUseId": "tooluse_abc123",
+                            "name": "query_database",
+                            "input": {"sql": "SELECT * FROM users LIMIT 10"},
+                        }
                     },
                 ],
             }
@@ -320,13 +327,33 @@ class TestBedrockProviderRequestPreparation:
         assert len(body["toolConfig"]["tools"]) == 2
 
     def test_convert_tool_to_bedrock_format(self, bedrock_provider, sample_tools):
-        """Test tool conversion to Bedrock format."""
+        """Tools are converted to the Converse toolSpec shape."""
         tool = sample_tools[0]
         bedrock_tool = bedrock_provider._convert_tool_to_bedrock_format(tool)
 
-        assert bedrock_tool["name"] == "query_database"
-        assert bedrock_tool["description"] == "Run a query against the database"
-        assert "input_schema" in bedrock_tool
+        assert set(bedrock_tool) == {"toolSpec"}
+        spec = bedrock_tool["toolSpec"]
+        assert spec["name"] == "query_database"
+        assert spec["description"] == "Run a query against the database"
+        # Converse nests the JSON Schema under inputSchema.json.
+        assert spec["inputSchema"] == {"json": tool.parameters}
+
+    def test_every_tool_entry_is_wrapped_in_toolspec(
+        self, bedrock_provider, sample_chat_context, sample_tools
+    ):
+        """Reproduces the Converse ValidationException on toolConfig.tool.0.
+
+        Converse rejects any entry in ``toolConfig.tools`` that does not set
+        one of toolSpec, systemTool, modelTool or cachePoint.
+        """
+        body_str = bedrock_provider._prepare_bedrock_request_with_tools(
+            "Query the DB", sample_chat_context, sample_tools
+        )
+        body = json.loads(body_str)
+
+        allowed = {"toolSpec", "systemTool", "modelTool", "cachePoint"}
+        for entry in body["toolConfig"]["tools"]:
+            assert allowed & set(entry), f"invalid tool entry: {entry}"
 
 
 # ---------------------------------------------------------------------------
@@ -560,6 +587,39 @@ class TestBedrockProviderToolCalling:
             assert response.tool_calls is not None
             assert len(response.tool_calls) == 1
             assert response.tool_calls[0].name == "query_database"
+            assert response.tool_calls[0].arguments == {
+                "sql": "SELECT * FROM users LIMIT 10"
+            }
+            assert response.tool_calls[0].id == "tooluse_abc123"
+
+    @pytest.mark.asyncio
+    async def test_text_only_converse_response_still_parsed_with_tools(
+        self, bedrock_provider, sample_chat_context, sample_tools
+    ):
+        """A tools request answered with text only yields content, no calls."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [{"text": "No query needed."}],
+                }
+            },
+            "usage": {"inputTokens": 7, "outputTokens": 4},
+        }
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                return_value=mock_response
+            )
+
+            response = await bedrock_provider.send_message_with_tools(
+                "Say hi", sample_chat_context, sample_tools
+            )
+
+            assert response.content == "No query needed."
+            assert response.tool_calls is None
 
     @pytest.mark.asyncio
     async def test_send_message_with_tools_authentication_error(

@@ -488,18 +488,26 @@ class BedrockProvider(BaseProvider):
 
     def _convert_tool_to_bedrock_format(self, tool: ToolDefinition) -> Dict:
         """
-        Convert tool definition to Bedrock format.
+        Convert tool definition to Bedrock Converse format.
+
+        Converse requires every entry in ``toolConfig.tools`` to set one of
+        toolSpec, systemTool, modelTool or cachePoint, and it nests the JSON
+        Schema under ``inputSchema.json``. Sending the Anthropic Messages
+        shape (name/description/input_schema at the top level) is a hard
+        ValidationException on toolConfig.tool.0.
 
         Args:
             tool: Tool definition
 
         Returns:
-            Tool formatted for Bedrock API
+            Tool formatted for the Bedrock Converse API
         """
         return {
-            "name": tool.name,
-            "description": tool.description,
-            "input_schema": tool.parameters,
+            "toolSpec": {
+                "name": tool.name,
+                "description": tool.description,
+                "inputSchema": {"json": tool.parameters},
+            }
         }
 
     def _handle_response(self, response: httpx.Response) -> ChatResponse:
@@ -587,14 +595,19 @@ class BedrockProvider(BaseProvider):
                 text_content = ""
                 tool_calls = []
 
+                # Converse tags content blocks by key, not by a "type"
+                # field: text is {"text": ...} and a call is
+                # {"toolUse": {"toolUseId", "name", "input"}}.
                 for block in content_blocks:
-                    if block.get("type") == "text":
-                        text_content += block.get("text", "")
-                    elif block.get("type") == "toolUse":
+                    if "text" in block:
+                        text_content += block.get("text") or ""
+                    elif "toolUse" in block:
+                        tool_use = block.get("toolUse") or {}
                         tool_calls.append(
                             ToolCall(
-                                name=block.get("name", ""),
-                                arguments=block.get("input", {}),
+                                name=tool_use.get("name", ""),
+                                arguments=tool_use.get("input") or {},
+                                id=tool_use.get("toolUseId"),
                             )
                         )
 
