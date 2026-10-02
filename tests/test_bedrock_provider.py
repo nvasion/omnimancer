@@ -218,11 +218,19 @@ class TestBedrockProviderInitialization:
         assert "eu-west-1" in provider.base_url
 
     def test_initialization_default_generation_params(self, bedrock_provider):
-        """Test default generation parameter values."""
+        """Unset sampling params stay None so the model's defaults apply."""
         assert bedrock_provider.max_tokens == 4096
-        assert bedrock_provider.temperature == 0.7
-        assert bedrock_provider.top_p == 1.0
+        assert bedrock_provider.temperature is None
+        assert bedrock_provider.top_p is None
         assert bedrock_provider.top_k == 250
+
+    def test_initialization_explicit_generation_params(self):
+        """Explicitly configured sampling params are kept."""
+        provider = BedrockProvider(
+            api_key="key", model=_SONNET_MODEL, temperature=0.2, top_p=0.9
+        )
+        assert provider.temperature == 0.2
+        assert provider.top_p == 0.9
 
     def test_initialization_missing_api_key_raises_error(self):
         """Test that missing api_key raises ValueError."""
@@ -288,7 +296,59 @@ class TestBedrockProviderRequestPreparation:
 
         assert "inferenceConfig" in body
         assert body["inferenceConfig"]["maxTokens"] == bedrock_provider.max_tokens
-        assert body["inferenceConfig"]["temperature"] == bedrock_provider.temperature
+
+    def test_unset_sampling_params_are_omitted_from_inference_config(
+        self, bedrock_provider, sample_chat_context, sample_tools
+    ):
+        """Bedrock hosts models that reject temperature/topP outright.
+
+        Nothing in Omnimancer lets a user choose these values, so an
+        unconfigured provider must not send them and trigger a
+        ValidationException on models that do not accept them.
+        """
+        for body_str in (
+            bedrock_provider._prepare_bedrock_request("Hello", sample_chat_context),
+            bedrock_provider._prepare_bedrock_request_with_tools(
+                "Hello", sample_chat_context, sample_tools
+            ),
+        ):
+            inference = json.loads(body_str)["inferenceConfig"]
+            assert "temperature" not in inference
+            assert "topP" not in inference
+            assert inference["maxTokens"] == bedrock_provider.max_tokens
+
+    def test_configured_sampling_params_are_sent(
+        self, sample_chat_context, sample_tools
+    ):
+        """A user who configures temperature/top_p still gets them sent."""
+        provider = BedrockProvider(
+            api_key="key", model=_SONNET_MODEL, temperature=0.2, top_p=0.9
+        )
+
+        for body_str in (
+            provider._prepare_bedrock_request("Hello", sample_chat_context),
+            provider._prepare_bedrock_request_with_tools(
+                "Hello", sample_chat_context, sample_tools
+            ),
+        ):
+            inference = json.loads(body_str)["inferenceConfig"]
+            assert inference["temperature"] == 0.2
+            assert inference["topP"] == 0.9
+
+    @pytest.mark.asyncio
+    async def test_validate_model_access_omits_temperature(self, bedrock_provider):
+        """The model-access probe must not send temperature either."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_post = AsyncMock(return_value=mock_response)
+            mock_client.return_value.__aenter__.return_value.post = mock_post
+
+            await bedrock_provider.validate_model_access()
+
+            sent = json.loads(mock_post.call_args.kwargs["content"])
+            assert "temperature" not in sent["inferenceConfig"]
 
     def test_prepare_request_standard_model_has_no_model_id_field(
         self, bedrock_provider, sample_chat_context
