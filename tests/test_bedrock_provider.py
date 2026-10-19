@@ -421,6 +421,86 @@ class TestBedrockProviderRequestPreparation:
 # ---------------------------------------------------------------------------
 
 
+class TestBedrockProviderRequestTimeout:
+    """Bedrock hardcoded 30s while the base class already had the knob.
+
+    BaseProvider._resolve_request_timeout (explicit config, then
+    OMNIMANCER_REQUEST_TIMEOUT, then DEFAULT_REQUEST_TIMEOUT) existed for
+    exactly this reason: a long agent turn on a large model needs more than
+    30 seconds, and only the OpenAI family honoured it.
+    """
+
+    @pytest.fixture(autouse=True)
+    def no_env_timeout(self, monkeypatch):
+        monkeypatch.delenv("OMNIMANCER_REQUEST_TIMEOUT", raising=False)
+        yield
+
+    def test_default_is_the_shared_default_not_thirty(self):
+        provider = BedrockProvider(api_key="k", model=_SONNET_MODEL)
+        assert provider.request_timeout == BedrockProvider.DEFAULT_REQUEST_TIMEOUT
+        assert provider.request_timeout > 30.0
+
+    def test_configured_timeout_wins(self):
+        provider = BedrockProvider(api_key="k", model=_SONNET_MODEL, timeout=600)
+        assert provider.request_timeout == 600.0
+
+    def test_env_timeout_is_honoured(self, monkeypatch):
+        monkeypatch.setenv("OMNIMANCER_REQUEST_TIMEOUT", "300")
+        provider = BedrockProvider(api_key="k", model=_SONNET_MODEL)
+        assert provider.request_timeout == 300.0
+
+    @pytest.mark.asyncio
+    async def test_send_message_uses_the_resolved_timeout(
+        self, sample_chat_context, mock_converse_response
+    ):
+        provider = BedrockProvider(api_key="k", model=_SONNET_MODEL, timeout=450)
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_converse_response
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_post = AsyncMock(return_value=mock_response)
+            mock_client.return_value.__aenter__.return_value.post = mock_post
+            await provider.send_message("Hello", sample_chat_context)
+
+        assert mock_post.call_args.kwargs["timeout"] == 450.0
+
+    @pytest.mark.asyncio
+    async def test_send_message_with_tools_uses_the_resolved_timeout(
+        self, sample_chat_context, sample_tools, mock_tool_response
+    ):
+        provider = BedrockProvider(api_key="k", model=_SONNET_MODEL, timeout=450)
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_tool_response
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_post = AsyncMock(return_value=mock_response)
+            mock_client.return_value.__aenter__.return_value.post = mock_post
+            await provider.send_message_with_tools(
+                "Hello", sample_chat_context, sample_tools
+            )
+
+        assert mock_post.call_args.kwargs["timeout"] == 450.0
+
+    @pytest.mark.asyncio
+    async def test_timeout_error_names_the_limit_and_the_knob(
+        self, sample_chat_context
+    ):
+        """A bare "timed out" leaves the user nothing to act on."""
+        provider = BedrockProvider(api_key="k", model=_SONNET_MODEL, timeout=45)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                side_effect=httpx.TimeoutException("too slow")
+            )
+            with pytest.raises(NetworkError) as exc:
+                await provider.send_message("Hello", sample_chat_context)
+
+        message = str(exc.value)
+        assert "45" in message
+        assert "OMNIMANCER_REQUEST_TIMEOUT" in message
+
+
 class TestBedrockProviderARNRoutingBehaviour:
     """Test that ARN-format models result in correct URL construction.
 
@@ -459,6 +539,29 @@ class TestBedrockProviderARNRoutingBehaviour:
             bare_model_id = _SONNET_ARN.split("/")[-1]
             assert bare_model_id in call_url
             assert "arn:aws:bedrock:" not in call_url
+
+    @pytest.mark.asyncio
+    async def test_send_message_uses_extracted_id_in_url_for_arn(
+        self, bedrock_provider_arn, sample_chat_context, mock_converse_response
+    ):
+        """The no-tools path must extract the ARN too.
+
+        send_message_with_tools extracted the bare model id while
+        send_message interpolated the whole ARN, so the same configured
+        model worked in agent mode and built a malformed URL in plain chat.
+        """
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_converse_response
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_post = AsyncMock(return_value=mock_response)
+            mock_client.return_value.__aenter__.return_value.post = mock_post
+            await bedrock_provider_arn.send_message("Hello", sample_chat_context)
+
+        call_url = mock_post.call_args[0][0]
+        assert _SONNET_ARN.split("/")[-1] in call_url
+        assert "arn:aws:bedrock:" not in call_url
 
     @pytest.mark.asyncio
     async def test_send_message_standard_model_uses_model_id_in_url(
