@@ -128,6 +128,28 @@ class TestResolve:
         # The stored config is still untouched.
         assert "digitalocean" not in cm.get_config().providers
 
+    def test_env_only_bedrock_provider_resolves(self, monkeypatch):
+        """The reported failure: OMNIMANCER_BEDROCK_API_KEY was ignored.
+
+        The existing env-only coverage used digitalocean, which happens to
+        have a conventional key in ENV_VAR_MAPPING; bedrock does not, so
+        H2L reported 'provider entry bedrock is not configured' while
+        naming the very variable the user had already set.
+        """
+        monkeypatch.setenv("OMNIMANCER_BEDROCK_API_KEY", "bedrock-key")
+        cm = _config_manager()  # no "bedrock" entry on disk
+        ref = H2LModelRef(provider="bedrock", model="moonshotai.kimi-k2-instruct")
+        with patch(
+            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            return_value=_tool_provider(),
+        ) as create:
+            resolve(ref, cm, MagicMock())
+        name, effective, _ = create.call_args[0]
+        assert name == "bedrock"
+        assert effective.api_key == "bedrock-key"
+        assert effective.model == "moonshotai.kimi-k2-instruct"
+        assert "bedrock" not in cm.get_config().providers
+
     def test_env_key_applies_to_stored_entry(self, monkeypatch):
         monkeypatch.setenv("OMNIMANCER_GATEWAY_BASE_URL", "http://env-host:8000/v1")
         cm = _config_manager()

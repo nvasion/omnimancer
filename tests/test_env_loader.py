@@ -32,7 +32,16 @@ def clean_env(monkeypatch):
     for var in _RELEVANT_ENV:
         monkeypatch.delenv(var, raising=False)
     # Clear any OMNIMANCER_<PROVIDER>_* vars for common providers.
-    for provider in ("OPENAI", "CLAUDE", "DIGITALOCEAN", "OPENROUTER"):
+    for provider in (
+        "OPENAI",
+        "CLAUDE",
+        "DIGITALOCEAN",
+        "OPENROUTER",
+        "BEDROCK",
+        "VERTEX",
+        "OPENAI_COMPATIBLE",
+        "NOTAPROVIDER",
+    ):
         for suffix in ("API_KEY", "BASE_URL", "MODEL"):
             monkeypatch.delenv(f"OMNIMANCER_{provider}_{suffix}", raising=False)
     yield
@@ -93,6 +102,34 @@ class TestApplyEnvOverrides:
         assert do.api_key == "do-123"
         assert do.base_url == "https://inference.do-ai.run/v1"
         assert do.model == "llama3.3-70b-instruct"
+
+    def test_creates_bedrock_provider_from_namespaced_env(self, monkeypatch):
+        """OMNIMANCER_<PROVIDER>_API_KEY must work for every provider.
+
+        bedrock has no entry in ENV_VAR_MAPPING (there is no conventional
+        single-key env var for it), so it was never even considered as a
+        candidate and the namespaced key was silently ignored.
+        """
+        monkeypatch.setenv("OMNIMANCER_BEDROCK_API_KEY", "bedrock-key")
+        monkeypatch.setenv("OMNIMANCER_BEDROCK_MODEL", "moonshotai.kimi-k2-instruct")
+        effective = apply_env_overrides(_config())
+        assert "bedrock" in effective.providers
+        assert effective.providers["bedrock"].api_key == "bedrock-key"
+        assert effective.providers["bedrock"].model == "moonshotai.kimi-k2-instruct"
+
+    def test_creates_hyphenated_provider_from_namespaced_env(self, monkeypatch):
+        """A hyphenated provider maps to an underscored env prefix."""
+        monkeypatch.setenv("OMNIMANCER_OPENAI_COMPATIBLE_API_KEY", "oc-key")
+        monkeypatch.setenv("OMNIMANCER_OPENAI_COMPATIBLE_BASE_URL", "http://host/v1")
+        effective = apply_env_overrides(_config())
+        assert "openai-compatible" in effective.providers
+        assert effective.providers["openai-compatible"].base_url == "http://host/v1"
+
+    def test_unregistered_name_does_not_create_provider(self, monkeypatch):
+        """Only real provider names are materialized from the environment."""
+        monkeypatch.setenv("OMNIMANCER_NOTAPROVIDER_API_KEY", "nope")
+        effective = apply_env_overrides(_config())
+        assert "notaprovider" not in effective.providers
 
     def test_does_not_mutate_original(self, monkeypatch):
         monkeypatch.setenv("OMNIMANCER_OPENAI_BASE_URL", "http://proxy/v1")
