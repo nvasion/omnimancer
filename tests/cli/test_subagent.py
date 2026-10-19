@@ -116,6 +116,52 @@ class TestSubAgentRunner:
         engine.chat_manager.add_user_message.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_model_override_uses_an_isolated_instance(self):
+        """A model override must not mutate the shared session provider.
+
+        The runner used to assign provider.model on the engine's own object
+        and put it back in a finally block; anything running concurrently saw
+        the subagent's model. It now resolves its own instance through the
+        shared provider resolver, the same way H2L tiers do.
+        """
+        from omnimancer.core.models import Config, ProviderConfig
+
+        shared = MagicMock()
+        shared.model = "base"
+        shared.send_message_with_tools = AsyncMock(return_value=_response("parent"))
+
+        isolated = MagicMock()
+        isolated.model = "special"
+        isolated.send_message_with_tools = AsyncMock(return_value=_response("child"))
+
+        engine = _engine(shared)
+        engine.providers = {"openai": shared}
+        engine.config_manager.get_config.return_value = Config(
+            default_provider="openai",
+            providers={"openai": ProviderConfig(api_key="k", model="base")},
+            storage_path="/tmp/omn-subagent",
+        )
+
+        runner = SubAgentRunner(engine)
+        defn = SubAgentDefinition(name="x", model="special")
+        with patch(
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
+            return_value=isolated,
+        ) as create:
+            with patch.object(runner, "_scoped_tools", return_value=TOOLS):
+                result = await runner.run(defn, "task")
+
+        assert result.success is True
+        assert result.output == "child"
+        # The isolated instance ran the loop; the shared one was never called.
+        isolated.send_message_with_tools.assert_awaited()
+        shared.send_message_with_tools.assert_not_awaited()
+        # And the shared provider's model was never touched at all.
+        assert shared.model == "base"
+        assert create.call_args[0][1].model == "special"
+        assert result.model == "special"
+
+    @pytest.mark.asyncio
     async def test_model_override_restored(self):
         provider = MagicMock()
         provider.model = "base"
@@ -127,6 +173,8 @@ class TestSubAgentRunner:
             return_value=_fake_tool_handler(TOOLS),
         ):
             await runner.run(defn, "task")
+        # Fallback path: nothing resolvable (MagicMock engine), so the runner
+        # still mutates and restores the shared provider.
         assert provider.model == "base"  # restored after run
 
     @pytest.mark.asyncio
