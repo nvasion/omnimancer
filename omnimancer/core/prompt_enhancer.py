@@ -264,23 +264,24 @@ async def enhance(
         if fallback_model is not None and fallback_model not in candidates:
             candidates.append(fallback_model)
 
-        from ..providers.factory import ProviderFactory
+        from .provider_resolver import ProviderResolutionError, resolve_provider
 
         for provider_name, model in candidates:
-            provider_config = config.providers.get(provider_name)
-            if provider_config is None:
+            try:
+                # The shared resolver so an entry materialized from
+                # OMNIMANCER_<PROVIDER>_* is as usable here as in the engine.
+                provider = resolve_provider(
+                    provider_name,
+                    config_manager,
+                    model,
+                    overrides={"temperature": temperature},
+                )
+            except ProviderResolutionError as exc:
                 logger.warning(
-                    "Enhancement provider %r is not configured", provider_name
+                    "Enhancement provider %r unusable: %s", provider_name, exc
                 )
                 continue
             try:
-                effective = provider_config.model_copy(
-                    update={"model": model, "temperature": temperature}
-                )
-                provider = ProviderFactory.create_provider(
-                    provider_name, effective, config_manager
-                )
-
                 # Isolated context: the session conversation never leaks
                 # into the rewrite, and the rewrite never lands in session
                 # history.

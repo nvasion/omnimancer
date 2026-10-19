@@ -136,17 +136,13 @@ class CoreEngine:
     async def initialize_providers(self) -> None:
         """Initialize all configured providers."""
         try:
-            config = self.config_manager.get_config()
+            # The effective configuration: stored config plus ephemeral
+            # environment overrides (API keys, base_url, model, default
+            # provider), never persisted. Every other surface resolves
+            # against this same view via core.provider_resolver.
+            from .provider_resolver import effective_config
 
-            # Apply ephemeral environment-variable overrides (API keys,
-            # base_url, model, default provider). Never persisted to disk.
-            # Overrides must never prevent startup, so fall back on any error.
-            try:
-                from .env_loader import apply_env_overrides
-
-                config = apply_env_overrides(config)
-            except Exception as e:
-                logger.warning(f"Skipping environment overrides: {e}")
+            config = effective_config(self.config_manager)
 
             # Use the optimized provider initializer with
             # config_manager for API key decryption
@@ -232,11 +228,13 @@ class CoreEngine:
                     break
         if not provider_name or not model:
             try:
-                config = self.config_manager.get_config()
+                from .provider_resolver import effective_config
+
+                config = effective_config(self.config_manager)
                 if not provider_name:
                     provider_name = config.default_provider or "unknown"
                 if not model:
-                    entry = config.providers.get(config.default_provider)
+                    entry = (config.providers or {}).get(config.default_provider)
                     raw = getattr(entry, "model", "")
                     model = raw if isinstance(raw, str) else ""
             except Exception as e:  # identity is best-effort diagnostics
@@ -945,11 +943,13 @@ class CoreEngine:
             Dictionary with health status information
         """
         try:
-            config = self.config_manager.get_config()
+            from .provider_resolver import effective_providers
+
+            providers = effective_providers(self.config_manager)
 
             if provider_name:
                 # Check specific provider
-                if provider_name not in config.providers:
+                if provider_name not in providers:
                     return {
                         provider_name: {
                             "status": "error",
@@ -959,7 +959,7 @@ class CoreEngine:
                         }
                     }
 
-                provider_config = config.providers[provider_name]
+                provider_config = providers[provider_name]
                 status = await self.health_monitor.check_provider_health(
                     provider_name, provider_config, force=force
                 )
@@ -967,7 +967,7 @@ class CoreEngine:
             else:
                 # Check all providers
                 return await self.health_monitor.check_all_providers_health(
-                    config.providers, force=force
+                    providers, force=force
                 )
 
         except Exception as e:

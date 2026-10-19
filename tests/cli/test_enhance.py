@@ -96,6 +96,78 @@ def _config_manager(providers=None, enhancement=_NO_BLOCK):
     return manager
 
 
+def _real_config_manager(enhancement_provider, enhancement_model, providers=None):
+    """A real Config (not a namespace) so env overrides actually apply."""
+    from omnimancer.core.models import Config, EnhancementConfig
+
+    config = Config(
+        default_provider="claude",
+        providers=providers or {},
+        storage_path="/tmp/omn-enhance",
+        enhancement=EnhancementConfig(
+            provider=enhancement_provider, model=enhancement_model
+        ),
+    )
+    manager = MagicMock()
+    manager.get_config.return_value = config
+    return manager
+
+
+class TestEnhanceProviderResolution:
+    """The enhancer must see the same effective config as every other surface."""
+
+    @pytest.mark.asyncio
+    async def test_env_only_provider_is_usable(self, monkeypatch):
+        """A provider configured purely through the environment must work.
+
+        The enhancer read the stored config, so an entry materialized from
+        OMNIMANCER_<PROVIDER>_API_KEY was reported as "not configured" even
+        though the engine was running on it.
+        """
+        monkeypatch.setenv("OMNIMANCER_BEDROCK_API_KEY", "bedrock-key")
+        monkeypatch.setenv("OMNIMANCER_BEDROCK_MODEL", "kimi-k2")
+        provider = MagicMock()
+        provider.send_message = AsyncMock(
+            return_value=ChatResponse(
+                content="REWRITTEN",
+                model_used="kimi-k2",
+                tokens_used=1,
+                timestamp=datetime.now(),
+            )
+        )
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            return_value=provider,
+        ) as create:
+            text, ok = await enhance(
+                "draft", "code", _real_config_manager("bedrock", "kimi-k2")
+            )
+        assert (text, ok) == ("REWRITTEN", True)
+        name, entry, _ = create.call_args[0]
+        assert name == "bedrock"
+        assert entry.api_key == "bedrock-key"
+        assert entry.model == "kimi-k2"
+
+    @pytest.mark.asyncio
+    async def test_enhancement_temperature_still_applied(self, monkeypatch):
+        monkeypatch.setenv("OMNIMANCER_BEDROCK_API_KEY", "bedrock-key")
+        provider = MagicMock()
+        provider.send_message = AsyncMock(
+            return_value=ChatResponse(
+                content="REWRITTEN",
+                model_used="kimi-k2",
+                tokens_used=1,
+                timestamp=datetime.now(),
+            )
+        )
+        with patch(
+            "omnimancer.providers.factory.ProviderFactory.create_provider",
+            return_value=provider,
+        ) as create:
+            await enhance("draft", "code", _real_config_manager("bedrock", "kimi-k2"))
+        assert create.call_args[0][1].temperature == 0.4
+
+
 class TestEnhance:
     @pytest.mark.asyncio
     async def test_success_returns_rewrite(self):

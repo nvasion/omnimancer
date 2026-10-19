@@ -39,7 +39,8 @@ class TestResolve:
         fresh = _tool_provider()
         ref = H2LModelRef(provider="claude", model="claude-opus-5")
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider", return_value=fresh
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
+            return_value=fresh,
         ) as create:
             provider = resolve(ref, cm, engine)
         assert provider is fresh
@@ -59,7 +60,7 @@ class TestResolve:
         cm.get_config().providers["gateway"].model = "rewritten-by-env"
         ref = H2LModelRef(provider="gateway", model="qwen3-8b")
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ) as create:
             resolve(ref, cm, MagicMock())
@@ -70,7 +71,7 @@ class TestResolve:
         # plans to that cap. H2L tiers get a floor.
         cm = _config_manager()
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ) as create:
             resolve(
@@ -86,7 +87,7 @@ class TestResolve:
         cm = _config_manager()
         cm.get_config().providers["claude"].max_tokens = 64000
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ) as create:
             resolve(H2LModelRef(provider="claude", model="m"), cm, None, 16384)
@@ -95,7 +96,7 @@ class TestResolve:
     def test_no_floor_leaves_cap_untouched(self):
         cm = _config_manager()
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ) as create:
             resolve(H2LModelRef(provider="claude", model="m"), cm, None, None)
@@ -117,7 +118,7 @@ class TestResolve:
         cm = _config_manager()  # no "digitalocean" entry on disk
         ref = H2LModelRef(provider="digitalocean", model="qwen3.5-397b-a17b")
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ) as create:
             resolve(ref, cm, MagicMock())
@@ -140,7 +141,7 @@ class TestResolve:
         cm = _config_manager()  # no "bedrock" entry on disk
         ref = H2LModelRef(provider="bedrock", model="moonshotai.kimi-k2-instruct")
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ) as create:
             resolve(ref, cm, MagicMock())
@@ -154,7 +155,7 @@ class TestResolve:
         monkeypatch.setenv("OMNIMANCER_GATEWAY_BASE_URL", "http://env-host:8000/v1")
         cm = _config_manager()
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ) as create:
             resolve(H2LModelRef(provider="gateway", model="qwen3-8b"), cm, None)
@@ -169,7 +170,7 @@ class TestResolve:
         engine = MagicMock()
         engine.providers = {"local": live}
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ) as create:
             resolve(H2LModelRef(provider="local", model="m"), _config_manager(), engine)
@@ -184,7 +185,7 @@ class TestResolve:
             providers={"ollama": ProviderConfig(api_key="", model="qwen2.5")}
         )
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(supports=False),
         ):
             with pytest.raises(H2LConfigError) as exc:
@@ -195,7 +196,7 @@ class TestResolve:
 
     def test_factory_failure_surfaces_as_config_error(self):
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             side_effect=RuntimeError("no key"),
         ):
             with pytest.raises(H2LConfigError, match="no key"):
@@ -208,7 +209,7 @@ class TestValidateTiers:
     def test_validates_high_and_every_low_before_any_model_call(self):
         cfg = H2LConfig(high="claude:a", low=["gateway:b", "gateway:c"])
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ) as create:
             resolved = validate_tiers(cfg, _config_manager(), None)
@@ -221,7 +222,7 @@ class TestValidateTiers:
     def test_bad_low_entry_fails_whole_validation(self):
         cfg = H2LConfig(high="claude:a", low=["gateway:b", "missing:c"])
         with patch(
-            "omnimancer.h2l.refs.ProviderFactory.create_provider",
+            "omnimancer.core.provider_resolver.ProviderFactory.create_provider",
             return_value=_tool_provider(),
         ):
             with pytest.raises(H2LConfigError, match="missing"):
