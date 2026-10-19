@@ -44,6 +44,8 @@ class ProviderInitializer:
     # Configuration
     _lazy_loading_enabled: bool = True
     _cache_enabled: bool = True
+    # provider name -> why it failed, from the most recent initialization
+    _last_init_errors: Dict[str, str] = {}
 
     @classmethod
     def get_provider_class(cls, provider_name: str) -> Type[BaseProvider]:
@@ -447,14 +449,35 @@ class ProviderInitializer:
             provider_configs: Dictionary of provider configurations
             config_manager: Optional config manager for API key decryption
 
+        An entry with no model id is *incomplete*, not broken: environment
+        materialized entries (``OMNIMANCER_<PROVIDER>_API_KEY`` with no
+        ``_MODEL``) are legitimate when the model comes from somewhere else,
+        such as an H2L ``--high <entry>:<model>`` ref. Those are skipped
+        without an error; real failures are recorded so callers can report
+        the actual cause instead of guessing at one.
+
         Returns:
             Dictionary of initialized provider instances
         """
         from ..providers.factory import ProviderFactory
 
         providers = {}
+        errors: Dict[str, str] = {}
 
         for provider_name, config in provider_configs.items():
+            if not (getattr(config, "model", "") or "").strip():
+                env_var = (
+                    "OMNIMANCER_" + provider_name.upper().replace("-", "_") + "_MODEL"
+                )
+                logger.info(
+                    "Provider '%s' has no model configured; not started. "
+                    "Set %s or '/config set-provider %s'. Model refs that "
+                    "carry their own model (H2L tiers) still work.",
+                    provider_name,
+                    env_var,
+                    provider_name,
+                )
+                continue
             try:
                 # Use ProviderFactory instead of direct class loading
                 provider = ProviderFactory.create_provider(
@@ -463,11 +486,18 @@ class ProviderInitializer:
                 providers[provider_name] = provider
                 logger.info(f"Initialized provider: {provider_name}")
             except Exception as e:
-                logger.error(f"Failed to initialize provider {provider_name}: {e}")
+                errors[provider_name] = str(e)
+                logger.error(f"Provider '{provider_name}' did not start: {e}")
                 # Continue with other providers instead of failing completely
                 continue
 
+        cls._last_init_errors = errors
         return providers
+
+    @classmethod
+    def get_last_init_errors(cls) -> Dict[str, str]:
+        """Why each provider failed during the most recent initialization."""
+        return dict(getattr(cls, "_last_init_errors", {}) or {})
 
     @classmethod
     def preload_model_info(cls, provider_names: List[str]) -> None:
