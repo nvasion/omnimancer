@@ -70,6 +70,14 @@ class BedrockProvider(BaseProvider):
         # AWS-specific configuration
         self.aws_region = kwargs.get("aws_region", "us-east-1")
 
+        # Chat-completion timeout. ProviderConfig's field is `timeout`;
+        # `request_timeout` is accepted as an alias, then
+        # OMNIMANCER_REQUEST_TIMEOUT, then DEFAULT_REQUEST_TIMEOUT. A long
+        # agent turn on a large model does not fit in the old hardcoded 30s.
+        self.request_timeout = self._resolve_request_timeout(
+            kwargs.get("request_timeout") or kwargs.get("timeout")
+        )
+
         # Standard parameters. Bedrock fronts third-party models that reject
         # temperature/topP in inferenceConfig outright, and nothing in
         # Omnimancer lets a user pick these values, so an unset param stays
@@ -81,6 +89,21 @@ class BedrockProvider(BaseProvider):
 
         # Build base URL for Bedrock API key authentication
         self.base_url = f"https://bedrock-runtime.{self.aws_region}.amazonaws.com"
+
+    def _timeout_network_error(self) -> NetworkError:
+        """The NetworkError raised when a Converse request times out."""
+        return NetworkError(
+            f"Request to AWS Bedrock API timed out after "
+            f"{self.request_timeout:.0f}s. Raise it with this provider's "
+            f"timeout (providers.<name>.timeout in config.json) or the "
+            f"OMNIMANCER_REQUEST_TIMEOUT environment variable."
+        )
+
+    def _model_for_url(self) -> str:
+        """The path segment for this model: ARNs carry an unusable prefix."""
+        if self._is_arn(self.model):
+            return self._extract_model_id_from_arn(self.model)
+        return self.model
 
     def _is_arn(self, model_id: str) -> bool:
         """Check if the model ID is in ARN format."""
@@ -144,7 +167,7 @@ class BedrockProvider(BaseProvider):
             request_body = self._prepare_bedrock_request(message, context)
 
             # Build URL for the specific model
-            url = f"{self.base_url}/model/{self.model}/converse"
+            url = f"{self.base_url}/model/{self._model_for_url()}/converse"
 
             # Create headers with Bearer token authentication
             headers = {
@@ -155,14 +178,17 @@ class BedrockProvider(BaseProvider):
             # Make API request
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    url, headers=headers, content=request_body, timeout=30.0
+                    url,
+                    headers=headers,
+                    content=request_body,
+                    timeout=self.request_timeout,
                 )
 
             # Handle response
             return self._handle_response(response)
 
         except httpx.TimeoutException:
-            raise NetworkError("Request to AWS Bedrock API timed out")
+            raise self._timeout_network_error()
         except httpx.RequestError as e:
             raise NetworkError(f"Network error: {e}")
         except Exception as e:
@@ -191,13 +217,8 @@ class BedrockProvider(BaseProvider):
                 message, context, available_tools
             )
 
-            # Build URL - use appropriate endpoint based on model format
-            if self._is_arn(self.model):
-                # For ARN format, extract the actual model ID for the URL
-                model_for_url = self._extract_model_id_from_arn(self.model)
-                url = f"{self.base_url}/model" f"/{model_for_url}/converse"
-            else:
-                url = f"{self.base_url}/model" f"/{self.model}/converse"
+            # Build URL - an ARN model id is not usable as a path segment
+            url = f"{self.base_url}/model/{self._model_for_url()}/converse"
 
             # Create headers with Bearer token authentication
             headers = {
@@ -211,14 +232,14 @@ class BedrockProvider(BaseProvider):
                     url,
                     headers=headers,
                     content=request_body,
-                    timeout=30.0,
+                    timeout=self.request_timeout,
                 )
 
             # Handle response with tool calls
             return self._handle_response_with_tools(response)
 
         except httpx.TimeoutException:
-            raise NetworkError("Request to AWS Bedrock API timed out")
+            raise self._timeout_network_error()
         except httpx.RequestError as e:
             raise NetworkError(f"Network error: {e}")
         except Exception as e:
