@@ -230,7 +230,7 @@ def apply_env_overrides(config: "Config") -> "Config":
                 model=overrides.get("model", ""),
             )
             effective.providers[name] = provider_config
-            logger.info(f"Created provider '{name}' from environment overrides")
+            logger.debug(f"Created provider '{name}' from environment overrides")
 
         if "api_key" in overrides:
             provider_config.api_key = overrides["api_key"]
@@ -241,6 +241,8 @@ def apply_env_overrides(config: "Config") -> "Config":
 
     if default_override:
         effective.default_provider = default_override
-        logger.info(f"Default provider overridden from environment: {default_override}")
+        logger.debug(
+            f"Default provider overridden from environment: {default_override}"
+        )
 
     return effective

@@ -182,11 +182,12 @@ class CoreEngine:
                     # DigitalOcean request). Leave it unset so the user gets a
                     # clear error naming the provider.
                     self._unavailable_default_provider = config.default_provider
+                    # One accurate line instead of a guess; the full
+                    # explanation is built on demand by _no_provider_error.
                     logger.error(
-                        "Default provider '%s' is configured but failed to "
-                        "initialize (missing or invalid API key?). Not falling "
-                        "back to another provider.",
+                        "Default provider '%s' is not available: %s",
                         config.default_provider,
+                        self._no_provider_error(),
                     )
             elif self.providers:
                 # No default configured — use first available provider.
@@ -306,14 +307,44 @@ class CoreEngine:
         missing, rather than a generic "no provider" message.
         """
         unavailable = getattr(self, "_unavailable_default_provider", None)
-        if unavailable:
+        if not unavailable:
+            return "No provider available. Please configure a provider first."
+
+        env_prefix = "OMNIMANCER_" + unavailable.upper().replace("-", "_")
+        try:
+            from .provider_resolver import effective_providers
+
+            entry = effective_providers(self.config_manager).get(unavailable)
+        except Exception as exc:  # diagnostics must not raise
+            logger.debug(f"Could not inspect entry for {unavailable}: {exc}")
+            entry = None
+
+        if entry is None:
             return (
-                f"Provider '{unavailable}' is selected but failed to initialize "
-                f"— most likely a missing or invalid API key. Configure it (e.g. "
-                f"'/config set-provider {unavailable}' or the provider's API-key "
-                f"environment variable) and try again."
+                f"Provider '{unavailable}' is selected as the default but is "
+                f"not configured: there is no entry for it and no "
+                f"{env_prefix}_API_KEY in the environment. Add it with "
+                f"'/config set-provider {unavailable}', or pick a different "
+                f"default with '/switch'."
             )
-        return "No provider available. Please configure a provider first."
+
+        if not (getattr(entry, "model", "") or "").strip():
+            return (
+                f"Provider '{unavailable}' has no model configured, so it was "
+                f"not started. Set {env_prefix}_MODEL, or run '/model' to pick "
+                f"one."
+            )
+
+        from .provider_initializer import ProviderInitializer
+
+        reason = ProviderInitializer.get_last_init_errors().get(unavailable)
+        if reason:
+            return f"Provider '{unavailable}' did not start: {reason}"
+        return (
+            f"Provider '{unavailable}' is configured but did not start. Check "
+            f"its credentials ('/config set-provider {unavailable}' or "
+            f"{env_prefix}_API_KEY) and try again."
+        )
 
     # ------------------------------------------------------------------
     # Fallback wiring
