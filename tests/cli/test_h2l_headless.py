@@ -80,6 +80,21 @@ class TestResolveConfig:
         assert cfg.high.provider == "claude"
         assert cfg.low[0].provider == "claude"
 
+    def test_bare_refs_honor_env_default_provider(self, monkeypatch):
+        """Env beats stored config, so a bare ref must follow the env default.
+
+        Otherwise OMNIMANCER_DEFAULT_PROVIDER=bedrock still sends bare refs
+        to the stored default and H2L fails trying to initialize a provider
+        the user is not using.
+        """
+        monkeypatch.setenv("OMNIMANCER_DEFAULT_PROVIDER", "bedrock")
+        monkeypatch.setenv("OMNIMANCER_BEDROCK_API_KEY", "bedrock-key")
+        cfg = resolve_h2l_config(
+            _config(None), H2LOptions(high="kimi-k2", low=["kimi-k2"])
+        )
+        assert cfg.high.provider == "bedrock"
+        assert cfg.low[0].provider == "bedrock"
+
     def test_missing_high(self):
         with pytest.raises(H2LConfigError) as exc:
             resolve_h2l_config(_config(None), H2LOptions(low=["gateway:qwen"]))

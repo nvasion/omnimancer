@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..core.env_loader import apply_env_overrides
 from ..core.models import ChatResponse, Config
 from ..h2l.models import (
     H2LConfig,
@@ -48,13 +49,28 @@ class H2LOptions:
     plan_iterations: Optional[int] = None
 
 
+def _effective_default_provider(config: Config) -> str:
+    """The default provider a bare ref should use.
+
+    Environment beats stored config everywhere else, so a bare ``--high
+    kimi-k2`` under OMNIMANCER_DEFAULT_PROVIDER=bedrock must resolve to
+    bedrock rather than to the stale entry on disk.
+    """
+    try:
+        effective = apply_env_overrides(config)
+    except Exception as exc:  # overrides must never block a run
+        logger.debug("H2L: env overrides unavailable: %s", exc)
+        effective = config
+    return getattr(effective, "default_provider", "") or ""
+
+
 def resolve_h2l_config(config: Config, options: H2LOptions) -> H2LConfig:
     """Flags override the config block field by field; never persisted."""
     base: Dict[str, Any] = {}
     block = getattr(config, "h2l", None)
     if block is not None:
         base = block.model_dump()
-    default_provider = getattr(config, "default_provider", "") or ""
+    default_provider = _effective_default_provider(config)
 
     if options.high:
         base["high"] = parse_model_ref(options.high, default_provider)

@@ -7,12 +7,15 @@ and inject them into provider configurations.
 
 import logging
 import os
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional, Set
 
 if TYPE_CHECKING:
     from .models import Config
 
 logger = logging.getLogger(__name__)
+
+# Namespaced env-var suffixes recognized for every provider.
+ENV_VAR_SUFFIXES = ("API_KEY", "BASE_URL", "MODEL")
 
 # Mapping of provider names to (conventional) environment variable names for API keys.
 ENV_VAR_MAPPING = {
@@ -35,6 +38,31 @@ DEFAULT_PROVIDER_ENV_VAR = "OMNIMANCER_DEFAULT_PROVIDER"
 def _omnimancer_env_prefix(provider_name: str) -> str:
     """Build the OMNIMANCER_<PROVIDER>_ env var prefix for a provider."""
     return "OMNIMANCER_" + provider_name.upper().replace("-", "_")
+
+
+def env_configured_provider_names() -> Set[str]:
+    """Registered provider names that have OMNIMANCER_<PROVIDER>_* vars set.
+
+    ``ENV_VAR_MAPPING`` only lists providers that have a conventional
+    single-key variable, so without this a namespaced key for anything else
+    (bedrock, vertex, openai-compatible) was never even considered as a
+    candidate and was silently ignored. The registry is the source of names so
+    the underscore-to-hyphen mapping stays unambiguous.
+    """
+    try:
+        from ..providers.factory import ProviderFactory
+
+        registered = set(ProviderFactory.get_available_providers())
+    except Exception as exc:  # discovery must never block config loading
+        logger.debug(f"Provider registry unavailable for env discovery: {exc}")
+        return set()
+
+    names: Set[str] = set()
+    for name in registered:
+        prefix = _omnimancer_env_prefix(name)
+        if any(os.environ.get(f"{prefix}_{suffix}") for suffix in ENV_VAR_SUFFIXES):
+            names.add(name)
+    return names
 
 
 def load_provider_env_overrides(provider_name: str) -> Dict[str, str]:
@@ -176,8 +204,13 @@ def apply_env_overrides(config: "Config") -> "Config":
     effective = config.model_copy(deep=True)
 
     # Consider providers already configured, those with a recognized API-key
-    # env var, plus any provider named by OMNIMANCER_DEFAULT_PROVIDER.
-    candidates = set(effective.providers.keys()) | set(ENV_VAR_MAPPING.keys())
+    # env var or a namespaced OMNIMANCER_<PROVIDER>_* var, plus any provider
+    # named by OMNIMANCER_DEFAULT_PROVIDER.
+    candidates = (
+        set(effective.providers.keys())
+        | set(ENV_VAR_MAPPING.keys())
+        | env_configured_provider_names()
+    )
     default_override = os.environ.get(DEFAULT_PROVIDER_ENV_VAR)
     if default_override:
         candidates.add(default_override)
