@@ -485,6 +485,37 @@ class TestWaitHeartbeat:
         assert "waiting on planner x (30s)" in err.getvalue()
 
 
+class TestModelDropped:
+    ERROR = "AWS Bedrock API error: This model doesn't support tool use."
+
+    async def test_stream_json_model_dropped_event(self):
+        from omnimancer.cli.h2l_headless import HeadlessPresenter
+
+        emitter = HeadlessOutputEmitter(OutputFormat.STREAM_JSON, "s")
+        buf = StringIO()
+        emitter._stdout = buf
+        await HeadlessPresenter(emitter, text_mode=False).on_model_dropped(
+            LOW, self.ERROR
+        )
+        line = json.loads(buf.getvalue())
+        assert line["subtype"] == "model_dropped"
+        assert line["provider"] == "gateway" and line["model"] == "qwen"
+        assert line["error"] == self.ERROR
+
+    async def test_text_mode_warning_on_stderr(self):
+        from omnimancer.cli.h2l_headless import HeadlessPresenter
+
+        emitter = HeadlessOutputEmitter(OutputFormat.TEXT, "s")
+        out, err = StringIO(), StringIO()
+        emitter._stdout, emitter._stderr = out, err
+        await HeadlessPresenter(emitter, text_mode=True).on_model_dropped(
+            LOW, self.ERROR
+        )
+        assert out.getvalue() == ""
+        assert "gateway:qwen" in err.getvalue()
+        assert "cannot call tools" in err.getvalue()
+
+
 class TestPlannerProgress:
     async def test_stream_json_planner_tool_event_keys(self):
         from omnimancer.cli.h2l_headless import HeadlessPresenter

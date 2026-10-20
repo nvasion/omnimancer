@@ -9,6 +9,7 @@ carries the diff, verify output, and out-of-scope files the judge needs.
 
 from __future__ import annotations
 
+import difflib
 import logging
 import re
 import subprocess
@@ -41,6 +42,8 @@ class WorkerRunner:
         self.cwd = Path(cwd)
         # Overridable for tests; the real handler routes through the gate.
         self._tool_handler_factory: Callable[[Any], Any] = ToolHandler
+        # Story id -> {path: content or None}, taken before its first attempt.
+        self._baselines: Dict[str, Dict[str, Optional[str]]] = {}
 
     async def run(
         self,
@@ -102,6 +105,8 @@ class WorkerRunner:
         )
 
         agent_id = agent_id or f"h2l-{story.id}-{uuid.uuid4().hex[:8]}"
+        if story.id not in self._baselines:
+            self._baselines[story.id] = {p: _read_text(p) for p in story.files}
         before = self._dirty_files()
         status = 1
         with fleet_events.agent_context(agent_id, run_id):
@@ -247,6 +252,9 @@ class WorkerRunner:
     def _capture_changes(
         self, report: WorkerReport, story: Story, before: Dict[str, str]
     ) -> None:
+        if self._repo_root() is None:
+            self._capture_from_baseline(report, story)
+            return
         after = self._dirty_files()
         scope = set(story.files)
         new_or_changed = {p for p in after if p not in before or p in scope}
@@ -267,6 +275,48 @@ class WorkerRunner:
         if proc is None:
             return f"[git diff unavailable for {path}]"
         return proc.stdout
+
+    def _capture_from_baseline(self, report: WorkerReport, story: Story) -> None:
+        """Without git, diff the story's files against its first-attempt snapshot.
+
+        The snapshot stands in for HEAD, so retries accumulate as they do under
+        git. Out-of-scope writes cannot be seen this way; the tool-level scope
+        check is the guard there.
+        """
+        baseline = self._baselines.get(story.id, {})
+        changed: List[str] = []
+        chunks: List[str] = []
+        for path in story.files:
+            old, new = baseline.get(path), _read_text(path)
+            if old != new:
+                changed.append(path)
+                chunks.append(_unified_diff(path, old, new))
+        report.files_changed = changed
+        report.diff = "\n".join(chunks)
+
+
+def _read_text(path: str) -> Optional[str]:
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def _unified_diff(path: str, old: Optional[str], new: Optional[str]) -> str:
+    fromfile = path if old is not None else "/dev/null"
+    tofile = path if new is not None else "/dev/null"
+    lines = list(
+        difflib.unified_diff(
+            (old or "").splitlines(),
+            (new or "").splitlines(),
+            fromfile=fromfile,
+            tofile=tofile,
+            lineterm="",
+        )
+    )
+    # An empty file created or removed has no hunks; keep the header so the
+    # change is still visible.
+    return "\n".join(lines or [f"--- {fromfile}", f"+++ {tofile}"])
 
 
 def worker_tool_names(tools: List[ToolDefinition]) -> List[str]:

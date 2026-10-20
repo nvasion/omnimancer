@@ -10,6 +10,7 @@ import pytest
 from omnimancer.core.agent.status_core import EventType
 from omnimancer.core.models import ChatResponse, ToolCall, ToolResult
 from omnimancer.events import emitter as fleet_events
+from omnimancer.h2l.judge import Judge
 from omnimancer.h2l.models import H2LModelRef, Story
 from omnimancer.h2l.worker import WorkerRunner
 
@@ -471,3 +472,105 @@ class TestWorkerGitCapture:
         )
         assert report.files_outside_scope == []
         assert report.diff == ""
+
+
+class TestWorkerCaptureWithoutGit:
+    """Outside a git repo the scoped files themselves are the evidence."""
+
+    def _no_git_runner(self, tmp_path, th):
+        runner = _runner(tmp_path, th)
+        runner._repo_root = lambda: None
+        return runner
+
+    def _writing_provider(self, target):
+        return _provider(
+            [
+                _resp(
+                    tool_calls=[
+                        ToolCall(
+                            name="Write",
+                            arguments={"file_path": str(target), "content": "x"},
+                        )
+                    ]
+                ),
+                _resp("done"),
+            ]
+        )
+
+    def _writer(self, target, text):
+        async def _mutate(tc):
+            target.write_text(text)
+            return ToolResult(content="Wrote")
+
+        th = MagicMock()
+        th.execute_tool_call = AsyncMock(side_effect=_mutate)
+        return th
+
+    async def test_new_in_scope_file_counts_as_change(self, tmp_path):
+        target = tmp_path / "fresh.py"
+        runner = self._no_git_runner(tmp_path, self._writer(target, "print('new')\n"))
+        story = _story(tmp_path, files=[str(target)])
+        report = await runner.run(
+            story,
+            REF,
+            self._writing_provider(target),
+            worker_tools=["Write"],
+            allow_read=False,
+            max_iterations=5,
+            run_id="r",
+        )
+        assert report.files_changed == [str(target)]
+        assert "+print('new')" in report.diff
+        assert Judge.deterministic(story, report) is None
+
+    async def test_edit_to_existing_file_shows_both_sides(self, tmp_path):
+        target = tmp_path / "a.py"
+        target.write_text("x = 1\n")
+        runner = self._no_git_runner(tmp_path, self._writer(target, "x = 2\n"))
+        report = await runner.run(
+            _story(tmp_path, files=[str(target)]),
+            REF,
+            self._writing_provider(target),
+            worker_tools=["Write"],
+            allow_read=False,
+            max_iterations=5,
+            run_id="r",
+        )
+        assert "-x = 1" in report.diff and "+x = 2" in report.diff
+
+    async def test_untouched_file_is_no_change(self, tmp_path):
+        target = tmp_path / "a.py"
+        target.write_text("x = 1\n")
+        runner = self._no_git_runner(tmp_path, _tool_handler())
+        report = await runner.run(
+            _story(tmp_path, files=[str(target)]),
+            REF,
+            _provider([_resp("done")]),
+            worker_tools=["Write"],
+            allow_read=False,
+            max_iterations=5,
+            run_id="r",
+        )
+        assert report.files_changed == []
+        assert report.diff == ""
+
+    async def test_retry_rewriting_same_content_still_counts(self, tmp_path):
+        # Like git's diff against HEAD, the baseline is the story's start, not
+        # the attempt's: a retry that rewrites attempt 1's file is not "no
+        # changes made".
+        target = tmp_path / "fresh.py"
+        runner = self._no_git_runner(tmp_path, self._writer(target, "print('new')\n"))
+        story = _story(tmp_path, files=[str(target)])
+        for attempt in (1, 2):
+            report = await runner.run(
+                story,
+                REF,
+                self._writing_provider(target),
+                worker_tools=["Write"],
+                allow_read=False,
+                max_iterations=5,
+                run_id="r",
+                attempt=attempt,
+            )
+        assert report.files_changed == [str(target)]
+        assert "+print('new')" in report.diff

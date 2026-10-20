@@ -15,7 +15,7 @@ from omnimancer.h2l.models import (
     Verdict,
     WorkerReport,
 )
-from omnimancer.h2l.orchestrator import H2LRun, PlanDecision
+from omnimancer.h2l.orchestrator import H2LRun, PlanDecision, matches_no_tool_support
 from omnimancer.h2l.planner import PlanResult
 from omnimancer.h2l.refs import ResolvedTiers
 
@@ -77,6 +77,9 @@ class RecordingPresenter:
     async def on_escalation(self, story, outcome):
         self.events.append(("escalation", story.id))
         return self._escalate
+
+    async def on_model_dropped(self, ref, error):
+        self.events.append(("dropped", ref.label, error))
 
     async def on_done(self, summary):
         self.events.append(("done", summary.passed))
@@ -415,6 +418,103 @@ class TestEscalation:
         summary = await run.run_plan(_plan(tmp_path, _story(tmp_path, "S1")))
         assert summary.stories[0].state == StoryState.PASSED
         assert len(worker.calls) == 2
+
+
+TOOLLESS = "AWS Bedrock API error: This model doesn't support tool use."
+
+
+def _toolless(ref=LOW_A):
+    return WorkerReport(story_id="S1", worker=ref, success=False, error=TOOLLESS)
+
+
+class TestToollessLowModel:
+    def test_matcher_recognises_vendor_messages(self):
+        assert matches_no_tool_support(TOOLLESS)
+        assert matches_no_tool_support("llama3 does not support tools")
+        assert matches_no_tool_support("No endpoints found that support tool use")
+        assert matches_no_tool_support("tool calling is not supported for model x")
+        assert not matches_no_tool_support("429 rate limit exceeded")
+        assert not matches_no_tool_support("max_iterations")
+        assert not matches_no_tool_support("")
+
+    async def test_dropped_from_pool_and_retry_not_spent(self, tmp_path):
+        worker = FakeWorker([_toolless()])
+        judge = FakeJudge()
+        run = _run(
+            tmp_path,
+            _config(max_retries=0, escalation="block"),
+            RecordingPresenter(),
+            worker,
+            judge,
+        )
+        summary = await run.run_plan(
+            _plan(tmp_path, _story(tmp_path, "S1"), _story(tmp_path, "S2"))
+        )
+        assert summary.all_passed
+        assert [c[1] for c in worker.calls] == ["gateway:a", "gateway:b", "gateway:b"]
+        # The model failed, not the story: attempt 1 is retried, not spent,
+        # and the judge never sees the tool-less attempt.
+        assert [c[3] for c in worker.calls[:2]] == [1, 1]
+        assert summary.stories[0].attempts == 1
+        assert summary.stories[0].verdicts and len(judge.calls) == 2
+
+    async def test_presenter_told_once(self, tmp_path):
+        presenter = RecordingPresenter()
+        worker = FakeWorker([_toolless()])
+        run = _run(tmp_path, _config(), presenter, worker, FakeJudge())
+        await run.run_plan(
+            _plan(tmp_path, _story(tmp_path, "S1"), _story(tmp_path, "S2"))
+        )
+        dropped = [e for e in presenter.events if e[0] == "dropped"]
+        assert dropped == [("dropped", "gateway:a", TOOLLESS)]
+
+    async def test_no_low_left_goes_to_high(self, tmp_path):
+        worker = FakeWorker([_toolless(LOW_A), _toolless(LOW_B)])
+        run = _run(
+            tmp_path,
+            _config(max_retries=2, escalation="high"),
+            RecordingPresenter(),
+            worker,
+            FakeJudge(),
+        )
+        summary = await run.run_plan(_plan(tmp_path, _story(tmp_path, "S1")))
+        assert [c[1] for c in worker.calls] == ["gateway:a", "gateway:b", "claude:opus"]
+        assert summary.stories[0].state == StoryState.PASSED
+        assert summary.stories[0].reason == "escalated_to_high"
+
+    async def test_no_low_left_blocks_under_block_policy(self, tmp_path):
+        worker = FakeWorker([_toolless(LOW_A), _toolless(LOW_B)])
+        run = _run(
+            tmp_path,
+            _config(max_retries=2, escalation="block"),
+            RecordingPresenter(),
+            worker,
+            FakeJudge(),
+        )
+        summary = await run.run_plan(
+            _plan(tmp_path, _story(tmp_path, "S1"), _story(tmp_path, "S2"))
+        )
+        by_id = {s.id: s for s in summary.stories}
+        assert by_id["S1"].state == StoryState.BLOCKED
+        assert by_id["S1"].reason == "no_tool_capable_low_model"
+        assert by_id["S2"].reason == "no_tool_capable_low_model"
+        assert len(worker.calls) == 2
+
+    async def test_retry_answer_with_no_low_left_blocks(self, tmp_path):
+        # "retry" has no model to run on; it must not loop back to the prompt.
+        presenter = RecordingPresenter(escalate="retry")
+        worker = FakeWorker([_toolless(LOW_A), _toolless(LOW_B)])
+        run = _run(
+            tmp_path,
+            _config(max_retries=0, escalation="ask"),
+            presenter,
+            worker,
+            FakeJudge(),
+        )
+        summary = await run.run_plan(_plan(tmp_path, _story(tmp_path, "S1")))
+        assert summary.stories[0].state == StoryState.BLOCKED
+        assert summary.stories[0].reason == "no_tool_capable_low_model"
+        assert presenter.events.count(("escalation", "S1")) == 1
 
 
 class TestCancellationAndErrors:

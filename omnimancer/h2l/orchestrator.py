@@ -18,7 +18,17 @@ import logging
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+)
 
 from ..core.agent.tool_definitions import CODING_AGENT_TOOLS
 from ..core.rate_limit_fallback import matches_rate_limit
@@ -48,6 +58,32 @@ _current_story: contextvars.ContextVar[str] = contextvars.ContextVar(
 )
 
 _TERMINAL_BAD = (StoryState.BLOCKED, StoryState.SKIPPED, StoryState.CANCELLED)
+
+
+# Vendor wording for "this model cannot call tools" (Bedrock, Ollama,
+# OpenRouter, OpenAI-compatible gateways).
+_NO_TOOL_PATTERNS: Tuple[str, ...] = (
+    "support tool use",
+    "does not support tools",
+    "tool calling is not supported",
+    "tool use is not supported",
+    "does not support function calling",
+    "function calling is not supported",
+)
+
+
+def matches_no_tool_support(error: str) -> bool:
+    """True when *error* says the model itself cannot call tools."""
+    lowered = error.lower()
+    return any(p in lowered for p in _NO_TOOL_PATTERNS)
+
+
+# Returned by ``_attempt`` when the model, not the story, failed: the attempt
+# is retried on another model without spending a retry or consulting the judge.
+_MODEL_DROPPED = Verdict(
+    story_id="", passed=False, failures=["model cannot call tools"]
+)
+_NO_LOW_MODEL = "no_tool_capable_low_model"
 
 
 @dataclass
@@ -100,6 +136,8 @@ class H2LRun:
         self._stop_cause = "done"
         self._stopped = False
         self._pool_index = 0
+        # Labels of low models that reported they cannot call tools.
+        self._dropped: Set[str] = set()
         # Surfaces turn this off when Bash would only be denied (headless
         # without --dangerously-skip-permissions).
         self.planner_bash = True
@@ -299,30 +337,39 @@ class H2LRun:
         feedback: Optional[str] = None
         attempt = 0
         while True:
-            attempt += 1
-            ref, provider = self._next_ref()
-            verdict = await self._attempt(story, ref, provider, attempt, feedback)
-            if verdict is None:
-                return  # cancelled or the run stopped
-            if verdict.passed:
-                outcome.state = StoryState.PASSED
-                outcome.score = verdict.score
-                outcome.model = ref.label
-                return
-            feedback = verdict.feedback
-            if attempt < max_attempts:
-                continue
+            # None once every low model has been dropped for lacking tools;
+            # only the escalation policy is left then.
+            picked = self._next_ref()
+            if picked is not None:
+                attempt += 1
+                ref, provider = picked
+                verdict = await self._attempt(story, ref, provider, attempt, feedback)
+                if verdict is None:
+                    return  # cancelled or the run stopped
+                if verdict is _MODEL_DROPPED:
+                    attempt -= 1  # the model failed, not the story
+                    continue
+                if verdict.passed:
+                    outcome.state = StoryState.PASSED
+                    outcome.score = verdict.score
+                    outcome.model = ref.label
+                    return
+                feedback = verdict.feedback
+                if attempt < max_attempts:
+                    continue
             policy: str = self.config.escalation
             if policy == "ask":
                 policy = await self.presenter.on_escalation(story, outcome)
-            if policy == "retry":
+            if policy == "retry" and picked is not None:
                 max_attempts += 1
                 continue
             if policy == "high":
                 await self._escalate_high(story, outcome, attempt + 1, feedback)
                 return
             outcome.state = StoryState.BLOCKED
-            outcome.reason = "retries_exhausted"
+            outcome.reason = (
+                "retries_exhausted" if picked is not None else _NO_LOW_MODEL
+            )
             return
 
     async def _attempt(
@@ -372,6 +419,10 @@ class H2LRun:
             outcome.state = StoryState.PENDING
             outcome.attempts = attempt - 1
             return None
+        if not report.success and matches_no_tool_support(report.error or ""):
+            outcome.attempts = attempt - 1
+            await self._drop_model(ref, report.error or "")
+            return _MODEL_DROPPED
 
         with self._high_context():
             verdict: Verdict = await judge.check(story, report)
@@ -451,12 +502,32 @@ class H2LRun:
 
         return observe
 
-    def _next_ref(self) -> Tuple[H2LModelRef, Any]:
+    def _next_ref(self) -> Optional[Tuple[H2LModelRef, Any]]:
         tiers = self._ensure_tiers()
-        pool = list(zip(self.config.low, tiers.low))
+        pool = [
+            (ref, provider)
+            for ref, provider in zip(self.config.low, tiers.low)
+            if ref.label not in self._dropped
+        ]
+        if not pool:
+            return None
         ref, provider = pool[self._pool_index % len(pool)]
         self._pool_index += 1
         return ref, provider
+
+    async def _drop_model(self, ref: H2LModelRef, error: str) -> None:
+        """Take a tool-less low model out of rotation; tell the surface once."""
+        if ref.label in self._dropped:
+            return
+        self._dropped.add(ref.label)
+        logger.info("H2L dropped %s, which cannot call tools: %s", ref.label, error)
+        hook = getattr(self.presenter, "on_model_dropped", None)
+        if hook is None:
+            return
+        try:
+            await hook(ref, error)
+        except Exception as exc:  # presentation must never break the run
+            logger.debug("H2L on_model_dropped presenter hook failed: %s", exc)
 
     def _add_usage(self, tier: str, usage: UsageTotals) -> None:
         self.usage_by_tier[tier] = self.usage_by_tier[tier].add(usage)

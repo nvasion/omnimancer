@@ -297,6 +297,12 @@ class TestTUIPresenter:
         outcome = StoryOutcome(id="S1", title="one", attempts=3)
         assert await presenter.on_escalation(PLAN.stories[0], outcome) == expected
 
+    async def test_model_dropped_prints_warning(self):
+        presenter, cli = self._presenter([])
+        await presenter.on_model_dropped(LOW, "This model doesn't support tool use.")
+        printed = cli.console.print.call_args[0][0]
+        assert LOW.label in printed and "cannot call tools" in printed
+
     async def test_planner_progress_prints(self):
         from omnimancer.core.models import ToolCall, ToolResult
 
