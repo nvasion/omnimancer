@@ -232,6 +232,16 @@ class HeadlessPresenter:
             + (f" ({'; '.join(verdict.failures)})" if verdict.failures else "")
         )
 
+    async def on_model_dropped(self, ref: H2LModelRef, error: str) -> None:
+        self.emitter.emit_h2l(
+            "model_dropped",
+            {"provider": ref.provider, "model": ref.model, "error": error},
+        )
+        self._progress(
+            f"dropped {ref.label}: it cannot call tools, so the remaining low "
+            f"models take its stories ({error})"
+        )
+
     async def on_escalation(self, story: Story, outcome: StoryOutcome) -> str:
         return "high"
 

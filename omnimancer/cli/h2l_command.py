@@ -251,6 +251,12 @@ class TUIPresenter:
                 f"{verdict.judge}): {failures}"
             )
 
+    async def on_model_dropped(self, ref: H2LModelRef, error: str) -> None:
+        self.console.print(
+            f"  [yellow]Dropped {ref.label}: it cannot call tools, so the "
+            f"remaining low models take its stories[/yellow] [dim]({error})[/dim]"
+        )
+
     async def on_escalation(self, story: Story, outcome: StoryOutcome) -> str:
         while True:
             answer = (
